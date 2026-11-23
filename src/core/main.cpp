@@ -28,9 +28,11 @@
 #include "versioninfo.h"
 
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QLocale>
+#include <QScreen>
 #include <QTimer>
 #include <QTranslator>
 #include <QApplication>
@@ -850,16 +852,41 @@ int main( int argc, char * * argv )
 		mainWindow->show();
 		if( fullscreen )
 		{
-			// Let the window manager map the window and process the resulting
-			// resize before asking for the maximized state. Requesting it
-			// immediately can leave LMMS marked as maximized while the
-			// compositor still uses the pre-maximize geometry, especially on
-			// Wayland. Processing events again afterwards makes sure the
-			// project below restores its sub-window layout against the final
-			// maximized workspace size.
+			// Let the window manager map the window before requesting the
+			// maximized state. Then wait until the compositor has actually
+			// applied the new geometry. Without this, Qt may report the
+			// window as maximized while it still has its pre-maximize size,
+			// and the project below would restore its sub-window layout
+			// against the wrong workspace size.
 			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 			mainWindow->showMaximized();
-			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+			const auto available = mainWindow->screen()->availableGeometry();
+			const auto minWidth = available.width() * 4 / 5;
+			const auto minHeight = available.height() * 4 / 5;
+
+			QElapsedTimer timer;
+			timer.start();
+			while (timer.elapsed() < 1000
+				&& (!mainWindow->isMaximized()
+					|| mainWindow->width() < minWidth
+					|| mainWindow->height() < minHeight))
+			{
+				QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 10);
+			}
+
+			// If the window manager still did not apply the maximized
+			// geometry, retry once. This is equivalent to the manual
+			// "restore, then maximize again" workaround and only runs when
+			// the first attempt did not take effect.
+			if (!mainWindow->isMaximized()
+				|| mainWindow->width() < minWidth
+				|| mainWindow->height() < minHeight)
+			{
+				mainWindow->showNormal();
+				mainWindow->showMaximized();
+				QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+			}
 		}
 
 		// Handle macOS-style FileOpen QEvents
