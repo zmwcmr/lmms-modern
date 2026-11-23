@@ -28,6 +28,7 @@
 #include "versioninfo.h"
 
 #include <QDebug>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QLocale>
 #include <QTimer>
@@ -844,11 +845,21 @@ int main( int argc, char * * argv )
 		// first show the Main Window and then try to load given file
 
 		// [Settel] workaround: showMaximized() doesn't work with
-		// FVWM2 unless the window is already visible -> show() first
-		getGUI()->mainWindow()->show();
+		// FVWM2 unless the window is already visible -> show() first.
+		auto* mainWindow = getGUI()->mainWindow();
+		mainWindow->show();
 		if( fullscreen )
 		{
-			getGUI()->mainWindow()->showMaximized();
+			// Let the window manager map the window and process the resulting
+			// resize before asking for the maximized state. Requesting it
+			// immediately can leave LMMS marked as maximized while the
+			// compositor still uses the pre-maximize geometry, especially on
+			// Wayland. Processing events again afterwards makes sure the
+			// project below restores its sub-window layout against the final
+			// maximized workspace size.
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+			mainWindow->showMaximized();
+			QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 		}
 
 		// Handle macOS-style FileOpen QEvents
