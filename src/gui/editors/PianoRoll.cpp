@@ -3322,12 +3322,13 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	if (!hasValidMidiClip())
 	{
 		const auto icon = embed::getIconPixmap("pr_no_clip");
-		const int x = (width() - icon.width()) / 2;
-		const int y = (height() - icon.height()) / 2;
+		const auto iconSize = embed::logicalSize(icon);
+		const int x = (width() - iconSize.width()) / 2;
+		const int y = (height() - iconSize.height()) / 2;
 		p.drawPixmap(x, y, icon);
 
 		p.setPen(QApplication::palette().color(QPalette::Active, QPalette::Text));
-		QRect textRect(0, y + icon.height() + 5, width(), 30);
+		QRect textRect(0, y + iconSize.height() + 5, width(), 30);
 		p.drawText(textRect, Qt::AlignHCenter | Qt::AlignTop,
 			tr("Double-click on an instrument clip in Song Editor to open it here"));
 		return;

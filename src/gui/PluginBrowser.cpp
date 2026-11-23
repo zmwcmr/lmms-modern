@@ -242,9 +242,10 @@ void PluginDescWidget::paintEvent( QPaintEvent * )
 	// Draw the rest
 	const int s = 16 + ( 32 * ( qBound( 24, height(), 60 ) - 24 ) ) /
 								( 60 - 24 );
-	const QSize logo_size( s, s );
-	QPixmap logo = m_logo.scaled( logo_size, Qt::KeepAspectRatio,
+	const qreal dpr = m_logo.devicePixelRatio();
+	QPixmap logo = m_logo.scaled( QSize( s, s ) * dpr, Qt::KeepAspectRatio,
 						Qt::SmoothTransformation );
+	logo.setDevicePixelRatio( dpr );
 	p.drawPixmap( 4, 4, logo );
 
 	QFont f = p.font();
@@ -254,7 +255,7 @@ void PluginDescWidget::paintEvent( QPaintEvent * )
 	}
 
 	p.setFont( f );
-	p.drawText( 10 + logo_size.width(), 15, m_pluginKey.displayName());
+	p.drawText( 10 + s, 15, m_pluginKey.displayName());
 }
 
 

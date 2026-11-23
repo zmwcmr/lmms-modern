@@ -159,11 +159,11 @@ QMenu::indicator {
 }
 
 QMenu::indicator:checked {
-	image: url("resources:apply.png");
+	image: url("resources:apply_css.png");
 }
 
 QMenu::indicator:selected {
-	image: url("resources:apply-selected.png");
+	image: url("resources:apply-selected_css.png");
 	border: 1px solid #101213;
 	background-color: #101213;
 }
