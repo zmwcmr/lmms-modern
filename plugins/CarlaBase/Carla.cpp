@@ -38,6 +38,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QCompleter>
+#include <QDebug>
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -153,6 +154,7 @@ CarlaInstrument::CarlaInstrument(InstrumentTrack* const instrumentTrack, const D
     : Instrument(instrumentTrack, descriptor, nullptr, Flag::IsSingleStreamed | Flag::IsMidiBased | Flag::IsNotBendable),
       kIsPatchbay(isPatchbay),
       fHandle(nullptr),
+      fHost{},
       fDescriptor(isPatchbay ? carla_get_native_patchbay_plugin() : carla_get_native_rack_plugin()),
       fMidiEventCount(0),
       m_paramModels()
@@ -160,6 +162,12 @@ CarlaInstrument::CarlaInstrument(InstrumentTrack* const instrumentTrack, const D
     fHost.handle      = this;
     fHost.uiName      = nullptr;
     fHost.uiParentId  = 0;
+
+    if (fDescriptor == nullptr)
+    {
+        qWarning() << "Carla native plugin library is not available";
+        return;
+    }
 
     // carla/resources contains PyQt scripts required for launch
     QDir path(carla_get_library_folder());
@@ -188,9 +196,12 @@ CarlaInstrument::CarlaInstrument(InstrumentTrack* const instrumentTrack, const D
     fTimeInfo.bbt.valid = true; // always valid
 
     fHandle = fDescriptor->instantiate(&fHost);
-    Q_ASSERT(fHandle != nullptr);
-
-    if (fHandle != nullptr && fDescriptor->activate != nullptr)
+    if (fHandle == nullptr)
+    {
+        qWarning() << "Carla failed to instantiate its native plugin";
+        return;
+    }
+    if (fDescriptor->activate != nullptr)
         fDescriptor->activate(fHandle);
 
     // we need a play-handle which cares for calling play()
@@ -380,10 +391,14 @@ void CarlaInstrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 void CarlaInstrument::refreshParams(bool init)
 {
 	m_paramGroupCount = 0;
-	if (fDescriptor->get_parameter_count != nullptr &&
-		fDescriptor->get_parameter_info  != nullptr &&
-		fDescriptor->get_parameter_value != nullptr &&
-		fDescriptor->set_parameter_value != nullptr)
+	if (fHandle == nullptr || fDescriptor == nullptr
+		|| fDescriptor->get_parameter_count == nullptr
+		|| fDescriptor->get_parameter_info  == nullptr
+		|| fDescriptor->get_parameter_value == nullptr
+		|| fDescriptor->set_parameter_value == nullptr)
+	{
+		return;
+	}
 	{
 		QList<QString> completerData;
 		QList<QString> groups; // used to count no. groups.
@@ -392,6 +407,7 @@ void CarlaInstrument::refreshParams(bool init)
 		for (uint32_t i=0; i < paramCount; ++i)
 		{
 			const NativeParameter* paramInfo(fDescriptor->get_parameter_info(fHandle, i));
+			if (paramInfo == nullptr || i >= m_paramModels.size()) { continue; }
 
 			m_paramModels[i]->setOutput((paramInfo->hints & NATIVE_PARAMETER_IS_OUTPUT));
 			m_paramModels[i]->setEnabled((paramInfo->hints & NATIVE_PARAMETER_IS_ENABLED));
@@ -452,6 +468,11 @@ void CarlaInstrument::clearParamModels()
 
 void CarlaInstrument::paramModelChanged(uint32_t index)
 { // Update Carla param (LMMS -> Carla)
+	if (fDescriptor == nullptr || index >= m_paramModels.size() || m_paramModels[index] == nullptr)
+	{
+		return;
+	}
+
 	if (!m_paramModels[index]->isOutput())
 	{
 		if (fDescriptor->set_parameter_value != nullptr)
@@ -470,6 +491,11 @@ void CarlaInstrument::paramModelChanged(uint32_t index)
 
 void CarlaInstrument::updateParamModel(uint32_t index)
 { // Called on param changed (Carla -> LMMS)
+	if (fDescriptor == nullptr || index >= m_paramModels.size() || m_paramModels[index] == nullptr)
+	{
+		return;
+	}
+
 	if (fDescriptor->get_parameter_value != nullptr)
 	{
 		m_paramModels[index]->setValue(
@@ -573,6 +599,11 @@ bool CarlaInstrument::handleMidiEvent(const MidiEvent& event, const TimePos&, f_
 
 gui::PluginView* CarlaInstrument::instantiateView(QWidget* parent)
 {
+    if (fDescriptor == nullptr)
+    {
+        return nullptr;
+    }
+
 // Disable plugin focus per https://bugreports.qt.io/browse/QTBUG-30181
 #ifndef CARLA_OS_MAC
     if (QWidget* const window = parent->window())
@@ -593,7 +624,11 @@ gui::PluginView* CarlaInstrument::instantiateView(QWidget* parent)
 
 void CarlaInstrument::sampleRateChanged()
 {
-    fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_SAMPLE_RATE_CHANGED, 0, 0, nullptr, handleGetSampleRate());
+    if (fHandle != nullptr && fDescriptor != nullptr
+        && fDescriptor->dispatcher != nullptr)
+    {
+        fDescriptor->dispatcher(fHandle, NATIVE_PLUGIN_OPCODE_SAMPLE_RATE_CHANGED, 0, 0, nullptr, handleGetSampleRate());
+    }
 }
 
 // -------------------------------------------------------------------
