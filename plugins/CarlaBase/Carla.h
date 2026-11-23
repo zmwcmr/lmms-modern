@@ -35,6 +35,7 @@
 #include <QCloseEvent>
 #include <QDomElement>
 #include <QMutex>
+#include <QPointer>
 #include <QRegularExpression>
 
 // carla/source/includes
@@ -231,6 +232,9 @@ private:
     QCompleter* m_paramsCompleter;
     QStringListModel* m_completerModel;
 
+    //! The currently instantiated plugin view, if any.
+    QPointer<gui::CarlaInstrumentView> m_view;
+
     friend class gui::CarlaInstrumentView;
     friend class gui::CarlaParamsView;
 };
@@ -302,6 +306,16 @@ public:
     CarlaInstrumentView(CarlaInstrument* const instrument, QWidget* const parent);
     ~CarlaInstrumentView() override;
 
+    /**
+     * @brief Detach the view from its instrument before the instrument is destroyed.
+     *
+     * The view is deleted by the instrument window when the instrument changes,
+     * which happens after the old instrument has already been destroyed.  Clear
+     * the native handle and delete any child windows here, while the instrument
+     * still exists, so that no native function is called on a freed handle.
+     */
+    void prepareForInstrumentDeletion();
+
 private slots:
     void toggleUI(bool);
     void uiClosed();
@@ -316,7 +330,8 @@ private:
     const NativePluginDescriptor* fDescriptor;
     int fTimerId;
 
-    CarlaInstrument* const m_carlaInstrument;
+    //! Null once the instrument has been destroyed.
+    CarlaInstrument* m_carlaInstrument;
     QWidget* const m_parent;
 
     QMdiSubWindow* m_paramsSubWindow;

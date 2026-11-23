@@ -297,7 +297,10 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 
 void InstrumentTrackWindow::resizeEvent(QResizeEvent * event) {
 	/* m_instrumentView->resize(QSize(size().width()-1, maxHeight)); */
-	adjustTabSize(m_instrumentView);
+	if (m_instrumentView)
+	{
+		adjustTabSize(m_instrumentView);
+	}
 	adjustTabSize(m_instrumentFunctionsView);
 	adjustTabSize(m_ssView);
 	adjustTabSize(m_effectView);
@@ -461,9 +464,17 @@ void InstrumentTrackWindow::updateName()
 void InstrumentTrackWindow::updateInstrumentView()
 {
 	delete m_instrumentView;
+	m_instrumentView = nullptr;
 	if( m_track->m_instrument != nullptr )
 	{
 		m_instrumentView = m_track->m_instrument->createView( m_tabWidget );
+		if( m_instrumentView == nullptr )
+		{
+			// The plugin could not create a view (e.g. its native backend is
+			// unavailable).  Keep the window usable instead of dereferencing
+			// a null view below.
+			return;
+		}
 		m_tabWidget->addTab( m_instrumentView, tr( "Plugin" ), "plugin_tab", 0 );
 		m_tabWidget->setActiveTab( 0 );
 
