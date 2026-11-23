@@ -420,6 +420,33 @@ IF(WANT_CARLA)
 	IF(NOT CARLA_FOUND)
 		PKG_CHECK_MODULES(CARLA carla-standalone>=1.9.5)
 	ENDIF()
+	# Some distributions install the native library without the pkg-config
+	# file. Look for the library directly before falling back to the dummy
+	# implementation.
+	IF(NOT CARLA_FOUND)
+		FIND_LIBRARY(CARLA_NATIVE_PLUGIN_LIBRARY
+			NAMES carla_native-plugin
+			PATHS
+				/usr/lib/carla
+				/usr/local/lib/carla
+				/usr/lib64/carla
+				/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/carla
+		)
+		IF(CARLA_NATIVE_PLUGIN_LIBRARY)
+			GET_FILENAME_COMPONENT(CARLA_LIBRARY_DIR
+				"${CARLA_NATIVE_PLUGIN_LIBRARY}" DIRECTORY)
+			SET(CARLA_FOUND TRUE)
+			SET(CARLA_LIBRARIES "${CARLA_NATIVE_PLUGIN_LIBRARY}")
+			SET(CARLA_LIBRARY_DIRS "${CARLA_LIBRARY_DIR}")
+			SET(CARLA_RPATH "${CARLA_LIBRARY_DIR}")
+			SET(CARLA_INCLUDE_DIRS
+				"${CMAKE_SOURCE_DIR}/plugins/CarlaBase/carla/source"
+				"${CMAKE_SOURCE_DIR}/plugins/CarlaBase/carla/source/includes"
+				"${CMAKE_SOURCE_DIR}/plugins/CarlaBase/carla/source/utils"
+				"${CMAKE_SOURCE_DIR}/plugins/CarlaBase/carla/source/backend"
+			)
+		ENDIF()
+	ENDIF()
 	IF(CARLA_FOUND)
 		SET(LMMS_HAVE_CARLA TRUE)
 		SET(STATUS_CARLA "OK")
