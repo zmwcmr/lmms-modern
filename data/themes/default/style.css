@@ -248,6 +248,7 @@ lmms--gui--CPULoadWidget {
 	border: none;
 	background: url("resources:cpuload_bg.png");
 	qproperty-stepSize: 1;
+	qproperty-labelColor: white;
 }
 
 /* scrollbar: trough */

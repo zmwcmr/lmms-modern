@@ -25,6 +25,7 @@
 
 
 #include <algorithm>
+#include <QFont>
 #include <QPainter>
 
 #include "AudioEngine.h"
@@ -83,6 +84,16 @@ void CPULoadWidget::paintEvent( QPaintEvent *  )
 	}
 	QPainter p( this );
 	p.drawPixmap( 0, 0, m_temp );
+
+	// The label is drawn as text instead of being baked into the background
+	// bitmap: a 1x raster image gets scaled up on high-DPI screens, which made
+	// the text look blurry. Drawing it with QPainter keeps it sharp at any
+	// device pixel ratio.
+	QFont labelFont = font();
+	labelFont.setPixelSize( height() - 2 );
+	p.setFont( labelFont );
+	p.setPen( m_labelColor );
+	p.drawText( 0, height() - 2, QStringLiteral( "CPU" ) );
 }
 
 
