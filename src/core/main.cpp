@@ -57,6 +57,15 @@
 #endif
 
 #include <csignal>  // To register the signal handler
+#include <cstdio>   // For snprintf in the crash handler
+
+#if defined(__has_include)
+#	if __has_include(<execinfo.h>) && __has_include(<unistd.h>)
+#		define LMMS_HAVE_EXECINFO 1
+#		include <execinfo.h>
+#		include <unistd.h>
+#	endif
+#endif
 
 #include "MainApplication.h"
 #include "ConfigManager.h"
@@ -98,6 +107,76 @@ void sigfpeHandler(int signum)
 	// terminate program
 
 	exit(signum);
+}
+#endif
+
+
+#ifdef LMMS_HAVE_EXECINFO
+// Print a backtrace for fatal signals (assertions call abort(), which raises
+// SIGABRT). This makes crashes visible in the journal even when LMMS was not
+// started from a debugger.
+static volatile std::sig_atomic_t inCrashHandler = 0;
+
+static const char * signalName( int sig )
+{
+	switch( sig )
+	{
+		case SIGABRT: return "SIGABRT";
+		case SIGSEGV: return "SIGSEGV";
+#ifdef SIGBUS
+		case SIGBUS:  return "SIGBUS";
+#endif
+		case SIGILL:  return "SIGILL";
+		case SIGFPE:  return "SIGFPE";
+		default:      return "signal";
+	}
+}
+
+static void crashHandler( int sig )
+{
+	// Avoid recursing if another fatal signal arrives while handling this one
+	if( inCrashHandler )
+	{
+		_exit( 128 + sig );
+	}
+	inCrashHandler = 1;
+
+	char header[128];
+	const int headerLength = std::snprintf( header, sizeof( header ),
+		"\n*** LMMS received %s (%d) - backtrace:\n", signalName( sig ), sig );
+	if( headerLength > 0 )
+	{
+		const size_t n = static_cast<size_t>( headerLength ) < sizeof( header )
+			? static_cast<size_t>( headerLength )
+			: sizeof( header ) - 1;
+		write( STDERR_FILENO, header, n );
+	}
+
+	void * frames[64];
+	const int frameCount = backtrace( frames, 64 );
+	backtrace_symbols_fd( frames, frameCount, STDERR_FILENO );
+
+	static const char tip[] =
+		"*** tip: resolve <lmms>(+0x...) frames with: "
+		"addr2line -f -C -e <lmms-binary> 0x<offset>\n";
+	write( STDERR_FILENO, tip, sizeof( tip ) - 1 );
+	write( STDERR_FILENO, "*** end of backtrace\n", 22 );
+
+	// Restore the default handler and re-raise so the exit status and core
+	// dump behaviour stay the same as without the handler.
+	std::signal( sig, SIG_DFL );
+	std::raise( sig );
+}
+
+static void installCrashHandler()
+{
+	std::signal( SIGABRT, crashHandler );
+	std::signal( SIGSEGV, crashHandler );
+#ifdef SIGBUS
+	std::signal( SIGBUS, crashHandler );
+#endif
+	std::signal( SIGILL, crashHandler );
+	std::signal( SIGFPE, crashHandler );
 }
 #endif
 
@@ -250,6 +329,10 @@ int main( int argc, char * * argv )
 {
 	using namespace lmms;
 
+#ifdef LMMS_HAVE_EXECINFO
+	installCrashHandler();
+#endif
+
 	bool coreOnly = false;
 	bool fullscreen = true;
 	bool exitAfterImport = false;
@@ -366,6 +449,10 @@ int main( int argc, char * * argv )
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
 	// High-DPI scaling is always enabled in Qt >= 6.0
 	QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+	// Qt 5 renders QIcon pixmaps at 1x unless this is set, and the window
+	// compositor then upscales them on HiDPI screens, which makes all icons
+	// look blurry even when they are SVGs. In Qt >= 6.0 this is always on.
+	QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
 	QCoreApplication * app = coreOnly ?
