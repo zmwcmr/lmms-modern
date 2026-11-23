@@ -130,6 +130,8 @@ SongEditor::SongEditor( Song * song ) :
 	m_proportionalSnap( false ),
 	m_scrollBack( false ),
 	m_smoothScroll( ConfigManager::inst()->value( "ui", "smoothscroll" ).toInt() ),
+	m_autoScrollPaused( false ),
+	m_autoScrollResumeTimer( nullptr ),
 	m_mode(EditMode::Draw),
 	m_origin(),
 	m_scrollPos(),
@@ -144,6 +146,19 @@ SongEditor::SongEditor( Song * song ) :
 		m_song->getTimeline(Song::PlayMode::Song),
 		m_currentPosition, this
 	);
+
+	m_autoScrollResumeTimer = new QTimer(this);
+	m_autoScrollResumeTimer->setSingleShot(true);
+	m_autoScrollResumeTimer->setInterval(2000);
+	connect(m_autoScrollResumeTimer, &QTimer::timeout, this, [this]() {
+		// Keep waiting while the user is still holding the scrollbar handle.
+		if (m_leftRightScroll->isSliderDown())
+		{
+			m_autoScrollResumeTimer->start();
+			return;
+		}
+		m_autoScrollPaused = false;
+	});
 	connect(this, &TrackContainerView::positionChanged, m_timeLine, qOverload<>(&QWidget::update));
 	connect(m_timeLine->timeline(), &Timeline::positionChanged, this, &SongEditor::updatePosition);
 	connect( m_timeLine, SIGNAL(regionSelectedFromPixels(int,int)),
@@ -288,6 +303,16 @@ SongEditor::SongEditor( Song * song ) :
 			this, SLOT(updateScrollBar(int)));
 	connect(m_leftRightScroll, SIGNAL(valueChanged(int)),this, SLOT(updateRubberband()));
 	connect(contentWidget()->verticalScrollBar(), SIGNAL(valueChanged(int)),this, SLOT(updateRubberband()));
+
+	// Manual scrolling temporarily takes control away from auto-scroll.
+	// After two seconds without scrollbar interaction, follow the playhead
+	// again instead of immediately snapping back.
+	connect(m_leftRightScroll, &QAbstractSlider::sliderPressed,
+			this, &SongEditor::pauseAutoScroll);
+	connect(m_leftRightScroll, &QAbstractSlider::sliderMoved,
+			this, &SongEditor::pauseAutoScroll);
+	connect(m_leftRightScroll, &QAbstractSlider::actionTriggered,
+			this, [this](int) { pauseAutoScroll(); });
 	connect(m_timeLine, SIGNAL(selectionFinished()), this, SLOT(stopSelectRegion()));
 
 
@@ -384,6 +409,37 @@ void SongEditor::scrolled( int new_pos )
 	update();
 	emit positionChanged(m_currentPosition = TimePos(new_pos));
 	updatePositionLine();
+}
+
+
+
+void SongEditor::pauseAutoScroll()
+{
+	const int delaySeconds = std::clamp(
+		ConfigManager::inst()->value("ui", "autoscrollresumedelay", "2").toInt(), 0, 60);
+	const int delayMs = delaySeconds * 1000;
+
+	if (m_autoScrollResumeTimer != nullptr)
+	{
+		if (delayMs <= 0)
+		{
+			m_autoScrollResumeTimer->stop();
+			m_autoScrollPaused = false;
+		}
+		else
+		{
+			m_autoScrollPaused = true;
+			m_autoScrollResumeTimer->start(delayMs);
+		}
+	}
+
+	// Stop a smooth auto-scroll animation that is currently in progress,
+	// otherwise it keeps moving the scrollbar while the user drags it.
+	if (QTimeLine* const t = m_leftRightScroll->findChild<QTimeLine*>())
+	{
+		t->stop();
+		t->deleteLater();
+	}
 }
 
 
@@ -579,6 +635,7 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 
 void SongEditor::adjustLeftRightScoll(int value)
 {
+	pauseAutoScroll();
 	m_leftRightScroll->setValue(m_leftRightScroll->value()
 						- value * DEFAULT_PIXELS_PER_BAR / pixelsPerBar());
 }
@@ -589,6 +646,8 @@ void SongEditor::wheelEvent( QWheelEvent * we )
 	const auto posX = we->position().toPoint().x();
 	if ((we->modifiers() & Qt::ControlModifier) && (posX > trackHeadWidth()))
 	{
+		pauseAutoScroll();
+
 		int x = posX - trackHeadWidth();
 		// tick based on the mouse x-position where the scroll wheel was used
 		int tick = x / pixelsPerBar() * TimePos::ticksPerBar();
@@ -806,25 +865,34 @@ static inline void animateScroll( QScrollBar *scrollBar, int newVal, bool smooth
 void SongEditor::updatePosition()
 {
 	const TimePos& t = m_timeLine->timeline()->pos();
+
 	if ((m_song->isPlaying() && m_song->m_playMode == Song::PlayMode::Song)
 							|| m_scrollBack)
 	{
 		m_smoothScroll = ConfigManager::inst()->value( "ui", "smoothscroll" ).toInt();
 		const int w = width() - trackHeadWidth()
 							- contentWidget()->verticalScrollBar()->width(); // width of right scrollbar
-		
-		if (m_timeLine->autoScroll() == TimeLineWidget::AutoScrollState::Stepped)
+		const auto autoScroll = m_timeLine->autoScroll();
+
+		if (!m_autoScrollPaused)
 		{
-			const auto nextPosition = m_currentPosition + w * TimePos::ticksPerBar() / pixelsPerBar();
-			if (t > nextPosition || t < m_currentPosition) 
+			const auto visibleTicks = w * TimePos::ticksPerBar() / pixelsPerBar();
+			const auto left = m_currentPosition.getTicks();
+
+			if (autoScroll == TimeLineWidget::AutoScrollState::Stepped)
 			{
-				animateScroll(m_leftRightScroll, t.getTicks(), m_smoothScroll);
+				const auto nextPosition = left + visibleTicks;
+				if (t > nextPosition || t < left)
+				{
+					animateScroll(m_leftRightScroll, t.getTicks(), m_smoothScroll);
+				}
+			}
+			else if (autoScroll == TimeLineWidget::AutoScrollState::Continuous)
+			{
+				m_leftRightScroll->setValue(std::max(t.getTicks() - visibleTicks / 2, 0.0f));
 			}
 		}
-		else if (m_timeLine->autoScroll() == TimeLineWidget::AutoScrollState::Continuous)
-		{
-			m_leftRightScroll->setValue(std::max(t.getTicks() - w * TimePos::ticksPerBar() / pixelsPerBar() / 2, 0.0f));
-		}
+
 		m_scrollBack = false;
 	}
 
