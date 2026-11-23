@@ -230,8 +230,28 @@ void TrackView::mousePressEvent( QMouseEvent * me )
 	{
 		if( me->modifiers() & Qt::ShiftModifier )
 		{
+			// If the click lands right below a track boundary, resize the
+			// track above it: that is the track whose bottom edge is closest
+			// to the cursor. Otherwise, clicking slightly below a track's
+			// edge used to resize the next track (#8663).
+			constexpr int boundaryTolerance = 4;
+			const auto globalPos = globalPosition(me);
+			m_resizeTargetView = this;
+			int nearestDistance = boundaryTolerance + 1;
+			for (auto* view : m_trackContainerView->trackViews())
+			{
+				const int bottom = view->mapToGlobal(QPoint(0, view->height())).y();
+				const int distance = qAbs(bottom - globalPos.y());
+				if (distance <= boundaryTolerance && distance < nearestDistance)
+				{
+					nearestDistance = distance;
+					m_resizeTargetView = view;
+				}
+			}
+
 			m_action = Action::Resize;
-			QCursor::setPos(mapToGlobal(QPoint(pos.x(), height())));
+			QCursor::setPos(globalPos.x(),
+				m_resizeTargetView->mapToGlobal(QPoint(0, m_resizeTargetView->height())).y());
 			QApplication::setOverrideCursor(Qt::SizeVerCursor);
 		}
 
@@ -284,7 +304,11 @@ void TrackView::mouseMoveEvent( QMouseEvent * me )
 	}
 	else if( m_action == Action::Resize )
 	{
-		resizeToHeight(pos.y());
+		if (m_resizeTargetView != nullptr)
+		{
+			m_resizeTargetView->resizeToHeight(
+				m_resizeTargetView->mapFromGlobal(globalPosition(me)).y());
+		}
 	}
 
 	if( height() < DEFAULT_TRACK_HEIGHT )
@@ -298,6 +322,7 @@ void TrackView::mouseMoveEvent( QMouseEvent * me )
 void TrackView::mouseReleaseEvent( QMouseEvent * me )
 {
 	m_action = Action::None;
+	m_resizeTargetView = nullptr;
 	while( QApplication::overrideCursor() != nullptr )
 	{
 		QApplication::restoreOverrideCursor();

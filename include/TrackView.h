@@ -214,6 +214,10 @@ private:
 
 	Action m_action = Action::None;
 
+	//! The track view currently being resized. May differ from `this` when
+	//! the cursor is closer to the bottom edge of a neighbouring track (#8663).
+	TrackView* m_resizeTargetView = nullptr;
+
 	virtual FadeButton * getActivityIndicator()
 	{
 		return nullptr;
