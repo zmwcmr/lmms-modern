@@ -126,8 +126,13 @@ void DrumSynth::UpdateEnv(int e, long t)
 
 void DrumSynth::GetEnv(int env, const char* sec, const char* key, QString ini)
 {
-	char en[256], s[8];
+	if (env < 0 || env >= 8) { return; }
+
+	char en[256], s[32];
 	int i = 0, o = 0, ep = 0;
+	// envpts has 32 entries per row; the last one is reserved for the
+	// terminator written below, so at most 31 points may be stored.
+	constexpr int MaxEnvPoints = 31;
 	GetPrivateProfileString(sec, key, "0,0 100,0", en, sizeof(en), ini);
 
 	// be safe!
@@ -138,32 +143,46 @@ void DrumSynth::GetEnv(int env, const char* sec, const char* key, QString ini)
 	{
 		if (en[i] == ',')
 		{
-			if (sscanf(s, "%f", &envpts[env][0][ep]) == 0)
+			if (ep < MaxEnvPoints)
 			{
-				envpts[env][0][ep] = 0.f;
+				if (sscanf(s, "%f", &envpts[env][0][ep]) == 0)
+				{
+					envpts[env][0][ep] = 0.f;
+				}
 			}
 			o = 0;
+			s[0] = 0;
 		}
 		else if (en[i] == ' ')
 		{
-			if (sscanf(s, "%f", &envpts[env][1][ep]) == 0)
+			if (ep < MaxEnvPoints)
 			{
-				envpts[env][1][ep] = 0.f;
+				if (sscanf(s, "%f", &envpts[env][1][ep]) == 0)
+				{
+					envpts[env][1][ep] = 0.f;
+				}
 			}
 			o = 0;
-			ep++;
+			s[0] = 0;
+			if (ep < MaxEnvPoints - 1) { ++ep; }
 		}
 		else
 		{
-			s[o] = en[i];
-			o++;
-			s[o] = 0;
+			if (o < static_cast<int>(sizeof(s)) - 1)
+			{
+				s[o] = en[i];
+				o++;
+				s[o] = 0;
+			}
 		}
 		i++;
 	}
-	if (sscanf(s, "%f", &envpts[env][1][ep]) == 0)
+	if (ep < MaxEnvPoints)
 	{
-		envpts[env][1][ep] = 0.f;
+		if (sscanf(s, "%f", &envpts[env][1][ep]) == 0)
+		{
+			envpts[env][1][ep] = 0.f;
+		}
 	}
 	envpts[env][0][ep + 1] = -1;
 
@@ -228,10 +247,14 @@ std::size_t DrumSynth::GetPrivateProfileString(const char* sec,
 			{
 				if (b)
 				{
-					// Trim trailing whitespace
-					k = &b[std::strlen(b)];
-					while (k >= b && (*k == ' ' || *k == '\t')) { --k; }
-					k[1] = '\0'; // k == b - 1 when string is empty or all whitespace
+					// Trim trailing whitespace without writing past the
+					// local line buffer.
+					std::size_t bLen = std::strlen(b);
+					while (bLen > 0 && (b[bLen - 1] == ' ' || b[bLen - 1] == '\t'))
+					{
+						--bLen;
+					}
+					b[bLen] = '\0';
 					std::strncpy(buffer, b, maxlen);
 				}
 				break;

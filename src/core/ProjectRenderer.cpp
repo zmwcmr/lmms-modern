@@ -161,16 +161,17 @@ void ProjectRenderer::run()
 	Engine::audioEngine()->startProcessing();
 
 	// Continually track and emit progress percentage to listeners.
-	while (!Engine::getSong()->isExportDone() && !m_abort)
+	while (!Engine::getSong()->isExportDone() && !m_abort.load(std::memory_order_relaxed))
 	{
 		const auto buffer = Engine::audioEngine()->renderNextPeriod();
 		m_fileDev->writeBuffer(buffer.data(), buffer.size());
 
 		const int nprog = Engine::getSong()->getExportProgress();
-		if (m_progress != nprog)
+		const int oldProgress = m_progress.load(std::memory_order_relaxed);
+		if (oldProgress != nprog)
 		{
-			m_progress = nprog;
-			emit progressChanged( m_progress );
+			m_progress.store(nprog, std::memory_order_relaxed);
+			emit progressChanged( nprog );
 		}
 	}
 
@@ -183,7 +184,7 @@ void ProjectRenderer::run()
 
 	// If the user aborted export-process, the file has to be deleted.
 	const QString f = m_fileDev->outputFile();
-	if( m_abort )
+	if( m_abort.load(std::memory_order_relaxed) )
 	{
 		QFile( f ).remove();
 	}
@@ -194,7 +195,7 @@ void ProjectRenderer::run()
 
 void ProjectRenderer::abortProcessing()
 {
-	m_abort = true;
+	m_abort.store(true, std::memory_order_relaxed);
 	wait();
 }
 
@@ -206,16 +207,17 @@ void ProjectRenderer::updateConsoleProgress()
 	static int rot = 0;
 	auto buf = std::array<char, 80>{};
 	auto prog = std::array<char, cols + 1>{};
+	const int progress = m_progress.load(std::memory_order_relaxed);
 
 	for( int i = 0; i < cols; ++i )
 	{
-		prog[i] = ( i*100/cols <= m_progress ? '-' : ' ' );
+		prog[i] = ( i*100/cols <= progress ? '-' : ' ' );
 	}
 	prog[cols] = 0;
 
 	const auto activity = "|/-\\";
 	std::fill(buf.begin(), buf.end(), 0);
-	std::snprintf(buf.data(), buf.size(), "\r|%s|    %3d%%   %c  ", prog.data(), m_progress,
+	std::snprintf(buf.data(), buf.size(), "\r|%s|    %3d%%   %c  ", prog.data(), progress,
 							activity[rot] );
 	rot = ( rot+1 ) % 4;
 

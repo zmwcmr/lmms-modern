@@ -136,6 +136,8 @@ bool SamplePlayHandle::isFromTrack( const Track * _track ) const
 
 f_cnt_t SamplePlayHandle::totalFrames() const
 {
+	if (m_sample->sampleRate() == 0) { return 0; }
+
 	return (m_sample->endFrame() - m_sample->startFrame()) *
 			(static_cast<float>(Engine::audioEngine()->outputSampleRate()) / m_sample->sampleRate());
 }

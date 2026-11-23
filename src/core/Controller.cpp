@@ -41,6 +41,7 @@ namespace lmms
 
 long Controller::s_periods = 0;
 std::vector<Controller*> Controller::s_controllers;
+QMutex Controller::s_controllersMutex;
 
 
 
@@ -55,6 +56,7 @@ Controller::Controller( ControllerType _type, Model * _parent,
 {
 	if( _type != ControllerType::Dummy && _type != ControllerType::Midi )
 	{
+		QMutexLocker locker(&s_controllersMutex);
 		s_controllers.push_back(this);
 		// Determine which name to use
 		for ( uint i=s_controllers.size(); ; i++ )
@@ -86,10 +88,13 @@ Controller::Controller( ControllerType _type, Model * _parent,
 
 Controller::~Controller()
 {
-	auto it = std::find(s_controllers.begin(), s_controllers.end(), this);
-	if (it != s_controllers.end())
 	{
-		s_controllers.erase(it);
+		QMutexLocker locker(&s_controllersMutex);
+		auto it = std::find(s_controllers.begin(), s_controllers.end(), this);
+		if (it != s_controllers.end())
+		{
+			s_controllers.erase(it);
+		}
 	}
 
 	m_valueBuffer.clear();
@@ -156,6 +161,7 @@ float Controller::runningTime()
 
 void Controller::triggerFrameCounter()
 {
+	QMutexLocker locker(&s_controllersMutex);
 	for (Controller * controller : s_controllers)
 	{
 		// This signal is for updating values for both stubborn knobs and for
@@ -173,6 +179,7 @@ void Controller::triggerFrameCounter()
 
 void Controller::resetFrameCounter()
 {
+	QMutexLocker locker(&s_controllersMutex);
 	for (Controller * controller : s_controllers)
 	{
 		controller->m_bufferLastUpdated = 0;

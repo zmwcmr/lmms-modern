@@ -24,6 +24,7 @@
  */
 
 
+#include <QDebug>
 #include <QVarLengthArray>
 #include <QMessageBox>
 
@@ -101,6 +102,8 @@ LadspaEffect::~LadspaEffect()
 
 void LadspaEffect::changeSampleRate()
 {
+	if( m_controls == nullptr ) { return; }
+
 	DataFile dataFile( DataFile::Type::EffectSettings );
 	m_controls->saveState( dataFile, dataFile.content() );
 
@@ -114,6 +117,8 @@ void LadspaEffect::changeSampleRate()
 
 	controls->effectModelChanged( m_controls );
 	delete controls;
+
+	if( m_controls == nullptr ) { return; }
 
 	m_controls->restoreState( dataFile.content().firstChild().toElement() );
 
@@ -147,7 +152,14 @@ Effect::ProcessStatus LadspaEffect::processImpl(SampleFrame* buf, const f_cnt_t 
 				case BufferRate::ChannelIn:
 					for (f_cnt_t frame = 0; frame < frames; ++frame)
 					{
-						pp->buffer[frame] = buf[frame][channel];
+						if (channel < DEFAULT_CHANNELS)
+						{
+							pp->buffer[frame] = buf[frame][channel];
+						}
+						else
+						{
+							pp->buffer[frame] = 0.f;
+						}
 					}
 					++channel;
 					break;
@@ -217,7 +229,10 @@ Effect::ProcessStatus LadspaEffect::processImpl(SampleFrame* buf, const f_cnt_t 
 				case BufferRate::ChannelOut:
 					for (f_cnt_t frame = 0; frame < frames; ++frame)
 					{
-						buf[frame][channel] = d * buf[frame][channel] + w * pp->buffer[frame];
+						if (channel < DEFAULT_CHANNELS)
+						{
+							buf[frame][channel] = d * buf[frame][channel] + w * pp->buffer[frame];
+						}
 					}
 					++channel;
 					break;
@@ -255,7 +270,25 @@ void LadspaEffect::pluginInstantiation()
 	Ladspa2LMMS * manager = Engine::getLADSPAManager();
 
 	// Calculate how many processing units are needed.
-	int effect_channels = manager->getDescription( m_key )->inputChannels;
+	const auto* description = manager->getDescription( m_key );
+	if( description == nullptr )
+	{
+		setOkay( false );
+		return;
+	}
+
+	const int effect_channels = description->inputChannels;
+	const int outputChannels = description->outputChannels;
+	if( effect_channels <= 0 || outputChannels <= 0
+		|| effect_channels > DEFAULT_CHANNELS || outputChannels > DEFAULT_CHANNELS
+		|| DEFAULT_CHANNELS % effect_channels != 0 )
+	{
+		qWarning( "Unsupported LADSPA channel configuration (%d in / %d out)",
+			effect_channels, outputChannels );
+		setOkay( false );
+		return;
+	}
+
 	m_processors = DEFAULT_CHANNELS / effect_channels;
 
 	// get inPlaceBroken property
@@ -290,14 +323,24 @@ void LadspaEffect::pluginInstantiation()
 				{
 					p->rate = BufferRate::ChannelIn;
 					p->buffer = new LADSPA_Data[Engine::audioEngine()->framesPerPeriod()];
-					inbuf[ inputch ] = p->buffer;
-					inputch++;
+					if( inputch < static_cast<int>(inbuf.size()) )
+					{
+						inbuf[ inputch ] = p->buffer;
+						inputch++;
+					}
+					else
+					{
+						// Should not happen after the channel check above,
+						// but keep the array access bounded just in case.
+						m_inPlaceBroken = true;
+					}
 				}
 				else if( p->name.toUpper().contains( "OUT" ) &&
 					manager->isPortOutput( m_key, port ) )
 				{
 					p->rate = BufferRate::ChannelOut;
-					if( ! m_inPlaceBroken && inbuf[ outputch ] )
+					if( ! m_inPlaceBroken && outputch < static_cast<int>(inbuf.size())
+						&& inbuf[ outputch ] )
 					{
 						p->buffer = inbuf[ outputch ];
 						outputch++;

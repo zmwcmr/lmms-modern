@@ -24,6 +24,7 @@
 
 #include "Mixer.h"
 
+#include <QDebug>
 #include <QDomElement>
 
 #include "AudioEngine.h"
@@ -39,6 +40,16 @@
 
 namespace lmms
 {
+
+namespace
+{
+
+// Upper bound for channels loaded from project files. This is deliberately
+// generous for normal use while preventing malformed files from exhausting
+// memory with an arbitrarily large mixer channel index.
+constexpr int MaxMixerChannels = 1024;
+
+} // namespace
 
 
 MixerRoute::MixerRoute( MixerChannel * from, MixerChannel * to, float amount ) :
@@ -65,12 +76,14 @@ MixerChannel::MixerChannel( int idx, Model * _parent ) :
 	m_peakLeft( 0.0f ),
 	m_peakRight( 0.0f ),
 	m_buffer(Engine::audioEngine()->framesPerPeriod()),
+	m_muteBeforeSolo( false ),
 	m_muteModel( false, _parent ),
 	m_soloModel( false, _parent ),
 	m_volumeModel(1.f, 0.f, 2.f, 0.001f, _parent),
 	m_name(),
 	m_lock(),
 	m_queued( false ),
+	m_muted( false ),
 	m_dependenciesMet(0),
 	m_channelIndex(idx)
 {
@@ -259,6 +272,8 @@ Mixer::~Mixer()
 
 int Mixer::createChannel()
 {
+	const auto guard = Engine::audioEngine()->requestChangesGuard();
+
 	const int index = m_mixerChannels.size();
 	// create new channel
 	m_mixerChannels.push_back( new MixerChannel( index, this ) );
@@ -428,6 +443,9 @@ void Mixer::moveChannelLeft( int index )
 	{
 		return;
 	}
+
+	const auto guard = Engine::audioEngine()->requestChangesGuard();
+
 	// channels to swap
 	int a = index - 1, b = index;
 
@@ -822,7 +840,16 @@ void Mixer::saveSettings( QDomDocument & _doc, QDomElement & _this )
 // make sure we have at least num channels
 void Mixer::allocateChannelsTo(int num)
 {
+	// Guard against malformed project files. A negative index would otherwise
+	// be used to index m_mixerChannels, and an arbitrarily large index would
+	// make us allocate channels until the process runs out of memory.
 	if (num <= 0) { return; }
+	if (num > MaxMixerChannels)
+	{
+		qWarning() << "Ignoring mixer channel index" << num
+			<< "(maximum is" << MaxMixerChannels << ")";
+		return;
+	}
 	while (static_cast<std::size_t>(num) > m_mixerChannels.size() - 1)
 	{
 		createChannel();
@@ -840,6 +867,12 @@ void Mixer::loadSettings( const QDomElement & _this )
 
 	while( ! node.isNull() )
 	{
+		if (!node.isElement() || node.toElement().nodeName() != "mixerchannel")
+		{
+			node = node.nextSibling();
+			continue;
+		}
+
 		QDomElement mixch = node.toElement();
 
 		// index of the channel we are about to load
@@ -847,6 +880,13 @@ void Mixer::loadSettings( const QDomElement & _this )
 
 		// allocate enough channels
 		allocateChannelsTo( num );
+
+		if (num < 0 || static_cast<std::size_t>(num) >= m_mixerChannels.size())
+		{
+			qWarning() << "Ignoring invalid mixer channel index" << num;
+			node = node.nextSibling();
+			continue;
+		}
 
 		m_mixerChannels[num]->m_volumeModel.loadSettings( mixch, "volume" );
 		m_mixerChannels[num]->m_muteModel.loadSettings( mixch, "muted" );
@@ -868,7 +908,16 @@ void Mixer::loadSettings( const QDomElement & _this )
 			if( chDataItem.nodeName() == QString( "send" ) )
 			{
 				int sendTo = chDataItem.attribute( "channel" ).toInt();
+				if (sendTo < 0 || sendTo > MaxMixerChannels)
+				{
+					qWarning() << "Ignoring invalid mixer send target" << sendTo;
+					continue;
+				}
 				allocateChannelsTo( sendTo ) ;
+				if (static_cast<std::size_t>(sendTo) >= m_mixerChannels.size())
+				{
+					continue;
+				}
 				MixerRoute * mxr = createChannelSend( num, sendTo, 1.0f );
 				if( mxr ) mxr->amount()->loadSettings( chDataItem, "amount" );
 			}

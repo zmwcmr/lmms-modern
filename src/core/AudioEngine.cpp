@@ -24,6 +24,8 @@
 
 #include "AudioEngine.h"
 
+#include <QDebug>
+
 #include "MixHelpers.h"
 
 #include "lmmsconfig.h"
@@ -200,9 +202,9 @@ void AudioEngine::renderStageNoteSetup()
 {
 	AudioEngineProfiler::Probe profilerProbe(m_profiler, AudioEngineProfiler::DetailType::NoteSetup);
 
-	if( m_clearSignal )
+	if( m_clearSignal.load(std::memory_order_relaxed) )
 	{
-		m_clearSignal = false;
+		m_clearSignal.store(false, std::memory_order_relaxed);
 		clearInternal();
 	}
 
@@ -303,7 +305,7 @@ void AudioEngine::renderStageMix()
 	Mixer *mixer = Engine::mixer();
 	mixer->masterMix(m_outputBufferWrite.get());
 
-	MixHelpers::multiply(m_outputBufferWrite.get(), m_masterGain, m_framesPerPeriod);
+	MixHelpers::multiply(m_outputBufferWrite.get(), m_masterGain.load(std::memory_order_relaxed), m_framesPerPeriod);
 
 	emit nextAudioBuffer(m_outputBufferRead.get());
 
@@ -346,7 +348,7 @@ void AudioEngine::swapBuffers()
 
 void AudioEngine::clear()
 {
-	m_clearSignal = true;
+	m_clearSignal.store(true, std::memory_order_relaxed);
 }
 
 
@@ -358,6 +360,22 @@ void AudioEngine::clearNewPlayHandles()
 	for( LocklessListElement * e = m_newPlayHandles.popList(); e; )
 	{
 		LocklessListElement * next = e->next;
+		PlayHandle* handle = e->value;
+		if (handle != nullptr)
+		{
+			if (handle->audioBusHandle() != nullptr)
+			{
+				handle->audioBusHandle()->removePlayHandle(handle);
+			}
+			if (handle->type() == PlayHandle::Type::NotePlayHandle)
+			{
+				NotePlayHandleManager::release(static_cast<NotePlayHandle*>(handle));
+			}
+			else
+			{
+				delete handle;
+			}
+		}
 		m_newPlayHandles.free( e );
 		e = next;
 	}
@@ -464,7 +482,19 @@ bool AudioEngine::addPlayHandle( PlayHandle* handle )
 	// associated instrument is created, so add those unconditionally.
 	if (handle->type() == PlayHandle::Type::InstrumentPlayHandle || !criticalXRuns())
 	{
-		m_newPlayHandles.push( handle );
+		if (!m_newPlayHandles.push(handle))
+		{
+			qWarning() << "Cannot queue more play handles";
+			if (handle->type() == PlayHandle::Type::NotePlayHandle)
+			{
+				NotePlayHandleManager::release(static_cast<NotePlayHandle*>(handle));
+			}
+			else
+			{
+				delete handle;
+			}
+			return false;
+		}
 		handle->audioBusHandle()->addPlayHandle(handle);
 		return true;
 	}

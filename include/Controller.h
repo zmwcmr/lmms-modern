@@ -32,6 +32,8 @@
 #include "JournallingObject.h"
 #include "ValueBuffer.h"
 
+#include <QMutex>
+
 namespace lmms
 {
 
@@ -169,6 +171,10 @@ protected:
 	static ControllerVector s_controllers;
 
 	static long s_periods;
+
+	// Protects s_controllers, which is modified on the GUI thread and read
+	// on the audio thread every period.
+	static QMutex s_controllersMutex;
 
 
 signals:

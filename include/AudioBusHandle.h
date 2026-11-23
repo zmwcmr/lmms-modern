@@ -97,6 +97,9 @@ private:
 	std::unique_ptr<EffectChain> m_effects;
 
 	PlayHandleList m_playHandles;
+	// Snapshot of m_playHandles used during processing. This avoids holding
+	// m_playHandleLock while a PlayHandle may add sub-notes to the same list.
+	PlayHandleList m_processingPlayHandles;
 	QMutex m_playHandleLock;
 
 	FloatModel* m_volumeModel;

@@ -140,7 +140,8 @@ NotePlayHandle::~NotePlayHandle()
 		m_instrumentTrack->deleteNotePluginData( this );
 	}
 
-	if( m_instrumentTrack->m_notes[key()] == this )
+	if (key() >= 0 && key() < NumKeys
+		&& m_instrumentTrack->m_notes[key()] == this)
 	{
 		m_instrumentTrack->m_notes[key()] = nullptr;
 	}

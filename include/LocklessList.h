@@ -53,9 +53,13 @@ public:
 		delete m_allocator;
 	}
 
-	void push( T value )
+	bool push( T value )
 	{
 		Element * e = m_allocator->alloc();
+		if( e == nullptr )
+		{
+			return false;
+		}
 		e->value = value;
 		e->next = m_first.load(std::memory_order_relaxed);
 
@@ -65,6 +69,7 @@ public:
 		{
 			// Empty loop (compare_exchange_weak updates e->next)
 		}
+		return true;
 	}
 
 	Element * popList()

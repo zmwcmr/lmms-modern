@@ -53,6 +53,7 @@ Track::Track(Type type, TrackContainer* tc)
 	, m_name()
 	, m_mutedModel(false, this, tr("Mute"))
 	, m_soloModel(false, this, tr("Solo"))
+	, m_mutedBeforeSolo(false)
 	, m_clips()
 {	
 	m_trackContainer->addTrack( this );
@@ -81,6 +82,13 @@ Track::~Track()
 
 Track * Track::create( Type tt, TrackContainer * tc )
 {
+	if( static_cast<int>( tt ) < static_cast<int>( Type::Instrument )
+		|| static_cast<int>( tt ) >= static_cast<int>( Type::Count ) )
+	{
+		qWarning( "Ignoring invalid track type %d", static_cast<int>( tt ) );
+		return nullptr;
+	}
+
 	Engine::audioEngine()->requestChangeInModel();
 
 	Track * t = nullptr;

@@ -119,8 +119,16 @@ void AudioBusHandle::doProcessing()
 	// clear the buffer
 	m_buffer.silenceAllChannels();
 
+	// Take a snapshot of the play-handle list while holding the lock. A
+	// PlayHandle may create sub-notes (chords/arpeggios) during processing,
+	// so holding the lock for the whole loop would deadlock.
+	{
+		QMutexLocker lockGuard(&m_playHandleLock);
+		m_processingPlayHandles = m_playHandles;
+	}
+
 	//qDebug( "Playhandles: %d", m_playHandles.size() );
-	for (PlayHandle* ph : m_playHandles) // now we mix all playhandle buffers into our internal buffer
+	for (PlayHandle* ph : m_processingPlayHandles) // now we mix all playhandle buffers into our internal buffer
 	{
 		if (ph->buffer())
 		{
@@ -137,6 +145,7 @@ void AudioBusHandle::doProcessing()
 									// pointer to null, so if it doesn't get re-acquired we know to skip it next time
 		}
 	}
+	m_processingPlayHandles.clear();
 
 	if (m_bufferUsage)
 	{

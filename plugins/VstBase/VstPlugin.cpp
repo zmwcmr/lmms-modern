@@ -35,6 +35,8 @@
 #include <QTemporaryFile>
 #include <QTimerEvent>
 
+#include <cstring>
+
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
 #	include <QX11Info>
 #	include <X11EmbedContainer.h>
@@ -99,13 +101,31 @@ public:
 
 	MachineType machineType()
 	{
-		int32_t peOffset = qFromLittleEndian(* reinterpret_cast<int32_t*>(m_map + 0x3C));
+		const auto fileSize = m_file.size();
+		if (m_map == nullptr || fileSize < 0x40)
+		{
+			throw std::runtime_error("Invalid PE file");
+		}
+
+		int32_t peOffset = 0;
+		std::memcpy(&peOffset, m_map + 0x3C, sizeof(peOffset));
+		peOffset = qFromLittleEndian(peOffset);
+
+		// The signature and the COFF header following it must both fit in
+		// the mapped file.
+		if (peOffset < 0 || static_cast<qint64>(peOffset) + 6 > fileSize)
+		{
+			throw std::runtime_error("Invalid PE file");
+		}
+
 		uchar* peSignature = m_map + peOffset;
 		if (memcmp(peSignature, "PE\0\0", 4)) {
 			throw std::runtime_error("Invalid PE file");
 		}
 		uchar * coffHeader = peSignature + 4;
-		uint16_t machineType = qFromLittleEndian(* reinterpret_cast<uint16_t*>(coffHeader));
+		uint16_t machineType = 0;
+		std::memcpy(&machineType, coffHeader, sizeof(machineType));
+		machineType = qFromLittleEndian(machineType);
 		return static_cast<MachineType>(machineType);
 	}
 

@@ -136,7 +136,7 @@ AudioEngineWorkerThread::~AudioEngineWorkerThread()
 
 void AudioEngineWorkerThread::quit()
 {
-	m_quit = true;
+	m_quit.store(true, std::memory_order_relaxed);
 	resetJobQueue();
 }
 
@@ -161,7 +161,7 @@ void AudioEngineWorkerThread::run()
 	disableDenormals();
 
 	QMutex m;
-	while( m_quit == false )
+	while( !m_quit.load(std::memory_order_relaxed) )
 	{
 		m.lock();
 		queueReadyWaitCond->wait( &m );

@@ -24,6 +24,10 @@
 
 #include "Sample.h"
 
+#include <algorithm>
+#include <cmath>
+#include <exception>
+
 namespace lmms {
 
 Sample::Sample(const SampleFrame* data, size_t numFrames, int sampleRate)
@@ -98,13 +102,21 @@ auto Sample::operator=(Sample&& other) noexcept -> Sample&
 
 bool Sample::play(SampleFrame* dst, PlaybackState* state, size_t numFrames, Loop loop, double ratio) const
 {
-	if (!m_buffer || m_buffer->empty()) { return false; }
+	if (!m_buffer || !state || m_buffer->empty() || m_buffer->sampleRate() == 0) { return false; }
 
 	state->m_frameIndex = std::max<int>(m_startFrame, state->m_frameIndex);
 
 	const auto sampleRateRatio = static_cast<double>(Engine::audioEngine()->outputSampleRate()) / m_buffer->sampleRate();
 	const auto freqRatio = frequency() / DefaultBaseFreq;
-	state->m_resampler.setRatio(sampleRateRatio * freqRatio * ratio);
+	const auto playbackRatio = sampleRateRatio * freqRatio * ratio;
+	if (!std::isfinite(playbackRatio) || playbackRatio <= 0.0)
+	{
+		return false;
+	}
+
+	// libsamplerate only accepts ratios in [1/256, 256]. Clamp instead of
+	// throwing from the audio thread for extreme pitch settings.
+	state->m_resampler.setRatio(std::clamp(playbackRatio, 1.0 / 256.0, 256.0));
 
 	// TODO: These kind of playback pipelines/graphs are repeated within other parts of the codebase that work with
 	// audio samples. We should find a way to unify this but the right abstraction is not so clear yet.
@@ -116,8 +128,21 @@ bool Sample::play(SampleFrame* dst, PlaybackState* state, size_t numFrames, Loop
 			state->m_bufferView = {state->m_buffer.data(), rendered};
 		}
  
-		const auto [inputFramesUsed, outputFramesGenerated] = state->m_resampler.process(
-			{&state->m_bufferView.data()[0][0], 2, state->m_bufferView.size()}, {&dst[0][0], 2, numFrames});
+		AudioResampler::Result result{};
+		try
+		{
+			result = state->m_resampler.process(
+				{&state->m_bufferView.data()[0][0], 2, state->m_bufferView.size()}, {&dst[0][0], 2, numFrames});
+		}
+		catch (const std::exception&)
+		{
+			// Never let a decoding/resampling failure escape into the audio
+			// engine thread; output silence for the remainder of this period.
+			std::fill_n(dst, numFrames, SampleFrame{});
+			return false;
+		}
+
+		const auto [inputFramesUsed, outputFramesGenerated] = result;
 
 		if (inputFramesUsed == 0 && outputFramesGenerated == 0)
 		{
@@ -165,6 +190,12 @@ f_cnt_t Sample::render(SampleFrame* dst, f_cnt_t size, PlaybackState* state, Loo
 			break;
 		}
 
+		if (state->m_frameIndex < 0
+			|| static_cast<std::size_t>(state->m_frameIndex) >= m_buffer->size())
+		{
+			return frame;
+		}
+
 		const auto value
 			= m_buffer->data()[m_reversed ? m_buffer->size() - state->m_frameIndex - 1 : state->m_frameIndex]
 			* m_amplification;
@@ -177,6 +208,8 @@ f_cnt_t Sample::render(SampleFrame* dst, f_cnt_t size, PlaybackState* state, Loo
 
 auto Sample::sampleDuration() const -> std::chrono::milliseconds
 {
+	if (!m_buffer || m_buffer->sampleRate() == 0) { return std::chrono::milliseconds{0}; }
+
 	const auto numFrames = endFrame() - startFrame();
 	const auto duration = numFrames / static_cast<float>(m_buffer->sampleRate()) * 1000;
 	return std::chrono::milliseconds{static_cast<int>(duration)};

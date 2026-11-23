@@ -31,6 +31,8 @@
 #include <QString>
 #include <QHash>  // IWYU pragma: keep
 
+#include <atomic>
+
 #include "AudioEngine.h"
 #include "Controller.h"
 #include "Metronome.h"
@@ -423,12 +425,12 @@ private:
 	bool m_modified;
 	bool m_loadOnLaunch;
 
-	volatile bool m_recording;
-	volatile bool m_exporting;
-	volatile bool m_exportLoop;
-	volatile bool m_renderBetweenMarkers;
-	volatile bool m_playing;
-	volatile bool m_paused;
+	std::atomic<bool> m_recording;
+	std::atomic<bool> m_exporting;
+	std::atomic<bool> m_exportLoop;
+	std::atomic<bool> m_renderBetweenMarkers;
+	std::atomic<bool> m_playing;
+	std::atomic<bool> m_paused;
 
 	bool m_savingProject;
 	bool m_loadingProject;

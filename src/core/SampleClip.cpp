@@ -272,7 +272,12 @@ void SampleClip::setStartTimeOffset(const TimePos& startTimeOffset)
 
 TimePos SampleClip::sampleLength() const
 {
-	return static_cast<int>(m_sample.sampleSize() / Engine::framesPerTick(m_sample.sampleRate()));
+	if (m_sample.sampleRate() == 0) { return TimePos(1); }
+
+	const auto framesPerTick = Engine::framesPerTick(m_sample.sampleRate());
+	if (framesPerTick <= 0) { return TimePos(1); }
+
+	return static_cast<int>(m_sample.sampleSize() / framesPerTick);
 }
 
 

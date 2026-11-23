@@ -30,6 +30,7 @@
 #include <QThread>
 #include <samplerate.h>
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -203,12 +204,12 @@ public:
 
 	inline float masterGain() const
 	{
-		return m_masterGain;
+		return m_masterGain.load(std::memory_order_relaxed);
 	}
 
 	inline void setMasterGain(const float mo)
 	{
-		m_masterGain = mo;
+		m_masterGain.store(mo, std::memory_order_relaxed);
 	}
 
 
@@ -395,7 +396,7 @@ private:
 	LocklessList<PlayHandle *> m_newPlayHandles;
 	ConstPlayHandleList m_playHandlesToRemove;
 
-	float m_masterGain;
+	std::atomic<float> m_masterGain;
 
 	// audio device stuff
 	void doSetAudioDevice( AudioDevice *_dev );
@@ -410,7 +411,7 @@ private:
 
 	AudioEngineProfiler m_profiler;
 
-	bool m_clearSignal;
+	std::atomic<bool> m_clearSignal;
 	std::atomic<bool> m_sanitizationEnabled = false;
 
 	std::recursive_mutex m_changeMutex;

@@ -34,16 +34,35 @@
 
 namespace lmms {
 
+namespace {
+
+auto sanitizeSampleRate(int sampleRate) -> int
+{
+	constexpr auto MaxSampleRate = 1000000;
+	if (sampleRate > 0 && sampleRate <= MaxSampleRate)
+	{
+		return sampleRate;
+	}
+
+	const auto fallback = Engine::audioEngine() != nullptr
+		? static_cast<int>(Engine::audioEngine()->outputSampleRate())
+		: 44100;
+	qWarning() << "Invalid sample rate" << sampleRate << "- using" << fallback;
+	return fallback;
+}
+
+} // namespace
+
 SampleBuffer::SampleBuffer(const SampleFrame* data, size_t numFrames, int sampleRate)
 	: m_data(data, data + numFrames)
-	, m_sampleRate(sampleRate)
+	, m_sampleRate(sanitizeSampleRate(sampleRate))
 {
 }
 
 SampleBuffer::SampleBuffer(std::vector<SampleFrame> data, int sampleRate, const QString& audioFile)
 	: m_data(std::move(data))
 	, m_audioFile(audioFile)
-	, m_sampleRate(sampleRate)
+	, m_sampleRate(sanitizeSampleRate(sampleRate))
 {
 }
 

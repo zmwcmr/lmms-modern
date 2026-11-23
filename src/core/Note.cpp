@@ -38,11 +38,11 @@ Note::Note( const TimePos & length, const TimePos & pos,
 		int key, volume_t volume, panning_t panning,
 						std::shared_ptr<DetuningHelper> detuning ) :
 	m_selected( false ),
-	m_oldKey(std::clamp(key, 0, NumKeys)),
+	m_oldKey(std::clamp(key, 0, NumKeys - 1)),
 	m_oldPos( pos ),
 	m_oldLength( length ),
 	m_isPlaying( false ),
-	m_key(std::clamp(key, 0, NumKeys)),
+	m_key(std::clamp(key, 0, NumKeys - 1)),
 	m_volume(std::clamp(volume, MinVolume, MaxVolume)),
 	m_panning(std::clamp(panning, PanningLeft, PanningRight)),
 	m_length( length ),
@@ -206,10 +206,12 @@ void Note::saveSettings( QDomDocument & doc, QDomElement & parent )
 void Note::loadSettings( const QDomElement & _this )
 {
 	const int oldKey = _this.attribute( "tone" ).toInt() + _this.attribute( "oct" ).toInt() * KeysPerOctave;
-	m_key = std::max(oldKey, _this.attribute("key").toInt());
-	m_volume = _this.attribute( "vol" ).toInt();
-	m_panning = _this.attribute( "pan" ).toInt();
-	m_length = _this.attribute( "len" ).toInt();
+	setKey(std::max(oldKey, _this.attribute("key").toInt()));
+	m_volume = static_cast<volume_t>(std::clamp(
+		_this.attribute( "vol" ).toInt(), static_cast<int>(MinVolume), static_cast<int>(MaxVolume)));
+	m_panning = static_cast<panning_t>(std::clamp(
+		_this.attribute( "pan" ).toInt(), static_cast<int>(PanningLeft), static_cast<int>(PanningRight)));
+	m_length = TimePos(std::max(0, _this.attribute( "len" ).toInt()));
 	m_pos = _this.attribute( "pos" ).toInt();
 	// Default m_type value is 0, which corresponds to RegularNote
 	static_assert(0 == static_cast<int>(Type::Regular));

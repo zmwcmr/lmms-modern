@@ -158,6 +158,7 @@ DataFile::DataFile( const QString & _fileName ) :
 	m_fileName(_fileName),
 	m_content(),
 	m_head(),
+	m_type( Type::Unknown ),
 	m_fileVersion( UPGRADE_METHODS.size() )
 {
 	QFile inFile( _fileName );
@@ -188,6 +189,7 @@ DataFile::DataFile( const QByteArray & _data ) :
 	m_fileName(""),
 	m_content(),
 	m_head(),
+	m_type( Type::Unknown ),
 	m_fileVersion( UPGRADE_METHODS.size() )
 {
 	loadData( _data, "<internal data>" );
@@ -830,7 +832,7 @@ void DataFile::upgrade_0_2_1_20070508()
 			for( int j = 0; !vol_list.item( j ).isNull();
 								++j )
 			{
-				QDomElement timeEl = list.item( j )
+				QDomElement timeEl = vol_list.item( j )
 							.toElement();
 				int value = timeEl.attribute( "value" )
 							.toInt();
@@ -1020,6 +1022,7 @@ void DataFile::upgrade_0_4_0_beta1()
 			if( !l.isEmpty() )
 			{
 				QString name = l[0].toString();
+				if (l.size() < 2) { continue; }
 				QVariant u = l[1];
 				EffectKey::AttributeMap m;
 				// VST-effect?
