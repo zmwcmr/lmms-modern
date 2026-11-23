@@ -5330,6 +5330,7 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto zoom_lbl = new QLabel(m_toolBar);
 	zoom_lbl->setPixmap( embed::getIconPixmap( "zoom_x" ) );
+	zoom_lbl->setToolTip( tr( "Horizontal zooming" ) );
 
 	m_zoomingComboBox = new ComboBox( m_toolBar );
 	m_zoomingComboBox->setModel( &m_editor->m_zoomingModel );
@@ -5338,6 +5339,7 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto zoom_y_lbl = new QLabel(m_toolBar);
 	zoom_y_lbl->setPixmap(embed::getIconPixmap("zoom_y"));
+	zoom_y_lbl->setToolTip(tr("Vertical zooming"));
 
 	m_zoomingYComboBox = new ComboBox(m_toolBar);
 	m_zoomingYComboBox->setModel(&m_editor->m_zoomingYModel);
@@ -5347,6 +5349,7 @@ PianoRollWindow::PianoRollWindow() :
 	// setup quantize-stuff
 	auto quantize_lbl = new QLabel(m_toolBar);
 	quantize_lbl->setPixmap( embed::getIconPixmap( "quantize" ) );
+	quantize_lbl->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );

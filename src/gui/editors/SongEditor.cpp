@@ -24,6 +24,7 @@
 
 #include "SongEditor.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QAction>
@@ -31,9 +32,12 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMdiArea>
+#include <QPainter>
 #include <QScrollBar>
 #include <QSlider>
 #include <QTimeLine>
+#include <QTimer>
+#include <QToolButton>
 
 #include "ActionGroup.h"
 #include "AudioDevice.h"
@@ -67,6 +71,49 @@ namespace
 constexpr int MIN_PIXELS_PER_BAR = 4;
 constexpr int MAX_PIXELS_PER_BAR = 400;
 constexpr int ZOOM_STEPS = 200;
+
+// QToolBar's built-in overflow button paints a style arrow, which is nearly
+// invisible with the LMMS theme. Draw a clear three-dot ellipsis instead while
+// keeping the button's normal click/menu behaviour.
+class ToolBarOverflowButtonFilter : public QObject
+{
+public:
+	explicit ToolBarOverflowButtonFilter(QToolButton* button)
+		: QObject(button), m_button(button) {}
+
+protected:
+	bool eventFilter(QObject* object, QEvent* event) override
+	{
+		if (object == m_button && event->type() == QEvent::Paint)
+		{
+			QPainter painter(m_button);
+			painter.setRenderHint(QPainter::Antialiasing, true);
+
+			if (m_button->underMouse())
+			{
+				QColor highlight = m_button->palette().color(QPalette::Highlight);
+				highlight.setAlpha(70);
+				painter.setPen(Qt::NoPen);
+				painter.setBrush(highlight);
+				painter.drawRoundedRect(m_button->rect().adjusted(1, 1, -1, -1), 3, 3);
+			}
+
+			const qreal y = m_button->height() / 2.0;
+			const qreal x = m_button->width() / 2.0;
+			painter.setPen(Qt::NoPen);
+			painter.setBrush(m_button->palette().color(QPalette::WindowText));
+			painter.drawEllipse(QPointF(x - 4.0, y), 1.5, 1.5);
+			painter.drawEllipse(QPointF(x, y), 1.5, 1.5);
+			painter.drawEllipse(QPointF(x + 4.0, y), 1.5, 1.5);
+			return true;
+		}
+
+		return QObject::eventFilter(object, event);
+	}
+
+private:
+	QToolButton* const m_button;
+};
 
 constexpr std::array SNAP_SIZES{8.f, 4.f, 2.f, 1.f, 1/2.f, 1/4.f, 1/8.f, 1/16.f};
 constexpr std::array PROPORTIONAL_SNAP_SIZES{64.f, 32.f, 16.f, 8.f, 4.f, 2.f, 1.f, 1/2.f, 1/4.f, 1/8.f, 1/16.f, 1/32.f, 1/64.f};
@@ -918,9 +965,16 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 
 	setCentralWidget(m_editor);
 	setAcceptDrops(true);
-	m_toolBar->setAcceptDrops(true);
-	connect(m_toolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
-	connect(m_toolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
+
+	// Use one toolbar for the whole song editor. Separate toolbars each get
+	// their own overflow button when space is tight, which is confusing.
+	removeToolBar(m_toolBar);
+	m_toolBar->hide();
+
+	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song editor"));
+	songToolBar->setAcceptDrops(true);
+	connect(songToolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
+	connect(songToolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
 
 	// Set up buttons
 	m_playAction->setToolTip(tr("Play song (Space)"));
@@ -928,9 +982,23 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	m_recordAccompanyAction->setToolTip(tr("Record samples from Audio-device while playing song or pattern track"));
 	m_stopAction->setToolTip(tr( "Stop song (Space)" ));
 
+	auto addTransportButton = [songToolBar](QAction* action, const char* name) {
+		songToolBar->addAction(action);
+		if (QWidget* const w = songToolBar->widgetForAction(action))
+			w->setObjectName(name);
+	};
+	addTransportButton(m_playAction, "playButton");
+	if (Engine::audioEngine()->audioDev()->supportsCapture())
+	{
+		addTransportButton(m_recordAction, "recordButton");
+		addTransportButton(m_recordAccompanyAction, "recordAccompanyButton");
+	}
+	addTransportButton(m_stopAction, "stopButton");
+	songToolBar->addSeparator();
+
 
 	// Track actions
-	DropToolBar *trackActionsToolBar = addDropToolBarToTop(tr("Track actions"));
+	DropToolBar *trackActionsToolBar = songToolBar;
 
 	m_addPatternTrackAction = new QAction(embed::getIconPixmap("add_pattern_track"),
 									 tr("Add pattern-track"), this);
@@ -948,10 +1016,11 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	trackActionsToolBar->addAction( m_addPatternTrackAction );
 	trackActionsToolBar->addAction( m_addSampleTrackAction );
 	trackActionsToolBar->addAction( m_addAutomationTrackAction );
+	trackActionsToolBar->addSeparator();
 
 
 	// Edit actions
-	DropToolBar *editActionsToolBar = addDropToolBarToTop(tr("Edit actions"));
+	DropToolBar *editActionsToolBar = songToolBar;
 
 	m_editModeGroup = new ActionGroup(this);
 	m_drawModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_draw"), tr("Draw mode"));
@@ -966,19 +1035,22 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	editActionsToolBar->addAction( m_drawModeAction );
 	editActionsToolBar->addAction( m_knifeModeAction );
 	editActionsToolBar->addAction( m_selectModeAction );
+	editActionsToolBar->addSeparator();
 
-	DropToolBar *timeLineToolBar = addDropToolBarToTop(tr("Timeline controls"));
+	DropToolBar *timeLineToolBar = songToolBar;
 	m_editor->m_timeLine->addToolButtons(timeLineToolBar);
+	timeLineToolBar->addSeparator();
 
-	DropToolBar *insertActionsToolBar = addDropToolBarToTop(tr("Bar insert controls"));
+	DropToolBar *insertActionsToolBar = songToolBar;
 	m_insertBarAction = new QAction(embed::getIconPixmap("insert_bar"), tr("Insert bar"), this);
 	m_removeBarAction = new QAction(embed::getIconPixmap("remove_bar"), tr("Remove bar"), this);
 	insertActionsToolBar->addAction( m_insertBarAction );
 	insertActionsToolBar->addAction( m_removeBarAction );
 	connect(m_insertBarAction, SIGNAL(triggered()), song, SLOT(insertBar()));
 	connect(m_removeBarAction, SIGNAL(triggered()), song, SLOT(removeBar()));
+	insertActionsToolBar->addSeparator();
 
-	DropToolBar *zoomToolBar = addDropToolBarToTop(tr("Zoom controls"));
+	DropToolBar *zoomToolBar = songToolBar;
 
 	auto zoom_lbl = new QLabel(m_toolBar);
 	zoom_lbl->setPixmap( embed::getIconPixmap( "zoom" ) );
@@ -996,10 +1068,12 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 
 	zoomToolBar->addWidget( zoom_lbl );
 	zoomToolBar->addWidget(m_zoomingSlider);
+	zoomToolBar->addSeparator();
 
-	DropToolBar *snapToolBar = addDropToolBarToTop(tr("Snap controls"));
+	DropToolBar *snapToolBar = songToolBar;
 	auto snap_lbl = new QLabel(m_toolBar);
 	snap_lbl->setPixmap( embed::getIconPixmap( "quantize" ) );
+	snap_lbl->setToolTip( tr( "Clip snapping size" ) );
 
 	//Set up quantization/snapping selector
 	m_snappingComboBox = new ComboBox( m_toolBar );
@@ -1022,6 +1096,22 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 
 	snapToolBar->addSeparator();
 	snapToolBar->addWidget( m_snapSizeLabel );
+
+	auto setupOverflowButton = [this](DropToolBar* const bar) {
+		if (QToolButton* const ext = bar->findChild<QToolButton*>("qt_toolbar_ext_button"))
+		{
+			if (!ext->property("lmmsOverflowFilter").toBool())
+			{
+				ext->installEventFilter(new ToolBarOverflowButtonFilter(ext));
+				ext->setProperty("lmmsOverflowFilter", true);
+			}
+			ext->setToolTip(tr("More tools"));
+		}
+	};
+	setupOverflowButton(songToolBar);
+	QTimer::singleShot(0, this, [setupOverflowButton, songToolBar]() {
+		setupOverflowButton(songToolBar);
+	});
 
 	connect(song, SIGNAL(projectLoaded()), this, SLOT(adjustUiAfterProjectLoad()));
 	connect(this, SIGNAL(resized()), m_editor, SLOT(updatePositionLine()));
