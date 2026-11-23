@@ -319,6 +319,10 @@ private:
 	BoolModel m_useMasterPitchModel;
 
 	Instrument * m_instrument;
+
+	//! XML of an instrument whose plugin is unavailable, kept so that saving
+	//! the project does not discard the plugin data (#8547).
+	QString m_unknownInstrumentXml;
 	InstrumentSoundShaping m_soundShaping;
 	InstrumentFunctionArpeggio m_arpeggio;
 	InstrumentFunctionNoteStacking m_noteStacking;
