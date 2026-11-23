@@ -1,19 +1,19 @@
-<?xml version="1.0"?>
+<?xml version='1.0'?>
 <!DOCTYPE lmms-project>
-<lmms-project type="song" version="1.0" creator="LMMS" creatorversion="1.2.0">
-  <head timesig_denominator="4" bpm="140" masterpitch="0" mastervol="100" timesig_numerator="4"/>
+<lmms-project creatorplatform="linux" creatorplatformtype="debian" version="31" creator="LMMS" type="song" creatorversion="1.3.0-alpha.2.31+caab053">
+  <head mastervol="100" timesig_numerator="4" bpm="140" masterpitch="0" timesig_denominator="4"/>
   <song>
-    <trackcontainer visible="1" width="600" height="300" type="song" x="6" y="5" maximized="0" minimized="0"/>
-    <mixer visible="1" width="561" height="332" x="5" y="310" maximized="0" minimized="0">
-      <mixerchannel num="0" muted="0" volume="1" name="Master" soloed="0">
-        <fxchain numofeffects="0" enabled="0"/>
+    <trackcontainer minimized="0" height="300" width="600" maximized="0" type="song" x="6" visible="1" y="5"/>
+    <mixer minimized="0" height="332" width="561" maximized="0" x="5" visible="1" y="310">
+      <mixerchannel soloed="0" name="Master" num="0" volume="1" muted="0">
+        <fxchain enabled="0" numofeffects="0"/>
       </mixerchannel>
     </mixer>
-    <ControllerRackView visible="1" width="258" height="142" x="836" y="407" maximized="0" minimized="0"/>
-    <pianoroll visible="0" width="640" height="480" x="1" y="1" maximized="0" minimized="0"/>
-    <automationeditor visible="0" width="640" height="400" x="56" y="255" maximized="0" minimized="0"/>
-    <projectnotes visible="0" width="640" height="400" x="1" y="1" maximized="0" minimized="0"></projectnotes>
-    <timeline lp0pos="0" lp1pos="192" lpstate="0"/>
+    <ControllerRackView minimized="0" height="142" width="258" maximized="0" x="836" visible="1" y="407"/>
+    <pianoroll minimized="0" height="480" width="640" maximized="0" x="1" visible="0" y="1"/>
+    <automationeditor minimized="0" height="400" width="640" maximized="0" x="56" visible="0" y="255"/>
+    <projectnotes minimized="0" height="400" width="640" maximized="0" x="1" visible="0" y="1"/>
+    <timeline lp1pos="192" lp0pos="0" lpstate="0"/>
     <controllers/>
   </song>
 </lmms-project>
