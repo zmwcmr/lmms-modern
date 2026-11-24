@@ -28,6 +28,7 @@
 #include <cctype>
 #include <set>
 
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -40,6 +41,7 @@
 #include <QString>
 
 #include "ConfigManager.h"
+#include "GuiApplication.h"
 #include "VstPlugin.h"
 #include "lmmsconfig.h"
 
@@ -289,6 +291,13 @@ void VstList::scanFile(const fs::path& filePath)
 		return;
 	}
 
+	if (gui::getGUI() != nullptr)
+	{
+		gui::getGUI()->displayInitProgress(
+			QCoreApplication::translate("VstList", "Scanning VSTs: %1")
+				.arg(fromPath(canonical)));
+	}
+
 	Metadata metadata;
 	metadata.path = canonical;
 	metadata.mtimeMs = mtimeMs;
@@ -311,6 +320,10 @@ void VstList::scanFile(const fs::path& filePath)
 
 	m_cache.insert_or_assign(key, std::move(metadata));
 	m_cacheChanged = true;
+
+	// Persist after every probe so an interrupted first scan does not lose
+	// all work and the next launch can continue where this one stopped.
+	saveCache();
 }
 
 void VstList::addToVisible(const Metadata& metadata)
