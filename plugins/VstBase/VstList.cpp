@@ -28,6 +28,7 @@
 #include <cctype>
 #include <set>
 
+#include <QByteArray>
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -220,6 +221,23 @@ void VstList::scanDefaultDirs()
 #if defined(LMMS_BUILD_WIN32)
 	scanDirRecursive(fs::path("C:/Program Files/Steinberg/VstPlugins"));
 #elif defined(LMMS_BUILD_LINUX)
+	// Honour the de-facto standard VST2 search path used by most Linux hosts.
+	for (const auto& variable : {QByteArrayLiteral("VST_PATH"),
+		QByteArrayLiteral("VST2_PATH")})
+	{
+		const auto value = qgetenv(variable.constData());
+		for (const auto& entry : value.split(':'))
+		{
+			if (!entry.isEmpty())
+			{
+				scanDirRecursive(toPath(QString::fromLocal8Bit(entry)));
+			}
+		}
+	}
+	scanDirRecursive(toPath(QDir::homePath() + QStringLiteral("/.vst")));
+	scanDirRecursive(toPath(QDir::homePath() + QStringLiteral("/.local/lib/vst")));
+	scanDirRecursive(fs::path("/usr/local/lib64/vst"));
+	scanDirRecursive(fs::path("/usr/local/lib/vst"));
 	scanDirRecursive(fs::path("/usr/lib64/vst"));
 	scanDirRecursive(fs::path("/usr/lib/vst"));
 #	if defined(LMMS_HAVE_VST_32) || defined(LMMS_HAVE_VST_64)
