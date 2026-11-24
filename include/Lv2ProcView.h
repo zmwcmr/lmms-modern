@@ -100,6 +100,7 @@ private:
 	bool useFloatingWindow() const;
 	void createUi();
 	void destroyUi();
+	void setUiVisible(bool visible);
 	void updateUi();
 	void resizeUiToPlugin();
 	int resizeUiRequest(int width, int height);
@@ -130,6 +131,9 @@ private:
 	LV2UI_Resize m_resize{};
 	float m_uiScale = 1.0f;
 	float m_uiSampleRate = 0.0f;
+	bool m_uiVisible = false;
+	int m_x11SavedX = 100;
+	int m_x11SavedY = 100;
 #endif
 
 #if defined(LMMS_BUILD_LINUX)

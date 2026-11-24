@@ -309,6 +309,7 @@ bool Lv2ProcView::hasPluginUi() const
 		}
 	}
 #endif
+	qDebug() << "TEST hasPluginUi false";
 	return false;
 }
 
@@ -410,6 +411,8 @@ void Lv2ProcView::createUi()
 		const QByteArray title = qStringFromPluginNode(m_proc->getPlugin(),
 			lilv_plugin_get_name).toUtf8();
 		XStoreName(dpy, m_x11Window, title.constData());
+		m_x11SavedX = 100;
+		m_x11SavedY = 100;
 		XMapWindow(dpy, m_x11Window);
 		XFlush(dpy);
 
@@ -531,6 +534,7 @@ void Lv2ProcView::createUi()
 		updateUi();
 	});
 	m_uiTimer->start(33);
+	m_uiVisible = true;
 #endif
 }
 
@@ -544,6 +548,7 @@ void Lv2ProcView::destroyUi()
 	{
 		m_proc->setUiActive(false);
 	}
+	m_uiVisible = false;
 
 	if (m_uiTimer)
 	{
@@ -791,7 +796,9 @@ void Lv2ProcView::toggleUI()
 #ifdef LMMS_HAVE_SUIL
 	if (m_uiInstance)
 	{
-		destroyUi();
+		// Keep the native UI instance alive and only hide/show it. Some UIs
+		// (e.g. Pianoteq) do not survive repeated destruction/re-creation.
+		setUiVisible(!m_uiVisible);
 	}
 	else
 	{
@@ -801,7 +808,51 @@ void Lv2ProcView::toggleUI()
 	if (m_toggleUIButton)
 	{
 		QSignalBlocker blocker(m_toggleUIButton);
-		m_toggleUIButton->setChecked(m_uiInstance != nullptr);
+		m_toggleUIButton->setChecked(m_uiVisible);
+	}
+#endif
+}
+
+
+
+
+void Lv2ProcView::setUiVisible(bool visible)
+{
+#ifdef LMMS_HAVE_SUIL
+	if (!m_uiInstance || m_uiVisible == visible)
+	{
+		return;
+	}
+	m_uiVisible = visible;
+
+#if defined(LMMS_BUILD_LINUX)
+	if (m_x11Window && m_x11Display)
+	{
+		Display* dpy = static_cast<Display*>(m_x11Display);
+		if (visible)
+		{
+			XMoveWindow(dpy, m_x11Window, m_x11SavedX, m_x11SavedY);
+			XRaiseWindow(dpy, m_x11Window);
+		}
+		else
+		{
+			XWindowAttributes attr{};
+			if (XGetWindowAttributes(dpy, m_x11Window, &attr))
+			{
+				m_x11SavedX = attr.x;
+				m_x11SavedY = attr.y;
+			}
+			XMoveWindow(dpy, m_x11Window, -20000, -20000);
+		}
+		XFlush(dpy);
+		return;
+	}
+#endif
+
+	if (m_uiWindow)
+	{
+		if (visible) { m_uiWindow->show(); }
+		else { m_uiWindow->hide(); }
 	}
 #endif
 }
@@ -876,5 +927,6 @@ bool HelpWindowEventFilter::eventFilter(QObject* , QEvent* event)
 
 
 } // namespace lmms::gui
+
 
 #endif // LMMS_HAVE_LV2
