@@ -100,6 +100,8 @@ private:
 	void destroyUi();
 	void updateUi();
 	void resizeUiToPlugin();
+	int resizeUiRequest(int width, int height);
+	void applyUiResize(int width, int height);
 	void touchPort(uint32_t portIndex, bool grabbed);
 	void writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
 		uint32_t protocol, const void* buffer);

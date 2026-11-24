@@ -36,6 +36,7 @@ Environment overrides:
 - Control values are periodically pushed to the UI.
 - Atom events are forwarded in both directions (`atom:eventTransfer`).
 - `ui:idleInterface` is called at ~30 Hz.
+- Dynamic `ui:resize` requests are queued to the GUI thread.
 - Touch events are accepted (currently no-op).
 - The UI is detached and freed before the plugin instance is destroyed.
 - Plugin state (including state bundles with files) is saved and restored by
@@ -46,8 +47,6 @@ Environment overrides:
 - Surge XT is blocklisted for native UI because its JUCE X11 UI corrupts the
   heap when hosted here; its generic controls remain usable.
 - Qt5/GTK-only UIs are not supported by the current host.
-- Dynamic `ui:resize` requests are not applied; the window is sized once from
-  the UI's initial geometry.
 - Atom events are queued with a mutex; the audio-thread path is not fully
   real-time safe yet.
 - A UI crash runs in-process and can take LMMS down with it. Out-of-process

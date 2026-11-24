@@ -37,6 +37,7 @@
 #include <QMdiSubWindow>
 #include <QPushButton>
 #include <QSignalBlocker>
+#include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -419,6 +420,13 @@ void Lv2ProcView::createUi()
 			static_cast<Lv2ProcView*>(handle)->touchPort(port, grabbed);
 		});
 
+	LV2UI_Resize resize{this,
+		[](LV2UI_Feature_Handle handle, int width, int height) -> int
+		{
+			return static_cast<Lv2ProcView*>(handle)->resizeUiRequest(width, height);
+		}};
+	LV2_Feature resizeFeature{LV2_UI__resize, &resize};
+
 	LV2_Feature parentFeature{
 		LV2_UI__parent,
 		reinterpret_cast<void*>(static_cast<uintptr_t>(parentId))
@@ -436,6 +444,7 @@ void Lv2ProcView::createUi()
 		&parentFeature,
 		&instanceFeature,
 		&dataFeature,
+		&resizeFeature,
 		m_proc->mapFeature(),
 		m_proc->unmapFeature(),
 		m_proc->optionsFeature(),
@@ -589,6 +598,61 @@ void Lv2ProcView::resizeUiToPlugin()
 	}
 #endif
 #endif
+}
+
+
+
+
+int Lv2ProcView::resizeUiRequest(int width, int height)
+{
+	if (width <= 0 || height <= 0)
+	{
+		return 1;
+	}
+
+	// Some UIs request a size from inside suil_instance_new().
+	if (!m_uiInstance)
+	{
+		return 0;
+	}
+
+	if (QThread::currentThread() != m_pluginWidget->thread())
+	{
+		QMetaObject::invokeMethod(m_pluginWidget,
+			[this, width, height] { applyUiResize(width, height); },
+			Qt::QueuedConnection);
+		return 0;
+	}
+
+	applyUiResize(width, height);
+	return 0;
+}
+
+
+
+
+void Lv2ProcView::applyUiResize(int width, int height)
+{
+#if defined(LMMS_BUILD_LINUX)
+	if (m_x11Window && m_x11Display)
+	{
+		Display* dpy = static_cast<Display*>(m_x11Display);
+		XResizeWindow(dpy, m_x11Window, static_cast<unsigned>(width),
+			static_cast<unsigned>(height));
+		XFlush(dpy);
+		return;
+	}
+#endif
+
+	if (m_uiHostWidget)
+	{
+		m_uiHostWidget->setMinimumSize(width, height);
+		m_uiHostWidget->resize(width, height);
+		if (m_uiWindow)
+		{
+			m_uiWindow->resize(width, height);
+		}
+	}
 }
 
 
