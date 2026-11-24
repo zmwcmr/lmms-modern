@@ -340,7 +340,12 @@ AutoLilvNodes Lv2Manager::findNodes(const LilvNode *subject,
 
 bool Lv2Manager::wantUi()
 {
+#ifdef LMMS_HAVE_SUIL
+	const char* disable = getenv("LMMS_DISABLE_LV2_UI");
+	return !(disable && *disable);
+#else
 	return false;
+#endif
 }
 
 

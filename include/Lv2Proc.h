@@ -31,6 +31,7 @@
 
 #include <lilv/lilv.h>
 #include <lv2/state/state.h>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -183,6 +184,25 @@ public:
 	const LilvPlugin* getPlugin() const { return m_plugin; }
 	bool hasGui() const { return m_hasGUI; }
 
+	/*
+		UI support
+	*/
+	LilvUIs* getUis() const { return lilv_plugin_get_uis(m_plugin); }
+	const char* pluginUri() const { return lilv_node_as_uri(lilv_plugin_get_uri(m_plugin)); }
+	std::size_t getIdOfPort(const char* symbol) const;
+	std::size_t portNum() const { return m_ports.size(); }
+	const Lv2Ports::PortBase* port(std::size_t idx) const { return m_ports[idx].get(); }
+	//! Called by the UI when the user moves a control
+	void setControlFromUi(uint32_t portIndex, float value);
+	//! Let the view detach its native UI before the plugin instance dies
+	void setViewDetacher(std::function<void()> detacher) { m_viewDetacher = std::move(detacher); }
+
+	const LilvInstance* getInstanceForInstanceFeatureOnly() const { return m_instance; }
+	const LV2_Feature* mapFeature() const { return m_features.feature(LV2_URID__map); }
+	const LV2_Feature* unmapFeature() const { return m_features.feature(LV2_URID__unmap); }
+	const LV2_Feature* optionsFeature() const { return m_features.feature(LV2_OPTIONS__options); }
+	LV2_Extension_Data_Feature* extdataFeature() { return &m_features.m_extData; }
+
 protected:
 	//! To be called by `Plugin::loadFile` overrides
 	void loadFile(const QString &file) { (void)file; }
@@ -232,6 +252,9 @@ private:
 	LV2_State_Make_Path m_makePath;
 	LV2_State_Free_Path m_freePath;
 	LV2_State_Map_Path m_mapPath;
+
+	//! Called by the view to detach its native UI before shutdown
+	std::function<void()> m_viewDetacher;
 
 	void saveState(QDomDocument& doc, QDomElement& that);
 	void loadState(const QDomElement& that);

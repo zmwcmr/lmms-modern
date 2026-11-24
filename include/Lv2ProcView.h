@@ -1,7 +1,7 @@
 /*
- * Lv2ViewBase.h - base class for Lv2 plugin views
+ * Lv2ProcView.h - base class for Lv2 plugin views
  *
- * Copyright (c) 2018-2024 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
+ * Copyright (c) 2018-2026 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
  *
  * This file is part of LMMS - https://lmms.io
  *
@@ -30,31 +30,27 @@
 
 #ifdef LMMS_HAVE_LV2
 
-
 #include <QWidget>
-namespace lmms::gui {
-class Control;
-}
 
 #include "ModelGroupView.h"
 #include "lmms_export.h"
 #include "Lv2Basics.h"
 
+#ifdef LMMS_HAVE_SUIL
+#include <suil/suil.h>
+#endif
 
 class QPushButton;
 class QMdiSubWindow;
+class QTimer;
+
 namespace lmms
 {
 
-
 class Lv2Proc;
-class Lv2ControlBase;
-
 
 namespace gui
 {
-
-
 
 class HelpWindowEventFilter : public QObject
 {
@@ -92,18 +88,30 @@ protected:
 	void modelChanged(Lv2Proc *proc);
 
 private:
-	enum Rows
-	{
-		ButtonRow,
-		ProcRow,
-		LinkChannelsRow
-	};
-
 	static AutoLilvNode uri(const char *uriStr);
 	void onHelpWindowClosed();
 
-	//! Numbers of controls per row; must be multiple of 2 for mono effects
-	const int m_colNum = 6;
+	//! Whether a supported native UI exists for this plugin
+	bool hasPluginUi() const;
+	void createUi();
+	void destroyUi();
+	void updateUi();
+	void resizeUiToPlugin();
+	void writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
+		uint32_t protocol, const void* buffer);
+	uint32_t indexOfPort(const char* symbol);
+
+	Lv2Proc* m_proc = nullptr;
+	QWidget* m_pluginWidget = nullptr;
+
+#ifdef LMMS_HAVE_SUIL
+	SuilHost* m_uiHost = nullptr;
+	SuilInstance* m_uiInstance = nullptr;
+	QWidget* m_uiHostWidget = nullptr;
+	QMdiSubWindow* m_uiWindow = nullptr;
+	QTimer* m_uiTimer = nullptr;
+#endif
+
 	QMdiSubWindow* m_helpWindow = nullptr;
 	HelpWindowEventFilter m_helpWindowEventFilter;
 };

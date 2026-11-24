@@ -26,6 +26,8 @@
 
 #ifdef LMMS_HAVE_LV2
 
+#include <cstring>
+
 #include <QtGlobal>
 
 #include "Engine.h"
@@ -102,6 +104,21 @@ void *&Lv2Features::operator[](const char *featName)
 	auto itr = m_featureByUri.find(featName);
 	Q_ASSERT(itr != m_featureByUri.end());
 	return itr->second;
+}
+
+
+
+
+const LV2_Feature* Lv2Features::feature(const char* uri) const
+{
+	for (const auto& f : m_features)
+	{
+		if (f.URI && std::strcmp(f.URI, uri) == 0)
+		{
+			return &f;
+		}
+	}
+	return nullptr;
 }
 
 

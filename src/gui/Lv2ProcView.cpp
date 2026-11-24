@@ -1,7 +1,7 @@
 /*
  * Lv2ProcView.cpp - base class for Lv2 plugin views
  *
- * Copyright (c) 2018-2024 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
+ * Copyright (c) 2018-2026 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
  *
  * This file is part of LMMS - https://lmms.io
  *
@@ -26,29 +26,47 @@
 
 #ifdef LMMS_HAVE_LV2
 
-#include <QGridLayout>
-#include <QPushButton>
+#include <algorithm>
+#include <cmath>
+
+#include <QApplication>
+#include <QDebug>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMdiSubWindow>
+#include <QPushButton>
+#include <QSignalBlocker>
+#include <QTimer>
+#include <QVBoxLayout>
+
 #include <lilv/lilv.h>
+#include <lv2/instance-access/instance-access.h>
 #include <lv2/port-props/port-props.h>
+#include <lv2/ui/ui.h>
+
+#ifdef LMMS_HAVE_SUIL
+#include <suil/suil.h>
+#endif
 
 #include "AudioEngine.h"
+#include "ControlLayout.h"
 #include "Controls.h"
-#include "Engine.h"
-#include "GuiApplication.h"
 #include "embed.h"
+#include "Engine.h"
 #include "FontHelper.h"
+#include "GuiApplication.h"
 #include "lmms_math.h"
-#include "Lv2Proc.h"
 #include "Lv2Manager.h"
-#include "Lv2Proc.h"
 #include "Lv2Ports.h"
+#include "Lv2Proc.h"
 #include "MainWindow.h"
 #include "SubWindow.h"
 
+#if defined(LMMS_BUILD_LINUX)
+#include <X11/Xlib.h>
+#endif
 
-#include "ControlLayout.h"
 
 namespace lmms::gui
 {
@@ -56,9 +74,18 @@ namespace lmms::gui
 
 Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	ModelGroupView(meAsWidget, proc),
+	m_proc(proc),
+	m_pluginWidget(meAsWidget),
 	m_helpWindowEventFilter(this)
 {
-	auto grid = new QGridLayout(meAsWidget);
+	// Destroy the native UI before the plugin instance is shut down.
+	if (m_proc)
+	{
+		m_proc->setViewDetacher([this] {
+			destroyUi();
+			m_proc = nullptr;
+		});
+	}
 
 	auto btnBox = new QHBoxLayout();
 	if (/* DISABLES CODE */ (false))
@@ -68,10 +95,10 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		btnBox->addWidget(m_reloadPluginButton, 0);
 	}
 
-	if (/* DISABLES CODE */ (false)) // TODO: check if the plugin has the UI extension
+	if (hasPluginUi())
 	{
 		m_toggleUIButton = new QPushButton(QObject::tr("Show GUI"),
-											meAsWidget);
+			meAsWidget);
 		m_toggleUIButton->setCheckable(true);
 		m_toggleUIButton->setChecked(false);
 		m_toggleUIButton->setIcon(embed::getIconPixmap("zoom"));
@@ -110,7 +137,18 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 
 	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton)
 	{
-		grid->addLayout(btnBox, Rows::ButtonRow, 0, 1, m_colNum);
+		auto* buttonBar = new QWidget(meAsWidget);
+		buttonBar->setObjectName("lv2ButtonBar");
+		buttonBar->setLayout(btnBox);
+		if (auto* layout = meAsWidget->layout())
+		{
+			layout->addWidget(buttonBar);
+		}
+		else
+		{
+			auto* vlayout = new QVBoxLayout(meAsWidget);
+			vlayout->addWidget(buttonBar);
+		}
 	}
 	else { delete btnBox; }
 
@@ -188,9 +226,333 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 
 
 
-Lv2ProcView::~Lv2ProcView() {
+Lv2ProcView::~Lv2ProcView()
+{
+	if (m_proc)
+	{
+		m_proc->setViewDetacher(nullptr);
+		m_proc = nullptr;
+	}
+	destroyUi();
 	closeHelpWindow();
-	// TODO: hide UI if required
+}
+
+
+
+
+bool Lv2ProcView::hasPluginUi() const
+{
+#ifdef LMMS_HAVE_SUIL
+	if (!m_proc || !Lv2Manager::wantUi())
+	{
+		return false;
+	}
+
+	// The current host embeds X11 UIs. Qt5 UI support can be added later.
+	if (QGuiApplication::platformName() != "xcb")
+	{
+		return false;
+	}
+
+	LilvUIs* uis = m_proc->getUis();
+	if (!uis)
+	{
+		return false;
+	}
+
+	AutoLilvNode hostType = uri(LV2_UI__X11UI);
+	LILV_FOREACH(uis, it, uis)
+	{
+		const LilvUI* ui = lilv_uis_get(uis, it);
+		const LilvNode* uiType = nullptr;
+		if (lilv_ui_is_supported(ui, suil_ui_supported, hostType.get(), &uiType))
+		{
+			return true;
+		}
+	}
+#endif
+	return false;
+}
+
+
+
+
+void Lv2ProcView::createUi()
+{
+#ifdef LMMS_HAVE_SUIL
+	if (m_uiInstance || !m_proc || !hasPluginUi())
+	{
+		return;
+	}
+
+	LilvUIs* uis = m_proc->getUis();
+	AutoLilvNode hostType = uri(LV2_UI__X11UI);
+	const LilvUI* ui = nullptr;
+	const LilvNode* uiType = nullptr;
+	LILV_FOREACH(uis, it, uis)
+	{
+		const LilvUI* candidate = lilv_uis_get(uis, it);
+		const LilvNode* candidateType = nullptr;
+		if (lilv_ui_is_supported(candidate, suil_ui_supported, hostType.get(), &candidateType))
+		{
+			ui = candidate;
+			uiType = candidateType;
+			break;
+		}
+	}
+
+	if (!ui)
+	{
+		return;
+	}
+
+	m_uiHostWidget = new QWidget;
+	m_uiHostWidget->setAttribute(Qt::WA_NativeWindow);
+	m_uiHostWidget->setAttribute(Qt::WA_OpaquePaintEvent);
+	m_uiHostWidget->setMinimumSize(320, 240);
+	m_uiHostWidget->resize(900, 700);
+
+	m_uiWindow = getGUI()->mainWindow()->addWindowedWidget(m_uiHostWidget);
+	if (!m_uiWindow)
+	{
+		destroyUi();
+		return;
+	}
+	m_uiWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+	m_uiWindow->setWindowTitle(qStringFromPluginNode(m_proc->getPlugin(),
+		lilv_plugin_get_name));
+	m_uiWindow->show();
+	m_uiHostWidget->show();
+	QApplication::processEvents();
+
+	const WId parentId = m_uiHostWidget->winId();
+	if (parentId == 0)
+	{
+		qWarning() << "Could not create a native window for the LV2 UI";
+		destroyUi();
+		return;
+	}
+
+	m_uiHost = suil_host_new(
+		[](void* handle, uint32_t port, uint32_t size, uint32_t protocol, const void* buffer)
+		{
+			static_cast<Lv2ProcView*>(handle)->writeToPlugin(port, size, protocol, buffer);
+		},
+		[](void* handle, const char* symbol) -> uint32_t
+		{
+			return static_cast<Lv2ProcView*>(handle)->indexOfPort(symbol);
+		},
+		nullptr, nullptr);
+	if (!m_uiHost)
+	{
+		qWarning() << "Could not create the LV2 UI host";
+		destroyUi();
+		return;
+	}
+
+	LV2_Feature parentFeature{
+		LV2_UI__parent,
+		reinterpret_cast<void*>(static_cast<uintptr_t>(parentId))
+	};
+	LV2_Feature instanceFeature{
+		LV2_INSTANCE_ACCESS_URI,
+		const_cast<void*>(lilv_instance_get_handle(
+			m_proc->getInstanceForInstanceFeatureOnly()))
+	};
+	LV2_Feature dataFeature{
+		LV2_DATA_ACCESS_URI,
+		m_proc->extdataFeature()
+	};
+	const LV2_Feature* features[] = {
+		&parentFeature,
+		&instanceFeature,
+		&dataFeature,
+		m_proc->mapFeature(),
+		m_proc->unmapFeature(),
+		m_proc->optionsFeature(),
+		nullptr
+	};
+
+	AutoLilvPtr<char> bundlePath(lilv_file_uri_parse(
+		lilv_node_as_uri(lilv_ui_get_bundle_uri(ui)), nullptr));
+	AutoLilvPtr<char> binaryPath(lilv_file_uri_parse(
+		lilv_node_as_uri(lilv_ui_get_binary_uri(ui)), nullptr));
+
+	m_uiInstance = suil_instance_new(
+		m_uiHost,
+		this,
+		LV2_UI__X11UI,
+		m_proc->pluginUri(),
+		lilv_node_as_uri(lilv_ui_get_uri(ui)),
+		uiType ? lilv_node_as_uri(uiType) : LV2_UI__X11UI,
+		bundlePath.get(),
+		binaryPath.get(),
+		features);
+
+	if (!m_uiInstance)
+	{
+		qWarning() << "Could not instantiate the LV2 UI for"
+			<< m_proc->pluginUri();
+		destroyUi();
+		return;
+	}
+
+	resizeUiToPlugin();
+	QTimer::singleShot(200, m_pluginWidget, [this] { resizeUiToPlugin(); });
+	QTimer::singleShot(1000, m_pluginWidget, [this] { resizeUiToPlugin(); });
+
+	m_uiTimer = new QTimer(m_pluginWidget);
+	QObject::connect(m_uiTimer, &QTimer::timeout, m_pluginWidget, [this] {
+		updateUi();
+	});
+	m_uiTimer->start(33);
+#endif
+}
+
+
+
+
+void Lv2ProcView::destroyUi()
+{
+#ifdef LMMS_HAVE_SUIL
+	if (m_uiTimer)
+	{
+		m_uiTimer->stop();
+		delete m_uiTimer;
+		m_uiTimer = nullptr;
+	}
+	if (m_uiInstance)
+	{
+		suil_instance_free(m_uiInstance);
+		m_uiInstance = nullptr;
+	}
+	if (m_uiHost)
+	{
+		suil_host_free(m_uiHost);
+		m_uiHost = nullptr;
+	}
+	if (m_uiWindow)
+	{
+		m_uiWindow->hide();
+		m_uiWindow->deleteLater();
+		m_uiWindow = nullptr;
+		m_uiHostWidget = nullptr;
+	}
+	if (m_uiHostWidget)
+	{
+		delete m_uiHostWidget;
+		m_uiHostWidget = nullptr;
+	}
+#endif
+}
+
+
+
+
+void Lv2ProcView::resizeUiToPlugin()
+{
+#ifdef LMMS_HAVE_SUIL
+	if (!m_uiInstance || !m_uiHostWidget)
+	{
+		return;
+	}
+
+#if defined(LMMS_BUILD_LINUX)
+	Display* dpy = XOpenDisplay(nullptr);
+	if (!dpy)
+	{
+		return;
+	}
+
+	XWindowAttributes attr{};
+	const auto widget = reinterpret_cast<uintptr_t>(
+		suil_instance_get_widget(m_uiInstance));
+	if (widget
+		&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
+		&& attr.width > 0 && attr.height > 0)
+	{
+		const qreal dpr = m_uiHostWidget->devicePixelRatioF();
+		const int width = std::max(static_cast<int>(std::lround(attr.width / dpr)), 320);
+		const int height = std::max(static_cast<int>(std::lround(attr.height / dpr)), 240);
+		m_uiHostWidget->setMinimumSize(width, height);
+		m_uiHostWidget->resize(width, height);
+		if (m_uiWindow)
+		{
+			m_uiWindow->resize(width, height);
+		}
+	}
+	XCloseDisplay(dpy);
+#endif
+#endif
+}
+
+
+
+
+void Lv2ProcView::updateUi()
+{
+#ifdef LMMS_HAVE_SUIL
+	if (!m_uiInstance || !m_proc)
+	{
+		return;
+	}
+
+	for (std::size_t i = 0; i < m_proc->portNum(); ++i)
+	{
+		const auto* port = m_proc->port(i);
+		if (!port || port->m_type != Lv2Ports::Type::Control)
+		{
+			continue;
+		}
+
+		const auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(port);
+		if (!ctrl)
+		{
+			continue;
+		}
+
+		float value = ctrl->m_val;
+		suil_instance_port_event(m_uiInstance, static_cast<uint32_t>(i),
+			sizeof(float), 0, &value);
+	}
+#endif
+}
+
+
+
+
+void Lv2ProcView::writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
+	uint32_t protocol, const void* buffer)
+{
+	if (!m_proc)
+	{
+		return;
+	}
+
+	if (protocol != 0 || bufferSize != sizeof(float) || !buffer)
+	{
+		qWarning() << "Unsupported LV2 UI event: protocol" << protocol
+			<< "size" << bufferSize;
+		return;
+	}
+
+	m_proc->setControlFromUi(portIndex, *static_cast<const float*>(buffer));
+}
+
+
+
+
+uint32_t Lv2ProcView::indexOfPort(const char* symbol)
+{
+	if (!m_proc || !symbol)
+	{
+		return LV2UI_INVALID_PORT_INDEX;
+	}
+
+	const auto id = m_proc->getIdOfPort(symbol);
+	return id == static_cast<std::size_t>(-1)
+		? LV2UI_INVALID_PORT_INDEX
+		: static_cast<uint32_t>(id);
 }
 
 
@@ -198,6 +560,22 @@ Lv2ProcView::~Lv2ProcView() {
 
 void Lv2ProcView::toggleUI()
 {
+#ifdef LMMS_HAVE_SUIL
+	if (m_uiInstance)
+	{
+		destroyUi();
+	}
+	else
+	{
+		createUi();
+	}
+
+	if (m_toggleUIButton)
+	{
+		QSignalBlocker blocker(m_toggleUIButton);
+		m_toggleUIButton->setChecked(m_uiInstance != nullptr);
+	}
+#endif
 }
 
 
@@ -228,7 +606,8 @@ void Lv2ProcView::modelChanged(Lv2Proc *proc)
 	// reconnect models
 	if (m_toggleUIButton)
 	{
-		m_toggleUIButton->setChecked(proc->hasGui());
+		QSignalBlocker blocker(m_toggleUIButton);
+		m_toggleUIButton->setChecked(m_uiInstance != nullptr);
 	}
 
 	ModelGroupView::modelChanged(proc);
@@ -255,7 +634,6 @@ void Lv2ProcView::onHelpWindowClosed()
 
 HelpWindowEventFilter::HelpWindowEventFilter(Lv2ProcView* viewBase) :
 	m_procView(viewBase) {}
-
 
 
 

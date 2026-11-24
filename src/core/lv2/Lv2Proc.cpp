@@ -29,6 +29,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <lv2/midi/midi.h>
 #include <lv2/atom/atom.h>
@@ -55,6 +56,7 @@
 #include "Lv2Evbuf.h"
 #include "MidiEvent.h"
 #include "MidiEventToByteSeq.h"
+#include "ModelVisitor.h"
 #include "NoCopyNoMove.h"
 
 
@@ -227,7 +229,15 @@ Lv2Proc::Lv2Proc(Model* parent, const QString &uri) :
 
 
 
-Lv2Proc::~Lv2Proc() { shutdownPlugin(); }
+Lv2Proc::~Lv2Proc()
+{
+	if (m_viewDetacher)
+	{
+		m_viewDetacher();
+		m_viewDetacher = nullptr;
+	}
+	shutdownPlugin();
+}
 
 
 
@@ -374,6 +384,79 @@ void Lv2Proc::copyBuffersToCore(SampleFrame* buf, f_cnt_t frames) const
 	Lv2Ports::Audio* ap = outPorts().m_right
 		? outPorts().m_right : outPorts().m_left;
 	ap->copyBuffersToCore(buf, 1, frames);
+}
+
+
+
+
+std::size_t Lv2Proc::getIdOfPort(const char* symbol) const
+{
+	for (std::size_t i = 0; i < m_ports.size(); ++i)
+	{
+		const auto* port = m_ports[i].get();
+		const char* portSymbol = lilv_node_as_string(
+			lilv_port_get_symbol(port->m_plugin, port->m_port));
+		if (portSymbol && std::strcmp(portSymbol, symbol) == 0)
+		{
+			return i;
+		}
+	}
+	return static_cast<std::size_t>(-1);
+}
+
+
+
+
+void Lv2Proc::setControlFromUi(uint32_t portIndex, float value)
+{
+	if (portIndex >= m_ports.size())
+	{
+		return;
+	}
+
+	auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(m_ports[portIndex].get());
+	if (!ctrl || !ctrl->m_connectedModel)
+	{
+		return;
+	}
+
+	ctrl->m_val = value;
+
+	struct SetModelVisitor : ModelVisitor
+	{
+		const std::vector<float>* m_scalePointMap = nullptr;
+		float m_val = 0.f;
+
+		void visit(FloatModel& m) override { m.setValue(m_val); }
+		void visit(IntModel& m) override { m.setValue(m_val); }
+		void visit(BoolModel& m) override { m.setValue(m_val); }
+		void visit(ComboBoxModel& m) override
+		{
+			if (!m_scalePointMap || m_scalePointMap->empty())
+			{
+				m.setValue(m_val);
+				return;
+			}
+
+			float bestDist = std::numeric_limits<float>::max();
+			std::size_t bestIdx = 0;
+			for (std::size_t idx = 0; idx < m_scalePointMap->size(); ++idx)
+			{
+				const float dist = std::fabs((*m_scalePointMap)[idx] - m_val);
+				if (dist < bestDist)
+				{
+					bestDist = dist;
+					bestIdx = idx;
+				}
+			}
+			m.setValue(static_cast<float>(bestIdx));
+		}
+	};
+
+	SetModelVisitor visitor;
+	visitor.m_scalePointMap = &ctrl->m_scalePointMap;
+	visitor.m_val = value;
+	ctrl->m_connectedModel->accept(visitor);
 }
 
 
@@ -732,6 +815,10 @@ void Lv2Proc::initPlugin()
 
 	if (m_instance)
 	{
+		// Data-access feature for plugin UIs (extension_data of the plugin)
+		m_features.m_extData.data_access =
+			lilv_instance_get_descriptor(m_instance)->extension_data;
+
 		if (m_worker)
 		{
 			const auto iface = static_cast<const LV2_Worker_Interface*>(
