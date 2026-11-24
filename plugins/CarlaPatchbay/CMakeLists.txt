@@ -6,5 +6,11 @@ if(LMMS_HAVE_CARLA OR LMMS_HAVE_WEAKCARLA)
 	LINK_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/../CarlaBase"
                           ${CARLA_LIBRARY_DIRS})
 	LINK_LIBRARIES(carlabase)
+	IF(LMMS_BUILD_LINUX)
+		# libcarlabase.so is installed next to this plugin.
+		SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+		SET(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/optional")
+		LIST(APPEND CMAKE_INSTALL_RPATH ${CARLA_LIBRARY_DIRS})
+	ENDIF()
 	BUILD_PLUGIN(carlapatchbay CarlaPatchbay.cpp EMBEDDED_RESOURCES logo.png)
 endif()
