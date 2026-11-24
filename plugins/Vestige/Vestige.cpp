@@ -54,6 +54,7 @@
 #include "SubWindow.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
+#include "VstSubPluginFeatures.h"
 
 namespace lmms
 {
@@ -81,7 +82,7 @@ Plugin::Descriptor Q_DECL_EXPORT  vestige_plugin_descriptor =
 		"so",
 #	endif
 #endif
-	nullptr,
+	new VstSubPluginFeatures(Plugin::Type::Instrument),
 } ;
 
 }
@@ -149,7 +150,8 @@ private:
 
 
 
-VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track ) :
+VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
+		const Plugin::Descriptor::SubPluginFeatures::Key* key ) :
 	Instrument(_instrument_track, &vestige_plugin_descriptor, nullptr, Flag::IsSingleStreamed | Flag::IsMidiBased),
 	m_plugin( nullptr ),
 	m_pluginMutex(),
@@ -165,6 +167,12 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track ) :
 	connect( ConfigManager::inst(), SIGNAL( valueChanged(QString,QString,QString) ),
 			 this, SLOT( handleConfigChange(QString, QString, QString) ),
 			 Qt::QueuedConnection );
+
+	if( key != nullptr && !key->attributes.value( "file" ).isEmpty() )
+	{
+		loadFile( key->attributes.value( "file" ) );
+		setDisplayName( key->displayName() );
+	}
 }
 
 
@@ -1171,9 +1179,10 @@ void ManageVestigeInstrumentView::paintEvent( QPaintEvent * )
 extern "C"
 {
 // necessary for getting instance out of shared lib
-Q_DECL_EXPORT Plugin * lmms_plugin_main( Model *m, void * )
+Q_DECL_EXPORT Plugin * lmms_plugin_main( Model *m, void * data )
 {
-	return new VestigeInstrument( static_cast<InstrumentTrack *>( m ) );
+	return new VestigeInstrument( static_cast<InstrumentTrack *>( m ),
+		static_cast<Plugin::Descriptor::SubPluginFeatures::Key*>( data ) );
 }
 
 }

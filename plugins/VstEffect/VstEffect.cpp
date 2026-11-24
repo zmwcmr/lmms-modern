@@ -70,8 +70,7 @@ VstEffect::VstEffect( Model * _parent,
 	{
 		loaded = openPlugin(m_key.attributes["file"]);
 	}
-	setDisplayName( m_key.attributes["file"].section( ".dll", 0, 0 ).isEmpty()
-		? m_key.name : m_key.attributes["file"].section( ".dll", 0, 0 ) );
+	setDisplayName( m_key.displayName() );
 
 	setDontRun(!loaded);
 }
