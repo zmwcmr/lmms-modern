@@ -27,12 +27,21 @@
 #ifdef LMMS_HAVE_LV2
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 #include <lv2/midi/midi.h>
 #include <lv2/atom/atom.h>
 #include <lv2/resize-port/resize-port.h>
+#include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
 #include <QDebug>
+#include <QDir>
+#include <QDirIterator>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QFile>
+#include <QFileInfo>
 #include <QtGlobal>
 
 #include "AudioEngine.h"
@@ -201,7 +210,10 @@ Lv2Proc::Lv2Proc(Model* parent, const QString &uri) :
 	m_plugin(Engine::getLv2Manager()->getPlugin(uri)),
 	m_workLock(1),
 	m_midiInputBuf(m_maxMidiInputEvents),
-	m_midiInputReader(m_midiInputBuf)
+	m_midiInputReader(m_midiInputBuf),
+	m_makePath{this, &Lv2Proc::makePath},
+	m_freePath{nullptr, &Lv2Proc::freePath},
+	m_mapPath{this, &Lv2Proc::absolutePath, &Lv2Proc::abstractPath}
 {
 	if (!m_plugin)
 	{
@@ -367,8 +379,285 @@ void Lv2Proc::copyBuffersToCore(SampleFrame* buf, f_cnt_t frames) const
 
 
 
+void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
+{
+	ModelGroup::saveSettings(doc, that);
+	saveState(doc, that);
+}
+
+
+
+
+void Lv2Proc::loadSettings(const QDomElement& that)
+{
+	ModelGroup::loadSettings(that);
+	loadState(that);
+}
+
+
+
+
+namespace
+{
+char* duplicateCString(const QByteArray& str)
+{
+	auto* result = static_cast<char*>(std::malloc(static_cast<std::size_t>(str.size()) + 1));
+	if (result)
+	{
+		std::memcpy(result, str.constData(), static_cast<std::size_t>(str.size()) + 1);
+	}
+	return result;
+}
+}
+
+
+
+
+void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
+{
+	if (!m_instance || !m_plugin || !m_stateDir)
+	{
+		return;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	if (!lilv_plugin_has_extension_data(m_plugin, stateIface.get()))
+	{
+		return;
+	}
+
+	QTemporaryDir saveDir(QDir::tempPath() + "/lmms-lv2save-XXXXXX");
+	if (!saveDir.isValid())
+	{
+		qWarning() << "Could not create temporary LV2 save directory";
+		return;
+	}
+
+	const QByteArray savePath = saveDir.path().toUtf8();
+	const QByteArray scratchPath = m_stateDir ? m_stateDir->path().toUtf8() : QByteArray();
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		LilvState* state = lilv_state_new_from_instance(
+			m_plugin, m_instance, mgr->uridMap().mapFeature(),
+			scratchPath.isEmpty() ? nullptr : scratchPath.constData(),
+			savePath.constData(), savePath.constData(), savePath.constData(),
+			nullptr, nullptr, 0, nullptr);
+		if (!state)
+		{
+			qWarning() << "Could not save LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+			return;
+		}
+
+		const int ret = lilv_state_save(
+			mgr->world(), mgr->uridMap().mapFeature(), mgr->uridMap().unmapFeature(),
+			state, nullptr, savePath.constData(), "state.ttl");
+		lilv_state_free(state);
+		if (ret != 0)
+		{
+			qWarning() << "Could not write LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name)
+				<< "(error" << ret << ")";
+			return;
+		}
+	}
+
+	QDomElement stateElem = doc.createElement("lv2state");
+	stateElem.setAttribute("version", 1);
+
+	const QDir dir(saveDir.path());
+	QDirIterator it(saveDir.path(), QDir::Files | QDir::NoDotAndDotDot,
+		QDirIterator::Subdirectories);
+	bool anyFile = false;
+	while (it.hasNext())
+	{
+		const QString path = it.next();
+		const QString rel = dir.relativeFilePath(path);
+		if (rel == "manifest.ttl")
+		{
+			continue;
+		}
+
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			qWarning() << "Could not read LV2 state file" << path;
+			continue;
+		}
+
+		QDomElement fileElem = doc.createElement("file");
+		fileElem.setAttribute("name", rel);
+		fileElem.appendChild(doc.createTextNode(
+			QString::fromLatin1(file.readAll().toBase64())));
+		stateElem.appendChild(fileElem);
+		anyFile = true;
+	}
+
+	if (anyFile)
+	{
+		that.appendChild(stateElem);
+	}
+}
+
+
+
+
+void Lv2Proc::loadState(const QDomElement& that)
+{
+	const QDomElement stateElem = that.firstChildElement("lv2state");
+	if (stateElem.isNull() || !m_instance || !m_plugin)
+	{
+		return;
+	}
+
+	const int version = stateElem.attribute("version", "0").toInt();
+	if (version != 1)
+	{
+		qWarning() << "Unsupported LV2 state version" << version;
+		return;
+	}
+
+	auto stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+	if (!stateDir->isValid())
+	{
+		qWarning() << "Could not create temporary LV2 state directory";
+		return;
+	}
+
+	for (QDomElement fileElem = stateElem.firstChildElement("file");
+		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
+	{
+		const QString name = fileElem.attribute("name");
+		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
+		{
+			qWarning() << "Ignoring invalid LV2 state file name" << name;
+			continue;
+		}
+
+		const QString path = QDir(stateDir->path()).filePath(name);
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		QFile file(path);
+		if (!file.open(QIODevice::WriteOnly))
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return;
+		}
+		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return;
+		}
+	}
+
+	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
+	if (!QFileInfo::exists(statePath))
+	{
+		qWarning() << "LV2 state has no state.ttl";
+		return;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	LilvState* state = lilv_state_new_from_file(
+		mgr->world(), mgr->uridMap().mapFeature(), nullptr,
+		statePath.toUtf8().constData());
+	if (!state)
+	{
+		qWarning() << "Could not load LV2 state from" << statePath;
+		return;
+	}
+
+	m_stateDir = std::move(stateDir);
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		LV2_Feature mapPathFeature{LV2_STATE__mapPath, &m_mapPath};
+		LV2_Feature makePathFeature{LV2_STATE__makePath, &m_makePath};
+		LV2_Feature freePathFeature{LV2_STATE__freePath, &m_freePath};
+		const LV2_Feature* features[] = {
+			&mapPathFeature, &makePathFeature, &freePathFeature, nullptr
+		};
+		lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
+	}
+	lilv_state_free(state);
+
+	copyModelsFromCore();
+}
+
+
+
+
+char* Lv2Proc::makePath(LV2_State_Make_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !self->m_stateDir->isValid() || !path || !*path)
+	{
+		return nullptr;
+	}
+
+	const QString full = QDir(self->m_stateDir->path()).filePath(QString::fromUtf8(path));
+	if (!QDir().mkpath(QFileInfo(full).absolutePath()))
+	{
+		return nullptr;
+	}
+	return duplicateCString(full.toUtf8());
+}
+
+
+
+
+void Lv2Proc::freePath(LV2_State_Free_Path_Handle, char* path)
+{
+	std::free(path);
+}
+
+
+
+
+char* Lv2Proc::absolutePath(LV2_State_Map_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !path || !*path)
+	{
+		return duplicateCString(QByteArray());
+	}
+
+	if (QDir::isAbsolutePath(QString::fromUtf8(path)))
+	{
+		return duplicateCString(QByteArray(path));
+	}
+
+	return duplicateCString(
+		QDir(self->m_stateDir->path()).filePath(QString::fromUtf8(path)).toUtf8());
+}
+
+
+
+
+char* Lv2Proc::abstractPath(LV2_State_Map_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !path || !*path)
+	{
+		return duplicateCString(QByteArray());
+	}
+
+	const QString absPath = QString::fromUtf8(path);
+	const QString stateDir = QDir(self->m_stateDir->path()).absolutePath();
+	if (absPath.startsWith(stateDir + '/'))
+	{
+		return duplicateCString(absPath.mid(stateDir.size() + 1).toUtf8());
+	}
+	return duplicateCString(QByteArray(path));
+}
+
+
+
+
 void Lv2Proc::run(f_cnt_t frames)
 {
+	// State save/restore must not run concurrently with the plugin instance
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+
 	if (m_worker)
 	{
 		// Process any worker replies
@@ -540,8 +829,27 @@ void Lv2Proc::initPluginSpecificFeatures()
 	initMOptions();
 	m_features[LV2_OPTIONS__options] = const_cast<LV2_Options_Option*>(m_options.feature());
 
-	// worker (if plugin has worker extension)
 	Lv2Manager* mgr = Engine::getLv2Manager();
+
+	// state: some plugins create files at instantiate time (state:makePath).
+	// Keep those files for the lifetime of this instance.
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	AutoLilvNode makePath = mgr->uri(LV2_STATE__makePath);
+	if (lilv_plugin_has_extension_data(m_plugin, stateIface.get())
+		|| lilv_plugin_has_feature(m_plugin, makePath.get()))
+	{
+		m_stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+		m_features[LV2_STATE__makePath] = &m_makePath;
+		m_features[LV2_STATE__freePath] = &m_freePath;
+		if (!m_stateDir->isValid())
+		{
+			qWarning() << "Could not create temporary LV2 state directory;"
+				<< "plugins requiring state:makePath at instantiate time may fail";
+			m_stateDir.reset();
+		}
+	}
+
+	// worker (if plugin has worker extension)
 	if (lilv_plugin_has_extension_data(m_plugin, mgr->uri(LV2_WORKER__interface).get()))
 	{
 		bool threaded = !Engine::audioEngine()->renderOnly();

@@ -30,8 +30,12 @@
 #ifdef LMMS_HAVE_LV2
 
 #include <lilv/lilv.h>
+#include <lv2/state/state.h>
 #include <memory>
+#include <mutex>
 #include <optional>
+
+#include <QTemporaryDir>
 
 #include <ringbuffer/ringbuffer.h>
 
@@ -100,6 +104,11 @@ public:
 	~Lv2Proc();
 	void reload();
 	void onSampleRateChanged();
+
+	//! Save port values and, if supported, the plugin's state extension
+	void saveSettings(QDomDocument& doc, QDomElement& that);
+	//! Load port values and, if present, the plugin's state extension
+	void loadSettings(const QDomElement& that);
 
 	/*
 		port access
@@ -213,6 +222,24 @@ private:
 	// other
 	static int32_t defaultEvbufSize() { return 1 << 15; /* ardour uses this*/ }
 	bool m_hasGUI = false;
+
+	//! Per-instance directory for files created via state:makePath.
+	//! It lives as long as the plugin instance so restored samples etc.
+	//! remain available.
+	std::unique_ptr<QTemporaryDir> m_stateDir;
+	//! Serializes run() against state save/restore
+	std::mutex m_stateMutex;
+	LV2_State_Make_Path m_makePath;
+	LV2_State_Free_Path m_freePath;
+	LV2_State_Map_Path m_mapPath;
+
+	void saveState(QDomDocument& doc, QDomElement& that);
+	void loadState(const QDomElement& that);
+
+	static char* makePath(LV2_State_Make_Path_Handle handle, const char* path);
+	static void freePath(LV2_State_Free_Path_Handle handle, char* path);
+	static char* absolutePath(LV2_State_Map_Path_Handle handle, const char* path);
+	static char* abstractPath(LV2_State_Map_Path_Handle handle, const char* path);
 
 	//! models for the controls, sorted by port symbols
 	//! @note These are not owned, but rather link to the models in
