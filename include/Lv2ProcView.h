@@ -40,6 +40,8 @@
 
 #ifdef LMMS_HAVE_SUIL
 #include <suil/suil.h>
+#include <lv2/options/options.h>
+#include <lv2/ui/ui.h>
 #endif
 
 class QPushButton;
@@ -116,6 +118,18 @@ private:
 	QWidget* m_uiHostWidget = nullptr;
 	QMdiSubWindow* m_uiWindow = nullptr;
 	QTimer* m_uiTimer = nullptr;
+
+	// The plugin UI may keep pointers to these features for its whole
+	// lifetime, so they must outlive suil_instance_new().
+	LV2_Feature m_parentFeature{};
+	LV2_Feature m_instanceFeature{};
+	LV2_Feature m_dataFeature{};
+	LV2_Feature m_resizeFeature{};
+	LV2_Feature m_uiOptionsFeature{};
+	LV2_Options_Option m_uiOptions[3]{};
+	LV2UI_Resize m_resize{};
+	float m_uiScale = 1.0f;
+	float m_uiSampleRate = 0.0f;
 #endif
 
 #if defined(LMMS_BUILD_LINUX)

@@ -46,6 +46,8 @@
 #include <lv2/instance-access/instance-access.h>
 #include <lv2/options/options.h>
 #include <lv2/parameters/parameters.h>
+#include <lv2/options/options.h>
+#include <lv2/parameters/parameters.h>
 #include <lv2/port-props/port-props.h>
 #include <lv2/ui/ui.h>
 
@@ -75,6 +77,27 @@
 
 namespace lmms::gui
 {
+
+#if defined(LMMS_BUILD_LINUX)
+namespace
+{
+XErrorHandler g_previousXErrorHandler = nullptr;
+
+int lmmsXErrorHandler(Display* display, XErrorEvent* event)
+{
+	if (event->error_code == BadWindow || event->error_code == BadDrawable)
+	{
+		qWarning() << "Ignoring stale X11 window operation on resource"
+			<< static_cast<qulonglong>(event->resourceid)
+			<< "(error" << event->error_code << ")";
+		return 0;
+	}
+	return g_previousXErrorHandler
+		? g_previousXErrorHandler(display, event)
+		: 0;
+}
+}
+#endif
 
 
 Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
@@ -331,6 +354,13 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
+#if defined(LMMS_BUILD_LINUX)
+	if (g_previousXErrorHandler == nullptr)
+	{
+		g_previousXErrorHandler = XSetErrorHandler(lmmsXErrorHandler);
+	}
+#endif
+
 	WId parentId = 0;
 	if (!useFloatingWindow())
 	{
@@ -420,34 +450,49 @@ void Lv2ProcView::createUi()
 			static_cast<Lv2ProcView*>(handle)->touchPort(port, grabbed);
 		});
 
-	LV2UI_Resize resize{this,
-		[](LV2UI_Feature_Handle handle, int width, int height) -> int
-		{
-			return static_cast<Lv2ProcView*>(handle)->resizeUiRequest(width, height);
-		}};
-	LV2_Feature resizeFeature{LV2_UI__resize, &resize};
-
-	LV2_Feature parentFeature{
+	m_parentFeature = LV2_Feature{
 		LV2_UI__parent,
 		reinterpret_cast<void*>(static_cast<uintptr_t>(parentId))
 	};
-	LV2_Feature instanceFeature{
+	m_instanceFeature = LV2_Feature{
 		LV2_INSTANCE_ACCESS_URI,
 		const_cast<void*>(lilv_instance_get_handle(
 			m_proc->getInstanceForInstanceFeatureOnly()))
 	};
-	LV2_Feature dataFeature{
+	m_dataFeature = LV2_Feature{
 		LV2_DATA_ACCESS_URI,
 		m_proc->extdataFeature()
 	};
+	m_resizeFeature = LV2_Feature{LV2_UI__resize, &m_resize};
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	m_uiScale = 1.0f;
+	m_uiSampleRate = static_cast<float>(
+		Engine::audioEngine()->outputSampleRate());
+	const LV2_URID floatType = mgr->uridMap().map(LV2_ATOM__Float);
+	m_uiOptions[0] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		mgr->uridMap().map(LV2_UI__scaleFactor),
+		sizeof(float), floatType, &m_uiScale
+	};
+	m_uiOptions[1] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		mgr->uridMap().map(LV2_PARAMETERS__sampleRate),
+		sizeof(float), floatType, &m_uiSampleRate
+	};
+	m_uiOptions[2] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0, 0, 0, 0, nullptr
+	};
+	m_uiOptionsFeature = LV2_Feature{LV2_OPTIONS__options, m_uiOptions};
+
 	const LV2_Feature* features[] = {
-		&parentFeature,
-		&instanceFeature,
-		&dataFeature,
-		&resizeFeature,
+		&m_parentFeature,
+		&m_instanceFeature,
+		&m_dataFeature,
+		&m_resizeFeature,
+		&m_uiOptionsFeature,
 		m_proc->mapFeature(),
 		m_proc->unmapFeature(),
-		m_proc->optionsFeature(),
 		nullptr
 	};
 
