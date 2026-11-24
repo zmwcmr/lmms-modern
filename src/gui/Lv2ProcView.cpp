@@ -308,7 +308,7 @@ bool Lv2ProcView::hasPluginUi() const
 			return true;
 		}
 	}
-#endif
+#endif // LMMS_HAVE_SUIL
 	return false;
 }
 
@@ -539,7 +539,7 @@ void Lv2ProcView::createUi()
 	});
 	m_uiTimer->start(33);
 	m_uiVisible = true;
-#endif
+#endif // LMMS_HAVE_SUIL
 }
 
 
@@ -592,7 +592,7 @@ void Lv2ProcView::destroyUi()
 		delete m_uiHostWidget;
 		m_uiHostWidget = nullptr;
 	}
-#endif
+#endif // LMMS_HAVE_SUIL
 }
 
 
@@ -650,8 +650,8 @@ void Lv2ProcView::resizeUiToPlugin()
 		}
 		XCloseDisplay(dpy);
 	}
-#endif
-#endif
+#endif // LMMS_BUILD_LINUX
+#endif // LMMS_HAVE_SUIL
 }
 
 
@@ -761,7 +761,7 @@ void Lv2ProcView::updateUi()
 	{
 		idle->idle(suil_instance_get_handle(m_uiInstance));
 	}
-#endif
+#endif // LMMS_HAVE_SUIL
 }
 
 
@@ -858,7 +858,7 @@ void Lv2ProcView::setUiVisible(bool visible)
 		if (visible) { m_uiWindow->show(); }
 		else { m_uiWindow->hide(); }
 	}
-#endif
+#endif // LMMS_HAVE_SUIL
 }
 
 
