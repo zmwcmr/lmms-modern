@@ -309,7 +309,6 @@ bool Lv2ProcView::hasPluginUi() const
 		}
 	}
 #endif
-	qDebug() << "TEST hasPluginUi false";
 	return false;
 }
 
@@ -465,6 +464,11 @@ void Lv2ProcView::createUi()
 	m_dataFeature = LV2_Feature{
 		LV2_DATA_ACCESS_URI,
 		m_proc->extdataFeature()
+	};
+	m_resize.handle = this;
+	m_resize.ui_resize = [](LV2UI_Handle handle, int width, int height) -> int
+	{
+		return static_cast<Lv2ProcView*>(handle)->resizeUiRequest(width, height);
 	};
 	m_resizeFeature = LV2_Feature{LV2_UI__resize, &m_resize};
 
