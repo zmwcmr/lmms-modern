@@ -42,6 +42,10 @@
 
 #ifdef LMMS_BUILD_LINUX
 
+#include <csignal>
+#include <sys/prctl.h>
+#include <unistd.h>
+
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -2477,6 +2481,17 @@ LRESULT CALLBACK RemoteVstPlugin::wndProc( HWND hwnd, UINT uMsg,
 
 int main( int _argc, char * * _argv )
 {
+#ifdef LMMS_BUILD_LINUX
+	// The remote plugin owns its own X11 window. If LMMS is killed with
+	// SIGKILL, make sure the kernel terminates this process as well instead
+	// of leaving an orphaned plugin window behind.
+	prctl(PR_SET_PDEATHSIG, SIGTERM);
+	if (getppid() == 1)
+	{
+		return 1;
+	}
+#endif
+
 	using lmms::RemoteVstPlugin;
 
 #ifdef SYNC_WITH_SHM_FIFO
