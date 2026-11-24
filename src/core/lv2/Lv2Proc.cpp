@@ -462,6 +462,131 @@ void Lv2Proc::setControlFromUi(uint32_t portIndex, float value)
 
 
 
+bool Lv2Proc::writeUiEvent(uint32_t portIndex, uint32_t protocol,
+	uint32_t size, const void* buffer)
+{
+	if (protocol == 0)
+	{
+		if (size != sizeof(float) || !buffer)
+		{
+			return false;
+		}
+		setControlFromUi(portIndex, *static_cast<const float*>(buffer));
+		return true;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	const LV2_URID atomEvent = mgr->uridMap().map(LV2_ATOM__eventTransfer);
+	if (protocol != atomEvent)
+	{
+		qWarning() << "Unsupported LV2 UI event: protocol" << protocol
+			<< "size" << size;
+		return false;
+	}
+
+	if (portIndex >= m_ports.size() || !buffer || size < sizeof(LV2_Atom))
+	{
+		return false;
+	}
+
+	const auto* atom = static_cast<const LV2_Atom*>(buffer);
+	if (atom->size > size - sizeof(LV2_Atom))
+	{
+		return false;
+	}
+
+	auto* atomSeq = dcast<Lv2Ports::AtomSeq>(m_ports[portIndex].get());
+	if (!atomSeq)
+	{
+		return false;
+	}
+
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+	auto it = lv2_evbuf_end(atomSeq->m_buf.get());
+	lv2_evbuf_write(&it, 0, atom->type, atom->size,
+		static_cast<const uint8_t*>(LV2_ATOM_BODY_CONST(atom)));
+	return true;
+}
+
+
+
+
+void Lv2Proc::connectToPluginEvents()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_uiEventMutex);
+		m_uiEvents.clear();
+	}
+	m_uiActive.store(true, std::memory_order_relaxed);
+}
+
+
+
+
+std::vector<Lv2Proc::UiEvent> Lv2Proc::takeUiEvents()
+{
+	std::deque<UiEvent> events;
+	{
+		std::lock_guard<std::mutex> lock(m_uiEventMutex);
+		events.swap(m_uiEvents);
+	}
+
+	std::vector<UiEvent> result;
+	result.reserve(events.size());
+	for (auto& event : events)
+	{
+		result.push_back(std::move(event));
+	}
+	return result;
+}
+
+
+
+
+bool Lv2Proc::sendToUi(uint32_t portIndex, uint32_t type, uint32_t size,
+	const void* body)
+{
+	if (!m_uiActive.load(std::memory_order_relaxed))
+	{
+		return false;
+	}
+
+	constexpr std::size_t maxBodySize = 4096;
+	if (size > maxBodySize || (size > 0 && !body))
+	{
+		qWarning() << "Dropping oversized LV2 UI event for port" << portIndex
+			<< "size" << size;
+		return false;
+	}
+
+	const LV2_URID atomEvent =
+		Engine::getLv2Manager()->uridMap().map(LV2_ATOM__eventTransfer);
+
+	std::lock_guard<std::mutex> lock(m_uiEventMutex);
+	if (m_uiEvents.size() >= 256)
+	{
+		qWarning() << "Plugin => UI queue overflow for port" << portIndex;
+		return false;
+	}
+
+	UiEvent event;
+	event.index = portIndex;
+	event.protocol = atomEvent;
+	event.data.resize(sizeof(LV2_Atom) + size);
+	auto* atom = reinterpret_cast<LV2_Atom*>(event.data.data());
+	atom->size = size;
+	atom->type = type;
+	if (size > 0)
+	{
+		std::memcpy(event.data.data() + sizeof(LV2_Atom), body, size);
+	}
+	m_uiEvents.push_back(std::move(event));
+	return true;
+}
+
+
+
+
 void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
 {
 	ModelGroup::saveSettings(doc, that);
@@ -748,6 +873,34 @@ void Lv2Proc::run(f_cnt_t frames)
 	}
 
 	lilv_instance_run(m_instance, static_cast<uint32_t>(frames));
+
+	// Forward atom output events (MIDI, patch messages, meters, ...) to the UI
+	for (std::size_t p = 0; p < m_ports.size(); ++p)
+	{
+		auto* port = m_ports[p].get();
+		if (port->m_flow != Lv2Ports::Flow::Output
+			|| port->m_type != Lv2Ports::Type::AtomSeq)
+		{
+			continue;
+		}
+
+		auto* atomSeq = dcast<Lv2Ports::AtomSeq>(port);
+		if (!atomSeq)
+		{
+			continue;
+		}
+
+		for (auto i = lv2_evbuf_begin(atomSeq->m_buf.get());
+			lv2_evbuf_is_valid(i); i = lv2_evbuf_next(i))
+		{
+			uint32_t frames = 0;
+			uint32_t type = 0;
+			uint32_t size = 0;
+			uint8_t* body = nullptr;
+			lv2_evbuf_get(i, &frames, &type, &size, &body);
+			sendToUi(static_cast<uint32_t>(p), type, size, body);
+		}
+	}
 
 	if (m_worker)
 	{

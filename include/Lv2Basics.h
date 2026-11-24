@@ -78,6 +78,15 @@ QString qStringFromPortName(const LilvPlugin* plug, const LilvPort* port);
 //! Return port name as std::string, everything will be freed automatically
 std::string stdStringFromPortName(const LilvPlugin* plug, const LilvPort* port);
 
+//! Control/atom change event, sent through ring buffers for UI updates
+struct Lv2UiControlChange
+{
+	uint32_t index;
+	uint32_t protocol;
+	uint32_t size;
+	// Followed immediately by <size> bytes of data
+};
+
 } // namespace lmms
 
 #endif // LMMS_HAVE_LV2

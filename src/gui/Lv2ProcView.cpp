@@ -41,7 +41,10 @@
 #include <QVBoxLayout>
 
 #include <lilv/lilv.h>
+#include <lv2/atom/atom.h>
 #include <lv2/instance-access/instance-access.h>
+#include <lv2/options/options.h>
+#include <lv2/parameters/parameters.h>
 #include <lv2/port-props/port-props.h>
 #include <lv2/ui/ui.h>
 
@@ -51,6 +54,7 @@
 
 #include "AudioEngine.h"
 #include "ControlLayout.h"
+#include "ConfigManager.h"
 #include "Controls.h"
 #include "embed.h"
 #include "Engine.h"
@@ -101,7 +105,6 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 			meAsWidget);
 		m_toggleUIButton->setCheckable(true);
 		m_toggleUIButton->setChecked(false);
-		m_toggleUIButton->setIcon(embed::getIconPixmap("zoom"));
 		m_toggleUIButton->setFont(adjustedToPixelSize(m_toggleUIButton->font(), SMALL_FONT_SIZE));
 		btnBox->addWidget(m_toggleUIButton, 0);
 	}
@@ -248,9 +251,20 @@ bool Lv2ProcView::hasPluginUi() const
 		return false;
 	}
 
-	// The current host embeds X11 UIs. Qt5 UI support can be added later.
-	if (QGuiApplication::platformName() != "xcb")
+	if (Lv2Manager::pluginUiIsUnstable(m_proc->pluginUri())
+		&& !qEnvironmentVariableIsSet("LMMS_ENABLE_UNSTABLE_LV2_UI"))
 	{
+		return false;
+	}
+
+	const QString platform = QGuiApplication::platformName();
+	if (platform != "xcb" && platform != "wayland")
+	{
+		return false;
+	}
+	if (platform == "wayland" && !qEnvironmentVariableIsSet("DISPLAY"))
+	{
+		// Wayland without XWayland cannot host X11 plugin UIs.
 		return false;
 	}
 
@@ -272,6 +286,16 @@ bool Lv2ProcView::hasPluginUi() const
 	}
 #endif
 	return false;
+}
+
+
+
+
+bool Lv2ProcView::useFloatingWindow() const
+{
+	const QString mode = ConfigManager::inst()->lv2UiEmbedMethod();
+	return mode == "floating"
+		|| QGuiApplication::platformName() != "xcb";
 }
 
 
@@ -306,26 +330,65 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
-	m_uiHostWidget = new QWidget;
-	m_uiHostWidget->setAttribute(Qt::WA_NativeWindow);
-	m_uiHostWidget->setAttribute(Qt::WA_OpaquePaintEvent);
-	m_uiHostWidget->setMinimumSize(320, 240);
-	m_uiHostWidget->resize(900, 700);
-
-	m_uiWindow = getGUI()->mainWindow()->addWindowedWidget(m_uiHostWidget);
-	if (!m_uiWindow)
+	WId parentId = 0;
+	if (!useFloatingWindow())
 	{
-		destroyUi();
-		return;
-	}
-	m_uiWindow->setAttribute(Qt::WA_DeleteOnClose, false);
-	m_uiWindow->setWindowTitle(qStringFromPluginNode(m_proc->getPlugin(),
-		lilv_plugin_get_name));
-	m_uiWindow->show();
-	m_uiHostWidget->show();
-	QApplication::processEvents();
+		m_uiHostWidget = new QWidget;
+		m_uiHostWidget->setAttribute(Qt::WA_NativeWindow);
+		m_uiHostWidget->setAttribute(Qt::WA_OpaquePaintEvent);
+		m_uiHostWidget->setMinimumSize(320, 240);
+		m_uiHostWidget->resize(900, 700);
 
-	const WId parentId = m_uiHostWidget->winId();
+		m_uiWindow = getGUI()->mainWindow()->addWindowedWidget(m_uiHostWidget);
+		if (!m_uiWindow)
+		{
+			destroyUi();
+			return;
+		}
+		m_uiWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+		m_uiWindow->setWindowTitle(qStringFromPluginNode(m_proc->getPlugin(),
+			lilv_plugin_get_name));
+		m_uiWindow->show();
+		m_uiHostWidget->show();
+		QApplication::processEvents();
+
+		parentId = m_uiHostWidget->winId();
+	}
+	else
+	{
+#if defined(LMMS_BUILD_LINUX)
+		// Create a standalone X11 window (Wayland, or floating mode).
+		Display* dpy = XOpenDisplay(nullptr);
+		if (!dpy)
+		{
+			qWarning() << "Could not open an X11 display for the LV2 UI";
+			return;
+		}
+
+		const int screen = DefaultScreen(dpy);
+		m_x11Window = XCreateSimpleWindow(dpy, RootWindow(dpy, screen),
+			100, 100, 900, 700, 1,
+			BlackPixel(dpy, screen), WhitePixel(dpy, screen));
+		if (!m_x11Window)
+		{
+			qWarning() << "Could not create an X11 window for the LV2 UI";
+			XCloseDisplay(dpy);
+			return;
+		}
+
+		const QByteArray title = qStringFromPluginNode(m_proc->getPlugin(),
+			lilv_plugin_get_name).toUtf8();
+		XStoreName(dpy, m_x11Window, title.constData());
+		XMapWindow(dpy, m_x11Window);
+		XFlush(dpy);
+
+		m_x11Display = dpy;
+		parentId = static_cast<WId>(m_x11Window);
+#else
+		return;
+#endif
+	}
+
 	if (parentId == 0)
 	{
 		qWarning() << "Could not create a native window for the LV2 UI";
@@ -349,6 +412,12 @@ void Lv2ProcView::createUi()
 		destroyUi();
 		return;
 	}
+
+	suil_host_set_touch_func(m_uiHost,
+		[](void* handle, uint32_t port, bool grabbed)
+		{
+			static_cast<Lv2ProcView*>(handle)->touchPort(port, grabbed);
+		});
 
 	LV2_Feature parentFeature{
 		LV2_UI__parent,
@@ -397,6 +466,8 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
+	m_proc->connectToPluginEvents();
+
 	resizeUiToPlugin();
 	QTimer::singleShot(200, m_pluginWidget, [this] { resizeUiToPlugin(); });
 	QTimer::singleShot(1000, m_pluginWidget, [this] { resizeUiToPlugin(); });
@@ -415,6 +486,11 @@ void Lv2ProcView::createUi()
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc)
+	{
+		m_proc->setUiActive(false);
+	}
+
 	if (m_uiTimer)
 	{
 		m_uiTimer->stop();
@@ -431,6 +507,16 @@ void Lv2ProcView::destroyUi()
 		suil_host_free(m_uiHost);
 		m_uiHost = nullptr;
 	}
+#if defined(LMMS_BUILD_LINUX)
+	if (m_x11Window && m_x11Display)
+	{
+		Display* dpy = static_cast<Display*>(m_x11Display);
+		XDestroyWindow(dpy, m_x11Window);
+		XCloseDisplay(dpy);
+		m_x11Window = 0;
+		m_x11Display = nullptr;
+	}
+#endif
 	if (m_uiWindow)
 	{
 		m_uiWindow->hide();
@@ -452,38 +538,66 @@ void Lv2ProcView::destroyUi()
 void Lv2ProcView::resizeUiToPlugin()
 {
 #ifdef LMMS_HAVE_SUIL
-	if (!m_uiInstance || !m_uiHostWidget)
+	if (!m_uiInstance)
 	{
 		return;
 	}
 
 #if defined(LMMS_BUILD_LINUX)
-	Display* dpy = XOpenDisplay(nullptr);
-	if (!dpy)
+	if (m_x11Window && m_x11Display)
 	{
+		Display* dpy = static_cast<Display*>(m_x11Display);
+		XWindowAttributes attr{};
+		const auto widget = reinterpret_cast<uintptr_t>(
+			suil_instance_get_widget(m_uiInstance));
+		if (widget
+			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
+			&& attr.width > 0 && attr.height > 0)
+		{
+			XResizeWindow(dpy, m_x11Window, attr.width, attr.height);
+			XFlush(dpy);
+		}
 		return;
 	}
 
-	XWindowAttributes attr{};
-	const auto widget = reinterpret_cast<uintptr_t>(
-		suil_instance_get_widget(m_uiInstance));
-	if (widget
-		&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
-		&& attr.width > 0 && attr.height > 0)
+	if (m_uiHostWidget)
 	{
-		const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-		const int width = std::max(static_cast<int>(std::lround(attr.width / dpr)), 320);
-		const int height = std::max(static_cast<int>(std::lround(attr.height / dpr)), 240);
-		m_uiHostWidget->setMinimumSize(width, height);
-		m_uiHostWidget->resize(width, height);
-		if (m_uiWindow)
+		Display* dpy = XOpenDisplay(nullptr);
+		if (!dpy)
 		{
-			m_uiWindow->resize(width, height);
+			return;
 		}
+
+		XWindowAttributes attr{};
+		const auto widget = reinterpret_cast<uintptr_t>(
+			suil_instance_get_widget(m_uiInstance));
+		if (widget
+			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
+			&& attr.width > 0 && attr.height > 0)
+		{
+			const qreal dpr = m_uiHostWidget->devicePixelRatioF();
+			const int width = std::max(static_cast<int>(std::lround(attr.width / dpr)), 320);
+			const int height = std::max(static_cast<int>(std::lround(attr.height / dpr)), 240);
+			m_uiHostWidget->setMinimumSize(width, height);
+			m_uiHostWidget->resize(width, height);
+			if (m_uiWindow)
+			{
+				m_uiWindow->resize(width, height);
+			}
+		}
+		XCloseDisplay(dpy);
 	}
-	XCloseDisplay(dpy);
 #endif
 #endif
+}
+
+
+
+
+void Lv2ProcView::touchPort(uint32_t portIndex, bool grabbed)
+{
+	Q_UNUSED(portIndex);
+	Q_UNUSED(grabbed);
 }
 
 
@@ -495,6 +609,13 @@ void Lv2ProcView::updateUi()
 	if (!m_uiInstance || !m_proc)
 	{
 		return;
+	}
+
+	for (auto& event : m_proc->takeUiEvents())
+	{
+		suil_instance_port_event(m_uiInstance, event.index,
+			static_cast<uint32_t>(event.data.size()), event.protocol,
+			event.data.empty() ? nullptr : event.data.data());
 	}
 
 	for (std::size_t i = 0; i < m_proc->portNum(); ++i)
@@ -515,6 +636,13 @@ void Lv2ProcView::updateUi()
 		suil_instance_port_event(m_uiInstance, static_cast<uint32_t>(i),
 			sizeof(float), 0, &value);
 	}
+
+	const auto* idle = static_cast<const LV2UI_Idle_Interface*>(
+		suil_instance_extension_data(m_uiInstance, LV2_UI__idleInterface));
+	if (idle && idle->idle)
+	{
+		idle->idle(suil_instance_get_handle(m_uiInstance));
+	}
 #endif
 }
 
@@ -524,19 +652,10 @@ void Lv2ProcView::updateUi()
 void Lv2ProcView::writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
 	uint32_t protocol, const void* buffer)
 {
-	if (!m_proc)
+	if (m_proc)
 	{
-		return;
+		m_proc->writeUiEvent(portIndex, protocol, bufferSize, buffer);
 	}
-
-	if (protocol != 0 || bufferSize != sizeof(float) || !buffer)
-	{
-		qWarning() << "Unsupported LV2 UI event: protocol" << protocol
-			<< "size" << bufferSize;
-		return;
-	}
-
-	m_proc->setControlFromUi(portIndex, *static_cast<const float*>(buffer));
 }
 
 

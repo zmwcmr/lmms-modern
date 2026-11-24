@@ -31,6 +31,7 @@
 
 #include <lilv/lilv.h>
 #include <lv2/state/state.h>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -40,6 +41,7 @@
 
 #include <ringbuffer/ringbuffer.h>
 
+#include "LocklessRingBuffer.h"
 #include "ModelGroup.h"
 #include "LmmsSemaphore.h"
 #include "Lv2Basics.h"
@@ -194,6 +196,21 @@ public:
 	const Lv2Ports::PortBase* port(std::size_t idx) const { return m_ports[idx].get(); }
 	//! Called by the UI when the user moves a control
 	void setControlFromUi(uint32_t portIndex, float value);
+	//! Handle any event sent by the plugin UI (float control or atom event)
+	bool writeUiEvent(uint32_t portIndex, uint32_t protocol,
+		uint32_t size, const void* buffer);
+	struct UiEvent
+	{
+		uint32_t index = 0;
+		uint32_t protocol = 0;
+		std::vector<char> data;
+	};
+	//! Start forwarding plugin -> UI events
+	void connectToPluginEvents();
+	//! Stop forwarding plugin -> UI events
+	void setUiActive(bool active) { m_uiActive = active; }
+	//! Take all queued plugin -> UI events
+	std::vector<UiEvent> takeUiEvents();
 	//! Let the view detach its native UI before the plugin instance dies
 	void setViewDetacher(std::function<void()> detacher) { m_viewDetacher = std::move(detacher); }
 
@@ -255,6 +272,12 @@ private:
 
 	//! Called by the view to detach its native UI before shutdown
 	std::function<void()> m_viewDetacher;
+
+	//! Plugin -> UI event queue (atom events, etc.)
+	std::mutex m_uiEventMutex;
+	std::deque<UiEvent> m_uiEvents;
+	std::atomic<bool> m_uiActive{false};
+	bool sendToUi(uint32_t portIndex, uint32_t type, uint32_t size, const void* body);
 
 	void saveState(QDomDocument& doc, QDomElement& that);
 	void loadState(const QDomElement& that);

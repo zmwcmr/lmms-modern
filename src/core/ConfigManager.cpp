@@ -221,6 +221,17 @@ QString ConfigManager::vstEmbedMethod() const
 	return methods.contains(currentMethod) ? currentMethod : defaultMethod;
 }
 
+QString ConfigManager::lv2UiEmbedMethod() const
+{
+	const QString current = value("ui", "lv2uimethod", "auto");
+	if (current == "auto" || current == "embedded"
+		|| current == "floating" || current == "disabled")
+	{
+		return current;
+	}
+	return "auto";
+}
+
 bool ConfigManager::hasWorkingDir() const
 {
 	return QDir(m_workingDir).exists();

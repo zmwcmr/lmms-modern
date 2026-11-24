@@ -137,6 +137,11 @@ public:
 	{
 		return unstablePlugins.find(pluginUri) != unstablePlugins.end();
 	}
+	//! Plugins whose native UI is known to crash the host
+	static bool pluginUiIsUnstable(const char* pluginUri)
+	{
+		return unstableUiPlugins.find(pluginUri) != unstableUiPlugins.end();
+	}
 	static bool pluginIsOnlyUsefulWithUi(const char* pluginUri)
 	{
 		return pluginsOnlyUsefulWithUi.find(pluginUri) != pluginsOnlyUsefulWithUi.end();
@@ -166,6 +171,7 @@ private:
 
 	// static
 	static const std::set<std::string_view> unstablePlugins;
+	static const std::set<std::string_view> unstableUiPlugins;
 	static const std::set<std::string_view> pluginsOnlyUsefulWithUi;
 	static const std::set<std::string_view> unstablePluginsBuffersizeLessEqual32;
 

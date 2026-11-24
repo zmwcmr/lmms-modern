@@ -31,6 +31,8 @@
 #ifdef LMMS_HAVE_LV2
 
 #include <QWidget>
+#include <optional>
+#include <vector>
 
 #include "ModelGroupView.h"
 #include "lmms_export.h"
@@ -93,10 +95,12 @@ private:
 
 	//! Whether a supported native UI exists for this plugin
 	bool hasPluginUi() const;
+	bool useFloatingWindow() const;
 	void createUi();
 	void destroyUi();
 	void updateUi();
 	void resizeUiToPlugin();
+	void touchPort(uint32_t portIndex, bool grabbed);
 	void writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
 		uint32_t protocol, const void* buffer);
 	uint32_t indexOfPort(const char* symbol);
@@ -110,6 +114,12 @@ private:
 	QWidget* m_uiHostWidget = nullptr;
 	QMdiSubWindow* m_uiWindow = nullptr;
 	QTimer* m_uiTimer = nullptr;
+#endif
+
+#if defined(LMMS_BUILD_LINUX)
+	//! Standalone X11 window used when Qt runs on Wayland
+	void* m_x11Display = nullptr;
+	unsigned long m_x11Window = 0;
 #endif
 
 	QMdiSubWindow* m_helpWindow = nullptr;

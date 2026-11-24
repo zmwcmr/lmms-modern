@@ -73,6 +73,16 @@ const std::set<std::string_view> Lv2Manager::unstablePlugins =
 	"urn:juced:DrumSynth"
 };
 
+const std::set<std::string_view> Lv2Manager::unstableUiPlugins =
+{
+	// Surge XT's JUCE-based X11 UI corrupts the heap in the current host
+	"https://surge-synthesizer.github.io/lv2/surge-xt",
+	"https://surge-synth-team.org//plugins/Surge_XT_Effects"
+};
+
+
+
+
 const std::set<std::string_view> Lv2Manager::pluginsOnlyUsefulWithUi =
 {
 	// Visualization, meters, and scopes etc., won't work if UI is disabled
@@ -342,7 +352,11 @@ bool Lv2Manager::wantUi()
 {
 #ifdef LMMS_HAVE_SUIL
 	const char* disable = getenv("LMMS_DISABLE_LV2_UI");
-	return !(disable && *disable);
+	if (disable && *disable)
+	{
+		return false;
+	}
+	return ConfigManager::inst()->lv2UiEmbedMethod() != "disabled";
 #else
 	return false;
 #endif
