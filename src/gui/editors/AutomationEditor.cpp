@@ -2088,7 +2088,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	zoom_x_label->setToolTip( tr( "Horizontal zooming" ) );
 
 	m_zoomingXComboBox = new ComboBox( zoomToolBar );
-	m_zoomingXComboBox->setFixedSize( 80, ComboBox::DEFAULT_HEIGHT );
+	m_zoomingXComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingXComboBox->setToolTip( tr( "Horizontal zooming" ) );
 
 	for( float const & zoomLevel : m_editor->m_zoomXLevels )
@@ -2098,6 +2098,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	m_editor->m_zoomingXModel.setValue( m_editor->m_zoomingXModel.findText( "100%" ) );
 
 	m_zoomingXComboBox->setModel( &m_editor->m_zoomingXModel );
+	m_zoomingXComboBox->setMinimumContentWidth(80);
 
 	connect( &m_editor->m_zoomingXModel, SIGNAL(dataChanged()),
 			m_editor, SLOT(zoomingXChanged()));
@@ -2107,7 +2108,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	zoom_y_label->setToolTip( tr( "Vertical zooming" ) );
 
 	m_zoomingYComboBox = new ComboBox( zoomToolBar );
-	m_zoomingYComboBox->setFixedSize( 80, ComboBox::DEFAULT_HEIGHT );
+	m_zoomingYComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingYComboBox->setToolTip( tr( "Vertical zooming" ) );
 
 	m_editor->m_zoomingYModel.addItem( "Auto" );
@@ -2118,6 +2119,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	m_editor->m_zoomingYModel.setValue( m_editor->m_zoomingYModel.findText( "Auto" ) );
 
 	m_zoomingYComboBox->setModel( &m_editor->m_zoomingYModel );
+	m_zoomingYComboBox->setMinimumContentWidth(80);
 
 	connect( &m_editor->m_zoomingYModel, SIGNAL(dataChanged()),
 			m_editor, SLOT(zoomingYChanged()));
@@ -2136,10 +2138,11 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	quantize_lbl->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
-	m_quantizeComboBox->setFixedSize( 60, ComboBox::DEFAULT_HEIGHT );
+	m_quantizeComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_quantizeComboBox->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );
+	m_quantizeComboBox->setMinimumContentWidth(60);
 
 	quantizationActionsToolBar->addWidget( quantize_lbl );
 	quantizationActionsToolBar->addWidget( m_quantizeComboBox );

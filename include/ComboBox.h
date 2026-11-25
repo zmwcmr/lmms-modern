@@ -53,6 +53,12 @@ public:
 
 	static constexpr int DEFAULT_HEIGHT = 22;
 
+	QSize sizeHint() const override;
+
+	//! Makes the combo at least \a width pixels wide and never narrower than
+	//! its longest item, so long translations are not elided.
+	void setMinimumContentWidth(int width);
+
 public slots:
 	void selectNext();
 	void selectPrevious();

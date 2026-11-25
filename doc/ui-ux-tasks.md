@@ -56,6 +56,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-5 | ✅ 已实现 | 12 → 10 经 UI 写入配置；缺省 100 已确认 |
 | T1-6 | ✅ 已实现 | 下拉框列出两套主题；切到 classic 重启生效 |
 | T1-7 | ✅ 已实现 | 10 pt → 13/11/16 px；100%/150% 截图无重叠 |
+| T1-8 | ✅ 已实现 | de_DE 1600 宽全部完整；1024 宽溢出菜单可用 |
 
 ### 实施中发现并修正的两个问题
 
@@ -419,13 +420,21 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-8 钢琴卷帘/自动化工具栏弹性宽度
+### T1-8 钢琴卷帘/自动化工具栏弹性宽度（已实现）
 
-**现象**：`PianoRoll.cpp:5337-5398` 八个固定像素宽度下拉框；`AutomationEditor.cpp` 同类。
+**现象**：`PianoRoll.cpp` 八个固定像素宽度下拉框（64/64/85/105/72/155/125/96）；`AutomationEditor.cpp` 同类三个（80/80/60）。`ComboBox` 是自绘控件，没有 `sizeHint()`，所以只能写死宽度。
 
-**改动点**：`setFixedSize(w, h)` → `setMinimumWidth(w)` + 保留高度；或实现 `sizeHint()` 取 `max(当前宽度, 最长条目的 sizeHint)`。
+**实现**
+- `ComboBox` 增加内容宽度支持：`sizeHint()` 遍历模型取最长条目，加上箭头按钮（18 px）、左右边距和可选的 16 px 图标宽度。默认仍返回 `QWidget::sizeHint()`，只有显式启用后才按内容计算，避免改变其它布局里的下拉框。启用状态用动态属性记录，不新增成员，类布局保持不变（不影响已编译插件的 ABI）。
+- 新增 `setMinimumContentWidth(designWidth)`：启用内容宽度，取 `max(designWidth, sizeHint().width())` 作为最小宽度，并把水平 size policy 设为 `Fixed`。`QToolBar` 因此不能再把控件压到文字以下；空间不够时把控件移进已有的溢出菜单（`b324ca449`）。
+- `PianoRoll` 的 8 个下拉框、`AutomationEditor` 的 3 个下拉框：`setFixedSize(w, h)` → `setFixedHeight(h)` + `setMinimumContentWidth(w)`。设计宽度保留为下限，长译文只会让控件变宽。
 
-**验收**：`LANG=de_DE` 或 `LANG=zh_CN` 下，工具栏文字不截断、无省略号；窗口缩到 1024 宽时工具栏仍可用（溢出按钮已有，见 `b324ca449`）。
+**实测**
+- `LANG=de_DE.UTF-8`、1600×1000：`Letzte Note`、`Keine Tonart`、`Keine Tonleiter`、`Kein Akkord` 全部完整显示，无省略号（`t1-8-piano-roll-de.png`）。
+- 同一语言、1024×768：`Letzte Note` 仍完整，放不下的 `Nudge` 自动进入溢出菜单，工具栏可用（`t1-8-piano-roll-1024-de.png`）。
+- 自动化编辑器同语言截图见 `t1-8-automation-de.png`。
+
+**不做**：Song Editor / Pattern Editor 的下拉框仍用固定宽度；插件控制对话框用绝对坐标，属于插件自身布局，不并入本项。
 
 ---
 
