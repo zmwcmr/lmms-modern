@@ -139,7 +139,10 @@ void Knob::onKnobNumUpdated()
 		{
 			convertPixmapToGrayScale(*m_knobPixmap.get());
 		}
-		setFixedSize( m_knobPixmap->width(), m_knobPixmap->height() );
+		// The pixmap may be an oversampled SVG raster. Size the widget in
+		// logical, not device, pixels so that HiDPI artwork does not blow up
+		// the layout.
+		setFixedSize( embed::logicalSize( *m_knobPixmap ) );
 	}
 }
 
@@ -175,12 +178,14 @@ void Knob::updateFixedSize()
 	{
 		if (m_knobPixmap)
 		{
+			const QSize pixmapSize = embed::logicalSize(*m_knobPixmap);
+
 			// In legacy mode only the width of the label is taken into account while the height is not
 			const int labelWidth = QFontMetrics(adjustedToPixelSize(font(), SMALL_FONT_SIZE)).horizontalAdvance(m_label);
-			const int width = std::max(m_knobPixmap->width(), labelWidth);
+			const int width = std::max(pixmapSize.width(), labelWidth);
 
 			// Legacy mode assumes that the label will fit into 10 pixels plus some of the pixmap area
-			setFixedSize(width, m_knobPixmap->height() + 10);
+			setFixedSize(width, pixmapSize.height() + 10);
 		}
 	}
 	else
@@ -193,7 +198,7 @@ void Knob::updateFixedSize()
 			return;
 		}
 
-		QSize pixmapSize = m_knobPixmap ? m_knobPixmap->size() : QSize(0, 0);
+		const QSize pixmapSize = m_knobPixmap ? embed::logicalSize(*m_knobPixmap) : QSize(0, 0);
 
 		auto fm = QFontMetrics(font());
 
@@ -389,12 +394,17 @@ void Knob::drawKnob( QPainter * _p )
 		return;
 	}
 
-	m_cache = QImage( size(), QImage::Format_ARGB32 );
+	// Render the cache at the widget's device resolution. Otherwise the
+	// logical-size image gets upscaled on HiDPI screens, which blurs both the
+	// knob artwork and the vector arc and line drawn on top of it.
+	const qreal dpr = devicePixelRatioF();
+	m_cache = QImage( (QSizeF(size()) * dpr).toSize(), QImage::Format_ARGB32 );
+	m_cache.setDevicePixelRatio( dpr );
 	m_cache.fill( qRgba( 0, 0, 0, 0 ) );
 
 	QPainter p( &m_cache );
 
-	QPoint mid;
+	QPointF mid;
 
 	if( m_knobNum == KnobType::Styled )
 	{
@@ -427,22 +437,31 @@ void Knob::drawKnob( QPainter * _p )
 
 
 	// Old-skool knobs
-	const float radius = m_knobPixmap->width() / 2.0f - 1;
-	mid = QPoint( width() / 2, m_knobPixmap->height() / 2 );
+	const QSize knobSize = embed::logicalSize( *m_knobPixmap );
+	const float radius = knobSize.width() / 2.0f - 1;
 
-	p.drawPixmap( static_cast<int>(
-				width() / 2 - m_knobPixmap->width() / 2 ), 0,
-				*m_knobPixmap );
+	// Center the pixmap, the arc and the pointer on the same (fractional)
+	// point. Computing the center with integer arithmetic made the pointer
+	// sit half a pixel off the arc center, which became visible at high DPI
+	// as a gap between the pointer and the arc that changed with the angle.
+	// Keep the pixmap on whole pixels so the artwork stays crisp, and derive
+	// the arc/pointer center from the pixmap position.
+	const int knobX = ( width() - knobSize.width() ) / 2;
+	mid = QPointF( knobX + knobSize.width() / 2.0, knobSize.height() / 2.0 );
+
+	p.drawPixmap( knobX, 0, *m_knobPixmap );
 
 	p.setRenderHint( QPainter::Antialiasing );
 
 	const int centerAngle = angleFromValue( model()->inverseScaledValue( model()->centerValue() ), model()->minValue(), model()->maxValue(), m_totalAngle );
 
-	const int arcLineWidth = 2;
-	const int arcRectSize = m_knobPixmap->width() - arcLineWidth;
+	const qreal arcLineWidth = 2;
+	const qreal arcRectSize = knobSize.width() - arcLineWidth;
+	const QRectF arcRect( mid.x() - arcRectSize / 2.0, mid.y() - arcRectSize / 2.0,
+						  arcRectSize, arcRectSize );
 
-	p.setPen(QPen(currentArcColor, 2));
-	p.drawArc( mid.x() - arcRectSize/2, 1, arcRectSize, arcRectSize, 315*16, 16*m_totalAngle );
+	p.setPen(QPen(currentArcColor, arcLineWidth));
+	p.drawArc( arcRect, 315*16, static_cast<int>( 16 * m_totalAngle ) );
 
 	p.setPen(QPen(currentLineColor, 2));
 	switch( m_knobNum )
@@ -476,7 +495,7 @@ void Knob::drawKnob( QPainter * _p )
 			break;
 	}
 
-	p.drawArc( mid.x() - arcRectSize/2, 1, arcRectSize, arcRectSize, (90-centerAngle)*16, -16*(m_angle-centerAngle) );
+	p.drawArc( arcRect, (90-centerAngle)*16, -16*(m_angle-centerAngle) );
 
 	p.end();
 
@@ -604,6 +623,7 @@ void VolumeKnob::enterValue()
 
 void convertPixmapToGrayScale(QPixmap& pixMap)
 {
+	const qreal dpr = pixMap.devicePixelRatio();
 	QImage temp = pixMap.toImage().convertToFormat(QImage::Format_ARGB32);
 	for (int i = 0; i < temp.height(); ++i)
 	{
@@ -616,6 +636,7 @@ void convertPixmapToGrayScale(QPixmap& pixMap)
 		}
 	}
 	pixMap.convertFromImage(temp);
+	pixMap.setDevicePixelRatio(dpr);
 }
 
 
