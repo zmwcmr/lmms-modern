@@ -107,8 +107,8 @@ Stages 1-4 are implemented and verified with temporary VST2 impulse plugins:
 - A saturation warning is emitted once when a required delay exceeds the
   8192-sample delay line.
 
-Stage 5 (UI display) is still open, as are freeze-path verification and a
-committed impulse/phase test project.
+Stage 5 (UI display) and a committed impulse/phase test project are still
+open.
 
 ## Tests
 

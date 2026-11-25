@@ -198,7 +198,7 @@ Tasks:
 - [x] Delay compensation during playback and export (first stage).
   - current status: track-to-channel and send alignment works in both paths;
     the renderer trims `Mixer::totalLatency()` from the start of the exported
-    stream. Freeze and latency reporting in the UI are still missing.
+    stream. Latency reporting in the UI is still missing.
 - [x] Update routing when plugin latency changes dynamically.
   - current status: the graph is rebuilt before and after every mixer round.
     VST2 reports `initialDelay` changes, instrument tracks refresh their bus
