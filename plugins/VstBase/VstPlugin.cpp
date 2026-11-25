@@ -35,6 +35,7 @@
 #include <QTemporaryFile>
 #include <QTimerEvent>
 
+#include <algorithm>
 #include <cstring>
 
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
@@ -527,6 +528,20 @@ bool VstPlugin::processMessage( const message & _m )
 		case IdVstIsSynth:
 			m_isSynth = true;
 			break;
+
+		case IdVstMidiOut:
+		{
+			const int deltaFrames = _m.getInt(0);
+			const int size = std::clamp(_m.getInt(1), 0, 4);
+			QByteArray data;
+			data.reserve(size);
+			for (int i = 0; i < size; ++i)
+			{
+				data.append(static_cast<char>(_m.getInt(2 + i) & 0xFF));
+			}
+			emit midiOutEvent(deltaFrames, data);
+			break;
+		}
 
 		case IdVstParameterDump:
 		{

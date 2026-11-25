@@ -370,6 +370,7 @@ public:
 
 	void idle();
 	void processUIThreadMessages();
+	void flushMidiOutEvents();
 #ifdef NATIVE_LINUX_VST
 	void sendX11Idle();
 #endif
@@ -481,6 +482,7 @@ private:
 
 	using VstMidiEventList = std::vector<VstMidiEvent>;
 	VstMidiEventList m_midiEvents;
+	VstMidiEventList m_midiOutEvents;
 
 	bpm_t m_bpm;
 	double m_currentSamplePos;
@@ -1137,10 +1139,56 @@ void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 
 	unlockShm();
 
+	flushMidiOutEvents();
+
 	m_currentSamplePos += bufferSize();
 }
 
 
+
+
+void RemoteVstPlugin::flushMidiOutEvents()
+{
+	if (m_midiOutEvents.empty())
+	{
+		return;
+	}
+
+	// TODO: move the IPC send off the audio thread. The queue is bounded,
+	// but sendMessage() still takes the transport mutex here.
+	for (const VstMidiEvent& event : m_midiOutEvents)
+	{
+		const uint8_t status = static_cast<uint8_t>(event.midiData[0]);
+		int size = 3;
+		switch (status & 0xF0)
+		{
+		case 0x80: case 0x90: case 0xA0: case 0xB0: case 0xE0:
+			size = 3;
+			break;
+		case 0xC0: case 0xD0:
+			size = 2;
+			break;
+		default:
+			// SysEx and system messages are not forwarded yet.
+			size = 0;
+			break;
+		}
+		if (size == 0)
+		{
+			continue;
+		}
+
+		message m(IdVstMidiOut);
+		m.addInt(event.deltaFrames);
+		m.addInt(size);
+		for (int i = 0; i < size; ++i)
+		{
+			m.addInt(static_cast<int>(static_cast<uint8_t>(event.midiData[i])));
+		}
+		sendMessage(m);
+	}
+	m_midiOutEvents.clear();
+}
 
 
 void RemoteVstPlugin::processMidiEvent( const MidiEvent& event, const f_cnt_t offset )
@@ -1950,7 +1998,21 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 
 		case audioMasterProcessEvents:
 			SHOW_CALLBACK( "amc: audioMasterProcessEvents\n" );
-			// VstEvents* in <ptr>
+			if (__plugin && _ptr)
+			{
+				const auto* events = static_cast<const VstEvents*>(_ptr);
+				const int count = std::min<int>(events->numEvents, 1024);
+				for (int i = 0; i < count; ++i)
+				{
+					const auto* event = reinterpret_cast<const VstMidiEvent*>(
+						events->events[i]);
+					if (event && event->type == kVstMidiType
+						&& __plugin->m_midiOutEvents.size() < 4096)
+					{
+						__plugin->m_midiOutEvents.push_back(*event);
+					}
+				}
+			}
 			return 0;
 
 		case audioMasterIOChanged:

@@ -49,10 +49,12 @@ the audio graph.
 
 Tasks:
 
-- [ ] VST2 `audioMasterProcessEvents`:
+- [x] VST2 `audioMasterProcessEvents`:
   - serialize `VstEvents`/`VstMidiEvent` into a new IPC message,
   - forward to the host-side `VstPlugin`,
   - expose as a MIDI output queue.
+  - current status: instrument events are routed to the track MIDI output;
+    effect routing is still pending.
 - [ ] VST2 `audioMasterBeginEdit` / `audioMasterEndEdit`:
   - map to parameter gesture begin/end,
   - update automation models without jumping.

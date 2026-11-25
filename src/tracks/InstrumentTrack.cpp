@@ -450,6 +450,15 @@ void InstrumentTrack::processInEvent( const MidiEvent& event, const TimePos& tim
 
 
 
+void InstrumentTrack::routeMidiOutEvent(const MidiEvent& event,
+	const TimePos& time)
+{
+	m_midiPort.processOutEvent(event, time);
+}
+
+
+
+
 void InstrumentTrack::processOutEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
 {
 	// do nothing if we do not have an instrument instance (e.g. when loading settings)

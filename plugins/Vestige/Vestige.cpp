@@ -45,6 +45,7 @@
 #include "GuiApplication.h"
 #include "InstrumentPlayHandle.h"
 #include "InstrumentTrack.h"
+#include "MidiEvent.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
 #include "PathUtil.h"
@@ -374,6 +375,27 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 	m_pluginMutex.lock();
 	m_plugin = new VstInstrumentPlugin( m_pluginDLL );
+	if( !m_plugin->failed() )
+	{
+		connect(m_plugin, &VstPlugin::midiOutEvent, this,
+			[this](int /*deltaFrames*/, const QByteArray& data)
+			{
+				if (data.isEmpty()) { return; }
+				const auto status = static_cast<quint8>(data[0]);
+				const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+				if (type == MidiSysEx) { return; }
+				const auto channel = static_cast<int8_t>(status & 0x0F);
+				const auto param1 = data.size() > 1
+					? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
+				const auto param2 = data.size() > 2
+					? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
+				if (auto* track = instrumentTrack(); track != nullptr)
+				{
+					track->routeMidiOutEvent(
+						MidiEvent(type, channel, param1, param2), TimePos());
+				}
+			}, Qt::QueuedConnection);
+	}
 	if( m_plugin->failed() )
 	{
 		m_pluginMutex.unlock();
