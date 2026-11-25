@@ -159,7 +159,8 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
 	m_subWindow( nullptr ),
 	m_scrollArea( nullptr ),
 	knobFModel( nullptr ),
-	p_subWindow( nullptr )
+	p_subWindow( nullptr ),
+	paramCount( 0 )
 {
 	// now we need a play-handle which cares for calling play()
 	auto iph = new InstrumentPlayHandle(this, _instrument_track);
@@ -257,11 +258,67 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 void VestigeInstrument::setParameter( Model * action )
 {
+	if (m_updatingParametersFromPlugin)
+	{
+		return;
+	}
+
 	int knobUNID = action->displayName().toInt();
 
 	if ( m_plugin != nullptr ) {
 		m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
 	}
+}
+
+
+
+
+void VestigeInstrument::handleParameterAutomated( int index, float value )
+{
+	if (m_updatingParametersFromPlugin || knobFModel == nullptr
+		|| index < 0 || index >= paramCount)
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_updatingParametersFromPlugin = true;
+	model->setValue(value, true);
+	m_updatingParametersFromPlugin = false;
+}
+
+
+
+
+void VestigeInstrument::handleParameterGestureBegin( int index )
+{
+	if (knobFModel == nullptr || index < 0 || index >= paramCount
+		|| m_parameterGestures.contains(index))
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_parameterGestures.insert(index);
+	model->addJournalCheckPoint();
+}
+
+
+
+
+void VestigeInstrument::handleParameterGestureEnd( int index )
+{
+	m_parameterGestures.remove(index);
 }
 
 void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString value)
@@ -395,6 +452,15 @@ void VestigeInstrument::loadFile( const QString & _file )
 						MidiEvent(type, channel, param1, param2), TimePos());
 				}
 			}, Qt::QueuedConnection);
+		connect(m_plugin, &VstPlugin::parameterAutomated, this,
+			&VestigeInstrument::handleParameterAutomated,
+			Qt::QueuedConnection);
+		connect(m_plugin, &VstPlugin::parameterGestureBegin, this,
+			&VestigeInstrument::handleParameterGestureBegin,
+			Qt::QueuedConnection);
+		connect(m_plugin, &VstPlugin::parameterGestureEnd, this,
+			&VestigeInstrument::handleParameterGestureEnd,
+			Qt::QueuedConnection);
 	}
 	if( m_plugin->failed() )
 	{
@@ -1139,6 +1205,11 @@ ManageVestigeInstrumentView::~ManageVestigeInstrumentView()
 
 void ManageVestigeInstrumentView::setParameter( Model * action )
 {
+	if (m_vi->m_updatingParametersFromPlugin)
+	{
+		return;
+	}
+
 	int knobUNID = action->displayName().toInt();
 
 	if ( m_vi->m_plugin != nullptr ) {

@@ -127,6 +127,8 @@ bool VstEffect::openPlugin(const QString& plugin)
 
 	delete tf;
 
+	m_vstControls.connectToPlugin(m_plugin.data());
+
 	m_key.attributes["file"] = plugin;
 	return true;
 }

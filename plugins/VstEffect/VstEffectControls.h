@@ -28,7 +28,10 @@
 #include "EffectControls.h"
 
 
+#include <atomic>
+
 #include <QObject>
+#include <QSet>
 
 class QGridLayout;
 class QPaintEvent;
@@ -41,6 +44,7 @@ namespace lmms
 
 
 class VstEffect;
+class VstPlugin;
 
 namespace gui
 {
@@ -68,6 +72,9 @@ public:
 
 	gui::EffectControlDialog* createView() override;
 
+	//! Connect to a newly loaded plugin instance
+	void connectToPlugin(VstPlugin* plugin);
+
 
 protected slots:
 	void updateMenu();
@@ -78,6 +85,9 @@ protected slots:
 	void rolrPreset();
 	void selPreset();
 	void setParameter( lmms::Model * action );
+	void handleParameterAutomated( int index, float value );
+	void handleParameterGestureBegin( int index );
+	void handleParameterGestureEnd( int index );
 
 protected:
 	virtual void paintEvent( QPaintEvent * _pe );
@@ -101,6 +111,9 @@ private:
 	friend class gui::ManageVSTEffectView;
 
 	bool m_vstGuiVisible;
+
+	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	QSet<int> m_parameterGestures;
 } ;
 
 

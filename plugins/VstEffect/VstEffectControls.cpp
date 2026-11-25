@@ -49,6 +49,7 @@ VstEffectControls::VstEffectControls( VstEffect * _eff ) :
 	EffectControls( _eff ),
 	m_effect( _eff ),
 	m_subWindow( nullptr ),
+	paramCount( 0 ),
 	ctrHandle( nullptr ),
 	lastPosInMenu (0),
 	m_vstGuiVisible ( true )
@@ -112,11 +113,85 @@ void VstEffectControls::loadSettings( const QDomElement & _this )
 
 void VstEffectControls::setParameter( Model * action )
 {
+	if (m_updatingParametersFromPlugin)
+	{
+		return;
+	}
+
 	int knobUNID = action->displayName().toInt();
 
 	if ( m_effect->m_plugin != nullptr ) {
 		m_effect->m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
 	}
+}
+
+
+
+
+void VstEffectControls::connectToPlugin( VstPlugin* plugin )
+{
+	if (plugin == nullptr)
+	{
+		return;
+	}
+
+	connect(plugin, &VstPlugin::parameterAutomated, this,
+		&VstEffectControls::handleParameterAutomated, Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureBegin, this,
+		&VstEffectControls::handleParameterGestureBegin, Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureEnd, this,
+		&VstEffectControls::handleParameterGestureEnd, Qt::QueuedConnection);
+}
+
+
+
+
+void VstEffectControls::handleParameterAutomated( int index, float value )
+{
+	if (m_updatingParametersFromPlugin || index < 0
+		|| index >= static_cast<int>(knobFModel.size()))
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_updatingParametersFromPlugin = true;
+	model->setValue(value, true);
+	m_updatingParametersFromPlugin = false;
+}
+
+
+
+
+void VstEffectControls::handleParameterGestureBegin( int index )
+{
+	if (index < 0 || index >= static_cast<int>(knobFModel.size())
+		|| m_parameterGestures.contains(index))
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_parameterGestures.insert(index);
+	model->addJournalCheckPoint();
+}
+
+
+
+
+void VstEffectControls::handleParameterGestureEnd( int index )
+{
+	m_parameterGestures.remove(index);
 }
 
 
@@ -491,6 +566,11 @@ void ManageVSTEffectView::displayAutomatedOnly()
 
 void ManageVSTEffectView::setParameter( Model * action )
 {
+	if (m_vi2->m_updatingParametersFromPlugin)
+	{
+		return;
+	}
+
 	int knobUNID = action->displayName().toInt();
 
 	if ( m_effect->m_plugin != nullptr ) {

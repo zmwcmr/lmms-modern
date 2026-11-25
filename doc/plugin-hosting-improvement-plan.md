@@ -20,6 +20,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 - Surge XT native UI enabled again.
 - VST2 MIDI events from `audioMasterProcessEvents` forwarded to the track MIDI
   output.
+- VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
+  the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
 
 ### Known gaps
@@ -30,7 +32,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
    internal track-to-track routing are still missing.
 4. No sample-accurate automation.
 5. Only bundle presets are exposed; user presets and preset saving are missing.
-6. VST2 host callback coverage is incomplete.
+6. VST2 host callback coverage is still incomplete: file selector,
+   `audioMasterGetDirectory`, and several 2.4 callbacks remain stubs.
 7. No sidechain/aux bus or multi-output routing.
 8. 32-bit VST remains untested.
 9. VST2 UI scale/DPI handling is not uniform.
@@ -60,9 +63,12 @@ Tasks:
   - expose as a MIDI output queue.
   - current status: instrument events are routed to the track MIDI output;
     effect routing is still pending.
-- [ ] VST2 `audioMasterBeginEdit` / `audioMasterEndEdit`:
+- [x] VST2 `audioMasterBeginEdit` / `audioMasterEndEdit`:
   - map to parameter gesture begin/end,
   - update automation models without jumping.
+  - current status: `audioMasterAutomate` is forwarded as well, and a
+    begin/end pair creates one undo checkpoint per gesture. Automated or
+    controlled models are not overwritten by plugin-originated changes.
 - [ ] VST2 `audioMasterGetDirectory` and file selector:
   - return a useful directory string,
   - implement a minimal host-side file selector or a safe failure.
@@ -97,7 +103,8 @@ src/gui/Lv2ProcView.cpp
 Acceptance:
 
 - A MIDI-out VST2 plugin emits events visible to the host.
-- A VST2 parameter gesture is recorded as one automation gesture.
+- A VST2 parameter gesture updates the host knob and creates one undo
+  checkpoint when the gesture begins.
 - An LV2 factory preset can be selected and restored.
 - The 32-bit host loads one real 32-bit plugin without crashing LMMS.
 - Existing VST2/LV2 projects still load.

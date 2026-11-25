@@ -27,7 +27,10 @@
 #define _VESTIGE_H
 
 
+#include <atomic>
+
 #include <QMutex>
+#include <QSet>
 
 #include "Instrument.h"
 #include "InstrumentView.h"
@@ -79,6 +82,9 @@ protected slots:
 	void setParameter( lmms::Model * action );
 	void handleConfigChange( QString cls, QString attr, QString value );
 	void reloadPlugin();
+	void handleParameterAutomated( int index, float value );
+	void handleParameterGestureBegin( int index );
+	void handleParameterGestureEnd( int index );
 
 private:
 	void closePlugin();
@@ -93,6 +99,11 @@ private:
 	FloatModel ** knobFModel;
 	QObject * p_subWindow;
 	int paramCount;
+
+	//! True while a plugin-originated parameter change is being applied
+	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	//! Parameters with an active beginEdit/endEdit gesture
+	QSet<int> m_parameterGestures;
 
 
 	friend class gui::VestigeInstrumentView;

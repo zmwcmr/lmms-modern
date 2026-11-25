@@ -1896,7 +1896,15 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 	{
 		case audioMasterAutomate:
 			SHOW_CALLBACK( "amc: audioMasterAutomate\n" );
-			// index, value, returns 0
+			// index, value
+			// TODO: queue parameter changes and flush them from the
+			// processing thread so plugins that automate from their DSP do
+			// not block on IPC.
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterAutomated)
+					.addInt(_index).addFloat(_opt));
+			}
 			return 0;
 
 		case audioMasterVersion:
@@ -2247,17 +2255,26 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 #endif
 			return 0;
 
-#if kVstVersion > 2
 		case audioMasterBeginEdit:
 			SHOW_CALLBACK( "amc: audioMasterBeginEdit\n" );
 			// begin of automation session (when mouse down),
 			// parameter index in <index>
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterGestureBegin)
+					.addInt(_index));
+			}
 			return 0;
 
 		case audioMasterEndEdit:
 			SHOW_CALLBACK( "amc: audioMasterEndEdit\n" );
 			// end of automation session (when mouse up),
 			// parameter index in <index>
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterGestureEnd)
+					.addInt(_index));
+			}
 			return 0;
 
 		case audioMasterOpenFileSelector:
@@ -2265,7 +2282,6 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 			// open a fileselector window with VstFileSelect*
 			// in <ptr>
 			return 0;
-#endif
 		default:
 			SHOW_CALLBACK( "amd: not handled" );
 			break;

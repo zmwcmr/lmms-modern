@@ -140,6 +140,13 @@ signals:
 	//! start of the current processing block.
 	void midiOutEvent(int deltaFrames, const QByteArray& data);
 
+	//! Parameter change initiated by the plugin UI or DSP
+	void parameterAutomated(int index, float value);
+	//! Start of a parameter gesture (mouse down in the plugin UI)
+	void parameterGestureBegin(int index);
+	//! End of a parameter gesture (mouse up in the plugin UI)
+	void parameterGestureEnd(int index);
+
 public slots:
 	void setTempo( lmms::bpm_t _bpm );
 	void updateSampleRate();

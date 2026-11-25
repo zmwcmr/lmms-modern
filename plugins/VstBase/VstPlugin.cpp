@@ -543,6 +543,18 @@ bool VstPlugin::processMessage( const message & _m )
 			break;
 		}
 
+		case IdVstParameterAutomated:
+			emit parameterAutomated(_m.getInt(0), _m.getFloat(1));
+			break;
+
+		case IdVstParameterGestureBegin:
+			emit parameterGestureBegin(_m.getInt(0));
+			break;
+
+		case IdVstParameterGestureEnd:
+			emit parameterGestureEnd(_m.getInt(0));
+			break;
+
 		case IdVstParameterDump:
 		{
 			m_parameterDump.clear();
