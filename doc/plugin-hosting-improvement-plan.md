@@ -172,6 +172,9 @@ Goal: keep parallel tracks and effect chains phase-aligned.
 
 Tasks:
 
+- [x] Design spike for the latency graph and delay buffers:
+  - current status: `doc/pdc-design.md` defines the path model, delay-line
+    placement, staged implementation and acceptance tests.
 - [x] Add a latency query to the plugin abstraction:
   - VST2: `initialDelay` and `audioMasterGetOutputLatency`,
   - LV2: `lv2:latency` control port / reportLatency.
