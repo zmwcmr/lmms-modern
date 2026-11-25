@@ -298,8 +298,12 @@ Goal: a crashing LV2 UI or DSP must not kill LMMS.
 
 Tasks:
 
-- [ ] Design a generic plugin host process interface (audio, parameters, MIDI,
+- [x] Design a generic plugin host process interface (audio, parameters, MIDI,
       state, UI window ID).
+  - current status: `doc/lv2-host-design.md` defines one child process per
+    plugin instance, the control FIFO, the shared audio/MIDI/control segment,
+    the block handshake, X11 UI hosting, state exchange over the filesystem,
+    crash/reload policy and a staged implementation with fake test plugins.
 - [ ] Implement `lmms-lv2-host`:
   - instantiate the plugin,
   - provide LV2 features (map/unmap, options, worker, state),
