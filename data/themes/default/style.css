@@ -24,7 +24,7 @@ QTreeWidget::branch:hover {
 
 QTreeWidget::item:selected,
 QTreeWidget::branch:selected {
-	background-color: #17793b;
+	background-color: #0f5c2c;
 	padding-left: 0px;
 }
 
@@ -95,7 +95,28 @@ QLineEdit:focus {
 
 QTextEdit, QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
 	color: #d1d8e4;
-	selection-background-color: #17793b;
+	selection-background-color: #0f5c2c;
+}
+
+/* Keyboard focus indication.
+   These rules only draw an outline; they never change border widths or
+   padding, so focus cannot shift the layout. An outline is used instead of
+   border colours because most buttons are styled through ID selectors
+   (QPushButton#btn), which outrank a plain ":focus" rule on specificity.
+   Combo boxes and spin boxes are painted by LmmsStyle and are not covered
+   here yet. */
+
+QToolButton:focus,
+QPushButton:focus {
+	outline: 1px solid #0bd556;
+	outline-offset: -2px;
+}
+
+QTreeView:focus,
+QListView:focus,
+QTableView:focus {
+	outline: 1px solid #0bd556;
+	outline-offset: -1px;
 }
 
 QToolTip {
@@ -791,7 +812,7 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 7pt;
+	font-size: 10px;
 }
 
 /* persistent peak markers for fx peak meters */
@@ -803,7 +824,7 @@ lmms--gui--Fader {
 
 lmms--gui--TimeLineWidget {
 	/* font-size only supports px and pt. */
-	font-size: 7pt;
+	font-size: 10px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
