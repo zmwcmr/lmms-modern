@@ -202,7 +202,8 @@ Tasks:
   - current status: graph delays are recomputed every mixer round, but the
     source latency is only refreshed when an instrument is loaded/changed.
 - [ ] Add a committed impulse/phase test project.
-  - verified locally with temporary VST2 impulse plugins (128-sample delay).
+  - `DelayLineTest` covers delayed impulses and block boundaries; the full
+    mixer impulse project is still verified with temporary VST2 plugins.
 
 Files:
 

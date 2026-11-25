@@ -5,6 +5,7 @@ set(CMAKE_AUTOMOC ON)
 
 set(LMMS_TESTS
 	src/core/ArrayVectorTest.cpp
+	src/core/DelayLineTest.cpp
 	src/core/AudioBufferTest.cpp
 	src/core/AutomatableModelTest.cpp
 	src/core/MathTest.cpp
