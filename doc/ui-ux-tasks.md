@@ -54,6 +54,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-4 | ⏸️ 已实现但隐藏 | 状态栏 + 悬停提示可用，当前 `hide()` 掉，等提示内容完善后再启用 |
 | T1-3 | ✅ 已实现 | Alt+滚轮实测 0.05 dB（普通滚轮 1 dB） |
 | T1-5 | ✅ 已实现 | 12 → 10 经 UI 写入配置；缺省 100 已确认 |
+| T1-6 | ✅ 已实现 | 下拉框列出两套主题；切到 classic 重启生效 |
 
 ### 实施中发现并修正的两个问题
 
@@ -358,15 +359,24 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-6 主题选择下拉框
+### T1-6 主题选择下拉框（已实现）
 
-**现象**：主题 = Paths 页里填目录字符串（`SetupDialog.cpp:862`），且必须重启（`LmmsStyle.cpp:139`）。
+**现象**：主题 = Paths 页里填目录字符串，用户得知道主题装在哪，且必须重启（`LmmsStyle.cpp:139`）。
 
-**改动点**
-- `SetupDialog.cpp` 的 Paths 页：把 `addPathEntry(tr("Theme directory"), ...)` 换成一个 `QComboBox` + "浏览…" 按钮；下拉项 = 枚举 `QFileInfo(ConfigManager::inst()->defaultThemeDir()).dir()` 下所有含 `style.css` 的子目录。
-- 选择后写入 `ConfigManager::setThemeDir()`，并给出提示"重启后生效"（`QMessageBox::information` 或设置页内联 Label）。
+**实现**
+- Paths 页的 "Theme directory" 文本框换成 `QComboBox` + 浏览按钮：
+  - 枚举 `data:/themes` 下含 `style.css` 的子目录（当前仓库里是 `classic`、`default`）；
+  - 当前配置的主题如果不在其中（自定义目录），额外加一项；
+  - 选中后调用 `ConfigManager::setThemeDir()` 并显示既有的 "Some changes require restarting." 提示。
+- 浏览按钮走原来的 `FileDialog`，选中的目录会加入下拉框并选中。
+- 删掉了不再使用的 `m_themeDirLineEdit`。
 
-**验收**：下拉框能列出 `default`、`classic`；选 `classic` 重启后图标变化；配置文件里写入的仍是目录路径，旧配置可读。
+**实测**
+- 下拉框列出 `classic`、`default`（`t1-6-theme-combo.png`），选中后出现重启提示；
+- 选 `classic` → OK → 退出后配置写入 `theme="data:/themes/classic/"`；
+- 用该配置重启，界面切换为 classic 主题（浅色、旧蓝色 clip，`t1-6-classic-theme.png`）。
+
+**兼容性**：配置里存的仍是目录路径，旧的 `paths/theme` 配置可直接读。
 
 **不做**：不做运行时热切换（涉及 `resources:` 搜索路径与已加载 pixmap，属于另一项）。
 

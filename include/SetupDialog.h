@@ -126,6 +126,7 @@ private slots:
 	void openGIGDir();
 	void setGIGDir(const QString & gigDir);
 	void openThemeDir();
+	void populateThemes();
 	void setThemeDir(const QString & themeDir);
 	void openBackgroundPicFile();
 	void setBackgroundPicFile(const QString & backgroundPicFile);
@@ -215,7 +216,7 @@ private:
 
 	QLineEdit * m_workingDirLineEdit;
 	QLineEdit * m_vstDirLineEdit;
-	QLineEdit * m_themeDirLineEdit;
+	QComboBox * m_themeComboBox;
 	QLineEdit * m_ladspaDirLineEdit;
 	QLineEdit * m_gigDirLineEdit;
 	QLineEdit * m_sf2DirLineEdit;
