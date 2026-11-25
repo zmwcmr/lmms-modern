@@ -28,6 +28,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
   outputs.
 - VST2 `initialDelay` and LV2 `lv2:latency` output ports are queried and
   reported through `Plugin::latency()`; `EffectChain::latency()` sums effects.
+- Track buses feeding the same mixer channel are delay-compensated against the
+  maximum input latency.
 - VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
   the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
@@ -35,7 +37,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 ### Known gaps
 
 1. LV2 UI and DSP run in the LMMS process.
-2. Plugin latency is reported, but there is no delay compensation (PDC) yet.
+2. Track-to-channel PDC is implemented, but send and master compensation is
+   still missing.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
    internal target track; longer routing chains are still missing.
 4. No sample-accurate automation.
@@ -183,14 +186,19 @@ Tasks:
 - [x] Report latency through `Plugin`/`Effect`/`Instrument`.
   - current status: `Plugin::latency()` is implemented for VST2 and LV2, and
     `EffectChain::latency()` sums the effects in a chain.
-- [ ] Add a latency graph to the engine:
+- [x] Add a latency graph to the engine (first stage):
   - per-track latency,
   - effect-chain latency,
   - mixer bus latency,
-  - maximum latency alignment.
-- [ ] Delay compensation during playback, export and freeze.
+  - maximum latency alignment across buses feeding the same channel.
+  - current status: track buses are aligned at mixer-channel inputs; send,
+    master and cross-channel alignment are next.
+- [x] Delay compensation during playback and export (first stage).
+  - current status: track-to-channel alignment works in both paths; freeze
+    and send/master compensation are still missing.
 - [ ] Update routing when plugin latency changes.
-- [ ] Add an impulse/phase test project.
+- [ ] Add a committed impulse/phase test project.
+  - verified locally with temporary VST2 impulse plugins (128-sample delay).
 
 Files:
 

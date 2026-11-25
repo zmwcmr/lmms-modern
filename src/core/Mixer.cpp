@@ -27,6 +27,7 @@
 #include <QDebug>
 #include <QDomElement>
 
+#include "AudioBusHandle.h"
 #include "AudioEngine.h"
 #include "AudioEngineWorkerThread.h"
 #include "Mixer.h"
@@ -277,6 +278,7 @@ int Mixer::createChannel()
 	const int index = m_mixerChannels.size();
 	// create new channel
 	m_mixerChannels.push_back( new MixerChannel( index, this ) );
+	m_latencyByChannel.push_back( 0 );
 
 	// reset channel state
 	clearChannel( index );
@@ -411,6 +413,7 @@ void Mixer::deleteChannel( int index )
 
 	// actually delete the channel
 	m_mixerChannels.erase(m_mixerChannels.begin() + index);
+	m_latencyByChannel.erase(m_latencyByChannel.begin() + index);
 	delete ch;
 
 	for (auto i = static_cast<std::size_t>(index); i < m_mixerChannels.size(); ++i)
@@ -683,9 +686,44 @@ void Mixer::prepareMasterMix()
 
 
 
+
+void Mixer::updateLatencyCompensation()
+{
+	const auto& buses = Engine::audioEngine()->audioBusHandles();
+	if (m_latencyByChannel.size() != m_mixerChannels.size())
+	{
+		m_latencyByChannel.resize(m_mixerChannels.size(), 0);
+	}
+	std::fill(m_latencyByChannel.begin(), m_latencyByChannel.end(), 0);
+	auto& maxLatency = m_latencyByChannel;
+
+	for (AudioBusHandle* bus : buses)
+	{
+		const auto destination = bus->nextMixerChannel();
+		if (destination >= 0
+			&& destination < static_cast<mix_ch_t>(maxLatency.size()))
+		{
+			maxLatency[destination] = std::max(maxLatency[destination], bus->latency());
+		}
+	}
+
+	for (AudioBusHandle* bus : buses)
+	{
+		const auto destination = bus->nextMixerChannel();
+		const f_cnt_t max = destination >= 0
+			&& destination < static_cast<mix_ch_t>(maxLatency.size())
+			? maxLatency[destination] : 0;
+		bus->setDelayFrames(std::max<f_cnt_t>(0, max - bus->latency()));
+	}
+}
+
+
+
 void Mixer::masterMix( SampleFrame* _buf )
 {
 	const int fpp = Engine::audioEngine()->framesPerPeriod();
+
+	updateLatencyCompensation();
 
 	// add the channels that have no dependencies (no incoming senders, ie.
 	// no receives) to the jobqueue. The channels that have receives get
