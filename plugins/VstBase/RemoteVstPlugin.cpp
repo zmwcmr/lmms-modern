@@ -2181,7 +2181,11 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 			//    thread
 			// other: not defined, but probably pre-empting user
 			//        thread.
-			return 0;
+#ifdef NATIVE_LINUX_VST
+			return pthread_equal(pthread_self(), __processingThreadId) ? 2 : 1;
+#else
+			return GetCurrentThreadId() == __processingThreadId ? 2 : 1;
+#endif
 
 		case audioMasterGetAutomationState:
 			SHOW_CALLBACK( "amc: audioMasterGetAutomationState\n" );
@@ -2240,9 +2244,13 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 
 		case audioMasterCanDo:
 			SHOW_CALLBACK("amc: audioMasterCanDo\n");
+			if (!p) { return 0; }
 			return !(std::strcmp(p, "sendVstEvents")
 				&& std::strcmp(p, "sendVstMidiEvent")
 				&& std::strcmp(p, "sendVstTimeInfo")
+				&& std::strcmp(p, "receiveVstEvents")
+				&& std::strcmp(p, "receiveVstMidiEvent")
+				&& std::strcmp(p, "receiveVstTimeInfo")
 				&& std::strcmp(p, "sizeWindow")
 				&& std::strcmp(p, "supplyIdle"));
 
