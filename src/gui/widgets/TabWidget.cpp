@@ -258,6 +258,9 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 
 			// Get artwork
 			QPixmap artwork(embed::getIconPixmap(currentWidgetDesc.pixmap));
+			// QPixmap::width() is in device pixels for high-DPI artwork; the
+			// tab bar and highlight use logical pixels.
+			const QSize artworkSize = embed::logicalSize(artwork);
 
 			// Highlight active tab
 			if (it.key() == m_activeTab)
@@ -266,7 +269,7 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 			}
 
 			// Draw artwork
-			p.drawPixmap(tab_x_offset + (currentWidgetDesc.nwidth - artwork.width()) / 2, 1, artwork);
+			p.drawPixmap(tab_x_offset + (currentWidgetDesc.nwidth - artworkSize.width()) / 2, 1, artwork);
 		}
 		else
 		{
