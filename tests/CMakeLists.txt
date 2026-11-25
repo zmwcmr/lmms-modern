@@ -10,9 +10,12 @@ set(LMMS_TESTS
 	src/core/MathTest.cpp
 	src/core/ProjectVersionTest.cpp
 	src/core/RelativePathsTest.cpp
+	src/core/SongAutomationTest.cpp
 	src/core/TimelineTest.cpp
 	src/core/ValidationTest.cpp
 	src/tracks/AutomationTrackTest.cpp
+	src/tracks/InstrumentTrackTest.cpp
+	src/tracks/MidiClipTest.cpp
 )
 
 if(LMMS_HAVE_LV2)

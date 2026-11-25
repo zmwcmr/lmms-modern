@@ -131,7 +131,13 @@ void MidiClip::updateLength()
 	{
 		if (m_instrumentTrack->trackContainer()->type() == TrackContainer::Type::Pattern)
 		{
-			changeLength(beatClipLength());
+			const auto length = beatClipLength();
+			// Keep the step count in sync with note-driven lengths. Older
+			// projects only store the steps, so without this a melody clip
+			// longer than a bar would be truncated to one bar on load (#8575).
+			m_steps = std::max(m_steps, static_cast<int>(length.getTicks()
+				* TimePos::stepsPerBar() / TimePos::ticksPerBar()));
+			changeLength(length);
 			updatePatternTrack();
 			return;
 		}
@@ -160,16 +166,15 @@ TimePos MidiClip::beatClipLength() const
 
 	for (const auto& note : m_notes)
 	{
-		if (note->type() == Note::Type::Step)
-		{
-			max_length = std::max<tick_t>(max_length, note->pos() + 1);
-		}
+		// Step notes occupy a single step, melody notes extend to their end.
+		const tick_t noteEnd = note->type() == Note::Type::Step
+			? note->pos() + 1
+			: static_cast<tick_t>(note->endPos());
+		max_length = std::max(max_length, noteEnd);
 	}
 
-	if (m_steps != TimePos::stepsPerBar())
-	{
-		max_length = m_steps * TimePos::ticksPerBar() / TimePos::stepsPerBar();
-	}
+	max_length = std::max<tick_t>(max_length,
+		m_steps * TimePos::ticksPerBar() / TimePos::stepsPerBar());
 
 	return TimePos{max_length}.nextFullBar() * TimePos::ticksPerBar();
 }

@@ -64,8 +64,14 @@ auto loadSvgPixmap(const QString& resourceName, int width, int height) -> QPixma
 	// If width/height are provided, use them
 	if (width > 0 && height > 0) { svgSize.scale(width, height, Qt::IgnoreAspectRatio); }
 
-	// Scale the svg
-	qreal devicePixelRatio = QGuiApplication::primaryScreen()->devicePixelRatio();
+	// Scale the SVG. The oversampling factor is important because Qt often draws
+	// the pixmap smaller than its intrinsic size (a QToolButton defaults to a
+	// 16 px icon size while most SVG artwork is 20 px) and because the DPR
+	// reported by the platform can be smaller than the compositor's actual
+	// scale. Keeping a higher-resolution raster around lets Qt downscale
+	// instead of upscaling, which keeps the icons crisp.
+	constexpr qreal svgOversampling = 2.0;
+	qreal devicePixelRatio = QGuiApplication::primaryScreen()->devicePixelRatio() * svgOversampling;
 	svgSize *= devicePixelRatio;
 
 	QImage image(svgSize, QImage::Format_ARGB32);
@@ -85,6 +91,17 @@ auto loadPixmap(const QString& name, int width, int height, const char* const* x
 	if (xpm) { return QPixmap{xpm}; }
 
 	const auto resourceName = QDir::isAbsolutePath(name) ? name : "artwork:" + name;
+
+	// Prefer SVGs explicitly. QImageReader resolves an extension-less name by
+	// probing formats in order, so a PNG left behind in a theme directory that
+	// shadows the current theme would win over the theme's SVG (for example
+	// while the default theme is being migrated from PNG to SVG).
+	if (!resourceName.endsWith(".svg", Qt::CaseInsensitive))
+	{
+		const auto svgName = resourceName + ".svg";
+		if (QFile::exists(svgName)) { return loadSvgPixmap(svgName, width, height); }
+	}
+
 	auto reader = QImageReader{resourceName};
 
 	if (reader.format().toLower() == "svg")

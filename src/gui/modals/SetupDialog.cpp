@@ -31,6 +31,7 @@
 #include <QLayout>
 #include <QLineEdit>
 #include <QScrollArea>
+#include <QSpinBox>
 
 #include "AudioEngine.h"
 #include "embed.h"
@@ -240,7 +241,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 		m_printNoteLabels, SLOT(toggleNoteLabels(bool)), false);
 	addCheckBox(tr("Show fader ticks"), guiGroupBox, guiGroupLayout,
 		m_showFaderTicks, SLOT(toggleShowFaderTicks(bool)), false);
-	addCheckBox(tr("Enable compact track buttons"), guiGroupBox, guiGroupLayout,
+	addCheckBox(tr("Use compact track buttons by default"), guiGroupBox, guiGroupLayout,
 		m_compactTrackButtons, SLOT(toggleCompactTrackButtons(bool)), true);
 	addCheckBox(tr("Enable one instrument-track-window mode"), guiGroupBox, guiGroupLayout,
 		m_oneInstrumentTrackWindow, SLOT(toggleOneInstrumentTrackWindow(bool)), true);
@@ -291,6 +292,16 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 
 	guiGroupLayout->addWidget(new QLabel{tr("Default Autoscroll Mode"), guiGroupBox});
 	guiGroupLayout->addWidget(m_autoScrollComboBox);
+
+	m_autoScrollResumeDelaySpinBox = new QSpinBox{guiGroupBox};
+	m_autoScrollResumeDelaySpinBox->setRange(0, 10);
+	m_autoScrollResumeDelaySpinBox->setSuffix(tr(" s"));
+	m_autoScrollResumeDelaySpinBox->setToolTip(tr("Time without scrollbar interaction before auto-scrolling resumes. 0 resumes immediately."));
+	m_autoScrollResumeDelaySpinBox->setValue(
+		ConfigManager::inst()->value("ui", "autoscrollresumedelay", "2").toInt());
+
+	guiGroupLayout->addWidget(new QLabel{tr("Auto-scroll resume delay"), guiGroupBox});
+	guiGroupLayout->addWidget(m_autoScrollResumeDelaySpinBox);
 
 	generalControlsLayout->addWidget(guiGroupBox);
 
@@ -1010,6 +1021,8 @@ void SetupDialog::accept()
 	ConfigManager::inst()->setValue("app", "loopmarkermode", m_loopMarkerMode);
 	ConfigManager::inst()->setValue("app", "language", m_lang);
 	ConfigManager::inst()->setValue("ui", "autoscroll", m_autoScroll);
+	ConfigManager::inst()->setValue("ui", "autoscrollresumedelay",
+					QString::number(m_autoScrollResumeDelaySpinBox->value()));
 	ConfigManager::inst()->setValue("ui", "saveinterval",
 					QString::number(m_saveInterval));
 	ConfigManager::inst()->setValue("ui", "enableautosave",

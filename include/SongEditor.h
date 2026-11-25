@@ -29,6 +29,8 @@
 #include "Editor.h"
 #include "TrackContainerView.h"
 
+#include <QTimer>
+
 class QLabel;
 class QScrollBar;
 
@@ -116,6 +118,8 @@ private slots:
 
 	void zoomingChanged();
 
+	void pauseAutoScroll();
+
 private:
 	void keyPressEvent( QKeyEvent * ke ) override;
 	void wheelEvent( QWheelEvent * we ) override;
@@ -157,6 +161,8 @@ private:
 
 	bool m_scrollBack;
 	bool m_smoothScroll;
+	bool m_autoScrollPaused;
+	QTimer* m_autoScrollResumeTimer;
 
 	EditMode m_mode;
 	EditMode m_ctrlMode; //!< Mode they were in before they hit ctrl
@@ -167,7 +173,6 @@ private:
 	int m_rubberBandStartTrackview;
 	TimePos m_rubberbandStartTimePos;
 	int m_rubberbandPixelsPerBar; //!< Pixels per bar when selection starts
-	int m_trackHeadWidth;
 	bool m_selectRegion;
 
 	friend class SongEditorWindow;

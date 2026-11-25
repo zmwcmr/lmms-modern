@@ -39,6 +39,7 @@ class QComboBox;
 class QLabel;
 class QLineEdit;
 class QSlider;
+class QSpinBox;
 
 
 namespace lmms::gui
@@ -155,6 +156,7 @@ private:
 	QComboBox* m_loopMarkerComboBox;
 	QString m_autoScroll;
 	QComboBox* m_autoScrollComboBox;
+	QSpinBox* m_autoScrollResumeDelaySpinBox;
 	QString m_lang;
 	QStringList m_languages;
 

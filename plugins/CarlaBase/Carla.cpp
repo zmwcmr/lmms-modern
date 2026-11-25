@@ -157,7 +157,8 @@ CarlaInstrument::CarlaInstrument(InstrumentTrack* const instrumentTrack, const D
       fHost{},
       fDescriptor(isPatchbay ? carla_get_native_patchbay_plugin() : carla_get_native_rack_plugin()),
       fMidiEventCount(0),
-      m_paramModels()
+      m_paramModels(),
+      m_view()
 {
     fHost.handle      = this;
     fHost.uiName      = nullptr;
@@ -232,6 +233,16 @@ CarlaInstrument::CarlaInstrument(InstrumentTrack* const instrumentTrack, const D
 CarlaInstrument::~CarlaInstrument()
 {
     Engine::audioEngine()->removePlayHandlesOfTypes(instrumentTrack(), PlayHandle::Type::NotePlayHandle | PlayHandle::Type::InstrumentPlayHandle);
+
+    // The view is deleted by InstrumentTrackWindow::updateInstrumentView(),
+    // which runs after the old instrument has already been destroyed.  Detach
+    // it now, while the native handle is still valid, to avoid the view
+    // calling into the native plugin after it has been cleaned up.
+    if (m_view != nullptr)
+    {
+        m_view->prepareForInstrumentDeletion();
+        m_view = nullptr;
+    }
 
     if (fHost.resourceDir != nullptr)
     {
@@ -619,7 +630,9 @@ gui::PluginView* CarlaInstrument::instantiateView(QWidget* parent)
     //fHost.uiName = strdup(parent->windowTitle().toUtf8().constData());
     fHost.uiName = strdup(kIsPatchbay ? "CarlaPatchbay-LMMS" : "CarlaRack-LMMS");
 
-    return new gui::CarlaInstrumentView(this, parent);
+    auto* const view = new gui::CarlaInstrumentView(this, parent);
+    m_view = view;
+    return view;
 }
 
 void CarlaInstrument::sampleRateChanged()
@@ -705,9 +718,34 @@ CarlaInstrumentView::~CarlaInstrumentView()
 #endif
 }
 
+void CarlaInstrumentView::prepareForInstrumentDeletion()
+{
+    // Stop idle callbacks before the native handle goes away.
+    if (fTimerId != 0)
+    {
+        killTimer(fTimerId);
+        fTimerId = 0;
+    }
+
+    // The parameters view dereferences the instrument in its destructor, so
+    // destroy it while the instrument is still alive.
+#if CARLA_VERSION_HEX >= CARLA_MIN_PARAM_VERSION
+    if (m_paramsView)
+    {
+        delete m_paramsView;
+        m_paramsView = nullptr;
+    }
+#endif
+
+    m_toggleUIButton->setChecked(false);
+    fHandle = nullptr;
+    fDescriptor = nullptr;
+    m_carlaInstrument = nullptr;
+}
+
 void CarlaInstrumentView::toggleUI(bool visible)
 {
-    if (fHandle != nullptr && fDescriptor->ui_show != nullptr) {
+    if (fHandle != nullptr && fDescriptor != nullptr && fDescriptor->ui_show != nullptr) {
 // TODO: remove when fixed upstream
 // change working path to location of carla.dll to avoid conflict with lmms
 #if defined(CARLA_OS_WIN32) || defined(CARLA_OS_WIN64)
@@ -734,18 +772,29 @@ void CarlaInstrumentView::modelChanged()
 
 void CarlaInstrumentView::timerEvent(QTimerEvent* event)
 {
-    if (event->timerId() == fTimerId)
+    if (event->timerId() == fTimerId && fHandle != nullptr && fDescriptor != nullptr
+        && fDescriptor->ui_idle != nullptr)
+    {
         fDescriptor->ui_idle(fHandle);
+    }
 
     InstrumentView::timerEvent(event);
 }
 
 void CarlaInstrumentView::toggleParamsWindow()
 {
+	if (m_carlaInstrument == nullptr)
+	{
+		return;
+	}
+
 	if (!m_paramsSubWindow)
 	{
 		m_paramsView = new CarlaParamsView(this, m_parent);
-		connect(m_paramsSubWindow, SIGNAL(uiClosed()), this, SLOT(paramsUiClosed()));
+		if (m_paramsSubWindow != nullptr)
+		{
+			connect(m_paramsSubWindow, SIGNAL(uiClosed()), this, SLOT(paramsUiClosed()));
+		}
 	}
 	else
 	{
@@ -920,7 +969,7 @@ CarlaParamsView::~CarlaParamsView()
 	m_carlaInstrumentView->m_paramsView = nullptr;
 
 	// Clear models
-	if (!m_carlaInstrument->m_paramModels.empty())
+	if (m_carlaInstrument != nullptr && !m_carlaInstrument->m_paramModels.empty())
 	{
 		m_carlaInstrument->clearParamModels();
 	}

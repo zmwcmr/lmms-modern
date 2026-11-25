@@ -27,6 +27,7 @@
 #define LMMS_GUI_CPU_LOAD_WIDGET_H
 
 #include <algorithm>
+#include <QColor>
 #include <QTimer>
 #include <QPixmap>
 #include <QWidget>
@@ -42,6 +43,7 @@ class CPULoadWidget : public QWidget
 {
 	Q_OBJECT
 	Q_PROPERTY(int stepSize MEMBER m_stepSize)
+	Q_PROPERTY(QColor labelColor MEMBER m_labelColor)
 public:
 	CPULoadWidget( QWidget * _parent );
 	~CPULoadWidget() override = default;
@@ -69,6 +71,8 @@ private:
 	QTimer m_updateTimer;
 
 	int m_stepSize = 1;
+
+	QColor m_labelColor = Qt::white;
 
 } ;
 

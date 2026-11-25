@@ -3322,12 +3322,13 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	if (!hasValidMidiClip())
 	{
 		const auto icon = embed::getIconPixmap("pr_no_clip");
-		const int x = (width() - icon.width()) / 2;
-		const int y = (height() - icon.height()) / 2;
+		const auto iconSize = embed::logicalSize(icon);
+		const int x = (width() - iconSize.width()) / 2;
+		const int y = (height() - iconSize.height()) / 2;
 		p.drawPixmap(x, y, icon);
 
 		p.setPen(QApplication::palette().color(QPalette::Active, QPalette::Text));
-		QRect textRect(0, y + icon.height() + 5, width(), 30);
+		QRect textRect(0, y + iconSize.height() + 5, width(), 30);
 		p.drawText(textRect, Qt::AlignHCenter | Qt::AlignTop,
 			tr("Double-click on an instrument clip in Song Editor to open it here"));
 		return;
@@ -5329,6 +5330,7 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto zoom_lbl = new QLabel(m_toolBar);
 	zoom_lbl->setPixmap( embed::getIconPixmap( "zoom_x" ) );
+	zoom_lbl->setToolTip( tr( "Horizontal zooming" ) );
 
 	m_zoomingComboBox = new ComboBox( m_toolBar );
 	m_zoomingComboBox->setModel( &m_editor->m_zoomingModel );
@@ -5337,6 +5339,7 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto zoom_y_lbl = new QLabel(m_toolBar);
 	zoom_y_lbl->setPixmap(embed::getIconPixmap("zoom_y"));
+	zoom_y_lbl->setToolTip(tr("Vertical zooming"));
 
 	m_zoomingYComboBox = new ComboBox(m_toolBar);
 	m_zoomingYComboBox->setModel(&m_editor->m_zoomingYModel);
@@ -5346,6 +5349,7 @@ PianoRollWindow::PianoRollWindow() :
 	// setup quantize-stuff
 	auto quantize_lbl = new QLabel(m_toolBar);
 	quantize_lbl->setPixmap( embed::getIconPixmap( "quantize" ) );
+	quantize_lbl->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );

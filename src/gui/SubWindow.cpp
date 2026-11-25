@@ -68,12 +68,23 @@ SubWindow::SubWindow(QWidget* parent, Qt::WindowFlags windowFlags)
 
 	// close, maximize, restore, and detach buttons
 	auto createButton = [this](std::string_view iconName, const QString& tooltip) -> QPushButton* {
-		auto button = new QPushButton{embed::getIconPixmap(iconName), QString{}, this};
+		auto button = new QPushButton{this};
 		button->resize(m_buttonSize);
 		button->setFocusPolicy(Qt::NoFocus);
 		button->setCursor(Qt::ArrowCursor);
 		button->setAttribute(Qt::WA_NoMousePropagation);
 		button->setToolTip(tooltip);
+
+		// Draw the pixmap with a QLabel so its devicePixelRatio is preserved.
+		// QPushButton/QIcon downscales HiDPI pixmaps to the logical icon size.
+		const QPixmap pixmap = embed::getIconPixmap(iconName);
+		const QSize iconSize = embed::logicalSize(pixmap);
+		auto icon = new QLabel{button};
+		icon->setPixmap(pixmap);
+		icon->setAttribute(Qt::WA_TransparentForMouseEvents);
+		icon->setGeometry(QRect(QPoint((m_buttonSize.width() - iconSize.width()) / 2,
+		                               (m_buttonSize.height() - iconSize.height()) / 2),
+		                        iconSize));
 		return button;
 	};
 	m_closeBtn = createButton("close", tr("Close"));
