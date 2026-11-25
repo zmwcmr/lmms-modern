@@ -231,9 +231,11 @@ QString TrackLabelButton::elideName( const QString &name )
 		setToolTip( m_trackView->getTrack()->displayName() );
 		return QString( " " );
 	}
-	setToolTip( "" );
 	QFontMetrics metrics( font() );
 	QString elidedName = metrics.elidedText( name, Qt::ElideRight, maxTextWidth );
+	// Show the full name whenever the button had to shorten it. The previous
+	// code only set a tooltip when there was no room for any text at all.
+	setToolTip( elidedName == name ? QString() : m_trackView->getTrack()->displayName() );
 	return elidedName;
 }
 
