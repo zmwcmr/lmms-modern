@@ -349,10 +349,14 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 	m_pluginMutex.unlock();
 
-	// if the same is loaded don't load again (for preview)
-	if (instrumentTrack() != nullptr && instrumentTrack()->isPreviewMode() &&
-			m_pluginDLL == PathUtil::toShortestRelative( _file ))
+	// Do not reload a plugin which is already loaded from the same file.
+	// This also avoids tearing down a freshly created editor during project
+	// loading, which some plugins do not survive.
+	if ( m_plugin != nullptr &&
+			m_pluginDLL == PathUtil::toShortestRelative( _file ) )
+	{
 		return;
+	}
 
 	if ( m_plugin != nullptr )
 	{
