@@ -239,6 +239,10 @@ Goal: make fast parameter automation land at the intended sample position.
 
 Tasks:
 
+- [x] Design spike for sample-accurate automation:
+  - current status: `doc/automation-timing-design.md` defines host-side curve
+    compression, the `IdVstParameterEvents` protocol, VST2 sub-block
+    processing, MIDI re-basing, LV2 limitations and tests.
 - [ ] Add a parameter event queue with sample offsets to VST2.
 - [ ] Split process blocks at automation event boundaries for VST2.
 - [ ] For LV2, evaluate block splitting vs. control-port limitations:
