@@ -248,6 +248,39 @@ int ControlLayout::doLayout(const QRect &rect, bool testOnly) const
 		QWidget *wid = item->widget();
 		if (wid)
 		{
+			int spaceX = horizontalSpacing();
+			if (spaceX == -1)
+			{
+				spaceX = wid->style()->layoutSpacing(
+					QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Horizontal);
+			}
+			int spaceY = verticalSpacing();
+			if (spaceY == -1)
+			{
+				spaceY = wid->style()->layoutSpacing(
+					QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Vertical);
+			}
+
+			if (wid->property("lmmsControlLayoutFullWidth").toBool())
+			{
+				wid->show();
+				if (lineHeight > 0)
+				{
+					y += lineHeight + spaceY;
+					lineHeight = 0;
+				}
+				const int height = wid->sizeHint().height();
+				if (!testOnly)
+				{
+					wid->setGeometry(QRect(effectiveRect.x(), y,
+						effectiveRect.width(), height));
+				}
+				y += height;
+				x = effectiveRect.x();
+				first = false;
+				continue;
+			}
+
 			if (	first || // do not filter search bar
 				filterText.isEmpty() || // no filter - pass all
 				itr.key().contains(filterText, Qt::CaseInsensitive))
@@ -261,18 +294,6 @@ int ControlLayout::doLayout(const QRect &rect, bool testOnly) const
 				}
 				else { wid->show(); }
 
-				int spaceX = horizontalSpacing();
-				if (spaceX == -1)
-				{
-					spaceX = wid->style()->layoutSpacing(
-						QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Horizontal);
-				}
-				int spaceY = verticalSpacing();
-				if (spaceY == -1)
-				{
-					spaceY = wid->style()->layoutSpacing(
-						QSizePolicy::PushButton, QSizePolicy::PushButton, Qt::Vertical);
-				}
 				int nextX = x + item->sizeHint().width() + spaceX;
 				if (nextX - spaceX > effectiveRect.right() && lineHeight > 0)
 				{

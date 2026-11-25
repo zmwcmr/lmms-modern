@@ -120,6 +120,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	{
 		m_reloadPluginButton = new QPushButton(QObject::tr("Reload Plugin"),
 			meAsWidget);
+		m_reloadPluginButton->setObjectName("btn");
 		btnBox->addWidget(m_reloadPluginButton, 0);
 	}
 
@@ -127,6 +128,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	{
 		m_toggleUIButton = new QPushButton(QObject::tr("Show GUI"),
 			meAsWidget);
+		m_toggleUIButton->setObjectName("btn");
 		m_toggleUIButton->setCheckable(true);
 		m_toggleUIButton->setChecked(false);
 		m_toggleUIButton->setFont(adjustedToPixelSize(m_toggleUIButton->font(), SMALL_FONT_SIZE));
@@ -149,6 +151,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		infoLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
 
 		m_helpButton = new QPushButton(QObject::tr("Help"));
+		m_helpButton->setObjectName("btn");
 		m_helpButton->setCheckable(true);
 		btnBox->addWidget(m_helpButton);
 
@@ -165,7 +168,10 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton)
 	{
 		auto* buttonBar = new QWidget(meAsWidget);
-		buttonBar->setObjectName("lv2ButtonBar");
+		// ControlLayout sorts items by object name. This key sorts after the
+		// search bar but before regular controls, and requests a full row.
+		buttonBar->setObjectName("!lv2ButtonBar");
+		buttonBar->setProperty("lmmsControlLayoutFullWidth", true);
 		buttonBar->setLayout(btnBox);
 		if (auto* layout = meAsWidget->layout())
 		{
