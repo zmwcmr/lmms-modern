@@ -32,6 +32,7 @@
 #include <QByteArray>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDebug>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -127,6 +128,40 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		btnBox->addWidget(m_reloadPluginButton, 0);
 	}
 
+	if (proc && !proc->presets().empty())
+	{
+		auto* presetLabel = new QLabel(QObject::tr("Preset:"), meAsWidget);
+		m_presetCombo = new QComboBox(meAsWidget);
+		m_presetCombo->setSizeAdjustPolicy(
+			QComboBox::AdjustToMinimumContentsLengthWithIcon);
+		m_presetCombo->setMinimumContentsLength(24);
+		m_presetCombo->setSizePolicy(QSizePolicy::Expanding,
+			QSizePolicy::Fixed);
+		m_presetCombo->setToolTip(QObject::tr(
+			"Load a factory preset from the plugin bundle"));
+		m_presetCombo->addItem(QObject::tr("Choose preset..."));
+		for (const Lv2Proc::Preset& preset : proc->presets())
+		{
+			m_presetCombo->addItem(preset.label);
+		}
+		btnBox->addWidget(presetLabel);
+		btnBox->addWidget(m_presetCombo, 1);
+		QObject::connect(m_presetCombo,
+			QOverload<int>::of(&QComboBox::currentIndexChanged),
+			meAsWidget,
+			[this](int index)
+			{
+				if (index <= 0 || !m_proc)
+				{
+					return;
+				}
+				if (!m_proc->loadPreset(static_cast<std::size_t>(index - 1)))
+				{
+					qWarning() << "Could not load LV2 preset" << index;
+				}
+			});
+	}
+
 	if (hasPluginUi())
 	{
 		m_toggleUIButton = new QPushButton(QObject::tr("Show GUI"),
@@ -168,7 +203,8 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		break;
 	}
 
-	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton)
+	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton
+		|| m_presetCombo)
 	{
 		auto* buttonBar = new QWidget(meAsWidget);
 		// ControlLayout sorts items by object name. This key sorts after the

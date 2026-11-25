@@ -26,6 +26,7 @@
 
 #ifdef LMMS_HAVE_LV2
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -33,6 +34,7 @@
 #include <stdexcept>
 #include <lv2/midi/midi.h>
 #include <lv2/atom/atom.h>
+#include <lv2/presets/presets.h>
 #include <lv2/resize-port/resize-port.h>
 #include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
@@ -76,6 +78,52 @@ struct MidiInputEvent
 	TimePos time;
 	f_cnt_t offset;
 };
+
+
+
+
+namespace
+{
+void setModelFromControlValue(AutomatableModel* model,
+	const std::vector<float>& scalePointMap, float value)
+{
+	struct SetModelVisitor : ModelVisitor
+	{
+		const std::vector<float>* m_scalePointMap = nullptr;
+		float m_val = 0.f;
+
+		void visit(FloatModel& m) override { m.setValue(m_val); }
+		void visit(IntModel& m) override { m.setValue(m_val); }
+		void visit(BoolModel& m) override { m.setValue(m_val); }
+		void visit(ComboBoxModel& m) override
+		{
+			if (!m_scalePointMap || m_scalePointMap->empty())
+			{
+				m.setValue(m_val);
+				return;
+			}
+
+			float bestDist = std::numeric_limits<float>::max();
+			std::size_t bestIdx = 0;
+			for (std::size_t idx = 0; idx < m_scalePointMap->size(); ++idx)
+			{
+				const float dist = std::fabs((*m_scalePointMap)[idx] - m_val);
+				if (dist < bestDist)
+				{
+					bestDist = dist;
+					bestIdx = idx;
+				}
+			}
+			m.setValue(static_cast<float>(bestIdx));
+		}
+	};
+
+	SetModelVisitor visitor;
+	visitor.m_scalePointMap = &scalePointMap;
+	visitor.m_val = value;
+	model->accept(visitor);
+}
+}
 
 
 
@@ -219,6 +267,7 @@ Lv2Proc::Lv2Proc(Model* parent, const QString &uri) :
 	}
 	createPorts();
 	initPlugin();
+	scanPresets();
 }
 
 
@@ -250,6 +299,172 @@ void Lv2Proc::dumpPorts()
 		(void)port;
 		dumpPort(num++);
 	}
+}
+
+
+
+
+void Lv2Proc::scanPresets()
+{
+	m_presets.clear();
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode presetType = mgr->uri(LV2_PRESETS__Preset);
+	AutoLilvNode labelPredicate = mgr->uri(LILV_NS_RDFS "label");
+	AutoLilvNodes related(lilv_plugin_get_related(m_plugin, presetType.get()));
+	if (!related)
+	{
+		return;
+	}
+
+	LILV_FOREACH(nodes, it, related.get())
+	{
+		const LilvNode* node = lilv_nodes_get(related.get(), it);
+		if (!lilv_node_is_uri(node))
+		{
+			continue;
+		}
+
+		QString label;
+		auto fetchLabel = [&]() -> QString
+		{
+			LilvNode* labelNode = lilv_world_get(
+				mgr->world(), node, labelPredicate.get(), nullptr);
+			if (!labelNode)
+			{
+				return {};
+			}
+			QString text;
+			if (lilv_node_is_string(labelNode))
+			{
+				text = QString::fromUtf8(
+					lilv_node_as_string(labelNode)).trimmed();
+			}
+			lilv_node_free(labelNode);
+			return text;
+		};
+
+		label = fetchLabel();
+		if (label.isEmpty())
+		{
+			// Older bundles (e.g. mda) only store the label in the file
+			// referenced by rdfs:seeAlso.
+			lilv_world_load_resource(mgr->world(), node);
+			label = fetchLabel();
+		}
+
+		const QString uri = QString::fromUtf8(lilv_node_as_uri(node));
+		if (label.isEmpty())
+		{
+			label = uri.section(QLatin1Char('#'), -1);
+			if (label.isEmpty())
+			{
+				label = uri;
+			}
+		}
+		m_presets.push_back({label, uri});
+	}
+
+	std::sort(m_presets.begin(), m_presets.end(),
+		[](const Preset& a, const Preset& b)
+		{
+			const int cmp = QString::localeAwareCompare(a.label, b.label);
+			return cmp < 0 || (cmp == 0 && a.uri < b.uri);
+		});
+}
+
+
+
+
+bool Lv2Proc::loadPreset(std::size_t index)
+{
+	if (!m_instance || index >= m_presets.size())
+	{
+		return false;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	const QByteArray presetUri = m_presets[index].uri.toUtf8();
+	AutoLilvNode presetNode(lilv_new_uri(mgr->world(), presetUri.constData()));
+	if (!presetNode)
+	{
+		return false;
+	}
+
+	if (lilv_world_load_resource(mgr->world(), presetNode.get()) < 0)
+	{
+		qWarning() << "Could not load LV2 preset resource"
+			<< m_presets[index].uri;
+	}
+
+	LilvState* state = lilv_state_new_from_world(
+		mgr->world(), mgr->uridMap().mapFeature(), presetNode.get());
+	if (!state)
+	{
+		qWarning() << "Could not create LV2 state for preset"
+			<< m_presets[index].uri;
+		return false;
+	}
+
+	struct RestoredValue
+	{
+		std::size_t portIndex;
+		float value;
+	};
+	struct RestoreContext
+	{
+		Lv2Proc* proc;
+		std::vector<RestoredValue>* values;
+	};
+
+	std::vector<RestoredValue> restoredValues;
+	RestoreContext context{this, &restoredValues};
+
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		lilv_state_restore(state, m_instance,
+			[](const char* portSymbol, void* userData, const void* value,
+				uint32_t size, uint32_t)
+			{
+				auto* ctx = static_cast<RestoreContext*>(userData);
+				if (!ctx || !ctx->proc || !ctx->values || !portSymbol
+					|| !value || size != sizeof(float))
+				{
+					return;
+				}
+
+				const std::size_t portIndex =
+					ctx->proc->getIdOfPort(portSymbol);
+				if (portIndex >= ctx->proc->portNum())
+				{
+					return;
+				}
+
+				auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(
+					ctx->proc->port(portIndex));
+				if (!ctrl)
+				{
+					return;
+				}
+
+				ctrl->m_val = *static_cast<const float*>(value);
+				ctx->values->push_back({portIndex, ctrl->m_val});
+			},
+			&context, 0, nullptr);
+	}
+	lilv_state_free(state);
+
+	for (const RestoredValue& restored : restoredValues)
+	{
+		auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(port(restored.portIndex));
+		if (ctrl && ctrl->m_connectedModel)
+		{
+			setModelFromControlValue(ctrl->m_connectedModel.get(),
+				ctrl->m_scalePointMap, restored.value);
+		}
+	}
+
+	return true;
 }
 
 
@@ -416,42 +631,8 @@ void Lv2Proc::setControlFromUi(uint32_t portIndex, float value)
 	}
 
 	ctrl->m_val = value;
-
-	struct SetModelVisitor : ModelVisitor
-	{
-		const std::vector<float>* m_scalePointMap = nullptr;
-		float m_val = 0.f;
-
-		void visit(FloatModel& m) override { m.setValue(m_val); }
-		void visit(IntModel& m) override { m.setValue(m_val); }
-		void visit(BoolModel& m) override { m.setValue(m_val); }
-		void visit(ComboBoxModel& m) override
-		{
-			if (!m_scalePointMap || m_scalePointMap->empty())
-			{
-				m.setValue(m_val);
-				return;
-			}
-
-			float bestDist = std::numeric_limits<float>::max();
-			std::size_t bestIdx = 0;
-			for (std::size_t idx = 0; idx < m_scalePointMap->size(); ++idx)
-			{
-				const float dist = std::fabs((*m_scalePointMap)[idx] - m_val);
-				if (dist < bestDist)
-				{
-					bestDist = dist;
-					bestIdx = idx;
-				}
-			}
-			m.setValue(static_cast<float>(bestIdx));
-		}
-	};
-
-	SetModelVisitor visitor;
-	visitor.m_scalePointMap = &ctrl->m_scalePointMap;
-	visitor.m_val = value;
-	ctrl->m_connectedModel->accept(visitor);
+	setModelFromControlValue(ctrl->m_connectedModel.get(),
+		ctrl->m_scalePointMap, value);
 }
 
 

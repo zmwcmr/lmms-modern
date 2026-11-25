@@ -45,6 +45,7 @@
 #endif
 
 class QPushButton;
+class QComboBox;
 class QMdiSubWindow;
 class QTimer;
 
@@ -82,6 +83,7 @@ protected:
 	QPushButton* m_reloadPluginButton = nullptr;
 	QPushButton* m_toggleUIButton = nullptr;
 	QPushButton* m_helpButton = nullptr;
+	QComboBox* m_presetCombo = nullptr;
 
 	void toggleUI();
 	void toggleHelp(bool visible);

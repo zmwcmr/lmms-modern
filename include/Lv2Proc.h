@@ -149,6 +149,20 @@ public:
 	void dumpPorts();
 
 	/*
+		factory presets
+	*/
+	struct Preset
+	{
+		QString label;
+		QString uri;
+	};
+
+	//! Presets from the plugin bundle that apply to this plugin
+	const std::vector<Preset>& presets() const { return m_presets; }
+	//! Restore a factory preset; must be called from the GUI thread
+	bool loadPreset(std::size_t index);
+
+	/*
 		utils for the run thread
 	*/
 
@@ -193,6 +207,7 @@ public:
 	const char* pluginUri() const { return lilv_node_as_uri(lilv_plugin_get_uri(m_plugin)); }
 	std::size_t getIdOfPort(const char* symbol) const;
 	std::size_t portNum() const { return m_ports.size(); }
+	Lv2Ports::PortBase* port(std::size_t idx) { return m_ports[idx].get(); }
 	const Lv2Ports::PortBase* port(std::size_t idx) const { return m_ports[idx].get(); }
 	//! Called by the UI when the user moves a control
 	void setControlFromUi(uint32_t portIndex, float value);
@@ -278,6 +293,10 @@ private:
 	std::deque<UiEvent> m_uiEvents;
 	std::atomic<bool> m_uiActive{false};
 	bool sendToUi(uint32_t portIndex, uint32_t type, uint32_t size, const void* body);
+
+	//! Factory presets exposed by the plugin bundle
+	std::vector<Preset> m_presets;
+	void scanPresets();
 
 	void saveState(QDomDocument& doc, QDomElement& that);
 	void loadState(const QDomElement& that);

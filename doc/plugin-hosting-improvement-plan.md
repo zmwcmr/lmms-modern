@@ -15,16 +15,21 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 - LV2 UI instance lifetime, feature lifetime, valid `ui:resize` callback.
 - LV2 `ui:showInterface`/`hideInterface`, HiDPI scale factor, WM close/destroy.
 - LV2 multichannel plugins accepted; first stereo pair used.
+- LV2 factory presets (`pset:Preset`) exposed through a controls-UI selector
+  and restored with `lilv_state_restore`.
 - Surge XT native UI enabled again.
+- VST2 MIDI events from `audioMasterProcessEvents` forwarded to the track MIDI
+  output.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
 
 ### Known gaps
 
 1. LV2 UI and DSP run in the LMMS process.
 2. No plugin delay compensation (PDC).
-3. No MIDI output from VST2/LV2 plugins.
+3. VST2 MIDI output is forwarded to the track MIDI port; LV2 MIDI output and
+   internal track-to-track routing are still missing.
 4. No sample-accurate automation.
-5. LV2 presets are not exposed.
+5. Only bundle presets are exposed; user presets and preset saving are missing.
 6. VST2 host callback coverage is incomplete.
 7. No sidechain/aux bus or multi-output routing.
 8. 32-bit VST remains untested.
@@ -61,10 +66,12 @@ Tasks:
 - [ ] VST2 `audioMasterGetDirectory` and file selector:
   - return a useful directory string,
   - implement a minimal host-side file selector or a safe failure.
-- [ ] LV2 preset discovery:
+- [x] LV2 preset discovery:
   - enumerate `pset:Preset` nodes related to the plugin,
   - add a preset selector to the LV2 controls UI,
   - restore via `lilv_state_restore`, refresh port values.
+  - current status: bundle labels and lazy `rdfs:seeAlso` loading implemented;
+    user preset files are not listed yet.
 - [ ] 32-bit VST smoke test:
   - build `RemoteVstPlugin32`,
   - test with one 32-bit VST2 plugin under Wine,
@@ -103,13 +110,17 @@ Goal: let instrument/effect plugins generate MIDI for other LMMS instruments.
 
 Tasks:
 
-- [ ] Add a host-side MIDI event queue for VST2 (`VstPlugin`).
+- [x] Add a host-side MIDI event queue for VST2 (`VstPlugin`).
 - [ ] Parse LV2 `m_midiOut` atom sequences into `MidiEvent`s.
-- [ ] Add a MIDI routing target to instrument/effect tracks or the track's MIDI
+- [x] Add a MIDI routing target to instrument/effect tracks or the track's MIDI
       output port.
-- [ ] Forward note on/off, CC, pitch bend and program changes.
+  - current status: instrument events go to the track MIDI output; there is no
+    internal MIDI routing between LMMS tracks yet.
+- [x] Forward note on/off, CC, pitch bend and program changes.
 - [ ] Handle all-notes-off on stop/seek.
 - [ ] Add a test plugin that emits a fixed note sequence.
+  - verified locally with a temporary fake VST2 instrument; the test plugin is
+    not committed yet.
 
 Files:
 
