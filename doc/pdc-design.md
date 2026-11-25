@@ -98,9 +98,9 @@ Stages 1-4 are implemented and verified with temporary VST2 impulse plugins:
   each mixer round and aligns track buses and send routes.
 - `Mixer::totalLatency()` reports the path to the master output including the
   master FX chain.
-- `ProjectRenderer` trims that many frames from the beginning of the exported
-  stream instead of discarding a full buffer. The first buffer is therefore
-  preserved when the total latency is shorter than one period.
+- `ProjectRenderer` discards the engine warm-up period and trims that many
+  frames from the beginning of the actual song stream. Export therefore starts
+  at timeline frame 0 without an extra warm-up block.
 - VST2 re-reports `initialDelay` when it changes while processing; VST2 and
   LV2 instruments publish their current latency through `play()`, and
   instrument tracks also poll it on the GUI thread for UI updates.

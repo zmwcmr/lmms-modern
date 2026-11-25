@@ -156,25 +156,14 @@ void ProjectRenderer::run()
 
 	m_progress = 0;
 
-	// Start processing before the first period so the first block is not
-	// discarded: its leading frames are the latency offset that we trim below.
+	// Start processing before the warm-up period so the file device is ready.
 	Engine::audioEngine()->startProcessing();
 
-	// Render one period first. Some plugins only publish their latency after
-	// processing a block, so query the graph after this period and remove
-	// exactly that many frames from the beginning of the exported stream.
-	const auto firstBuffer = Engine::audioEngine()->renderNextPeriod();
+	// The first period is a warm-up period: plugins initialize and may only
+	// publish their latency after processing a block. Discard it, then trim
+	// the reported total latency from the beginning of the actual song stream.
+	Engine::audioEngine()->renderNextPeriod();
 	f_cnt_t framesToSkip = Engine::mixer()->totalLatency();
-	if (framesToSkip < static_cast<f_cnt_t>(firstBuffer.size()))
-	{
-		m_fileDev->writeBuffer(firstBuffer.data() + framesToSkip,
-			firstBuffer.size() - framesToSkip);
-		framesToSkip = 0;
-	}
-	else
-	{
-		framesToSkip -= firstBuffer.size();
-	}
 
 	// Continually track and emit progress percentage to listeners.
 	while (!Engine::getSong()->isExportDone() && !m_abort.load(std::memory_order_relaxed))
