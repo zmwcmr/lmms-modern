@@ -75,9 +75,9 @@ const std::set<std::string_view> Lv2Manager::unstablePlugins =
 
 const std::set<std::string_view> Lv2Manager::unstableUiPlugins =
 {
-	// Surge XT's JUCE-based X11 UI corrupts the heap in the current host
-	"https://surge-synthesizer.github.io/lv2/surge-xt",
-	"https://surge-synth-team.org//plugins/Surge_XT_Effects"
+	// Surge XT was removed after the UI lifetime and resize fixes: it now
+	// passes ASan and repeated open/close tests in LMMS. Keep this list for
+	// future regressions.
 };
 
 

@@ -26,7 +26,7 @@ Environment overrides:
 
 - `LMMS_DISABLE_LV2_UI=1` disables all LV2 UIs.
 - `LMMS_ENABLE_UNSTABLE_LV2_UI=1` re-enables UIs for plugins on the known
-  unstable list (currently Surge XT, whose UI corrupts the heap in this host).
+  unstable list (currently empty).
 
 ## Implemented
 
@@ -42,10 +42,12 @@ Environment overrides:
 - Plugin state (including state bundles with files) is saved and restored by
   the LV2 state support.
 
+Surge XT was previously on the unstable list. After the feature lifetime and
+resize fixes it passes ASan and repeated open/close tests, so its native UI is
+enabled again.
+
 ## Known limitations
 
-- Surge XT is blocklisted for native UI because its JUCE X11 UI corrupts the
-  heap when hosted here; its generic controls remain usable.
 - Qt5/GTK-only UIs are not supported by the current host.
 - Atom events are queued with a mutex; the audio-thread path is not fully
   real-time safe yet.
