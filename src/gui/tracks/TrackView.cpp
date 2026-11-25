@@ -49,6 +49,15 @@
 namespace lmms::gui
 {
 
+void TrackView::setTrackBackground(const QColor& color)
+{
+	m_trackBackground = color;
+
+	QPalette pal;
+	pal.setColor(backgroundRole(), color);
+	setPalette(pal);
+}
+
 TrackView::TrackView(Track* track, TrackContainerView* tcv)
 	: QWidget(tcv->contentWidget())
 	, ModelView(nullptr, this)
@@ -59,9 +68,7 @@ TrackView::TrackView(Track* track, TrackContainerView* tcv)
 	, m_trackContentWidget(this)
 {
 	setAutoFillBackground( true );
-	QPalette pal;
-	pal.setColor( backgroundRole(), QColor( 32, 36, 40 ) );
-	setPalette( pal );
+	setTrackBackground( m_trackBackground );
 
 	m_trackSettingsWidget.setAutoFillBackground( true );
 

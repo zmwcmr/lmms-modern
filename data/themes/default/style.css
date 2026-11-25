@@ -409,6 +409,11 @@ lmms--gui--TrackView > QWidget {
 	background-color: #3B424A;
 }
 
+/* background of the whole track */
+lmms--gui--TrackView {
+	qproperty-trackBackground: #202428;
+}
+
 
 QPushButton#btn {
 	color: #d1d8e4;
