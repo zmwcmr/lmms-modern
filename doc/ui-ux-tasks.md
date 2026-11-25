@@ -49,11 +49,26 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T0-4 | ✅ 已实现 | 独立 QSS 渲染验证（见下方说明），应用内无法截图验证 |
 | T0-5 | ✅ 已实现 | 仅编译验证；需在真实桌面用 Orca/accerciser 复核 |
 | T0-6 | ✅ 已实现 | 仅编译验证；Linux 绑定与改前相同（`QKeySequence::Undo` = Ctrl+Z） |
+| T1-1 | 🚧 进行中 | `TrackView` 已改（截图逐像素对比 = 0 差异，主题覆盖测试通过） |
 
 ### 实施中发现并修正的两个问题
 
 1. **`QPushButton:focus { border-color: … }` 无效**：Qt 的 QSS 走 CSS2 特异性，`QPushButton#btn`（ID 选择器）压过 `QPushButton:focus`（类型 + 伪类）。改用 `outline` 属性（没有任何 ID 规则设置 outline），并用独立渲染测试确认按钮与树都能画出绿色描边。
 2. **无窗口管理器时 `:focus` 永不触发**：截图环境是 Xephyr 裸 X 服务器，没有 WM 也就没有窗口激活，`QWidget::hasFocus()` 恒为 false（连原有的 `QLineEdit:focus` 绿边也不出现）。因此焦点样式在截图里看不到，这是环境限制；样式本身已用 `QT_QPA_PLATFORM=offscreen` 的独立渲染验证。
+
+### T1-1 的进展与发现
+
+已完成 `TrackView`：新增 `Q_PROPERTY(QColor trackBackground)`，默认值等于原来的硬编码值，`style.css` 里用
+`qproperty-trackBackground: #202428;` 暴露给主题。
+
+**发现：`FloatModelEditorBase::paintEvent` 是死代码。** 三个子类 `Knob`、`Fader`、`BarModelEditor`、`Draggable`
+都各自覆盖了 `paintEvent`，且该类从不被直接实例化，所以审计报告里列出的
+`FloatModelEditorBase.cpp:305` 的 `QColor{3, 94, 97}` 根本不会被绘制。已撤回针对它的改动，
+改为一个独立的清理项：**删除该死方法**（不要为它加主题属性）。
+
+**待定：`ProjectNotes`。** 它的背景（`#404040`）可以照 `TrackView` 的办法处理，但正文颜色（`#e0e0e0`）
+是写进文档字符格式的，改了主题也不会影响已有内容。需要先决定"笔记正文是否应跟随主题文字色"，
+再动手。
 
 ### T0-5 的实现方式（与最初方案不同）
 
