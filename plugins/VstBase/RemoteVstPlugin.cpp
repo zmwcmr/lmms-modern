@@ -93,6 +93,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <queue>
 #include <string>
@@ -441,6 +442,7 @@ private:
 
 
 	std::string m_shortName;
+	std::string m_pluginDir;
 
 #ifndef NATIVE_LINUX_VST
 	HINSTANCE m_libInst;
@@ -738,6 +740,15 @@ bool RemoteVstPlugin::processMessage( const message & _m )
 
 void RemoteVstPlugin::init( const std::string & _plugin_file )
 {
+	// Make the directory available before loading: some plugins query it from
+	// their VSTPluginMain() or effOpen handler.
+	const std::filesystem::path pluginPath( _plugin_file );
+	m_pluginDir = pluginPath.parent_path().string();
+	if( m_pluginDir.empty() )
+	{
+		m_pluginDir = ".";
+	}
+
 	if( load( _plugin_file ) == false )
 	{
 		sendMessage( IdVstFailedLoadingPlugin );
@@ -1869,10 +1880,9 @@ int RemoteVstPlugin::updateInOutCount()
 
 /* TODO:
  * - complete audioMasterGetTime-handling (bars etc.)
- * - implement audioMasterProcessEvents
  * - audioMasterGetVendorVersion: return LMMS-version (config.h!)
- * - audioMasterGetDirectory: return either VST-plugin-dir or LMMS-workingdir
- * - audioMasterOpenFileSelector: show QFileDialog?
+ * - audioMasterOpenFileSelector: forward the request to the host so it can
+ *   show a QFileDialog and fill in VstFileSelect
  */
 intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 					int32_t _index, intptr_t _value,
@@ -2243,7 +2253,10 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 		case audioMasterGetDirectory:
 			SHOW_CALLBACK( "amc: audioMasterGetDirectory\n" );
 			// get plug directory, FSSpec on MAC, else char*
-			return 0;
+			return __plugin && !__plugin->m_pluginDir.empty()
+				? reinterpret_cast<intptr_t>(
+					const_cast<char*>(__plugin->m_pluginDir.c_str()))
+				: 0;
 
 		case audioMasterUpdateDisplay:
 			SHOW_CALLBACK( "amc: audioMasterUpdateDisplay\n" );
@@ -2279,8 +2292,8 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 
 		case audioMasterOpenFileSelector:
 			SHOW_CALLBACK( "amc: audioMasterOpenFileSelector\n" );
-			// open a fileselector window with VstFileSelect*
-			// in <ptr>
+			// Not supported yet. Returning 0 makes plugins fall back to their
+			// own file dialog instead of receiving an incomplete VstFileSelect.
 			return 0;
 		default:
 			SHOW_CALLBACK( "amd: not handled" );

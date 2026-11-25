@@ -32,8 +32,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
    internal track-to-track routing are still missing.
 4. No sample-accurate automation.
 5. Only bundle presets are exposed; user presets and preset saving are missing.
-6. VST2 host callback coverage is still incomplete: file selector,
-   `audioMasterGetDirectory`, and several 2.4 callbacks remain stubs.
+6. VST2 host callback coverage is still incomplete: the file selector is not
+   implemented, and several 2.4 callbacks remain stubs.
 7. No sidechain/aux bus or multi-output routing.
 8. 32-bit VST remains untested.
 9. VST2 UI scale/DPI handling is not uniform.
@@ -69,9 +69,11 @@ Tasks:
   - current status: `audioMasterAutomate` is forwarded as well, and a
     begin/end pair creates one undo checkpoint per gesture. Automated or
     controlled models are not overwritten by plugin-originated changes.
-- [ ] VST2 `audioMasterGetDirectory` and file selector:
+- [x] VST2 `audioMasterGetDirectory` and file selector:
   - return a useful directory string,
   - implement a minimal host-side file selector or a safe failure.
+  - current status: the plugin directory is returned; the file selector
+    returns 0 so plugins fall back to their own dialog.
 - [x] LV2 preset discovery:
   - enumerate `pset:Preset` nodes related to the plugin,
   - add a preset selector to the LV2 controls UI,
