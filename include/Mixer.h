@@ -26,6 +26,7 @@
 #define LMMS_MIXER_H
 
 #include "AudioBuffer.h"
+#include "DelayLine.h"
 #include "EffectChain.h"
 #include "JournallingObject.h"
 #include "Model.h"
@@ -114,6 +115,12 @@ public:
 		return m_to->index();
 	}
 
+	//! Delay required to align this send with other paths into the receiver
+	void setDelayFrames(f_cnt_t delay) { m_delayLine.setDelayFrames(delay); }
+	f_cnt_t delayFrames() const { return m_delayLine.delayFrames(); }
+	AudioBuffer& delayedBuffer() { return m_delayedBuffer; }
+	DelayLine& delayLine() { return m_delayLine; }
+
 	FloatModel * amount()
 	{
 		return &m_amount;
@@ -135,6 +142,8 @@ public:
 		MixerChannel * m_from;
 		MixerChannel * m_to;
 		FloatModel m_amount;
+		AudioBuffer m_delayedBuffer;
+		DelayLine m_delayLine;
 };
 
 
@@ -225,6 +234,8 @@ private:
 	std::vector<MixerChannel*> m_mixerChannels;
 	//! Maximum input latency per channel, rebuilt between mixer rounds
 	std::vector<f_cnt_t> m_latencyByChannel;
+	//! Output latency per channel (input latency + channel FX chain)
+	std::vector<f_cnt_t> m_outputLatencyByChannel;
 
 	// make sure we have at least num channels
 	void allocateChannelsTo(int num);

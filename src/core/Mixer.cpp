@@ -24,6 +24,8 @@
 
 #include "Mixer.h"
 
+#include <algorithm>
+
 #include <QDebug>
 #include <QDomElement>
 
@@ -57,10 +59,10 @@ MixerRoute::MixerRoute( MixerChannel * from, MixerChannel * to, float amount ) :
 	m_from( from ),
 	m_to( to ),
 	m_amount(amount, 0, 1, 0.001f, nullptr,
-			tr("Amount to send from channel %1 to channel %2").arg(m_from->index()).arg(m_to->index()))
+			tr("Amount to send from channel %1 to channel %2").arg(m_from->index()).arg(m_to->index())),
+	m_delayedBuffer(Engine::audioEngine()->framesPerPeriod())
 {
-	//qDebug( "created: %d to %d", m_from->m_channelIndex, m_to->m_channelIndex );
-	// create send amount model
+	m_delayedBuffer.allocateInterleavedBuffer();
 }
 
 
@@ -187,7 +189,25 @@ void MixerChannel::doProcessing()
 			FloatModel * sendModel = senderRoute->amount();
 			if( ! sendModel ) qFatal( "Error: no send model found from %d to %d", senderRoute->senderIndex(), m_channelIndex );
 
-			if (sender->m_buffer.hasAnySignal() || sender->m_stillRunning)
+			const AudioBuffer* senderBuffer = &sender->m_buffer;
+			if (senderRoute->delayFrames() > 0)
+			{
+				auto src = sender->m_buffer.groupBuffers(0);
+				auto dst = senderRoute->delayedBuffer().groupBuffers(0);
+				const auto channels = std::min(
+					src.channels(), dst.channels());
+				for (ch_cnt_t ch = 0; ch < channels; ++ch)
+				{
+					std::copy_n(src.bufferPtr(ch), fpp, dst.bufferPtr(ch));
+				}
+				senderRoute->delayLine().process(dst, fpp);
+				toInterleaved(dst,
+					senderRoute->delayedBuffer().interleavedBuffer());
+				senderRoute->delayedBuffer().updateAllSilenceFlags();
+				senderBuffer = &senderRoute->delayedBuffer();
+			}
+
+			if (senderBuffer->hasAnySignal() || sender->m_stillRunning)
 			{
 				auto buffer = m_buffer.interleavedBuffer().asSampleFrames();
 
@@ -196,7 +216,7 @@ void MixerChannel::doProcessing()
 				ValueBuffer * volBuf = sender->m_volumeModel.valueBuffer();
 
 				// mix it's output with this one's output
-				auto ch_buf = sender->m_buffer.interleavedBuffer().asSampleFrames();
+				auto ch_buf = senderBuffer->interleavedBuffer().asSampleFrames();
 
 				// use sample-exact mixing if sample-exact values are available
 				if( ! volBuf && ! sendBuf ) // neither volume nor send has sample-exact data...
@@ -219,7 +239,7 @@ void MixerChannel::doProcessing()
 					MixHelpers::addMultipliedByBuffer(buffer.data(), ch_buf.data(), v, sendBuf, fpp);
 				}
 				toPlanar(m_buffer.interleavedBuffer(), m_buffer.groupBuffers(0));
-				m_buffer.mixSilenceFlags(sender->m_buffer);
+				m_buffer.mixSilenceFlags(*senderBuffer);
 			}
 		}
 
@@ -279,6 +299,7 @@ int Mixer::createChannel()
 	// create new channel
 	m_mixerChannels.push_back( new MixerChannel( index, this ) );
 	m_latencyByChannel.push_back( 0 );
+	m_outputLatencyByChannel.push_back( 0 );
 
 	// reset channel state
 	clearChannel( index );
@@ -414,6 +435,7 @@ void Mixer::deleteChannel( int index )
 	// actually delete the channel
 	m_mixerChannels.erase(m_mixerChannels.begin() + index);
 	m_latencyByChannel.erase(m_latencyByChannel.begin() + index);
+	m_outputLatencyByChannel.erase(m_outputLatencyByChannel.begin() + index);
 	delete ch;
 
 	for (auto i = static_cast<std::size_t>(index); i < m_mixerChannels.size(); ++i)
@@ -694,28 +716,91 @@ void Mixer::updateLatencyCompensation()
 	{
 		m_latencyByChannel.resize(m_mixerChannels.size(), 0);
 	}
+	if (m_outputLatencyByChannel.size() != m_mixerChannels.size())
+	{
+		m_outputLatencyByChannel.resize(m_mixerChannels.size(), 0);
+	}
 	std::fill(m_latencyByChannel.begin(), m_latencyByChannel.end(), 0);
-	auto& maxLatency = m_latencyByChannel;
+	std::fill(m_outputLatencyByChannel.begin(),
+		m_outputLatencyByChannel.end(), 0);
 
+	// Start with the track buses feeding each channel.
 	for (AudioBusHandle* bus : buses)
 	{
 		const auto destination = bus->nextMixerChannel();
 		if (destination >= 0
-			&& destination < static_cast<mix_ch_t>(maxLatency.size()))
+			&& destination < static_cast<mix_ch_t>(m_latencyByChannel.size()))
 		{
-			maxLatency[destination] = std::max(maxLatency[destination], bus->latency());
+			m_latencyByChannel[destination] = std::min(
+				DelayLine::maxFrames,
+				std::max(m_latencyByChannel[destination], bus->latency()));
+		}
+	}
+
+	// Propagate the longest path through the send graph. The graph is a DAG
+	// (mixer sends reject cycles), so this converges within numChannels
+	// iterations.
+	const auto numChannels = static_cast<int>(m_mixerChannels.size());
+	for (int iteration = 0; iteration < numChannels; ++iteration)
+	{
+		bool changed = false;
+		for (int i = 0; i < numChannels; ++i)
+		{
+			m_outputLatencyByChannel[i] = std::min(
+				DelayLine::maxFrames,
+				m_latencyByChannel[i] + m_mixerChannels[i]->latency());
+		}
+
+		for (MixerRoute* route : m_mixerRoutes)
+		{
+			const auto from = route->senderIndex();
+			const auto to = route->receiverIndex();
+			if (from >= static_cast<mix_ch_t>(numChannels)
+				|| to >= static_cast<mix_ch_t>(numChannels))
+			{
+				continue;
+			}
+
+			const f_cnt_t pathLatency = m_outputLatencyByChannel[from];
+			if (pathLatency > m_latencyByChannel[to])
+			{
+				m_latencyByChannel[to] = pathLatency;
+				changed = true;
+			}
+		}
+
+		if (!changed)
+		{
+			break;
 		}
 	}
 
 	for (AudioBusHandle* bus : buses)
 	{
 		const auto destination = bus->nextMixerChannel();
-		const f_cnt_t max = destination >= 0
-			&& destination < static_cast<mix_ch_t>(maxLatency.size())
-			? maxLatency[destination] : 0;
-		bus->setDelayFrames(std::max<f_cnt_t>(0, max - bus->latency()));
+		const f_cnt_t inputLatency = destination >= 0
+			&& destination < static_cast<mix_ch_t>(numChannels)
+			? m_latencyByChannel[destination] : 0;
+		bus->setDelayFrames(
+			std::max<f_cnt_t>(0, inputLatency - bus->latency()));
+	}
+
+	for (MixerRoute* route : m_mixerRoutes)
+	{
+		const auto from = route->senderIndex();
+		const auto to = route->receiverIndex();
+		if (from >= static_cast<mix_ch_t>(numChannels)
+			|| to >= static_cast<mix_ch_t>(numChannels))
+		{
+			continue;
+		}
+
+		const f_cnt_t routeLatency = std::max<f_cnt_t>(
+			0, m_latencyByChannel[to] - m_outputLatencyByChannel[from]);
+		route->setDelayFrames(routeLatency);
 	}
 }
+
 
 
 

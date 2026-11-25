@@ -27,8 +27,6 @@
 
 #include <QMutexLocker>
 
-#include <algorithm>
-
 #include "AudioDevice.h"
 #include "AudioEngine.h"
 #include "EffectChain.h"
@@ -53,10 +51,6 @@ AudioBusHandle::AudioBusHandle(const QString& name, bool hasEffectChain,
 	m_mutedModel(mutedModel)
 {
 	m_buffer.allocateInterleavedBuffer();
-	for (auto& delayBuffer : m_delayBuffer)
-	{
-		delayBuffer.assign(MaxDelayFrames, 0.0f);
-	}
 
 	Engine::audioEngine()->addAudioBusHandle(this);
 	setExtOutputEnabled(true);
@@ -122,39 +116,9 @@ f_cnt_t AudioBusHandle::latency() const
 
 
 
-void AudioBusHandle::setDelayFrames(f_cnt_t delay)
-{
-	m_delayFrames.store(
-		std::clamp<f_cnt_t>(delay, 0, MaxDelayFrames - 1),
-		std::memory_order_relaxed);
-}
-
-
-
-
 void AudioBusHandle::applyDelay(f_cnt_t frames)
 {
-	const f_cnt_t delay = m_delayFrames.load(std::memory_order_relaxed);
-	if (delay <= 0)
-	{
-		return;
-	}
-
-	auto buffers = m_buffer.groupBuffers(0);
-	const auto channels = std::min<ch_cnt_t>(
-		static_cast<ch_cnt_t>(buffers.channels()), m_delayBuffer.size());
-	for (f_cnt_t frame = 0; frame < frames; ++frame)
-	{
-		const f_cnt_t writeIndex = (m_delayWriteIndex + frame) % MaxDelayFrames;
-		const f_cnt_t readIndex =
-			(writeIndex + MaxDelayFrames - delay) % MaxDelayFrames;
-		for (ch_cnt_t channel = 0; channel < channels; ++channel)
-		{
-			m_delayBuffer[channel][writeIndex] = buffers.sample(channel, frame);
-			buffers.sample(channel, frame) = m_delayBuffer[channel][readIndex];
-		}
-	}
-	m_delayWriteIndex = (m_delayWriteIndex + frames) % MaxDelayFrames;
+	m_delayLine.process(m_buffer.groupBuffers(0), frames);
 }
 
 

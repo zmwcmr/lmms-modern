@@ -29,7 +29,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 - VST2 `initialDelay` and LV2 `lv2:latency` output ports are queried and
   reported through `Plugin::latency()`; `EffectChain::latency()` sums effects.
 - Track buses feeding the same mixer channel are delay-compensated against the
-  maximum input latency.
+  maximum input latency, and mixer sends are compensated against the full
+  channel latency graph.
 - VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
   the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
@@ -186,17 +187,20 @@ Tasks:
 - [x] Report latency through `Plugin`/`Effect`/`Instrument`.
   - current status: `Plugin::latency()` is implemented for VST2 and LV2, and
     `EffectChain::latency()` sums the effects in a chain.
-- [x] Add a latency graph to the engine (first stage):
+- [x] Add a latency graph to the engine:
   - per-track latency,
   - effect-chain latency,
   - mixer bus latency,
-  - maximum latency alignment across buses feeding the same channel.
-  - current status: track buses are aligned at mixer-channel inputs; send,
-    master and cross-channel alignment are next.
+  - maximum latency alignment across buses and sends.
+  - current status: the graph propagates latency through the send DAG and
+    aligns both buses and send routes; the master insert latency is reported
+    in the graph but not removed from the final output.
 - [x] Delay compensation during playback and export (first stage).
-  - current status: track-to-channel alignment works in both paths; freeze
-    and send/master compensation are still missing.
-- [ ] Update routing when plugin latency changes.
+  - current status: track-to-channel and send alignment works in both paths;
+    freeze and master-latency reporting in the UI are still missing.
+- [ ] Update routing when plugin latency changes dynamically.
+  - current status: graph delays are recomputed every mixer round, but the
+    source latency is only refreshed when an instrument is loaded/changed.
 - [ ] Add a committed impulse/phase test project.
   - verified locally with temporary VST2 impulse plugins (128-sample delay).
 
