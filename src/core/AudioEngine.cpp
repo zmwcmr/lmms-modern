@@ -312,6 +312,11 @@ void AudioEngine::renderStageMix()
 	Mixer *mixer = Engine::mixer();
 	mixer->masterMix(m_outputBufferWrite.get());
 
+	// Refresh the graph after the effects have run: plugins may have published
+	// a new latency during this block. This also makes totalLatency() current
+	// for export offset calculation and UI reporting.
+	mixer->updateLatencyCompensation();
+
 	MixHelpers::multiply(m_outputBufferWrite.get(), m_masterGain.load(std::memory_order_relaxed), m_framesPerPeriod);
 
 	emit nextAudioBuffer(m_outputBufferRead.get());
@@ -333,6 +338,11 @@ std::span<const SampleFrame> AudioEngine::renderNextPeriod()
 
 	renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
 	renderStageInstruments();   // STAGE 1: run and render all play handles
+
+	// Rebuild the latency graph after the tracks have reported their current
+	// latency and before the bus delay lines are applied in stage 2.
+	Engine::mixer()->updateLatencyCompensation();
+
 	renderStageEffects();       // STAGE 2: process effects of all instrument- and sampletracks
 	renderStageMix();           // STAGE 3: do master mix in mixer
 

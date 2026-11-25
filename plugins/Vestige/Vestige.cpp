@@ -508,6 +508,11 @@ void VestigeInstrument::play( SampleFrame* _buf )
 	m_plugin->process( nullptr, _buf );
 	drainMidiOutQueue();
 
+	if (auto* track = instrumentTrack())
+	{
+		track->audioBusHandle()->setSourceLatency(m_plugin->latency());
+	}
+
 	m_pluginMutex.unlock();
 }
 

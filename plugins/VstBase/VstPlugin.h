@@ -25,6 +25,8 @@
 #ifndef _VST_PLUGIN_H
 #define _VST_PLUGIN_H
 
+#include <atomic>
+
 #include <QByteArray>
 #include <QMap>
 #include <QPointer>
@@ -116,7 +118,7 @@ public:
 	//! Processing latency reported by the plugin, in samples
 	f_cnt_t latency() const
 	{
-		return m_latency;
+		return m_latency.load(std::memory_order_relaxed);
 	}
 
 	int currentProgram();
@@ -195,7 +197,7 @@ private:
 	std::vector<QString> m_allParameterLabels;
 	std::vector<QString> m_allParameterDisplays;
 	QString m_uniqueID;
-	f_cnt_t m_latency = 0;
+	std::atomic<f_cnt_t> m_latency{0};
 	bool m_isSynth;
 
 	QString p_name;

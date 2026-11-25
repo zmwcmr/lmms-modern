@@ -222,6 +222,9 @@ public:
 	//! Align the track buses that feed the same mixer channel
 	void updateLatencyCompensation();
 
+	//! Total latency from the timeline to the final output, in samples
+	f_cnt_t totalLatency() const;
+
 	inline mix_ch_t numChannels() const
 	{
 		return m_mixerChannels.size();
@@ -236,6 +239,8 @@ private:
 	std::vector<f_cnt_t> m_latencyByChannel;
 	//! Output latency per channel (input latency + channel FX chain)
 	std::vector<f_cnt_t> m_outputLatencyByChannel;
+	//! Whether the last graph update exceeded the delay-line capacity
+	bool m_latencySaturated = false;
 
 	// make sure we have at least num channels
 	void allocateChannelsTo(int num);

@@ -28,6 +28,7 @@
 #include "ProjectRenderer.h"
 #include "Song.h"
 #include "PerfLog.h"
+#include "Mixer.h"
 
 #include "AudioFileWave.h"
 #include "AudioFileOgg.h"
@@ -152,19 +153,43 @@ void ProjectRenderer::run()
 	PerfLogTimer perfLog("Project Render");
 
 	Engine::getSong()->startExport();
-	// Skip first empty buffer.
-	Engine::audioEngine()->renderNextPeriod();
 
 	m_progress = 0;
 
-	// Now start processing
+	// Start processing before the first period so the first block is not
+	// discarded: its leading frames are the latency offset that we trim below.
 	Engine::audioEngine()->startProcessing();
+
+	// Render one period first. Some plugins only publish their latency after
+	// processing a block, so query the graph after this period and remove
+	// exactly that many frames from the beginning of the exported stream.
+	const auto firstBuffer = Engine::audioEngine()->renderNextPeriod();
+	f_cnt_t framesToSkip = Engine::mixer()->totalLatency();
+	if (framesToSkip < static_cast<f_cnt_t>(firstBuffer.size()))
+	{
+		m_fileDev->writeBuffer(firstBuffer.data() + framesToSkip,
+			firstBuffer.size() - framesToSkip);
+		framesToSkip = 0;
+	}
+	else
+	{
+		framesToSkip -= firstBuffer.size();
+	}
 
 	// Continually track and emit progress percentage to listeners.
 	while (!Engine::getSong()->isExportDone() && !m_abort.load(std::memory_order_relaxed))
 	{
 		const auto buffer = Engine::audioEngine()->renderNextPeriod();
-		m_fileDev->writeBuffer(buffer.data(), buffer.size());
+		if (framesToSkip >= static_cast<f_cnt_t>(buffer.size()))
+		{
+			framesToSkip -= buffer.size();
+		}
+		else
+		{
+			m_fileDev->writeBuffer(buffer.data() + framesToSkip,
+				buffer.size() - framesToSkip);
+			framesToSkip = 0;
+		}
 
 		const int nprog = Engine::getSong()->getExportProgress();
 		const int oldProgress = m_progress.load(std::memory_order_relaxed);

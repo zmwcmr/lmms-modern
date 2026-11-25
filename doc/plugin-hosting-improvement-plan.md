@@ -183,24 +183,28 @@ Tasks:
   - VST2: `initialDelay` and `audioMasterGetOutputLatency`,
   - LV2: `lv2:latency` control port / reportLatency.
   - current status: VST2 initialDelay and LV2 designated latency ports are
-    queried; runtime latency changes still need to be re-queried.
+    queried; VST2 re-reports initialDelay when it changes during processing.
 - [x] Report latency through `Plugin`/`Effect`/`Instrument`.
   - current status: `Plugin::latency()` is implemented for VST2 and LV2, and
-    `EffectChain::latency()` sums the effects in a chain.
+    `EffectChain::latency()` sums only the effects that are processing audio.
 - [x] Add a latency graph to the engine:
   - per-track latency,
   - effect-chain latency,
   - mixer bus latency,
   - maximum latency alignment across buses and sends.
   - current status: the graph propagates latency through the send DAG and
-    aligns both buses and send routes; the master insert latency is reported
-    in the graph but not removed from the final output.
+    aligns both buses and send routes; `Mixer::totalLatency()` includes the
+    master insert latency.
 - [x] Delay compensation during playback and export (first stage).
   - current status: track-to-channel and send alignment works in both paths;
-    freeze and master-latency reporting in the UI are still missing.
-- [ ] Update routing when plugin latency changes dynamically.
-  - current status: graph delays are recomputed every mixer round, but the
-    source latency is only refreshed when an instrument is loaded/changed.
+    the renderer trims `Mixer::totalLatency()` from the start of the exported
+    stream. Freeze and latency reporting in the UI are still missing.
+- [x] Update routing when plugin latency changes dynamically.
+  - current status: the graph is rebuilt before and after every mixer round.
+    VST2 reports `initialDelay` changes, instrument tracks refresh their bus
+    latency from a GUI timer, and VST2/LV2 instruments publish it from
+    `play()` so headless renders see runtime changes too.
+- [x] Warn when the required delay exceeds the delay-line capacity.
 - [ ] Add a committed impulse/phase test project.
   - `DelayLineTest` covers delayed impulses and block boundaries; the full
     mixer impulse project is still verified with temporary VST2 plugins.

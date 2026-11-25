@@ -82,11 +82,33 @@ used for export offset and UI information.
    - Include the master FX latency in the reported total.
    - Verify that real-time playback, offline render and `rendertracks` use the
      same compensation.
-   - Acceptance: exported WAV matches real-time capture sample-for-sample.
+   - Acceptance: exported WAV has the same relative alignment as a real-time
+     capture; export additionally removes the reported total latency from the
+     start of the stream.
 5. UI/status
    - Show per-track/channel latency and the total latency in the mixer or
      plugin dialog.
    - Warn when the requested latency exceeds the allocated delay line.
+
+## Implementation status (2026-11-25)
+
+Stages 1-4 are implemented and verified with temporary VST2 impulse plugins:
+
+- `Mixer::updateLatencyCompensation()` rebuilds the graph before and after
+  each mixer round and aligns track buses and send routes.
+- `Mixer::totalLatency()` reports the path to the master output including the
+  master FX chain.
+- `ProjectRenderer` trims that many frames from the beginning of the exported
+  stream instead of discarding a full buffer. The first buffer is therefore
+  preserved when the total latency is shorter than one period.
+- VST2 re-reports `initialDelay` when it changes while processing; VST2 and
+  LV2 instruments publish their current latency through `play()`, and
+  instrument tracks also poll it on the GUI thread for UI updates.
+- A saturation warning is emitted once when a required delay exceeds the
+  8192-sample delay line.
+
+Stage 5 (UI display) is still open, as are freeze-path verification and a
+committed impulse/phase test project.
 
 ## Tests
 

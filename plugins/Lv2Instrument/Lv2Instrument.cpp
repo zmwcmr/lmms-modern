@@ -193,6 +193,11 @@ void Lv2Instrument::play(SampleFrame* buf)
 
 	run(fpp);
 
+	if (auto* track = instrumentTrack())
+	{
+		track->audioBusHandle()->setSourceLatency(latency());
+	}
+
 	for (const MidiOutEvent& event : midiOutEvents())
 	{
 		if (event.size == 0)

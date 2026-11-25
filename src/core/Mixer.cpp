@@ -723,6 +723,7 @@ void Mixer::updateLatencyCompensation()
 	std::fill(m_latencyByChannel.begin(), m_latencyByChannel.end(), 0);
 	std::fill(m_outputLatencyByChannel.begin(),
 		m_outputLatencyByChannel.end(), 0);
+	bool saturated = false;
 
 	// Start with the track buses feeding each channel.
 	for (AudioBusHandle* bus : buses)
@@ -781,8 +782,13 @@ void Mixer::updateLatencyCompensation()
 		const f_cnt_t inputLatency = destination >= 0
 			&& destination < static_cast<mix_ch_t>(numChannels)
 			? m_latencyByChannel[destination] : 0;
-		bus->setDelayFrames(
-			std::max<f_cnt_t>(0, inputLatency - bus->latency()));
+		const f_cnt_t requiredDelay =
+			std::max<f_cnt_t>(0, inputLatency - bus->latency());
+		if (requiredDelay > DelayLine::maxFrames - 1)
+		{
+			saturated = true;
+		}
+		bus->setDelayFrames(requiredDelay);
 	}
 
 	for (MixerRoute* route : m_mixerRoutes)
@@ -797,8 +803,32 @@ void Mixer::updateLatencyCompensation()
 
 		const f_cnt_t routeLatency = std::max<f_cnt_t>(
 			0, m_latencyByChannel[to] - m_outputLatencyByChannel[from]);
+		if (routeLatency > DelayLine::maxFrames - 1)
+		{
+			saturated = true;
+		}
 		route->setDelayFrames(routeLatency);
 	}
+
+	if (saturated && !m_latencySaturated)
+	{
+		qWarning() << "Latency compensation exceeds the"
+			<< DelayLine::maxFrames
+			<< "sample delay line; some paths will not be aligned";
+	}
+	m_latencySaturated = saturated;
+}
+
+
+
+
+f_cnt_t Mixer::totalLatency() const
+{
+	if (m_latencyByChannel.empty() || m_mixerChannels.empty())
+	{
+		return 0;
+	}
+	return m_latencyByChannel[0] + m_mixerChannels[0]->latency();
 }
 
 
@@ -807,8 +837,6 @@ void Mixer::updateLatencyCompensation()
 void Mixer::masterMix( SampleFrame* _buf )
 {
 	const int fpp = Engine::audioEngine()->framesPerPeriod();
-
-	updateLatencyCompensation();
 
 	// add the channels that have no dependencies (no incoming senders, ie.
 	// no receives) to the jobqueue. The channels that have receives get

@@ -489,6 +489,8 @@ private:
 	bpm_t m_bpm;
 	double m_currentSamplePos;
 	int m_currentProgram;
+	//! Last latency value reported to the host, in samples
+	int m_lastReportedLatency = -1;
 
 	//! Host to plugin synchronisation data structure
 	struct Sync
@@ -1060,8 +1062,8 @@ bool RemoteVstPlugin::load( const std::string & _plugin_file )
 	};
 
 	sendMessage( message( IdVstPluginUniqueID ).addString( id ) );
-	sendMessage( message( IdVstLatency ).addInt(
-		std::max( 0, static_cast<int>( m_plugin->initialDelay ) ) ) );
+	m_lastReportedLatency = std::max( 0, static_cast<int>( m_plugin->initialDelay ) );
+	sendMessage( message( IdVstLatency ).addInt( m_lastReportedLatency ) );
 
 	if( !m_skipInit )
 	{
@@ -1151,6 +1153,17 @@ void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 #endif
 
 	unlockShm();
+
+	// A plugin may change initialDelay while it runs, for example when a
+	// look-ahead control is automated. Report the new value once per change so
+	// the host can rebuild its latency graph without polling the plugin.
+	const int latency =
+		std::max( 0, static_cast<int>( m_plugin->initialDelay ) );
+	if( latency != m_lastReportedLatency )
+	{
+		m_lastReportedLatency = latency;
+		sendMessage( message( IdVstLatency ).addInt( latency ) );
+	}
 
 	flushMidiOutEvents();
 

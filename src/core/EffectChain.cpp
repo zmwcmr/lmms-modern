@@ -205,10 +205,19 @@ bool EffectChain::processAudioBuffer(AudioBuffer& buffer)
 
 f_cnt_t EffectChain::latency() const
 {
+	if (!m_enabledModel.value())
+	{
+		return 0;
+	}
+
 	f_cnt_t total = 0;
 	for (const Effect* effect : m_effects)
 	{
-		total += effect->latency();
+		// A bypassed or sleeping effect does not delay the signal.
+		if (effect->isProcessingAudio())
+		{
+			total += effect->latency();
+		}
 	}
 	return total;
 }

@@ -43,6 +43,8 @@
 #include "Pitch.h"
 #include "Song.h"
 
+#include <QTimer>
+
 namespace lmms
 {
 
@@ -128,6 +130,19 @@ InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
 		m_audioBusHandle.setSourceLatency(
 			m_instrument != nullptr ? m_instrument->latency() : 0);
 	});
+
+	// Some plugins change their reported latency at runtime (for example
+	// after a look-ahead parameter changes). Query it on the GUI thread and
+	// publish the value through the lock-free bus field instead of blocking
+	// the audio thread on a plugin mutex.
+	auto* latencyTimer = new QTimer(this);
+	latencyTimer->setInterval(500);
+	latencyTimer->setTimerType(Qt::CoarseTimer);
+	connect(latencyTimer, &QTimer::timeout, this, [this] {
+		m_audioBusHandle.setSourceLatency(
+			m_instrument != nullptr ? m_instrument->latency() : 0);
+	});
+	latencyTimer->start();
 
 	autoAssignMidiDevice(true);
 }
