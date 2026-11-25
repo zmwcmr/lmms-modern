@@ -159,11 +159,11 @@ QMenu::indicator {
 }
 
 QMenu::indicator:checked {
-	image: url("resources:apply.png");
+	image: url("resources:apply_css.png");
 }
 
 QMenu::indicator:selected {
-	image: url("resources:apply-selected.png");
+	image: url("resources:apply-selected_css.png");
 	border: 1px solid #101213;
 	background-color: #101213;
 }
@@ -248,6 +248,7 @@ lmms--gui--CPULoadWidget {
 	border: none;
 	background: url("resources:cpuload_bg.png");
 	qproperty-stepSize: 1;
+	qproperty-labelColor: white;
 }
 
 /* scrollbar: trough */
@@ -702,14 +703,12 @@ lmms--gui--TrackLabelButton:pressed {
 lmms--gui--TrackLabelButton:checked {
 	border: 1px solid #485059;
 	background: #1C1F24;
-	background-image: url("resources:track_shadow_p.png");
 	border-radius: none;
 }
 
 lmms--gui--TrackLabelButton:checked:pressed {
 	border: 1px solid #2f353b;
 	background: #0e1012;
-	background-image: url("resources:track_shadow_p.png");
 	font-weight: solid;
 }
 

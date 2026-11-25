@@ -31,6 +31,7 @@
 #include "AudioEngine.h"
 #include "AutomationClip.h"
 #include "ControllerConnection.h"
+#include "Engine.h"
 #include "LocaleHelper.h"
 #include "ProjectJournal.h"
 #include "Song.h"
@@ -72,6 +73,14 @@ AutomatableModel::AutomatableModel(
 
 AutomatableModel::~AutomatableModel()
 {
+	// Drop the reference held by Song::m_oldAutomatedValues before this model
+	// is gone. Otherwise Song::processAutomations() may still access it on the
+	// next audio buffer and crash with a use-after-free (#8646). Most code
+	// paths that destroy models already guard the change with
+	// Engine::audioEngine()->requestChangeInModel(), so the audio thread does
+	// not read the map at this point.
+	if (auto song = Engine::getSong()) { song->removeOldAutomatedValue(this); }
+
 	unlink();
 
 	if (m_controllerConnection)

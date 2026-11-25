@@ -1046,12 +1046,13 @@ void AutomationEditor::paintEvent(QPaintEvent * pe )
 	if (!validClip())
 	{
 		const auto icon = embed::getIconPixmap("pr_no_clip");
-		const int x = (width() - icon.width()) / 2;
-		const int y = (height() - icon.height()) / 2;
+		const auto iconSize = embed::logicalSize(icon);
+		const int x = (width() - iconSize.width()) / 2;
+		const int y = (height() - iconSize.height()) / 2;
 		p.drawPixmap(x, y, icon);
 
 		p.setPen(QApplication::palette().color(QPalette::Active, QPalette::Text));
-		QRect textRect(0, y + icon.height() + 5, width(), 30);
+		QRect textRect(0, y + iconSize.height() + 5, width(), 30);
 		p.drawText(textRect, Qt::AlignHCenter | Qt::AlignTop,
 			tr("Double-click on an automation clip in Song Editor to open it here"));
 		return;
@@ -2084,6 +2085,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 
 	auto zoom_x_label = new QLabel(zoomToolBar);
 	zoom_x_label->setPixmap( embed::getIconPixmap( "zoom_x" ) );
+	zoom_x_label->setToolTip( tr( "Horizontal zooming" ) );
 
 	m_zoomingXComboBox = new ComboBox( zoomToolBar );
 	m_zoomingXComboBox->setFixedSize( 80, ComboBox::DEFAULT_HEIGHT );
@@ -2102,6 +2104,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 
 	auto zoom_y_label = new QLabel(zoomToolBar);
 	zoom_y_label->setPixmap( embed::getIconPixmap( "zoom_y" ) );
+	zoom_y_label->setToolTip( tr( "Vertical zooming" ) );
 
 	m_zoomingYComboBox = new ComboBox( zoomToolBar );
 	m_zoomingYComboBox->setFixedSize( 80, ComboBox::DEFAULT_HEIGHT );
@@ -2130,6 +2133,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 
 	auto quantize_lbl = new QLabel(m_toolBar);
 	quantize_lbl->setPixmap( embed::getIconPixmap( "quantize" ) );
+	quantize_lbl->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setFixedSize( 60, ComboBox::DEFAULT_HEIGHT );

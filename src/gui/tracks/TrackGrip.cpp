@@ -62,7 +62,8 @@ TrackGrip::TrackGrip(TrackView* trackView, QWidget* parent) :
 
 	setCursor(Qt::OpenHandCursor);
 
-	setFixedWidth(std::max(s_grabbedPixmap->width(), s_releasedPixmap->width()) + 2 * c_margin);
+	setFixedWidth(std::max(embed::logicalSize(*s_grabbedPixmap).width(),
+		embed::logicalSize(*s_releasedPixmap).width()) + 2 * c_margin);
 }
 
 void TrackGrip::mousePressEvent(QMouseEvent* m)

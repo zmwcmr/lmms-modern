@@ -28,6 +28,7 @@
 #include "ConfigManager.h"
 #include "ControllerConnection.h"
 #include "DataFile.h"
+#include "DummyInstrument.h"
 #include "GuiApplication.h"
 #include "Mixer.h"
 #include "InstrumentTrackView.h"
@@ -44,6 +45,20 @@
 
 namespace lmms
 {
+
+namespace
+{
+
+//! Serialize an element so it can be restored later even if the document it
+//! came from is gone.
+QString serializeElement(const QDomElement& element)
+{
+	QDomDocument doc;
+	doc.appendChild(doc.importNode(element, true));
+	return doc.toString();
+}
+
+} // namespace
 
 
 InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
@@ -840,13 +855,31 @@ void InstrumentTrack::saveTrackSpecificSettings(QDomDocument& doc, QDomElement& 
 
 	if( m_instrument != nullptr )
 	{
-		QDomElement i = doc.createElement( "instrument" );
-		i.setAttribute( "name", m_instrument->descriptor()->name );
-		QDomElement ins = m_instrument->saveState( doc, i );
-		if(m_instrument->key().isValid()) {
-			ins.appendChild( m_instrument->key().saveXML( doc ) );
+		// If the instrument could not be loaded, write back its original XML
+		// instead of the empty state of the dummy instrument (#8547).
+		bool wrotePreservedInstrument = false;
+		if (dynamic_cast<DummyInstrument*>( m_instrument ) != nullptr
+			&& !m_unknownInstrumentXml.isEmpty())
+		{
+			QDomDocument unknownInstrument;
+			if( unknownInstrument.setContent( m_unknownInstrumentXml ) )
+			{
+				thisElement.appendChild(
+					doc.importNode( unknownInstrument.documentElement(), true ) );
+				wrotePreservedInstrument = true;
+			}
 		}
-		thisElement.appendChild( i );
+
+		if( !wrotePreservedInstrument )
+		{
+			QDomElement i = doc.createElement( "instrument" );
+			i.setAttribute( "name", m_instrument->descriptor()->name );
+			QDomElement ins = m_instrument->saveState( doc, i );
+			if(m_instrument->key().isValid()) {
+				ins.appendChild( m_instrument->key().saveXML( doc ) );
+			}
+			thisElement.appendChild( i );
+		}
 	}
 	m_soundShaping.saveState( doc, thisElement );
 	m_noteStacking.saveState( doc, thisElement );
@@ -879,6 +912,9 @@ void InstrumentTrack::saveTrackSpecificSettings(QDomDocument& doc, QDomElement& 
 
 void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement )
 {
+	// A fresh load replaces any instrument data preserved from a previous load.
+	m_unknownInstrumentXml.clear();
+
 	// don't delete instrument in preview mode if it's the same
 	// we can't do this for other situations due to some issues with linked models
 	bool reuseInstrument = m_previewMode && m_instrument && m_instrument->nodeName() == getSavedInstrumentName(thisElement);
@@ -949,7 +985,16 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 					m_instrument = nullptr;
 					m_instrument = Instrument::instantiate(
 						node.toElement().attribute("name"), this, &key);
-					m_instrument->restoreState(node.firstChildElement());
+					if( dynamic_cast<DummyInstrument*>( m_instrument ) != nullptr )
+					{
+						// The plugin is unavailable. Keep the original XML so
+						// that saving the project does not lose its data (#8547).
+						m_unknownInstrumentXml = serializeElement( node.toElement() );
+					}
+					else
+					{
+						m_instrument->restoreState(node.firstChildElement());
+					}
 					emit instrumentChanged();
 				}
 			}
@@ -971,7 +1016,11 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 				m_instrument = nullptr;
 				m_instrument = Instrument::instantiate(
 					node.nodeName(), this, nullptr, true);
-				if (m_instrument->nodeName() == node.nodeName())
+				if( dynamic_cast<DummyInstrument*>( m_instrument ) != nullptr )
+				{
+					m_unknownInstrumentXml = serializeElement( node.toElement() );
+				}
+				else if (m_instrument->nodeName() == node.nodeName())
 				{
 					m_instrument->restoreState(node.toElement());
 				}
@@ -1047,6 +1096,8 @@ Instrument * InstrumentTrack::loadInstrument(const QString & _plugin_name,
 
 	lock();
 	delete m_instrument;
+	m_instrument = nullptr;
+	m_unknownInstrumentXml.clear();
 	m_instrument = Instrument::instantiate(_plugin_name, this,
 					key, keyFromDnd);
 	unlock();
