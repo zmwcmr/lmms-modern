@@ -263,7 +263,7 @@ void LcdWidget::updateSize()
 				m_cellWidth * m_numDigits + marginX1 + marginX2,
 				QFontMetrics(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE)).horizontalAdvance(m_label)
 			),
-			m_cellHeight + (2 * marginY) + 9
+			m_cellHeight + (2 * marginY) + scaledFontSize(9)
 		);
 	}
 

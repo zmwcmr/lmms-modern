@@ -127,7 +127,6 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setVerticalSpacing(0);
 	basicControlsLayout->setContentsMargins(0, 0, 0, 0);
 
-	QString labelStyleSheet = "font-size: 10px;";
 	Qt::Alignment labelAlignment = Qt::AlignHCenter | Qt::AlignTop;
 	Qt::Alignment widgetAlignment = Qt::AlignHCenter | Qt::AlignCenter;
 	
@@ -159,7 +158,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setAlignment( m_volumeKnob, widgetAlignment );
 
 	auto label = new QLabel(tr("VOL"), this);
-	label->setStyleSheet(labelStyleSheet);
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 1);
 	basicControlsLayout->setAlignment(label, labelAlignment);
 
@@ -171,7 +170,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setAlignment( m_panningKnob, widgetAlignment );
 
 	label = new QLabel( tr( "PAN" ), this );
-	label->setStyleSheet( labelStyleSheet );
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 2);
 	basicControlsLayout->setAlignment( label, labelAlignment );
 
@@ -185,7 +184,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setAlignment( m_pitchKnob, widgetAlignment );
 
 	m_pitchLabel = new QLabel( tr( "PITCH" ), this );
-	m_pitchLabel->setStyleSheet( labelStyleSheet );
+	m_pitchLabel->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(m_pitchLabel, 1, 4);
 	basicControlsLayout->setAlignment( m_pitchLabel, labelAlignment );
 
@@ -196,7 +195,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setAlignment( m_pitchRangeSpinBox, widgetAlignment );
 
 	m_pitchRangeLabel = new QLabel( tr( "RANGE" ), this );
-	m_pitchRangeLabel->setStyleSheet( labelStyleSheet );
+	m_pitchRangeLabel->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(m_pitchRangeLabel, 1, 5);
 	basicControlsLayout->setAlignment( m_pitchRangeLabel, labelAlignment );
 
@@ -209,7 +208,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->setAlignment( m_mixerChannelNumber, widgetAlignment );
 
 	label = new QLabel(tr("CHAN"), this);
-	label->setStyleSheet( labelStyleSheet );
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 7);
 	basicControlsLayout->setAlignment( label, labelAlignment );
 
@@ -223,7 +222,7 @@ InstrumentTrackWindow::InstrumentTrackWindow( InstrumentTrackView * _itv ) :
 	basicControlsLayout->addWidget(saveSettingsBtn, 0, 8);
 
 	label = new QLabel( tr( "SAVE" ), this );
-	label->setStyleSheet( labelStyleSheet );
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 8);
 	basicControlsLayout->setAlignment( label, labelAlignment );
 

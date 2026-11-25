@@ -184,8 +184,9 @@ void Knob::updateFixedSize()
 			const int labelWidth = QFontMetrics(adjustedToPixelSize(font(), SMALL_FONT_SIZE)).horizontalAdvance(m_label);
 			const int width = std::max(pixmapSize.width(), labelWidth);
 
-			// Legacy mode assumes that the label will fit into 10 pixels plus some of the pixmap area
-			setFixedSize(width, pixmapSize.height() + 10);
+			// Legacy mode assumes that the label will fit into the space of
+			// the small font size plus some of the pixmap area.
+			setFixedSize(width, pixmapSize.height() + scaledFontSize(SMALL_FONT_SIZE));
 		}
 	}
 	else

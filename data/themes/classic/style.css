@@ -134,7 +134,7 @@ QMenu::indicator:selected {
 
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 8pt;
+	font-size: 11px;
 	color: white;
 }
 
@@ -481,6 +481,11 @@ QPushButton#btn-solo:checked {
 
 /* font sizes */
 
+lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
+lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
+	font-size: 10px;
+}
+
 lmms--gui--Sf2InstrumentView > QLabel {
 	font-size:10px;
 }
@@ -738,7 +743,7 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 7pt;
+	font-size: 10px;
 }
 
 /* persistent peak markers for fx peak meters */
@@ -750,7 +755,7 @@ lmms--gui--Fader {
 
 lmms--gui--TimeLineWidget {
         /* font-size only supports px and pt. */
-	font-size: 7pt;
+	font-size: 10px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.

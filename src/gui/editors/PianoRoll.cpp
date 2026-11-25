@@ -1061,7 +1061,8 @@ void PianoRoll::drawNoteRect( QPainter & p, int x, int y,
 			QString noteKeyString = getNoteString(n->key());
 
 			QFont noteFont(p.font());
-			noteFont = adjustedToPixelSize(noteFont, noteTextHeight);
+			// The note height is already in scaled layout pixels.
+			noteFont.setPixelSize(noteTextHeight);
 			QFontMetrics fontMetrics(noteFont);
 			QSize textSize = fontMetrics.size(Qt::TextSingleLine, noteKeyString);
 
@@ -3337,7 +3338,9 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	// set font-size to 80% of key line height
 	QFont f = p.font();
 	int keyFontSize = m_keyLineHeight * 0.8;
-	p.setFont(adjustedToPixelSize(f, keyFontSize));
+	// The key line height is already in scaled layout pixels.
+	f.setPixelSize(keyFontSize);
+	p.setFont(f);
 	QFontMetrics fontMetrics(p.font());
 	// G-1 is one of the widest; plus one pixel margin for the shadow
 	QRect const boundingRect = fontMetrics.boundingRect(QString("G-1")) + QMargins(0, 0, 1, 0);

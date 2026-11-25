@@ -55,6 +55,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-3 | ✅ 已实现 | Alt+滚轮实测 0.05 dB（普通滚轮 1 dB） |
 | T1-5 | ✅ 已实现 | 12 → 10 经 UI 写入配置；缺省 100 已确认 |
 | T1-6 | ✅ 已实现 | 下拉框列出两套主题；切到 classic 重启生效 |
+| T1-7 | ✅ 已实现 | 10 pt → 13/11/16 px；100%/150% 截图无重叠 |
 
 ### 实施中发现并修正的两个问题
 
@@ -382,16 +383,39 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-7 字号常量统一
+### T1-7 字号常量统一（已实现）
 
-**现象**：`FontHelper.h:31-33` 的像素常量 + 31 处 `adjustedToPixelSize` + 14 处 QSS `font-size`（px/pt 混用）+ C++ 字符串里的 `"font-size: 10px;"`。
+**现象**：`FontHelper.h:31-33` 的像素常量 + 41 处 `adjustedToPixelSize`（`src/gui` 25、`plugins` 16）+ QSS 里 px/pt 混用 + 两个 C++ 字符串里的 `"font-size: 10px;"`。
 
-**改动点**
-1. `FontHelper.h`：给出一个按 DPI/字体缩放的取值函数（`scaledFontSize()`），常量保留为"基准像素"。
-2. `InstrumentTrackWindow.cpp:130`：把 `labelStyleSheet` 里的 `font-size: 10px` 删掉，改用对象名 + QSS 统一控制。
-3. `style.css`：px/pt 统一为 px（Qt 的 px 是 device-independent，缩放策略更可预测）。
+**实现**
+1. `include/FontHelper.h` 新增 `fontScaleFactor()` / `scaledFontSize()`：
+   - 基准是 9 pt（96 DPI 下即 12 px），因子 = 应用字体磅值 / 9；
+   - 限制在 `[1.0, 1.5]`：不把界面缩得比设计值更小，也避免在固定高度的布局里放大到互相重叠；
+   - 平台把字体指定为像素（没有磅值）时，回退到 `QFontInfo::pixelSize() / 12`。
+   - `adjustedToPixelSize()` 内部改为 `setPixelSize(scaledFontSize(size))`，因此 41 处调用点（含插件）不用逐个修改就跟随系统字体。
+2. **不缩放**由控件几何推导出的字号。这些值已经随布局缩放，再乘一次会双重放大：
+   - `PianoRoll` 音符名（`noteTextHeight`）与键名（`keyLineHeight * 0.8`）；
+   - `PianoView` 的八度标签（固定 8 px，10 px 宽的琴键放不下更大的字）；
+   - `LfoGraph` 的 Hz 文本（`height() * 0.2`）；
+   - `TabWidget`（标签栏固定 14/17 px，`ControllerConnectionDialog` 还把输入框绝对定位在它下方）。
+   这些位置改为直接 `QFont::setPixelSize()` 并加注释说明原因。
+3. 为放大后的文字补足固定布局空间：
+   - `Knob` legacy 标签区：`+10` → `+ scaledFontSize(SMALL_FONT_SIZE)`；
+   - `LcdWidget` / `LcdFloatSpinBox` 的标签区：`9` → `scaledFontSize(9)`，后者高度按 `cellHeight()` 重算，不再写死 32；
+   - `EffectView` 的 "Controls" 按钮：按字体 metrics 计算宽高，保持原来的右下角锚点。
+4. `InstrumentTrackWindow` 与 `SampleTrackWindow` 删除 `labelStyleSheet = "font-size: 10px;"`，6 + 3 个标签改用 `setObjectName("trackSettingsLabel")`；两套主题的 `style.css` 增加同名规则统一控制。
+5. QSS 单位统一为 px：default 的 `8pt` → `11px`（原值约 10.7 px）；classic 的 `8pt` → `11px`，`7pt` → `10px`（T0-2 当时只处理了 default 主题）。现在两套主题的 `font-size` 全部是 px。
 
-**验收**：`grep -rn 'font-size' src/gui` 剩余条目均有理由；在 `QT_SCALE_FACTOR=1.5` 下控件文字不重叠。
+**Qt QSS 限制（实测）**：`font-size: 1.2em` 和 `font-size: 120%` 都被 Qt 忽略，QSS 只接受 px/pt。所以 QSS 里的字号仍是固定 px，跟随系统字体的是 C++ 绘制的文字。要让 QSS 也动态缩放，需要运行时生成样式表，另立项。
+
+**实测**
+- 当前 Xvfb 会话是 10 pt → 因子 1.11：12/10/14 → **13/11/16 px**；11 pt → 1.22；12 pt → 1.33；13.5 pt 以上封顶 1.5。
+- 100%：主窗口、Piano Roll、乐器窗口、Settings 截图见 `doc/ui-ux-shots/t1-7-*.png`，无重叠或裁切；Settings 使用原生 Qt 控件，字号保持应用字体不变（符合预期）。
+- 150%：`t1-7-hidpi-150.png`（2400×1500 屏幕，`QT_SCALE_FACTOR=1.5`），文字和布局同比放大，主窗口无重叠。
+- `grep -rn 'font-size' src/gui` = **0**；`grep -nE 'font-size:\s*[0-9]+pt' data/themes/*/style.css` = **0**。
+- 12 个测试可执行文件全部通过；完整构建（含插件）通过。
+
+**不做**：不做 QSS 字号动态化；不做真正弹性的固定高度控件（属于 T1-8）；不改插件内嵌 UI 自身的字号策略。
 
 ---
 
@@ -469,8 +493,9 @@ grep -rn 'QColor\s*[{(]\s*[0-9]' src/gui | wc -l
 # 2. 固定尺寸不应增加
 grep -rn 'setFixed\(Size\|Width\|Height\)' src/gui include | wc -l
 
-# 3. 字号下限
-grep -nE 'font-size:\s*[0-9]+pt' data/themes/default/style.css
+# 3. 字号：主题内不再混用 pt，C++ 不再内联 font-size
+grep -nE 'font-size:\s*[0-9]+pt' data/themes/*/style.css
+grep -rn 'font-size' src/gui
 
 # 4. 快捷键不应出现在可译文本里
 grep -rn 'tr([^)]*Ctrl+' src/gui

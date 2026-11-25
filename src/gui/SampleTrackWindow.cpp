@@ -83,7 +83,6 @@ SampleTrackWindow::SampleTrackWindow(SampleTrackView* stv)
 	basicControlsLayout->setVerticalSpacing(0);
 	basicControlsLayout->setContentsMargins(0, 0, 0, 0);
 
-	QString labelStyleSheet = "font-size: 10px;";
 	Qt::Alignment labelAlignment = Qt::AlignHCenter | Qt::AlignTop;
 	Qt::Alignment widgetAlignment = Qt::AlignHCenter | Qt::AlignCenter;
 	
@@ -115,7 +114,7 @@ SampleTrackWindow::SampleTrackWindow(SampleTrackView* stv)
 	basicControlsLayout->setAlignment(m_volumeKnob, widgetAlignment);
 
 	auto label = new QLabel(tr("VOL"), this);
-	label->setStyleSheet(labelStyleSheet);
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 1);
 	basicControlsLayout->setAlignment(label, labelAlignment);
 
@@ -127,7 +126,7 @@ SampleTrackWindow::SampleTrackWindow(SampleTrackView* stv)
 	basicControlsLayout->setAlignment(m_panningKnob, widgetAlignment);
 
 	label = new QLabel(tr("PAN"),this);
-	label->setStyleSheet(labelStyleSheet);
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 2);
 	basicControlsLayout->setAlignment(label, labelAlignment);
 
@@ -141,7 +140,7 @@ SampleTrackWindow::SampleTrackWindow(SampleTrackView* stv)
 	basicControlsLayout->setAlignment(m_mixerChannelNumber, widgetAlignment);
 
 	label = new QLabel(tr("CHAN"), this);
-	label->setStyleSheet(labelStyleSheet);
+	label->setObjectName("trackSettingsLabel");
 	basicControlsLayout->addWidget(label, 1, 4);
 	basicControlsLayout->setAlignment(label, labelAlignment);
 

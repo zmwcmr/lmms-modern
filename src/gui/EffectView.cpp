@@ -80,9 +80,14 @@ EffectView::EffectView( Effect * _model, QWidget * _parent ) :
 	if( effect()->controls()->controlCount() > 0 )
 	{
 		auto ctls_btn = new QPushButton(tr("Controls"), this);
-		QFont f = ctls_btn->font();
-		ctls_btn->setFont(adjustedToPixelSize(f, DEFAULT_FONT_SIZE));
-		ctls_btn->setGeometry( 150, 14, 50, 20 );
+		QFont f = adjustedToPixelSize(ctls_btn->font(), DEFAULT_FONT_SIZE);
+		ctls_btn->setFont(f);
+		// The button sits in a fixed-size effect view. Size it from the scaled
+		// font and keep its original right/bottom corner anchored.
+		const QFontMetrics buttonMetrics(f);
+		const int buttonWidth = buttonMetrics.horizontalAdvance(ctls_btn->text()) + 12;
+		const int buttonHeight = buttonMetrics.height() + 4;
+		ctls_btn->setGeometry(200 - buttonWidth, 34 - buttonHeight, buttonWidth, buttonHeight);
 		ctls_btn->setFocusPolicy(Qt::NoFocus);
 		connect( ctls_btn, SIGNAL(clicked()),
 					this, SLOT(editControls()));

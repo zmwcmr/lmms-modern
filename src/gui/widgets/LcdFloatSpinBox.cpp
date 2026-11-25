@@ -99,13 +99,14 @@ void LcdFloatSpinBox::layoutSetup(const QString &style)
 	lcdLayout->setSpacing(0);
 
 	// Add space for label
+	const int labelSpace = scaledFontSize(9);
 	auto outerLayout = new QVBoxLayout();
 	outerLayout->addLayout(lcdLayout);
-	outerLayout->addSpacing(9);
+	outerLayout->addSpacing(labelSpace);
 	outerLayout->setContentsMargins(0, 0, 0, 0);
 	outerLayout->setSizeConstraint(QLayout::SetFixedSize);
 	this->setLayout(outerLayout);
-	this->setFixedHeight(32);
+	this->setFixedHeight(m_wholeDisplay.cellHeight() + labelSpace);
 }
 
 
