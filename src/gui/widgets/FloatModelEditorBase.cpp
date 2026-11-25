@@ -297,8 +297,8 @@ void FloatModelEditorBase::leaveEvent(QEvent *event)
 QString FloatModelEditorBase::statusHint() const
 {
 	return tr("Drag to adjust · Shift+wheel coarse · %1+wheel fine · "
-			  "Middle-click resets · Double-click to type a value")
-		.arg(UI_CTRL_KEY);
+			  "%2+wheel finest · Middle-click resets · Double-click to type a value")
+		.arg(UI_CTRL_KEY, UI_ALT_KEY);
 }
 
 

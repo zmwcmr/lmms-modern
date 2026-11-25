@@ -52,6 +52,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-1 | 🚧 进行中 | `TrackView` 已改（截图逐像素对比 = 0 差异，主题覆盖测试通过） |
 | T1-10 | ✅ 已实现 | 仅编译验证；tooltip 需在交互式桌面悬停复核 |
 | T1-4 | ✅ 已实现 | 状态栏 + 三类控件悬停提示，截图验证（`t1-4-status-hints.png`） |
+| T1-3 | ✅ 已实现 | Alt+滚轮实测 0.05 dB（普通滚轮 1 dB） |
 
 ### 实施中发现并修正的两个问题
 
@@ -277,13 +278,22 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-3 滚轮语义对齐
+### T1-3 滚轮语义对齐（已实现）
 
-**现象**：`Fader::determineAdjustmentDelta` 对 `Alt` 返回 0（`Fader.cpp:283-297`），而 `FloatModelEditorBase` 用 Alt 做"最细"（`FloatModelEditorBase.cpp:355`）。
+**现象**：`Fader::determineAdjustmentDelta` 对 `Alt` 返回 0（完全不响应），而旋钮用 Alt 做"最细"。
 
-**改动点**：`Fader.cpp:283-297` 让 Alt 走 0.1 dB 档（与 Ctrl 同档或更细），并保留 macOS 上 Qt 的 Alt 滚轮 quirk 兼容（参考 `FloatModelEditorBase.cpp:361-372` 的 `deltaX` 回退逻辑）。
+**实现**
+- Alt 档从 `0` 改为 **0.05 dB**（比 Ctrl 的 0.1 dB 细一倍，与旋钮"Alt 比 Ctrl 更细"的比例一致）。
+- 同时把旋钮里已有的 Alt 兼容逻辑搬到推子：某些系统会把 Alt+滚轮上报成水平滚动（`angleDelta().x()`），
+  `Fader::wheelEvent` 现在在 `y == 0` 时回退到 `x`，否则方向和幅度都会丢。
+- 状态栏文案同步加上 `Alt+wheel finest`。
 
-**验收**：同一个插件窗口里，旋钮与推子的 Shift/Ctrl/Alt 三档行为一致（粗/细/更细）；macOS 上按 Alt 滚动不出现方向反转。
+**实测**（Xephyr，抓值提示窗口读取模型值）：
+- 普通滚轮一格：`-4.04 dB` → 上一步基准 = -5.04 dB，即 **+1 dB**。
+- `Alt`+滚轮一格：`-4.04 → -3.99 dB`，即 **+0.05 dB**，不再是 0。
+
+**没有做**：滑块（`AutomatableSlider`）仍然不吃修饰键——它走 `QSlider` 默认实现，
+需要单独改造，见矩阵里的第 4 条。
 
 ---
 

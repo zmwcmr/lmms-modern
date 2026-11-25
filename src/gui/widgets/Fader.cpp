@@ -175,8 +175,9 @@ void Fader::leaveEvent(QEvent* event)
 QString Fader::statusHint() const
 {
 	return tr("Drag to adjust · Wheel 1 dB · Shift+wheel coarse · "
-			  "%1+wheel fine · Middle-click resets · Double-click to type a value")
-		.arg(UI_CTRL_KEY);
+			  "%1+wheel fine · %2+wheel finest · Middle-click resets · "
+			  "Double-click to type a value")
+		.arg(UI_CTRL_KEY, UI_ALT_KEY);
 }
 
 
@@ -289,7 +290,17 @@ void Fader::mouseReleaseEvent(QMouseEvent* mouseEvent)
 
 void Fader::wheelEvent (QWheelEvent* ev)
 {
-	const int direction = (ev->angleDelta().y() > 0 ? 1 : -1) * (ev->inverted() ? -1 : 1);
+	int delta = ev->angleDelta().y();
+
+	// Alt is a window manager modifier on some systems, so Qt may report the
+	// wheel as a horizontal scroll instead of a vertical one. Fall back to the
+	// horizontal delta so that Alt+wheel still adjusts the fader.
+	if (delta == 0)
+	{
+		delta = ev->angleDelta().x();
+	}
+
+	const int direction = (delta > 0 ? 1 : -1) * (ev->inverted() ? -1 : 1);
 
 	const float increment = determineAdjustmentDelta(ev->modifiers()) * direction;
 
@@ -313,8 +324,10 @@ float Fader::determineAdjustmentDelta(const Qt::KeyboardModifiers & modifiers) c
 	}
 	else if (modifiers & Qt::AltModifier)
 	{
-		// Work around a Qt bug in conjunction with the scroll wheel and the Alt key
-		return 0.f;
+		// Even finer than control, matching the knobs where Alt is the finest
+		// wheel step. It used to return 0 as a workaround for the Qt quirk that
+		// is now handled in wheelEvent().
+		return 0.05f;
 	}
 
 	return 1.f;
