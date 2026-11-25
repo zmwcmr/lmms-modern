@@ -105,6 +105,11 @@ private:
 	void resizeUiToPlugin();
 	int resizeUiRequest(int width, int height);
 	void applyUiResize(int width, int height);
+	void updateToggleButton();
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	void processX11Events();
+	void resizePluginChild(int width, int height);
+#endif
 	void touchPort(uint32_t portIndex, bool grabbed);
 	void writeToPlugin(uint32_t portIndex, uint32_t bufferSize,
 		uint32_t protocol, const void* buffer);
@@ -129,17 +134,20 @@ private:
 	LV2_Feature m_uiOptionsFeature{};
 	LV2_Options_Option m_uiOptions[3]{};
 	LV2UI_Resize m_resize{};
+	const LV2UI_Show_Interface* m_uiShow = nullptr;
 	float m_uiScale = 1.0f;
 	float m_uiSampleRate = 0.0f;
 	bool m_uiVisible = false;
-	int m_x11SavedX = 100;
-	int m_x11SavedY = 100;
+	bool m_uiResizable = true;
+	int m_lastUiWidth = 0;
+	int m_lastUiHeight = 0;
 #endif
 
 #if defined(LMMS_BUILD_LINUX)
 	//! Standalone X11 window used when Qt runs on Wayland
 	void* m_x11Display = nullptr;
 	unsigned long m_x11Window = 0;
+	unsigned long m_x11WmDelete = 0;
 #endif
 
 	QMdiSubWindow* m_helpWindow = nullptr;

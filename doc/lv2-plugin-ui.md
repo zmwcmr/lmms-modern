@@ -27,6 +27,8 @@ Environment overrides:
 - `LMMS_DISABLE_LV2_UI=1` disables all LV2 UIs.
 - `LMMS_ENABLE_UNSTABLE_LV2_UI=1` re-enables UIs for plugins on the known
   unstable list (currently empty).
+- `LMMS_LV2_UI_SCALE=1.5` overrides the scale factor passed to plugin UIs.
+  By default the widget's device pixel ratio is used.
 
 ## Implemented
 
@@ -36,7 +38,11 @@ Environment overrides:
 - Control values are periodically pushed to the UI.
 - Atom events are forwarded in both directions (`atom:eventTransfer`).
 - `ui:idleInterface` is called at ~30 Hz.
-- Dynamic `ui:resize` requests are queued to the GUI thread.
+- `ui:showInterface` / `ui:hideInterface` are used when the UI provides them.
+- Dynamic `ui:resize` requests are queued to the GUI thread. Host-side
+  resizing also resizes the embedded plugin widget.
+- Floating X11 windows handle window-manager close events and resizing; a
+  closed window is hidden and can be reopened with **Show GUI**.
 - Touch events are accepted (currently no-op).
 - The UI is detached and freed before the plugin instance is destroyed.
 - Plugin state (including state bundles with files) is saved and restored by
