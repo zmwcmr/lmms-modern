@@ -446,12 +446,14 @@ void VestigeInstrument::loadFile( const QString & _file )
 					? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
 				const auto param2 = data.size() > 2
 					? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
-				if (auto* track = instrumentTrack(); track != nullptr)
+
+				std::lock_guard<std::mutex> lock(m_midiOutMutex);
+				if (m_midiOutQueue.size() < 4096)
 				{
-					track->routeMidiOutEvent(
-						MidiEvent(type, channel, param1, param2), TimePos());
+					m_midiOutQueue.emplace_back(type, channel, param1, param2,
+						nullptr, MidiEvent::Source::Internal);
 				}
-			}, Qt::QueuedConnection);
+			}, Qt::DirectConnection);
 		connect(m_plugin, &VstPlugin::parameterAutomated, this,
 			&VestigeInstrument::handleParameterAutomated,
 			Qt::QueuedConnection);
@@ -504,8 +506,29 @@ void VestigeInstrument::play( SampleFrame* _buf )
 	}
 
 	m_plugin->process( nullptr, _buf );
+	drainMidiOutQueue();
 
 	m_pluginMutex.unlock();
+}
+
+
+
+
+void VestigeInstrument::drainMidiOutQueue()
+{
+	std::vector<MidiEvent> events;
+	{
+		std::lock_guard<std::mutex> lock(m_midiOutMutex);
+		events.swap(m_midiOutQueue);
+	}
+
+	if (auto* track = instrumentTrack())
+	{
+		for (const MidiEvent& event : events)
+		{
+			track->routeMidiOutEvent(event, TimePos());
+		}
+	}
 }
 
 
@@ -528,6 +551,11 @@ bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& 
 
 void VestigeInstrument::closePlugin( void )
 {
+	{
+		std::lock_guard<std::mutex> lock(m_midiOutMutex);
+		m_midiOutQueue.clear();
+	}
+
 	// disconnect all signals
 	if( knobFModel != nullptr )
 	{

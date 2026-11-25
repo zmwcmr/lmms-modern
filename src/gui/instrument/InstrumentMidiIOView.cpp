@@ -22,10 +22,13 @@
  *
  */
 
+#include <QLabel>
+#include <QShowEvent>
 #include <QToolButton>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
+#include "ComboBox.h"
 #include "InstrumentMidiIOView.h"
 #include "MidiPortMenu.h"
 #include "AudioEngine.h"
@@ -81,16 +84,20 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 	m_midiOutputGroupBox = new GroupBox( tr( "ENABLE MIDI OUTPUT" ) );
 	layout->addWidget( m_midiOutputGroupBox );
 
-	auto midiOutputLayout = new QHBoxLayout(m_midiOutputGroupBox);
+	auto midiOutputLayout = new QVBoxLayout(m_midiOutputGroupBox);
 	midiOutputLayout->setContentsMargins( 8, 18, 8, 8 );
 	midiOutputLayout->setSpacing( 4 );
+
+	auto midiOutputControls = new QHBoxLayout();
+	midiOutputControls->setSpacing( 4 );
+	midiOutputLayout->addLayout( midiOutputControls );
 
 	m_outputChannelSpinBox = new LcdSpinBox( 2, m_midiOutputGroupBox );
 	m_outputChannelSpinBox->addTextForValue( 0, "--" );
 	/*: This string must be be short, its width must be less than
 	 *  width of LCD spin-box of two digits */
 	m_outputChannelSpinBox->setLabel( tr( "CHAN" ) );
-	midiOutputLayout->addWidget( m_outputChannelSpinBox );
+	midiOutputControls->addWidget( m_outputChannelSpinBox );
 
 	m_fixedOutputVelocitySpinBox = new LcdSpinBox( 3, m_midiOutputGroupBox );
 	m_fixedOutputVelocitySpinBox->addTextForValue( -1, "---" );
@@ -98,14 +105,14 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 	 *  width of LCD spin-box of three digits */
 	m_fixedOutputVelocitySpinBox->setLabel( tr( "VELOC" ) );
 	m_fixedOutputVelocitySpinBox->setEnabled( false );
-	midiOutputLayout->addWidget( m_fixedOutputVelocitySpinBox );
+	midiOutputControls->addWidget( m_fixedOutputVelocitySpinBox );
 
 	m_outputProgramSpinBox = new LcdSpinBox( 3, m_midiOutputGroupBox );
 	/*: This string must be be short, its width must be less than the
 	 *  width of LCD spin-box of three digits */
 	m_outputProgramSpinBox->setLabel( tr( "PROG" ) );
 	m_outputProgramSpinBox->setEnabled( false );
-	midiOutputLayout->addWidget( m_outputProgramSpinBox );
+	midiOutputControls->addWidget( m_outputProgramSpinBox );
 
 	m_fixedOutputNoteSpinBox = new LcdSpinBox( 3, m_midiOutputGroupBox );
 	m_fixedOutputNoteSpinBox->addTextForValue( -1, "---" );
@@ -113,8 +120,7 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 	 *  width of LCD spin-box of three digits */
 	m_fixedOutputNoteSpinBox->setLabel( tr( "NOTE" ) );
 	m_fixedOutputNoteSpinBox->setEnabled( false );
-	midiOutputLayout->addWidget( m_fixedOutputNoteSpinBox );
-	midiOutputLayout->addStretch();
+	midiOutputControls->addWidget( m_fixedOutputNoteSpinBox );
 
 	connect( m_midiOutputGroupBox->ledButton(), SIGNAL(toggled(bool)),
 		m_fixedOutputVelocitySpinBox, SLOT(setEnabled(bool)));
@@ -138,9 +144,19 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 		m_wpBtn->setText( tr( "MIDI devices to send MIDI events to" ) );
 		m_wpBtn->setIcon( embed::getIconPixmap( "piano" ) );
 		m_wpBtn->setPopupMode( QToolButton::InstantPopup );
-		midiOutputLayout->insertSpacing( 0, 4 );
-		midiOutputLayout->insertWidget( 0, m_wpBtn );
+		midiOutputControls->insertSpacing( 0, 4 );
+		midiOutputControls->insertWidget( 0, m_wpBtn );
 	}
+
+	auto midiOutTargetLayout = new QHBoxLayout();
+	midiOutTargetLayout->setSpacing( 4 );
+	auto midiOutTargetLabel = new QLabel( tr( "TRACK" ), m_midiOutputGroupBox );
+	m_midiOutTargetCombo = new ComboBox( m_midiOutputGroupBox,
+		tr( "MIDI output target" ) );
+	midiOutTargetLayout->addWidget( midiOutTargetLabel );
+	midiOutTargetLayout->addWidget( m_midiOutTargetCombo, 1 );
+	midiOutputLayout->addLayout( midiOutTargetLayout );
+	midiOutputLayout->addStretch();
 
 	auto baseVelocityGroupBox = new GroupBox(tr("VELOCITY MAPPING"));
 	baseVelocityGroupBox->setLedButtonShown(false);
@@ -162,9 +178,24 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 
 
 
+void InstrumentMidiIOView::showEvent( QShowEvent* event )
+{
+	if( auto* mp = dynamic_cast<MidiPort*>( model() ) )
+	{
+		mp->refreshMidiOutTargets();
+	}
+	QWidget::showEvent( event );
+}
+
+
+
+
 void InstrumentMidiIOView::modelChanged()
 {
 	auto mp = castModel<MidiPort>();
+
+	mp->refreshMidiOutTargets();
+	m_midiOutTargetCombo->setModel( &mp->m_midiOutTargetModel );
 
 	m_midiInputGroupBox->setModel( &mp->m_readableModel );
 	m_inputChannelSpinBox->setModel( &mp->m_inputChannelModel );

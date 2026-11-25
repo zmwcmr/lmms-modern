@@ -211,7 +211,8 @@ void Lv2Instrument::play(SampleFrame* buf)
 		if (auto* track = instrumentTrack())
 		{
 			track->routeMidiOutEvent(
-				MidiEvent(type, channel, param1, param2), TimePos());
+				MidiEvent(type, channel, param1, param2, nullptr,
+					MidiEvent::Source::Internal), TimePos());
 		}
 	}
 	clearMidiOutEvents();

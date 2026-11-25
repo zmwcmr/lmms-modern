@@ -22,6 +22,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
   output.
 - LV2 MIDI output parsed from the `m_midiOut` atom sequence and routed to the
   instrument track's MIDI output.
+- Plugin-generated MIDI can target another song-level instrument track through
+  the MIDI output page; one internal hop is supported.
 - VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
   the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
@@ -30,8 +32,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 
 1. LV2 UI and DSP run in the LMMS process.
 2. No plugin delay compensation (PDC).
-3. VST2 and LV2 MIDI output are forwarded to the track MIDI port; internal
-   track-to-track routing is still missing.
+3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
+   internal target track; longer routing chains and all-notes-off are missing.
 4. No sample-accurate automation.
 5. Only bundle presets are exposed; user presets and preset saving are missing.
 6. VST2 host callback coverage is still incomplete: the file selector is not
@@ -127,8 +129,9 @@ Tasks:
     are forwarded; SysEx is skipped.
 - [x] Add a MIDI routing target to instrument/effect tracks or the track's MIDI
       output port.
-  - current status: instrument events go to the track MIDI output; there is no
-    internal MIDI routing between LMMS tracks yet.
+  - current status: plugin-generated MIDI can target another song-level
+    instrument track; one hop is supported to prevent cycles. Effect-track
+    routing is still pending.
 - [x] Forward note on/off, CC, pitch bend and program changes.
 - [ ] Handle all-notes-off on stop/seek.
 - [ ] Add a test plugin that emits a fixed note sequence.

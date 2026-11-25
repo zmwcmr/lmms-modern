@@ -28,12 +28,15 @@
 
 
 #include <atomic>
+#include <mutex>
+#include <vector>
 
 #include <QMutex>
 #include <QSet>
 
 #include "Instrument.h"
 #include "InstrumentView.h"
+#include "MidiEvent.h"
 #include "SubWindow.h"
 
 
@@ -88,6 +91,7 @@ protected slots:
 
 private:
 	void closePlugin();
+	void drainMidiOutQueue();
 
 
 	VstPlugin * m_plugin;
@@ -104,6 +108,10 @@ private:
 	std::atomic<bool> m_updatingParametersFromPlugin{false};
 	//! Parameters with an active beginEdit/endEdit gesture
 	QSet<int> m_parameterGestures;
+
+	//! MIDI output produced by the plugin, consumed on the audio thread
+	std::mutex m_midiOutMutex;
+	std::vector<MidiEvent> m_midiOutQueue;
 
 
 	friend class gui::VestigeInstrumentView;

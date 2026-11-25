@@ -26,6 +26,8 @@
 #include <QDomElement>
 
 #include "MidiPort.h"
+#include "Engine.h"
+#include "InstrumentTrack.h"
 #include "MidiClient.h"
 #include "MidiDummy.h"
 #include "MidiEventProcessor.h"
@@ -63,7 +65,8 @@ MidiPort::MidiPort( const QString& name,
 	m_outputProgramModel( 1, 1, MidiProgramCount, this, tr( "Output MIDI program" ) ),
 	m_baseVelocityModel( MidiMaxVelocity/2, 1, MidiMaxVelocity, this, tr( "Base velocity" ) ),
 	m_readableModel( false, this, tr( "Receive MIDI-events" ) ),
-	m_writableModel( false, this, tr( "Send MIDI-events" ) )
+	m_writableModel( false, this, tr( "Send MIDI-events" ) ),
+	m_midiOutTargetModel( this, tr( "MIDI output target" ) )
 {
 	m_midiClient->addPort( this );
 
@@ -76,6 +79,8 @@ MidiPort::MidiPort( const QString& name,
 			this, SLOT(updateMidiPortMode()), Qt::DirectConnection );
 	connect( &m_outputProgramModel, SIGNAL(dataChanged()),
 			this, SLOT(updateOutputProgram()), Qt::DirectConnection );
+	connect( &m_midiOutTargetModel, SIGNAL(dataChanged()),
+			this, SLOT(updateMidiOutTarget()), Qt::DirectConnection );
 
 
 	// when using with non-raw-clients we can provide buttons showing
@@ -158,6 +163,8 @@ void MidiPort::processInEvent( const MidiEvent& event, const TimePos& time )
 
 void MidiPort::processOutEvent( const MidiEvent& event, const TimePos& time )
 {
+	routeMidiOutToTrack( event, time );
+
 	// When output is enabled, route midi events if the selected channel matches
 	// the event channel or if there's no selected channel (value 0, represented by "--")
 	if( isOutputEnabled() && ( outputChannel() == 0 || realOutputChannel() == event.channel() ) )
@@ -183,8 +190,102 @@ void MidiPort::processOutEvent( const MidiEvent& event, const TimePos& time )
 
 
 
+void MidiPort::routeMidiOutToTrack( const MidiEvent& event, const TimePos& time )
+{
+	const int targetIndex = m_midiOutTargetTrackIndex.load();
+	if( targetIndex < 0 )
+	{
+		return;
+	}
+
+	// Only one internal hop is supported. This also prevents cycles such as
+	// track A -> track B -> track A when both tracks select each other.
+	static thread_local bool routing = false;
+	if( routing )
+	{
+		return;
+	}
+
+	auto* song = Engine::getSong();
+	auto* self = dynamic_cast<InstrumentTrack*>( m_midiEventProcessor );
+	auto* target = song
+		? dynamic_cast<InstrumentTrack*>( song->trackAt( targetIndex ) )
+		: nullptr;
+	if( target == nullptr || target == self )
+	{
+		return;
+	}
+
+	routing = true;
+	target->processInEvent( event, time );
+	routing = false;
+}
+
+
+
+
+void MidiPort::refreshMidiOutTargets()
+{
+	m_refreshingMidiOutTargets = true;
+
+	m_midiOutTargetModel.clear();
+	m_midiOutTargetTrackIndices.clear();
+
+	m_midiOutTargetModel.addItem( tr( "None" ) );
+	m_midiOutTargetTrackIndices.push_back( -1 );
+
+	const auto previousTarget = m_midiOutTargetTrackIndex.load();
+	int comboIndex = 0;
+	if( auto* song = Engine::getSong() )
+	{
+		auto* self = dynamic_cast<InstrumentTrack*>( m_midiEventProcessor );
+		const auto& tracks = song->tracks();
+		for( int i = 0; i < static_cast<int>( tracks.size() ); ++i )
+		{
+			auto* track = dynamic_cast<InstrumentTrack*>( tracks[i] );
+			if( track == nullptr || track == self )
+			{
+				continue;
+			}
+
+			if( i == previousTarget )
+			{
+				comboIndex = m_midiOutTargetTrackIndices.size();
+			}
+			m_midiOutTargetModel.addItem( track->name() );
+			m_midiOutTargetTrackIndices.push_back( i );
+		}
+	}
+
+	m_midiOutTargetModel.setValue( comboIndex );
+	m_refreshingMidiOutTargets = false;
+}
+
+
+
+
+void MidiPort::updateMidiOutTarget()
+{
+	if( m_refreshingMidiOutTargets )
+	{
+		return;
+	}
+
+	const int comboIndex = m_midiOutTargetModel.value();
+	if( comboIndex >= 0
+		&& comboIndex < static_cast<int>( m_midiOutTargetTrackIndices.size() ) )
+	{
+		m_midiOutTargetTrackIndex = m_midiOutTargetTrackIndices[comboIndex];
+	}
+}
+
+
+
+
 void MidiPort::saveSettings( QDomDocument& doc, QDomElement& thisElement )
 {
+	thisElement.setAttribute( "midiouttarget", m_midiOutTargetTrackIndex.load() );
+
 	m_inputChannelModel.saveSettings( doc, thisElement, "inputchannel" );
 	m_outputChannelModel.saveSettings( doc, thisElement, "outputchannel" );
 	m_inputControllerModel.saveSettings( doc, thisElement, "inputcontroller" );
@@ -239,6 +340,8 @@ void MidiPort::saveSettings( QDomDocument& doc, QDomElement& thisElement )
 
 void MidiPort::loadSettings( const QDomElement& thisElement )
 {
+	m_midiOutTargetTrackIndex = thisElement.attribute( "midiouttarget", "-1" ).toInt();
+
 	m_inputChannelModel.loadSettings( thisElement, "inputchannel" );
 	m_outputChannelModel.loadSettings( thisElement, "outputchannel" );
 	m_inputControllerModel.loadSettings( thisElement, "inputcontroller" );
@@ -286,6 +389,8 @@ void MidiPort::loadSettings( const QDomElement& thisElement )
 		// which did not allow note volumes > 100%
 		m_baseVelocityModel.setValue( MidiMaxVelocity );
 	}
+
+	refreshMidiOutTargets();
 }
 
 

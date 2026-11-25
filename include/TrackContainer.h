@@ -79,6 +79,9 @@ public:
 		return m_tracks;
 	}
 
+	//! Return a song-level track by its position, or nullptr
+	Track* trackAt(int index) const;
+
 	bool isEmpty() const;
 
 	static const QString classNodeName()
