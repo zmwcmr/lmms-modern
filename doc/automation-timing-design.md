@@ -41,8 +41,15 @@ sub-block sizes add up to the block size.
 
 ### Host side
 
+Automation clips are evaluated at tick boundaries. When a clip changes a
+parameter, `Song::processNextBuffer()` knows the frame offset of that tick
+inside the current audio block. `VestigeInstrument` sends one event at that
+offset. This is the maximum precision the automation system can provide
+without changing the clip format. `ValueBuffer` interpolation is not used for
+this case because it would start the change at frame 0 of the block.
+
 1. In `VestigeInstrument::setParameter()`, ask the model for its
-   `ValueBuffer`.
+   `ValueBuffer` when the value comes from a controller rather than a clip.
 2. If there is no per-frame data, or the model is not automated/controlled,
    keep the existing block-start `IdVstSetParameter` path.
 3. If there is per-frame data, compress it into a bounded list of
@@ -128,6 +135,26 @@ locate transitions without relying on audio FFT analysis.
 3. Remote sub-block processing for instruments, including MIDI re-basing.
 4. Effects reuse.
 5. LV2 evaluation and tests.
+
+## Implementation status (2026-11-25)
+
+The VST2 path is implemented:
+
+- `IdVstParameterEvents` carries `(frame, value)` points.
+- `VestigeInstrument` sends automation-clip changes at
+  `Song::currentFrameOffsetInPeriod()` and controller curves through
+  `compressParameterCurve()`.
+- `RemoteVstPlugin::process()` splits the block at event frames, applies the
+  points with `effSetParameter`, and re-bases MIDI events for each sub-block.
+  With no events it keeps the original single `processReplacing()` call.
+- `ParameterCurveTest` covers step, ramp, spacing and event-cap behavior.
+- A fake VST2 parameter plugin with a step at tick 3 (110 BPM, 501.136 frames
+  per tick) rendered the transition at sample 1504, matching the tick frame
+  instead of the block boundary.
+
+The LV2 control-port path is still block-rate; evaluating atom-sequence
+parameters remains open. VST effects still use the block-start scalar path;
+`VstEffectControls` needs the same curve/offset logic as instruments.
 
 ## Risks
 

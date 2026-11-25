@@ -733,6 +733,29 @@ void VstPlugin::setParam( int i, float f )
 
 
 
+
+void VstPlugin::setParamEvents( int i, const std::vector<ParameterEvent> & events )
+{
+	if( events.empty() )
+	{
+		return;
+	}
+
+	lock();
+	message m( IdVstParameterEvents );
+	m.addInt( i );
+	m.addInt( static_cast<int>( events.size() ) );
+	for( const auto & event : events )
+	{
+		m.addInt( event.frame );
+		m.addFloat( event.value );
+	}
+	sendMessage( m );
+	unlock();
+}
+
+
+
 void VstPlugin::idleUpdate()
 {
 	lock();

@@ -317,6 +317,12 @@ public:
 		++s_periodCounter;
 	}
 
+	//! Current audio period, used to coalesce per-period automation updates
+	static long periodCounter()
+	{
+		return s_periodCounter;
+	}
+
 	static void resetPeriodCounter()
 	{
 		s_periodCounter = 0;

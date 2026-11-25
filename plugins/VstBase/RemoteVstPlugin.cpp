@@ -492,6 +492,15 @@ private:
 	//! Last latency value reported to the host, in samples
 	int m_lastReportedLatency = -1;
 
+	struct ParameterEvent
+	{
+		int frame;
+		int index;
+		float value;
+	};
+	//! Sample-offset parameter changes waiting for the next block
+	std::vector<ParameterEvent> m_parameterEvents;
+
 	//! Host to plugin synchronisation data structure
 	struct Sync
 	{
@@ -687,6 +696,21 @@ bool RemoteVstPlugin::processMessage( const message & _m )
 			m_plugin->setParameter( m_plugin, _m.getInt( 0 ), _m.getFloat( 1 ) );
 			//sendMessage( IdVstSetParameter );
 			break;
+
+		case IdVstParameterEvents:
+		{
+			const int index = _m.getInt( 0 );
+			const int count = std::max( 0, _m.getInt( 1 ) );
+			for( int i = 0; i < count; ++i )
+			{
+				m_parameterEvents.push_back( {
+					_m.getInt( 2 + 2 * i ),
+					index,
+					_m.getFloat( 3 + 2 * i )
+				} );
+			}
+			break;
+		}
 
 		case IdVstLoadAllParameterDisplays:
 			loadAllParameterDisplays();
@@ -1078,45 +1102,25 @@ bool RemoteVstPlugin::load( const std::string & _plugin_file )
 
 void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 {
-	// first we gonna post all MIDI-events we enqueued so far
-	if( m_midiEvents.size() )
-	{
-		// since MIDI-events are not received immediately, we
-		// have to have them stored somewhere even after
-		// dispatcher-call, so we create static copies of the
-		// data and post them
-#define MIDI_EVENT_BUFFER_COUNT		1024
-		static char eventsBuffer[sizeof( VstEvents ) + sizeof( VstMidiEvent * ) * MIDI_EVENT_BUFFER_COUNT];
-		static VstMidiEvent vme[MIDI_EVENT_BUFFER_COUNT];
+	const int blockSize = bufferSize();
 
-		// first sort events chronologically, since some plugins
-		// (e.g. Sinnah) can hang if they're out of order
-		// TODO: Sort on the server side instead
-		std::stable_sort( m_midiEvents.begin(), m_midiEvents.end(),
-				[]( const VstMidiEvent &a, const VstMidiEvent &b )
-				{
-					return a.deltaFrames < b.deltaFrames;
-				} );
-
-		auto events = (VstEvents*)eventsBuffer;
-		events->reserved = 0;
-		events->numEvents = m_midiEvents.size();
-
-		int idx = 0;
-		for( VstMidiEventList::iterator it = m_midiEvents.begin(); it != m_midiEvents.end(); ++it, ++idx )
+	// Some plugins (e.g. Sinnah) can hang if MIDI events are not ordered
+	// chronologically.
+	std::stable_sort( m_midiEvents.begin(), m_midiEvents.end(),
+		[]( const VstMidiEvent &a, const VstMidiEvent &b )
 		{
-			memcpy( &vme[idx], &*it, sizeof( VstMidiEvent ) );
-			events->events[idx] = (VstEvent *) &vme[idx];
-		}
-
-		m_midiEvents.clear();
-		pluginDispatch( effProcessEvents, 0, 0, events );
-	}
-
-	// now we're ready to fetch sound from VST-plugin
+			return a.deltaFrames < b.deltaFrames;
+		} );
 
 	if( !tryLockShm() )
 	{
+		// The shared audio buffer is busy. Keep the final parameter values
+		// rather than dropping automation, and retry MIDI next period.
+		for( const auto & event : m_parameterEvents )
+		{
+			m_plugin->setParameter( m_plugin, event.index, event.value );
+		}
+		m_parameterEvents.clear();
 		return;
 	}
 
@@ -1126,31 +1130,131 @@ void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 		return;
 	}
 
-	for( int i = 0; i < inputCount(); ++i )
+	// Split the block at every parameter event so changes land on the exact
+	// frame. Without events this reduces to one processReplacing() call.
+	std::vector<int> splitFrames;
+	splitFrames.reserve( m_parameterEvents.size() + 2 );
+	splitFrames.push_back( 0 );
+	for( const auto & event : m_parameterEvents )
 	{
-		m_inputs[i] = &((float *) _in)[i * bufferSize()];
+		const int frame = std::clamp( event.frame, 0, blockSize - 1 );
+		if( frame > 0 )
+		{
+			splitFrames.push_back( frame );
+		}
 	}
+	std::sort( splitFrames.begin(), splitFrames.end() );
+	splitFrames.erase(
+		std::unique( splitFrames.begin(), splitFrames.end() ),
+		splitFrames.end() );
+	splitFrames.push_back( blockSize );
 
-	for( int i = 0; i < outputCount(); ++i )
+	std::sort( m_parameterEvents.begin(), m_parameterEvents.end(),
+		[]( const auto & a, const auto & b )
+		{
+			return a.frame < b.frame;
+		} );
+
+	std::size_t nextEvent = 0;
+	auto applyEventsUntil = [&]( int frame )
 	{
-		m_outputs[i] = &((float *) _out)[i * bufferSize()];
-		memset( m_outputs[i], 0, bufferSize() * sizeof( float ) );
-	}
+		while( nextEvent < m_parameterEvents.size() )
+		{
+			const auto & event = m_parameterEvents[nextEvent];
+			const int eventFrame = std::clamp( event.frame, 0, blockSize - 1 );
+			if( eventFrame > frame )
+			{
+				break;
+			}
+			m_plugin->setParameter( m_plugin, event.index, event.value );
+			++nextEvent;
+		}
+	};
+
+	std::size_t nextMidi = 0;
+	auto processMidiRange = [&]( int startFrame, int endFrame )
+	{
+		if( nextMidi >= m_midiEvents.size() )
+		{
+			return;
+		}
+
+#define MIDI_EVENT_BUFFER_COUNT		1024
+		static char eventsBuffer[sizeof( VstEvents ) + sizeof( VstMidiEvent * ) * MIDI_EVENT_BUFFER_COUNT];
+		static VstMidiEvent vme[MIDI_EVENT_BUFFER_COUNT];
+
+		auto events = (VstEvents*)eventsBuffer;
+		events->reserved = 0;
+		events->numEvents = 0;
+
+		while( nextMidi < m_midiEvents.size()
+			&& events->numEvents < MIDI_EVENT_BUFFER_COUNT )
+		{
+			const VstMidiEvent & event = m_midiEvents[nextMidi];
+			if( event.deltaFrames >= endFrame )
+			{
+				break;
+			}
+			memcpy( &vme[events->numEvents], &event, sizeof( VstMidiEvent ) );
+			vme[events->numEvents].deltaFrames = std::max(
+				0, std::min( event.deltaFrames, blockSize - 1 ) - startFrame );
+			events->events[events->numEvents] = (VstEvent *) &vme[events->numEvents];
+			++events->numEvents;
+			++nextMidi;
+		}
+
+		if( events->numEvents > 0 )
+		{
+			pluginDispatch( effProcessEvents, 0, 0, events );
+		}
+	};
+
+	auto processRange = [&]( int startFrame, int frames )
+	{
+		if( frames <= 0 )
+		{
+			return;
+		}
+
+		for( int i = 0; i < inputCount(); ++i )
+		{
+			m_inputs[i] = &((float *) _in)[i * blockSize + startFrame];
+		}
+
+		for( int i = 0; i < outputCount(); ++i )
+		{
+			m_outputs[i] = &((float *) _out)[i * blockSize + startFrame];
+			memset( m_outputs[i], 0, frames * sizeof( float ) );
+		}
 
 #ifdef OLD_VST_SDK
-	if( m_plugin->flags & effFlagsCanReplacing )
-	{
-		m_plugin->processReplacing( m_plugin, m_inputs, m_outputs,
-								bufferSize() );
-	}
-	else
-	{
-		m_plugin->process( m_plugin, m_inputs, m_outputs,
-								bufferSize() );
-	}
+		if( m_plugin->flags & effFlagsCanReplacing )
+		{
+			m_plugin->processReplacing( m_plugin, m_inputs, m_outputs, frames );
+		}
+		else
+		{
+			m_plugin->process( m_plugin, m_inputs, m_outputs, frames );
+		}
 #else
-	m_plugin->processReplacing(m_plugin, m_inputs, m_outputs, bufferSize());
+		m_plugin->processReplacing( m_plugin, m_inputs, m_outputs, frames );
 #endif
+	};
+
+	applyEventsUntil( 0 );
+
+	int position = 0;
+	for( std::size_t i = 1; i < splitFrames.size(); ++i )
+	{
+		const int next = splitFrames[i];
+		processMidiRange( position, next );
+		processRange( position, next - position );
+		position = next;
+		applyEventsUntil( position );
+	}
+
+	m_parameterEvents.clear();
+	m_midiEvents.clear();
 
 	unlockShm();
 
@@ -1167,7 +1271,7 @@ void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 
 	flushMidiOutEvents();
 
-	m_currentSamplePos += bufferSize();
+	m_currentSamplePos += blockSize;
 }
 
 
@@ -2436,6 +2540,7 @@ void * RemoteVstPlugin::processingThread(void * _param)
 		if( m.id == IdStartProcessing
 			|| m.id == IdMidiEvent
 			|| m.id == IdVstSetParameter
+			|| m.id == IdVstParameterEvents
 			|| m.id == IdVstSetTempo)
 		{
 			_this->processMessage( m );

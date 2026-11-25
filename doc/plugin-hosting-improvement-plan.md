@@ -243,14 +243,31 @@ Tasks:
   - current status: `doc/automation-timing-design.md` defines host-side curve
     compression, the `IdVstParameterEvents` protocol, VST2 sub-block
     processing, MIDI re-basing, LV2 limitations and tests.
-- [ ] Add a parameter event queue with sample offsets to VST2.
-- [ ] Split process blocks at automation event boundaries for VST2.
+- [x] Add a parameter event queue with sample offsets to VST2.
+  - `IdVstParameterEvents` carries `(frame, value)` points and is handled on
+    the remote processing thread.
+- [x] Split process blocks at automation event boundaries for VST2.
+  - `RemoteVstPlugin::process()` splits at event frames and re-bases MIDI
+    events per sub-block. Without events the old single call is unchanged.
+- [x] Apply automation-clip changes at their tick position.
+  - `Song::currentFrameOffsetInPeriod()` gives the tick's frame offset inside
+    the audio period; `VestigeInstrument` sends a VST2 event at that offset.
+- [x] Apply CC/pitch-bend events at their offsets.
+  - already forwarded as `VstMidiEvent::deltaFrames`; now re-based when a
+    block is split.
+- [x] Preserve parameter changes across block boundaries.
+  - events are queued per block and applied exactly once; no events means the
+    original block-at-once path.
+- [x] Add tests comparing rendered automation timing.
+  - `ParameterCurveTest` covers curve compression. A fake VST2 parameter
+    plugin with a tick-3 step rendered the transition at sample 1504 instead
+    of the block boundary.
+- [ ] Route VST effect parameter automation through the same event path.
+  - current status: instruments are wired; `VstEffectControls` still uses the
+    block-start scalar path.
 - [ ] For LV2, evaluate block splitting vs. control-port limitations:
   - document that LV2 control ports are block-rate,
   - split only where a plugin exposes sample-accurate data.
-- [ ] Apply CC/pitch-bend events at their offsets.
-- [ ] Preserve parameter changes across block boundaries.
-- [ ] Add tests comparing rendered automation timing.
 
 Files:
 

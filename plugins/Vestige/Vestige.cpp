@@ -48,6 +48,7 @@
 #include "MidiEvent.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
+#include "ParameterCurve.h"
 #include "PathUtil.h"
 #include "PixmapButton.h"
 #include "Song.h"
@@ -229,6 +230,7 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 		const QMap<QString, QString> & dump = m_plugin->parameterDump();
 		paramCount = dump.size();
+		m_lastParameterPeriod.assign(paramCount, -1);
 		auto paramStr = std::array<char, 35>{};
 		knobFModel = new FloatModel *[ paramCount ];
 		QStringList s_dumpValues;
@@ -263,11 +265,67 @@ void VestigeInstrument::setParameter( Model * action )
 		return;
 	}
 
-	int knobUNID = action->displayName().toInt();
-
-	if ( m_plugin != nullptr ) {
-		m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
+	const int knobUNID = action->displayName().toInt();
+	if (knobUNID < 0 || knobUNID >= paramCount || knobFModel == nullptr)
+	{
+		return;
 	}
+
+	sendParameter(knobUNID, knobFModel[knobUNID]);
+}
+
+
+
+
+void VestigeInstrument::sendParameter( int index, FloatModel * model )
+{
+	if (m_plugin == nullptr || model == nullptr)
+	{
+		return;
+	}
+
+	// Automation clips update the model at tick boundaries. Send one event at
+	// the exact frame offset within the current block. valueBuffer() is not
+	// used here: for a scalar automation change it interpolates over the whole
+	// period instead of starting at the tick.
+	if (model->isAutomated())
+	{
+		const f_cnt_t frameOffset = Engine::getSong() != nullptr
+			? Engine::getSong()->currentFrameOffsetInPeriod() : 0;
+		m_plugin->setParamEvents(index, {
+			{static_cast<int>(frameOffset), model->value()}});
+		return;
+	}
+
+	// Controllers with sample-exact data provide a block-aligned curve.
+	if (model->controllerConnection())
+	{
+		const long period = AutomatableModel::periodCounter();
+		if (index >= 0
+			&& index < static_cast<int>(m_lastParameterPeriod.size()))
+		{
+			if (m_lastParameterPeriod[index] == period)
+			{
+				return;
+			}
+			m_lastParameterPeriod[index] = period;
+		}
+
+		ValueBuffer * values = model->valueBuffer();
+		if (values != nullptr && values->length() > 0)
+		{
+			const auto events = compressParameterCurve(
+				values->values(), values->length(),
+				model->minValue(), model->maxValue());
+			if (!events.empty())
+			{
+				m_plugin->setParamEvents(index, events);
+				return;
+			}
+		}
+	}
+
+	m_plugin->setParam(index, model->value());
 }
 
 
@@ -584,6 +642,7 @@ void VestigeInstrument::closePlugin( void )
 		delete [] knobFModel;
 		knobFModel = nullptr;
 	}
+	m_lastParameterPeriod.clear();
 
 	if( m_scrollArea != nullptr )
 	{
@@ -1096,6 +1155,9 @@ ManageVestigeInstrumentView::ManageVestigeInstrumentView( Instrument * _instrume
 		m_vi->knobFModel = new FloatModel *[ m_vi->paramCount ];
 		hasKnobModel = false;
 	}
+	if (!hasKnobModel) {
+		m_vi->m_lastParameterPeriod.assign(m_vi->paramCount, -1);
+	}
 
 	auto paramStr = std::array<char, 35>{};
 	QStringList s_dumpValues;
@@ -1254,8 +1316,10 @@ void ManageVestigeInstrumentView::setParameter( Model * action )
 
 	int knobUNID = action->displayName().toInt();
 
-	if ( m_vi->m_plugin != nullptr ) {
-		m_vi->m_plugin->setParam( knobUNID, m_vi->knobFModel[knobUNID]->value() );
+	if ( m_vi->m_plugin != nullptr && m_vi->knobFModel != nullptr
+		&& knobUNID >= 0 && knobUNID < m_vi->paramCount )
+	{
+		m_vi->sendParameter( knobUNID, m_vi->knobFModel[knobUNID] );
 	}
 }
 

@@ -36,6 +36,7 @@
 
 #include "Knob.h"
 #include "JournallingObject.h"
+#include "ParameterCurve.h"
 #include "RemotePlugin.h"
 
 #include "vstbase_export.h"
@@ -168,6 +169,8 @@ public slots:
 	void updateParameterDisplay(int index);
 	void savePreset();
 	void setParam( int i, float f );
+	//! Send sample-offset parameter changes for the next process block
+	void setParamEvents( int i, const std::vector<ParameterEvent> & events );
 	void idleUpdate();
 
 	void showUI() override;

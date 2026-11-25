@@ -94,6 +94,8 @@ protected slots:
 private:
 	void closePlugin();
 	void drainMidiOutQueue();
+	//! Send one parameter value, or a sample-accurate curve when automated
+	void sendParameter(int index, FloatModel* model);
 
 
 	VstPlugin * m_plugin;
@@ -108,6 +110,8 @@ private:
 
 	//! True while a plugin-originated parameter change is being applied
 	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	//! Last audio period in which a parameter curve was sent
+	std::vector<long> m_lastParameterPeriod;
 	//! Parameters with an active beginEdit/endEdit gesture
 	QSet<int> m_parameterGestures;
 
