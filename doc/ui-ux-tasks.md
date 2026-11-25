@@ -57,6 +57,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-6 | ✅ 已实现 | 下拉框列出两套主题；切到 classic 重启生效 |
 | T1-7 | ✅ 已实现 | 10 pt → 13/11/16 px；100%/150% 截图无重叠 |
 | T1-8 | ✅ 已实现 | de_DE 1600 宽全部完整；1024 宽溢出菜单可用 |
+| T1-9 | 🚧 进行中 | 第一批 4 个：`black_key`×3 + `combobox_bg` |
 
 ### 实施中发现并修正的两个问题
 
@@ -438,16 +439,25 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-9 剩余 PNG → SVG
+### T1-9 剩余 PNG → SVG（第一批）
 
-**现象**：`data/themes/default/` 仍有 78 个 PNG。
+**现象**：`data/themes/default/` 原有 78 个 PNG。
 
-**改动点**
-- 候选（图标类）：`black_key*.png`、`combobox_bg.png`、`horizontal_slider.png`、`cursor_select_*.png`、`clip_rec.png`、`effect_plugin.png`、`envelope_graph.png`。
-- **必须保留**：`apply_css.png`、`apply-selected_css.png`（QSS 菜单指示图标，见提交 `74bac7745` 的说明：Qt 样式表在这些位置无法可靠使用 SVG）；`closed_branch.png`、`open_branch.png` 仅被 `QTreeView::branch` 的 `border-image` 引用，转换前需先验证 `border-image` 对 SVG 的缩放行为。
-- 每次 PR 转 5–10 个，改动 `data/themes/CMakeLists.txt` 的安装清单。
+**第一批（已实现）**
+- `black_key` / `black_key_pressed` / `black_key_disabled` → SVG。按原 10×37 像素图的逐行渐变与 1 px 边框重绘，保留左右透明边和底部两行高光/描边。
+- `combobox_bg` → SVG（50×20 线性渐变）。仍作为 `QPixmap` 画刷使用，没有 tiling 或拉伸差异。
+- 删除对应 4 个 PNG；`embed::getIconPixmap()` 已优先查找同名 SVG（`embed.cpp:99-103`），安装清单用通配符，无需改动 CMake。
+- 与原 PNG 的 1× 渲染对比（Inkscape 光栅化后 RMSE）：`black_key` 0.89%，`black_key_pressed` 3.29%，`black_key_disabled` 0.47%，`combobox_bg` 0.25%。
+- 运行截图 `t1-9-piano-roll.png`：键盘黑键与工具栏下拉框显示正常；删除 PNG 后启动日志无 "Error loading icon pixmap"。
 
-**验收**：删除对应 PNG 后 `embed::getIconPixmap()` 仍能找到（`embed.cpp` 已实现优先取 SVG）；在 200% 缩放下无模糊。
+**未转换（原因）**
+- `horizontal_slider`：被 QSS `border-image` 引用（`style.css:598`），需先验证 `border-image` 对 SVG 的缩放行为。
+- `cursor_select_left/right`：灰度光标掩码，需在真实桌面验证 `QCursor` 的透明与热点。
+- `clip_rec` / `envelope_graph`：含像素字体，SVG `<text>` 依赖系统字体，需先转成路径。
+- `effect_plugin`：214×57 圆角渐变 + 半透明边框，比第一批复杂，后续单独处理。
+- **必须保留**：`apply_css.png`、`apply-selected_css.png`（QSS 菜单指示图标，见 `74bac7745`）；`closed_branch.png`、`open_branch.png` 仅被 `QTreeView::branch` 的 `border-image` 引用。
+
+**验收**：删除对应 PNG 后 `embed::getIconPixmap()` 仍能找到；Piano Roll 键盘与下拉框显示正常；SVG 由 `embed` 的 2× oversampling 光栅化，不随 DPR 模糊。
 
 ---
 
