@@ -282,6 +282,29 @@ void MidiPort::updateMidiOutTarget()
 
 
 
+void MidiPort::sendAllNotesOff()
+{
+	if( isOutputEnabled() == false )
+	{
+		return;
+	}
+
+	for( int channel = 0; channel < MidiChannelCount; ++channel )
+	{
+		if( outputChannel() == 0 || realOutputChannel() == channel )
+		{
+			m_midiClient->processOutEvent(
+				MidiEvent( MidiControlChange, channel,
+					MidiControllerAllNotesOff, 0, nullptr,
+					MidiEvent::Source::Internal ),
+				TimePos(), this );
+		}
+	}
+}
+
+
+
+
 void MidiPort::saveSettings( QDomDocument& doc, QDomElement& thisElement )
 {
 	thisElement.setAttribute( "midiouttarget", m_midiOutTargetTrackIndex.load() );

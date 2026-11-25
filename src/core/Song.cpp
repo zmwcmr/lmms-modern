@@ -133,6 +133,11 @@ Song::Song() :
 
 	// Inform VST plugins if the user moved the play head
 	connect(this, &Song::playbackPositionJumped, this, [this](){ m_vstSyncController.setPlaybackJumped(true); }, Qt::DirectConnection);
+
+	// Release notes on external MIDI outputs after a seek.
+	connect(this, &Song::playbackPositionJumped, this,
+		[](){ Engine::audioEngine()->requestNoteOffAll(); },
+		Qt::DirectConnection);
 }
 
 

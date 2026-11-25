@@ -117,6 +117,8 @@ public:
 
 	void processInEvent( const MidiEvent& event, const TimePos& time = TimePos() );
 	void processOutEvent( const MidiEvent& event, const TimePos& time = TimePos() );
+	//! Send All Notes Off to the external MIDI output only
+	void sendAllNotesOff();
 
 
 	void saveSettings( QDomDocument& doc, QDomElement& thisElement ) override;

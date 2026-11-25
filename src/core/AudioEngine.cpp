@@ -50,6 +50,7 @@
 
 // platform-specific midi-interface-classes
 #include "MidiAlsaRaw.h"
+#include "MidiClient.h"
 #include "MidiAlsaSeq.h"
 #include "MidiJack.h"
 #include "MidiSndio.h"
@@ -208,6 +209,12 @@ void AudioEngine::renderStageNoteSetup()
 		clearInternal();
 	}
 
+	if( m_noteOffSignal.exchange(false, std::memory_order_relaxed)
+		&& m_midiClient != nullptr )
+	{
+		m_midiClient->noteOffAll();
+	}
+
 	// remove all play-handles that have to be deleted and delete
 	// them if they still exist...
 	// maybe this algorithm could be optimized...
@@ -354,6 +361,14 @@ void AudioEngine::clear()
 
 
 
+void AudioEngine::requestNoteOffAll()
+{
+	m_noteOffSignal.store(true, std::memory_order_relaxed);
+}
+
+
+
+
 void AudioEngine::clearNewPlayHandles()
 {
 	requestChangeInModel();
@@ -388,7 +403,11 @@ void AudioEngine::clearNewPlayHandles()
 // all remaining notes etc. would be played until their end
 void AudioEngine::clearInternal()
 {
-	// TODO: m_midiClient->noteOffAll();
+	if( m_midiClient != nullptr )
+	{
+		m_midiClient->noteOffAll();
+	}
+
 	for (auto ph : m_playHandles)
 	{
 		if (ph->type() != PlayHandle::Type::InstrumentPlayHandle)
