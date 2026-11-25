@@ -22,6 +22,7 @@ set(LMMS_TESTS
 
 if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)

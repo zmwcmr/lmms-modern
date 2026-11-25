@@ -135,6 +135,7 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 	unsigned maxPorts = lilv_plugin_get_num_ports(plugin);
 	enum { inCount, outCount, maxCount };
 	auto audioChannels = std::array<unsigned, maxCount>{}; // audio input and output count
+	auto optionalAudioChannels = std::array<unsigned, maxCount>{}; // optional audio ports
 	auto midiChannels = std::array<unsigned, maxCount>{}; // MIDI input and output count
 
 	const char* pluginUri = lilv_node_as_uri(lilv_plugin_get_uri(plugin));
@@ -165,14 +166,22 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		std::vector<PluginIssue> tmp = meta.get(plugin, portNum);
 		std::move(tmp.begin(), tmp.end(), std::back_inserter(issues));
 
-		bool portMustBeUsed =
-			!portIsSideChain(plugin,
-							lilv_plugin_get_port_by_index(plugin, portNum)) &&
-			!meta.m_optional;
-		if (meta.m_type == Lv2Ports::Type::Audio && portMustBeUsed)
+		const bool sideChain = portIsSideChain(plugin,
+			lilv_plugin_get_port_by_index(plugin, portNum));
+		const bool portMustBeUsed = !sideChain && !meta.m_optional;
+		if (meta.m_type == Lv2Ports::Type::Audio)
 		{
-			++audioChannels[meta.m_flow == Lv2Ports::Flow::Output
-				? outCount : inCount];
+			if (portMustBeUsed)
+			{
+				++audioChannels[meta.m_flow == Lv2Ports::Flow::Output
+					? outCount : inCount];
+			}
+			else if (!sideChain)
+			{
+				++optionalAudioChannels[
+					meta.m_flow == Lv2Ports::Flow::Output
+						? outCount : inCount];
+			}
 		}
 		else if(meta.m_type == Lv2Ports::Type::AtomSeq && portMustBeUsed)
 		{
@@ -184,7 +193,7 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 	// LMMS only consumes the first stereo pair. Extra audio ports remain
 	// connected to their own buffers so the plugin can run, but their data is
 	// ignored. This matches the VST2 host's behaviour.
-	if (audioChannels[outCount] == 0)
+	if (audioChannels[outCount] == 0 && optionalAudioChannels[outCount] == 0)
 		issues.emplace_back(PluginIssueType::NoOutputChannel);
 
 	if (midiChannels[inCount] > 1)
@@ -475,15 +484,27 @@ void Lv2Proc::copyModelsFromCore()
 {
 	struct FloatFromModelVisitor : public ConstModelVisitor
 	{
-		const std::vector<float>* m_scalePointMap; // in
-		float m_res; // out
+		const std::vector<float>* m_scalePointMap = nullptr; // in
+		float m_res = 0.f; // out
 		void visit(const FloatModel& m) override { m_res = m.value(); }
 		void visit(const IntModel& m) override {
 			m_res = static_cast<float>(m.value()); }
 		void visit(const BoolModel& m) override {
 			m_res = static_cast<float>(m.value()); }
-		void visit(const ComboBoxModel& m) override {
-			m_res = (*m_scalePointMap)[static_cast<std::size_t>(m.value())]; }
+		void visit(const ComboBoxModel& m) override
+		{
+			// Plugins may advertise lv2:enumeration without scale points.
+			// Never index an empty or too-short scale point map.
+			if (m_scalePointMap == nullptr || m_scalePointMap->empty())
+			{
+				m_res = 0.f;
+				return;
+			}
+			const std::size_t index = static_cast<std::size_t>(
+				std::max(0, m.value()));
+			m_res = (*m_scalePointMap)[
+				std::min(index, m_scalePointMap->size() - 1)];
+		}
 	};
 
 	struct Copy : public Lv2Ports::Visitor
@@ -570,6 +591,11 @@ void Lv2Proc::copyModelsToCore()
 
 void Lv2Proc::copyBuffersFromCore(const SampleFrame* buf, f_cnt_t frames)
 {
+	if (!inPorts().m_left)
+	{
+		return;
+	}
+
 	inPorts().m_left->copyBuffersFromCore(buf, 0, frames);
 	if (inPorts().m_right)
 	{
@@ -588,6 +614,18 @@ void Lv2Proc::copyBuffersFromCore(const SampleFrame* buf, f_cnt_t frames)
 
 void Lv2Proc::copyBuffersToCore(SampleFrame* buf, f_cnt_t frames) const
 {
+	if (!outPorts().m_left)
+	{
+		// No audio output was registered; keep the track silent instead of
+		// dereferencing a null port.
+		for (f_cnt_t f = 0; f < frames; ++f)
+		{
+			buf[f][0] = 0.f;
+			buf[f][1] = 0.f;
+		}
+		return;
+	}
+
 	outPorts().m_left->copyBuffersToCore(buf, 0, frames);
 	// if the caller requests to copy into two channels, but we only have
 	// one output channel, duplicate our output
@@ -1404,12 +1442,10 @@ void Lv2Proc::createPort(std::size_t portNum)
 						break;
 					case Lv2Ports::Vis::Enumeration:
 					{
-						ComboBoxModel* comboModel = new ComboBoxModel(nullptr, dispName);
-
+						std::map<float, const char*> scalePointMap;
 						{
 							AutoLilvScalePoints sps (static_cast<LilvScalePoints*>(lilv_port_get_scale_points(m_plugin, lilvPort)));
 							// temporary map, since lilv may return scale points in random order
-							std::map<float, const char*> scalePointMap;
 							LILV_FOREACH(scale_points, i, sps.get())
 							{
 								const LilvScalePoint* sp = lilv_scale_points_get(sps.get(), i);
@@ -1417,11 +1453,32 @@ void Lv2Proc::createPort(std::size_t portNum)
 								const char* s = lilv_node_as_string(lilv_scale_point_get_label(sp));
 								scalePointMap[f] = s;
 							}
-							for (const auto& [f,s] : scalePointMap)
-							{
-								ctrl->m_scalePointMap.push_back(f);
-								comboModel->addItem(s);
-							}
+						}
+
+						// Some plugins mark integer controls as lv2:enumeration
+						// but do not provide scale points (e.g. sfizz). A combo
+						// box without entries would index an empty map when the
+						// parameter values are copied to the plugin.
+						if (scalePointMap.empty())
+						{
+							const float range = meta.max(sr) - meta.min(sr);
+							const bool integralValues =
+								meta.def() == std::floor(meta.def())
+								&& meta.min(sr) == std::floor(meta.min(sr))
+								&& meta.max(sr) == std::floor(meta.max(sr));
+							const float stepSize = integralValues
+								? 1.0f : std::max(range / 1000.0f, 0.01f);
+							ctrl->m_connectedModel.reset(
+								new FloatModel(meta.def(), meta.min(sr),
+									meta.max(sr), stepSize, nullptr, dispName));
+							break;
+						}
+
+						ComboBoxModel* comboModel = new ComboBoxModel(nullptr, dispName);
+						for (const auto& [f,s] : scalePointMap)
+						{
+							ctrl->m_scalePointMap.push_back(f);
+							comboModel->addItem(s);
 						}
 						for(std::size_t i = 0; i < ctrl->m_scalePointMap.size(); ++i)
 						{
@@ -1551,7 +1608,10 @@ void Lv2Proc::createPorts()
 
 		void visit(Lv2Ports::Audio& audio) override
 		{
-			if (audio.mustBeUsed())
+			// Optional audio ports still have to be usable: some instruments
+			// (e.g. OB-Xd) mark their only outputs as connectionOptional.
+			// Sidechain ports are intentionally not routed here.
+			if (!audio.isSideChain())
 			{
 				StereoPortRef dummy;
 				StereoPortRef* portRef = &dummy;
