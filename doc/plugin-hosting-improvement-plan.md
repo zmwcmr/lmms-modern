@@ -140,9 +140,10 @@ Tasks:
 - [x] Handle all-notes-off on stop/seek.
   - current status: external MIDI outputs receive CC 123 on stop, pause and
     playback jumps; internal notes are cleared by the audio engine.
-- [ ] Add a test plugin that emits a fixed note sequence.
-  - verified locally with a temporary fake VST2 instrument; the test plugin is
-    not committed yet.
+- [x] Add a test plugin that emits a fixed note sequence.
+  - current status: `tests/plugins/fake-midi-vst.cpp` is built as the
+    `FakeMidiVst` test target. The automated routing test still needs to be
+    wired into ctest (see P6.6).
 
 Files:
 

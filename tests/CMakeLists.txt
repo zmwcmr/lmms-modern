@@ -22,6 +22,16 @@ if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 endif()
 
+if(LMMS_BUILD_LINUX AND WANT_VST)
+	add_library(FakeMidiVst SHARED plugins/fake-midi-vst.cpp)
+	target_include_directories(FakeMidiVst PRIVATE ${CMAKE_SOURCE_DIR}/include)
+	target_compile_features(FakeMidiVst PRIVATE cxx_std_17)
+	set_target_properties(FakeMidiVst PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "fake-midi-vst"
+	)
+endif()
+
 foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	# TODO CMake 3.20: Use cmake_path
 	get_filename_component(LMMS_TEST_NAME ${LMMS_TEST_SRC} NAME_WE)
