@@ -132,14 +132,11 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		}
 	}
 
-	if (audioChannels[inCount] > 2)
-		issues.emplace_back(PluginIssueType::TooManyInputChannels,
-			std::to_string(audioChannels[inCount]));
+	// LMMS only consumes the first stereo pair. Extra audio ports remain
+	// connected to their own buffers so the plugin can run, but their data is
+	// ignored. This matches the VST2 host's behaviour.
 	if (audioChannels[outCount] == 0)
 		issues.emplace_back(PluginIssueType::NoOutputChannel);
-	else if (audioChannels[outCount] > 2)
-		issues.emplace_back(PluginIssueType::TooManyOutputChannels,
-			std::to_string(audioChannels[outCount]));
 
 	if (midiChannels[inCount] > 1)
 		issues.emplace_back(PluginIssueType::TooManyMidiInputChannels,
@@ -176,11 +173,9 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		}
 	}
 
-	return (audioChannels[inCount] > 2 || audioChannels[outCount] > 2)
-		? Plugin::Type::Undefined
-		: (audioChannels[inCount] > 0)
-			? Plugin::Type::Effect
-			: Plugin::Type::Instrument;
+	return (audioChannels[inCount] > 0)
+		? Plugin::Type::Effect
+		: Plugin::Type::Instrument;
 }
 
 

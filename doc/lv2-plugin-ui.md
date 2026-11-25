@@ -48,6 +48,9 @@ enabled again.
 
 ## Known limitations
 
+- Plugins with more than two audio inputs or outputs are loaded, but LMMS
+  only uses the first stereo pair. Extra ports are connected and ignored,
+  matching the VST2 host.
 - Qt5/GTK-only UIs are not supported by the current host.
 - Atom events are queued with a mutex; the audio-thread path is not fully
   real-time safe yet.
