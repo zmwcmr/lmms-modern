@@ -33,9 +33,12 @@
 #include <QScrollArea>
 
 #include "embed.h"
+#include "Engine.h"
 #include "GuiApplication.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
+#include "ParameterCurve.h"
+#include "Song.h"
 #include "SubWindow.h"
 #include "VstEffectControlDialog.h"
 #include "VstEffect.h"
@@ -84,6 +87,7 @@ void VstEffectControls::loadSettings( const QDomElement & _this )
 		paramCount = dump.size();
 		auto paramStr = std::array<char, 35>{};
 		knobFModel.resize(paramCount);
+		m_lastParameterPeriod.assign(paramCount, -1);
 		QStringList s_dumpValues;
 		for( int i = 0; i < paramCount; i++ )
 		{
@@ -118,11 +122,66 @@ void VstEffectControls::setParameter( Model * action )
 		return;
 	}
 
-	int knobUNID = action->displayName().toInt();
-
-	if ( m_effect->m_plugin != nullptr ) {
-		m_effect->m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
+	const int knobUNID = action->displayName().toInt();
+	if (knobUNID < 0 || knobUNID >= static_cast<int>(knobFModel.size()))
+	{
+		return;
 	}
+
+	sendParameter(knobUNID, knobFModel[knobUNID]);
+}
+
+
+
+
+void VstEffectControls::sendParameter( int index, FloatModel * model )
+{
+	if (m_effect->m_plugin == nullptr || model == nullptr)
+	{
+		return;
+	}
+
+	// Automation clips update the model at tick boundaries. Send one event at
+	// the exact frame offset within the current block instead of letting the
+	// scalar path apply the change at the block start.
+	if (model->isAutomated())
+	{
+		const f_cnt_t frameOffset = Engine::getSong() != nullptr
+			? Engine::getSong()->currentFrameOffsetInPeriod() : 0;
+		m_effect->m_plugin->setParamEvents(index, {
+			{static_cast<int>(frameOffset), model->value()}});
+		return;
+	}
+
+	// Controllers with sample-exact data provide a block-aligned curve.
+	if (model->controllerConnection())
+	{
+		const long period = AutomatableModel::periodCounter();
+		if (index >= 0
+			&& index < static_cast<int>(m_lastParameterPeriod.size()))
+		{
+			if (m_lastParameterPeriod[index] == period)
+			{
+				return;
+			}
+			m_lastParameterPeriod[index] = period;
+		}
+
+		ValueBuffer * values = model->valueBuffer();
+		if (values != nullptr && values->length() > 0)
+		{
+			const auto events = compressParameterCurve(
+				values->values(), values->length(),
+				model->minValue(), model->maxValue());
+			if (!events.empty())
+			{
+				m_effect->m_plugin->setParamEvents(index, events);
+				return;
+			}
+		}
+	}
+
+	m_effect->m_plugin->setParam(index, model->value());
 }
 
 
@@ -444,6 +503,7 @@ ManageVSTEffectView::ManageVSTEffectView( VstEffect * _eff, VstEffectControls * 
 		m_vi->knobFModel.resize(m_vi->paramCount);
 		hasKnobModel = false;
 	}
+	m_vi->m_lastParameterPeriod.assign(m_vi->paramCount, -1);
 
 	auto paramStr = std::array<char, 35>{};
 	QStringList s_dumpValues;
@@ -571,11 +631,14 @@ void ManageVSTEffectView::setParameter( Model * action )
 		return;
 	}
 
-	int knobUNID = action->displayName().toInt();
-
-	if ( m_effect->m_plugin != nullptr ) {
-		m_effect->m_plugin->setParam( knobUNID, m_vi2->knobFModel[knobUNID]->value() );
+	const int knobUNID = action->displayName().toInt();
+	if (knobUNID < 0
+		|| knobUNID >= static_cast<int>(m_vi2->knobFModel.size()))
+	{
+		return;
 	}
+
+	m_vi2->sendParameter(knobUNID, m_vi2->knobFModel[knobUNID]);
 }
 
 ManageVSTEffectView::~ManageVSTEffectView()

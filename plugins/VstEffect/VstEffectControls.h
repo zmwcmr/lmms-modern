@@ -29,6 +29,7 @@
 
 
 #include <atomic>
+#include <vector>
 
 #include <QObject>
 #include <QSet>
@@ -93,6 +94,9 @@ protected:
 	virtual void paintEvent( QPaintEvent * _pe );
 
 private:
+	//! Send one parameter value, or a sample-accurate curve when automated
+	void sendParameter( int index, FloatModel * model );
+
 	VstEffect * m_effect;
 
 	QPushButton * m_selPresetButton;
@@ -113,6 +117,8 @@ private:
 	bool m_vstGuiVisible;
 
 	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	//! Last audio period in which a parameter curve was sent
+	std::vector<long> m_lastParameterPeriod;
 	QSet<int> m_parameterGestures;
 } ;
 

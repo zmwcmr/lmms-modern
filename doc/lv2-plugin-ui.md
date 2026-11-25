@@ -62,3 +62,8 @@ enabled again.
   real-time safe yet.
 - A UI crash runs in-process and can take LMMS down with it. Out-of-process
   UI hosting is future work.
+- LV2 control ports are block-rate: a parameter change takes effect at the
+  start of the next `run()` cycle, not at a sample offset inside the block.
+  Sample-accurate plugin parameters are VST2-only for now; core LV2 has no
+  standard parameter event with a sample position. MIDI atom events still keep
+  their block-relative frame offsets.

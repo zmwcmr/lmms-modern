@@ -108,6 +108,30 @@ same input/output pointer offsetting.
 - Do not split for plugins without sample-accurate parameter input. Document
   the limitation in the plugin dialog or manual.
 
+### Evaluation result (2026-11-25)
+
+Decision: keep the LV2 control-port path block-rate and do not split `run()`
+in this milestone.
+
+Reasons:
+
+- Core LV2 parameter changes are `patch:Set` messages on atom ports without a
+  defined sample position. Even when a plugin accepts timestamped atom events,
+  there is no standard parameter semantics tied to `time:Frame`; each plugin
+  would need its own event type and mapping.
+- `Lv2Proc::run()` also drives worker scheduling, options, state restore and
+  UI notifications. Splitting it multiplies those callbacks per audio period
+  and assumes the plugin is stateless between sub-block runs, which is not
+  guaranteed.
+- Most LV2 plugins smooth control changes internally, so the audible result of
+  block-rate control is usually better than hard sub-block steps.
+- The host still forwards MIDI with block-relative offsets; only the scalar
+  control ports are quantized.
+
+The limitation is documented in `doc/lv2-plugin-ui.md`. Revisit only when a
+plugin with explicit sample-accurate parameter atoms becomes a target; in that
+case gate splitting on the port's event type, not on "LV2 in general".
+
 ## Tests
 
 Use a fake VST2 plugin with one parameter that maps to output gain or DC:
@@ -144,6 +168,9 @@ The VST2 path is implemented:
 - `VestigeInstrument` sends automation-clip changes at
   `Song::currentFrameOffsetInPeriod()` and controller curves through
   `compressParameterCurve()`.
+- `VstEffectControls` uses the same helper: effect parameters are sent as
+  offset events when the model is automated or driven by a sample-exact
+  controller; manual knob changes keep the block-start scalar path.
 - `RemoteVstPlugin::process()` splits the block at event frames, applies the
   points with `effSetParameter`, and re-bases MIDI events for each sub-block.
   With no events it keeps the original single `processReplacing()` call.
@@ -153,8 +180,7 @@ The VST2 path is implemented:
   instead of the block boundary.
 
 The LV2 control-port path is still block-rate; evaluating atom-sequence
-parameters remains open. VST effects still use the block-start scalar path;
-`VstEffectControls` needs the same curve/offset logic as instruments.
+parameters remains open.
 
 ## Risks
 

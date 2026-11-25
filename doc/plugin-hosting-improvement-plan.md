@@ -42,7 +42,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
    still missing.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
    internal target track; longer routing chains are still missing.
-4. No sample-accurate automation.
+4. VST2 sample-accurate parameter automation is implemented for instruments and
+   effects; LV2 control ports remain block-rate by design.
 5. Only bundle presets are exposed; user presets and preset saving are missing.
 6. VST2 host callback coverage is still incomplete: the file selector is not
    implemented, and several 2.4 callbacks remain stubs.
@@ -262,18 +263,22 @@ Tasks:
   - `ParameterCurveTest` covers curve compression. A fake VST2 parameter
     plugin with a tick-3 step rendered the transition at sample 1504 instead
     of the block boundary.
-- [ ] Route VST effect parameter automation through the same event path.
-  - current status: instruments are wired; `VstEffectControls` still uses the
-    block-start scalar path.
-- [ ] For LV2, evaluate block splitting vs. control-port limitations:
-  - document that LV2 control ports are block-rate,
-  - split only where a plugin exposes sample-accurate data.
+- [x] Route VST effect parameter automation through the same event path.
+  - current status: `VstEffectControls` sends automated and controller-driven
+    parameters through `compressParameterCurve()`/`setParamEvents()`;
+    manual knob changes keep the block-start scalar path.
+- [x] For LV2, evaluate block splitting vs. control-port limitations:
+  - current status: `doc/automation-timing-design.md` records the decision to
+    keep LV2 control ports block-rate. Core LV2 has no sample-accurate
+    parameter semantics, and splitting `run()` would multiply worker, option
+    and UI callbacks. The limitation is documented in the LV2 UI guide.
 
 Files:
 
 ```text
 plugins/VstBase/VstPlugin.*
 plugins/VstBase/RemoteVstPlugin.cpp
+plugins/VstEffect/VstEffectControls.*
 src/core/lv2/Lv2Proc.*
 src/core/AutomatableModel.*
 src/core/AutomationClip.*
