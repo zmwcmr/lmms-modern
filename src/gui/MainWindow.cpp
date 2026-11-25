@@ -222,8 +222,11 @@ MainWindow::MainWindow() :
 	setCentralWidget( main_widget );
 
 	// status bar, used for hints while hovering controls and short messages
-	// such as the result of saving the project
+	// such as the result of saving the project.
+	// TODO: hidden until the gesture hints are finished (see doc/ui-ux-tasks.md,
+	// T1-4). Remove the hide() call to bring the bar back.
 	statusBar()->setSizeGripEnabled( false );
+	statusBar()->hide();
 
 	m_updateTimer.start( 1000 / 60, this );  // 60 fps
 
