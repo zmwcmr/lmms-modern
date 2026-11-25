@@ -89,6 +89,7 @@ enum VstRemoteMessageIDs
 	IdVstParameterDump,
 	IdVstIsSynth,
 	IdVstMidiOut,
+	IdVstLatency,
 	IdVstParameterAutomated,
 	IdVstParameterGestureBegin,
 	IdVstParameterGestureEnd

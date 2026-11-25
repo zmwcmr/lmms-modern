@@ -1060,6 +1060,8 @@ bool RemoteVstPlugin::load( const std::string & _plugin_file )
 	};
 
 	sendMessage( message( IdVstPluginUniqueID ).addString( id ) );
+	sendMessage( message( IdVstLatency ).addInt(
+		std::max( 0, static_cast<int>( m_plugin->initialDelay ) ) ) );
 
 	if( !m_skipInit )
 	{

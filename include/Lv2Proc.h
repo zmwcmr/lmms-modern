@@ -67,6 +67,7 @@ class SampleFrame;
 namespace Lv2Ports
 {
 	struct Audio;
+	struct Control;
 	struct PortBase;
 	struct AtomSeq;
 }
@@ -215,6 +216,8 @@ public:
 	AutomatableModel *modelAtPort(const QString &uri); // unused currently
 	std::size_t controlCount() const { return ModelGroup::size(); }
 	bool hasNoteInput() const;
+	//! Processing latency reported by the plugin, in samples
+	f_cnt_t latency() const { return m_latency.load(std::memory_order_relaxed); }
 	const LilvPlugin* getPlugin() const { return m_plugin; }
 	bool hasGui() const { return m_hasGUI; }
 
@@ -305,6 +308,10 @@ private:
 
 	//! Called by the view to detach its native UI before shutdown
 	std::function<void()> m_viewDetacher;
+
+	//! Output control port carrying the plugin latency, if any
+	Lv2Ports::Control* m_latencyPort = nullptr;
+	std::atomic<f_cnt_t> m_latency{0};
 
 	//! Plugin -> UI event queue (atom events, etc.)
 	std::mutex m_uiEventMutex;

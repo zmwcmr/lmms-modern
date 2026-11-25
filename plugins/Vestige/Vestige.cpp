@@ -534,6 +534,15 @@ void VestigeInstrument::drainMidiOutQueue()
 
 
 
+f_cnt_t VestigeInstrument::latency() const
+{
+	QMutexLocker lock( &m_pluginMutex );
+	return m_plugin != nullptr ? m_plugin->latency() : 0;
+}
+
+
+
+
 bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
 {
 	m_pluginMutex.lock();

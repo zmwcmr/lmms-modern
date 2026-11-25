@@ -241,22 +241,27 @@ public:
 	int32_t numOutputs;
 	// flags 24-27
 	int32_t flags;
-	// Fill somewhere 28-2b
+	// 28-2f
 	void *ptr1;
+	// 30-37
 	void *ptr2;
-	// Zeroes 2c-2f 30-33 34-37 38-3b
-	char empty3[4 + 4 + 4];
-	// 1.0f 3c-3f
-	float unknown_float;
-	// An object? pointer 40-43
-	void *ptr3;
-	// Zeroes 44-47
+	// Initial delay in samples 38-3b
+	int32_t initialDelay;
+	// 3c-3f
+	int32_t realQualities;
+	// 40-43
+	int32_t offQualities;
+	// 44-47
+	float ioRatio;
+	// 48-4f
+	void *object;
+	// 50-57
 	void *user;
-	// Id 48-4b
+	// Unique ID 58-5b
 	int32_t uniqueID;
-	// Don't know 4c-4f
-	char unknown1[4];
-	// processReplacing 50-53
+	// Version 5c-5f
+	int32_t version;
+	// processReplacing 60-67
 	void (VST_CALL_CONV * processReplacing)( AEffect * , float * * , float * * , int );
 
 } ;

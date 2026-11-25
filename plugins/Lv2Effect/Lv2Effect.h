@@ -45,6 +45,7 @@ public:
 	ProcessStatus processImpl(SampleFrame* buf, const f_cnt_t frames) override;
 
 	EffectControls* controls() override { return &m_controls; }
+	f_cnt_t latency() const override { return m_controls.latency(); }
 
 	Lv2FxControls* lv2Controls() { return &m_controls; }
 	const Lv2FxControls* lv2Controls() const { return &m_controls; }

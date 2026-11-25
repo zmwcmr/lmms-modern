@@ -32,6 +32,7 @@
 #include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <lv2/core/lv2.h>
 #include <lv2/midi/midi.h>
 #include <lv2/atom/atom.h>
 #include <lv2/presets/presets.h>
@@ -1050,6 +1051,13 @@ void Lv2Proc::run(f_cnt_t frames)
 
 	lilv_instance_run(m_instance, static_cast<uint32_t>(frames));
 
+	if (m_latencyPort)
+	{
+		m_latency.store(
+			std::max<f_cnt_t>(0, static_cast<f_cnt_t>(std::lround(m_latencyPort->m_val))),
+			std::memory_order_relaxed);
+	}
+
 	m_midiOutEvents.clear();
 	const uint32_t midiEventType = Engine::getLv2Manager()->
 		uridCache()[Lv2UridCache::Id::midi_MidiEvent];
@@ -1525,6 +1533,19 @@ void Lv2Proc::createPorts()
 										m_proc->m_plugin, ctrl.m_port)),
 					amo);
 				m_proc->addModel(amo, ctrl.uri());
+			}
+			else if (ctrl.m_flow == Lv2Ports::Flow::Output)
+			{
+				AutoLilvNode designation = Engine::getLv2Manager()->
+					uri(LV2_CORE__designation);
+				AutoLilvNode latency = Engine::getLv2Manager()->
+					uri(LV2_CORE__latency);
+				AutoLilvNodes values(lilv_port_get_value(
+					m_proc->m_plugin, ctrl.m_port, designation.get()));
+				if (values && lilv_nodes_contains(values.get(), latency.get()))
+				{
+					m_proc->m_latencyPort = &ctrl;
+				}
 			}
 		}
 

@@ -113,6 +113,12 @@ public:
 		return m_isSynth;
 	}
 
+	//! Processing latency reported by the plugin, in samples
+	f_cnt_t latency() const
+	{
+		return m_latency;
+	}
+
 	int currentProgram();
 
 	const QMap<QString, QString> & parameterDump();
@@ -189,6 +195,7 @@ private:
 	std::vector<QString> m_allParameterLabels;
 	std::vector<QString> m_allParameterDisplays;
 	QString m_uniqueID;
+	f_cnt_t m_latency = 0;
 	bool m_isSynth;
 
 	QString p_name;

@@ -79,6 +79,8 @@ public:
 
 	virtual bool handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset = 0 );
 
+	f_cnt_t latency() const override;
+
 	virtual gui::PluginView* instantiateView( QWidget * _parent );
 
 protected slots:
@@ -95,7 +97,7 @@ private:
 
 
 	VstPlugin * m_plugin;
-	QMutex m_pluginMutex;
+	mutable QMutex m_pluginMutex;
 
 	QString m_pluginDLL;
 	gui::SubWindow* m_subWindow;

@@ -529,6 +529,10 @@ bool VstPlugin::processMessage( const message & _m )
 			m_isSynth = true;
 			break;
 
+		case IdVstLatency:
+			m_latency = std::max(0, _m.getInt(0));
+			break;
+
 		case IdVstMidiOut:
 		{
 			const int deltaFrames = _m.getInt(0);

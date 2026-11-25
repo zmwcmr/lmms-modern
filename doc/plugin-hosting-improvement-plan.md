@@ -26,6 +26,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
   the MIDI output page; one internal hop is supported.
 - Stop/pause and playback jumps send All Notes Off (CC 123) to external MIDI
   outputs.
+- VST2 `initialDelay` and LV2 `lv2:latency` output ports are queried and
+  reported through `Plugin::latency()`; `EffectChain::latency()` sums effects.
 - VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
   the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
@@ -33,7 +35,7 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 ### Known gaps
 
 1. LV2 UI and DSP run in the LMMS process.
-2. No plugin delay compensation (PDC).
+2. Plugin latency is reported, but there is no delay compensation (PDC) yet.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
    internal target track; longer routing chains are still missing.
 4. No sample-accurate automation.
@@ -169,10 +171,14 @@ Goal: keep parallel tracks and effect chains phase-aligned.
 
 Tasks:
 
-- [ ] Add a latency query to the plugin abstraction:
+- [x] Add a latency query to the plugin abstraction:
   - VST2: `initialDelay` and `audioMasterGetOutputLatency`,
   - LV2: `lv2:latency` control port / reportLatency.
-- [ ] Report latency through `Plugin`/`Effect`/`Instrument`.
+  - current status: VST2 initialDelay and LV2 designated latency ports are
+    queried; runtime latency changes still need to be re-queried.
+- [x] Report latency through `Plugin`/`Effect`/`Instrument`.
+  - current status: `Plugin::latency()` is implemented for VST2 and LV2, and
+    `EffectChain::latency()` sums the effects in a chain.
 - [ ] Add a latency graph to the engine:
   - per-track latency,
   - effect-chain latency,
