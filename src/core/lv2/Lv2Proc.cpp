@@ -1050,6 +1050,10 @@ void Lv2Proc::run(f_cnt_t frames)
 
 	lilv_instance_run(m_instance, static_cast<uint32_t>(frames));
 
+	m_midiOutEvents.clear();
+	const uint32_t midiEventType = Engine::getLv2Manager()->
+		uridCache()[Lv2UridCache::Id::midi_MidiEvent];
+
 	// Forward atom output events (MIDI, patch messages, meters, ...) to the UI
 	for (std::size_t p = 0; p < m_ports.size(); ++p)
 	{
@@ -1073,7 +1077,14 @@ void Lv2Proc::run(f_cnt_t frames)
 			uint32_t type = 0;
 			uint32_t size = 0;
 			uint8_t* body = nullptr;
-			lv2_evbuf_get(i, &frames, &type, &size, &body);
+			if (!lv2_evbuf_get(i, &frames, &type, &size, &body))
+			{
+				continue;
+			}
+			if (atomSeq == m_midiOut && type == midiEventType)
+			{
+				collectMidiOutEvent(frames, body, size);
+			}
 			sendToUi(static_cast<uint32_t>(p), type, size, body);
 		}
 	}
@@ -1083,6 +1094,50 @@ void Lv2Proc::run(f_cnt_t frames)
 		// Notify the plugin the run() cycle is finished
 		m_worker->notifyPluginThatRunFinished();
 	}
+}
+
+
+
+
+void Lv2Proc::collectMidiOutEvent(uint32_t offset, const uint8_t* data,
+	uint32_t size)
+{
+	if (!data || size == 0 || m_midiOutEvents.size() >= 1024)
+	{
+		return;
+	}
+
+	const uint8_t status = data[0];
+	if (status < 0x80)
+	{
+		// Running status is not expected in LV2 MIDI atoms.
+		return;
+	}
+
+	switch (status & 0xF0)
+	{
+	case 0x80:
+	case 0x90:
+	case 0xA0:
+	case 0xB0:
+	case 0xE0:
+		if (size < 3) { return; }
+		break;
+	case 0xC0:
+	case 0xD0:
+		if (size < 2) { return; }
+		break;
+	default:
+		// SysEx and system messages are not routed yet.
+		return;
+	}
+
+	MidiOutEvent event;
+	event.offset = offset;
+	event.size = static_cast<uint8_t>((status & 0xF0) == 0xC0
+		|| (status & 0xF0) == 0xD0 ? 2 : 3);
+	std::copy(data, data + event.size, event.data.begin());
+	m_midiOutEvents.push_back(event);
 }
 
 

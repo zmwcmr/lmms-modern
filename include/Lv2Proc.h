@@ -31,11 +31,14 @@
 
 #include <lilv/lilv.h>
 #include <lv2/state/state.h>
+#include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <vector>
 
 #include <QTemporaryDir>
 
@@ -161,6 +164,21 @@ public:
 	const std::vector<Preset>& presets() const { return m_presets; }
 	//! Restore a factory preset; must be called from the GUI thread
 	bool loadPreset(std::size_t index);
+
+	//! One MIDI message emitted on the plugin's MIDI output port
+	struct MidiOutEvent
+	{
+		uint32_t offset = 0;
+		std::array<uint8_t, 3> data{};
+		uint8_t size = 0;
+	};
+
+	//! MIDI events produced since the last clear; audio-thread only
+	const std::vector<MidiOutEvent>& midiOutEvents() const
+	{
+		return m_midiOutEvents;
+	}
+	void clearMidiOutEvents() { m_midiOutEvents.clear(); }
 
 	/*
 		utils for the run thread
@@ -297,6 +315,10 @@ private:
 	//! Factory presets exposed by the plugin bundle
 	std::vector<Preset> m_presets;
 	void scanPresets();
+
+	//! MIDI output collected in run(); consumed on the audio thread
+	std::vector<MidiOutEvent> m_midiOutEvents;
+	void collectMidiOutEvent(uint32_t offset, const uint8_t* data, uint32_t size);
 
 	void saveState(QDomDocument& doc, QDomElement& that);
 	void loadState(const QDomElement& that);

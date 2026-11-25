@@ -193,6 +193,29 @@ void Lv2Instrument::play(SampleFrame* buf)
 
 	run(fpp);
 
+	for (const MidiOutEvent& event : midiOutEvents())
+	{
+		if (event.size == 0)
+		{
+			continue;
+		}
+
+		const uint8_t status = event.data[0];
+		const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+		const auto channel = static_cast<int8_t>(status & 0x0F);
+		const auto param1 = event.size > 1
+			? static_cast<int16_t>(event.data[1]) : 0;
+		const auto param2 = event.size > 2
+			? static_cast<int16_t>(event.data[2]) : 0;
+
+		if (auto* track = instrumentTrack())
+		{
+			track->routeMidiOutEvent(
+				MidiEvent(type, channel, param1, param2), TimePos());
+		}
+	}
+	clearMidiOutEvents();
+
 	copyModelsToCore();
 	copyBuffersToCore(buf, fpp);
 }

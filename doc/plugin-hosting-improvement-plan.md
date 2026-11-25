@@ -20,6 +20,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 - Surge XT native UI enabled again.
 - VST2 MIDI events from `audioMasterProcessEvents` forwarded to the track MIDI
   output.
+- LV2 MIDI output parsed from the `m_midiOut` atom sequence and routed to the
+  instrument track's MIDI output.
 - VST2 `audioMasterAutomate` and `audioMasterBeginEdit`/`EndEdit` forwarded to
   the host parameter models; gestures coalesce undo checkpoints.
 - Build, unit tests, scripted checks, AppImage/tar.gz packaging.
@@ -28,8 +30,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 
 1. LV2 UI and DSP run in the LMMS process.
 2. No plugin delay compensation (PDC).
-3. VST2 MIDI output is forwarded to the track MIDI port; LV2 MIDI output and
-   internal track-to-track routing are still missing.
+3. VST2 and LV2 MIDI output are forwarded to the track MIDI port; internal
+   track-to-track routing is still missing.
 4. No sample-accurate automation.
 5. Only bundle presets are exposed; user presets and preset saving are missing.
 6. VST2 host callback coverage is still incomplete: the file selector is not
@@ -120,7 +122,9 @@ Goal: let instrument/effect plugins generate MIDI for other LMMS instruments.
 Tasks:
 
 - [x] Add a host-side MIDI event queue for VST2 (`VstPlugin`).
-- [ ] Parse LV2 `m_midiOut` atom sequences into `MidiEvent`s.
+- [x] Parse LV2 `m_midiOut` atom sequences into `MidiEvent`s.
+  - current status: note on/off, pressure, CC, program change and pitch bend
+    are forwarded; SysEx is skipped.
 - [x] Add a MIDI routing target to instrument/effect tracks or the track's MIDI
       output port.
   - current status: instrument events go to the track MIDI output; there is no
