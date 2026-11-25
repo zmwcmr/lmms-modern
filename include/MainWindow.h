@@ -146,6 +146,11 @@ signals:
 public slots:
 	void resetWindowTitle();
 
+	//! Shows a hint (e.g. the gestures of a control) in the status bar.
+	void showStatusHint(const QString& text);
+	//! Removes the hint again, but only if it is still the current one.
+	void clearStatusHint(const QString& text);
+
 	void emptySlot();
 	void createNewProject();
 	void openProject();
@@ -245,6 +250,10 @@ private:
 	QMenu * m_viewMenu;
 
 	ToolButton * m_metronomeToggle;
+
+	//! The hint currently shown in the status bar, used to avoid clearing a
+	//! hint that another control has set in the meantime.
+	QString m_statusHint;
 
 	SessionState m_session;
 	

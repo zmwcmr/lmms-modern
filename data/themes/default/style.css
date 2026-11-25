@@ -1221,6 +1221,18 @@ lmms--gui--BarModelEditor {
 	qproperty-barBrush: rgba(17, 136, 71, 255);
 }
 
+/* status bar (hints while hovering controls, short messages) */
+
+QStatusBar {
+	background-color: #262b30;
+	color: #d1d8e4;
+	border-top: 1px solid #101213;
+}
+
+QStatusBar::item {
+	border: none;
+}
+
 /* palette information  */
 
 lmms--gui--LmmsPalette {

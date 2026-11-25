@@ -106,6 +106,9 @@ protected:
 	void paintEvent(QPaintEvent * me) override;
 	void wheelEvent(QWheelEvent * me) override;
 
+	//! Text shown in the status bar while the mouse hovers over the control.
+	virtual QString statusHint() const;
+
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 	void enterEvent(QEnterEvent*) override;
 #else

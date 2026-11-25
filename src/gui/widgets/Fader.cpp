@@ -56,7 +56,9 @@
 #include "CaptionMenu.h"
 #include "ConfigManager.h"
 #include "DeprecationHelper.h"
+#include "GuiApplication.h"
 #include "KeyboardShortcuts.h"
+#include "MainWindow.h"
 #include "SimpleTextFloat.h"
 
 namespace
@@ -145,6 +147,38 @@ void Fader::adjustByDialog()
 			[factor](float value) { return value / factor; });
 	}
 }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+void Fader::enterEvent(QEnterEvent* event)
+#else
+void Fader::enterEvent(QEvent* event)
+#endif
+{
+	QWidget::enterEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->showStatusHint(statusHint());
+	}
+}
+
+
+void Fader::leaveEvent(QEvent* event)
+{
+	QWidget::leaveEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->clearStatusHint(statusHint());
+	}
+}
+
+
+QString Fader::statusHint() const
+{
+	return tr("Drag to adjust · Wheel 1 dB · Shift+wheel coarse · "
+			  "%1+wheel fine · Middle-click resets · Double-click to type a value")
+		.arg(UI_CTRL_KEY);
+}
+
 
 void Fader::contextMenuEvent(QContextMenuEvent* ev)
 {

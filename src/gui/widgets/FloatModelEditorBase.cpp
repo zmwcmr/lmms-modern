@@ -274,6 +274,11 @@ void FloatModelEditorBase::enterEvent(QEvent* event)
 {
 	updateInteractionState(event);
 	showTextFloat(700, 2000);
+
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->showStatusHint(statusHint());
+	}
 }
 
 
@@ -281,6 +286,19 @@ void FloatModelEditorBase::leaveEvent(QEvent *event)
 {
 	updateInteractionState(event);
 	s_textFloat->hide();
+
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->clearStatusHint(statusHint());
+	}
+}
+
+
+QString FloatModelEditorBase::statusHint() const
+{
+	return tr("Drag to adjust · Shift+wheel coarse · %1+wheel fine · "
+			  "Middle-click resets · Double-click to type a value")
+		.arg(UI_CTRL_KEY);
 }
 
 

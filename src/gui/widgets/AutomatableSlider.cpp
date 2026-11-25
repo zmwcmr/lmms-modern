@@ -28,7 +28,9 @@
 #include <QMouseEvent>
 
 #include "CaptionMenu.h"
+#include "GuiApplication.h"
 #include "InlineValueEditor.h"
+#include "MainWindow.h"
 
 
 namespace lmms::gui
@@ -102,6 +104,36 @@ void AutomatableSlider::mouseReleaseEvent( QMouseEvent * _me )
 }
 
 
+
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+void AutomatableSlider::enterEvent(QEnterEvent* event)
+#else
+void AutomatableSlider::enterEvent(QEvent* event)
+#endif
+{
+	QSlider::enterEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->showStatusHint(statusHint());
+	}
+}
+
+
+QString AutomatableSlider::statusHint() const
+{
+	return tr("Drag to adjust · Wheel steps · Double-click to type a value");
+}
+
+
+void AutomatableSlider::leaveEvent(QEvent* event)
+{
+	QSlider::leaveEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->clearStatusHint(statusHint());
+	}
+}
 
 
 void AutomatableSlider::wheelEvent( QWheelEvent * _me )

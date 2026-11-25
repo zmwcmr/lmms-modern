@@ -34,6 +34,7 @@
 #include <QMessageBox>
 #include <QShortcut>
 #include <QSplitter>
+#include <QStatusBar>
 
 #include "AboutDialog.h"
 #include "AutomationEditor.h"
@@ -219,6 +220,10 @@ MainWindow::MainWindow() :
 	vbox->addWidget( m_toolBar );
 	vbox->addWidget( w );
 	setCentralWidget( main_widget );
+
+	// status bar, used for hints while hovering controls and short messages
+	// such as the result of saving the project
+	statusBar()->setSizeGripEnabled( false );
 
 	m_updateTimer.start( 1000 / 60, this );  // 60 fps
 
@@ -608,6 +613,24 @@ void MainWindow::resetWindowTitle()
 	}
 
 	setWindowTitle( title + " - " + tr( "LMMS %1" ).arg( LMMS_VERSION ) );
+}
+
+
+void MainWindow::showStatusHint(const QString& text)
+{
+	m_statusHint = text;
+	statusBar()->showMessage(text);
+}
+
+
+void MainWindow::clearStatusHint(const QString& text)
+{
+	// Only clear the bar if no other control has replaced our hint in the
+	// meantime, otherwise moving from one control to the next would flicker.
+	if (m_statusHint != text) { return; }
+
+	m_statusHint.clear();
+	statusBar()->clearMessage();
 }
 
 
@@ -1589,6 +1612,11 @@ bool MainWindow::guiSaveProjectAs( const QString & filename )
 	Song * song = Engine::getSong();
 	bool const songSaveResult = song->guiSaveProjectAs(filename);
 	handleSaveResult(filename, songSaveResult);
+
+	if (songSaveResult)
+	{
+		statusBar()->showMessage(tr("Saved: %1").arg(filename), 4000);
+	}
 
 	return songSaveResult;
 }

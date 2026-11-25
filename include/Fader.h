@@ -119,7 +119,16 @@ public:
 signals:
 	void peakChanged(float peak);
 
+protected:
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+	void enterEvent(QEnterEvent* event) override;
+#else
+	void enterEvent(QEvent* event) override;
+#endif
+	void leaveEvent(QEvent* event) override;
+
 private:
+	QString statusHint() const;
 	void contextMenuEvent(QContextMenuEvent* me) override;
 	void mousePressEvent(QMouseEvent* ev) override;
 	void mouseDoubleClickEvent(QMouseEvent* mouseEvent) override;

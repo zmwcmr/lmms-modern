@@ -51,6 +51,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T0-6 | ✅ 已实现 | 仅编译验证；Linux 绑定与改前相同（`QKeySequence::Undo` = Ctrl+Z） |
 | T1-1 | 🚧 进行中 | `TrackView` 已改（截图逐像素对比 = 0 差异，主题覆盖测试通过） |
 | T1-10 | ✅ 已实现 | 仅编译验证；tooltip 需在交互式桌面悬停复核 |
+| T1-4 | ✅ 已实现 | 状态栏 + 三类控件悬停提示，截图验证（`t1-4-status-hints.png`） |
 
 ### 实施中发现并修正的两个问题
 
@@ -286,22 +287,35 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-4 状态栏
+### T1-4 状态栏（已实现，含手势提示）
 
 **现象**：无状态栏，长任务与操作结果无承载点（`grep statusBar src/gui` = 0）。
 
-**改动点**
-- `src/gui/MainWindow.cpp` 构造末尾：使用 `QMainWindow::statusBar()`（`MainWindow` 本身就是 `QMainWindow`，无需改 central widget）。
-- 试点 3 处瞬时消息（都是现成钩子，不必新增信号）：
-  1. `MainWindow::guiSaveProjectAs()` 成功分支（`MainWindow.cpp:1570-1578`，两条保存路径都会经过它）→ `showMessage(tr("Saved: %1").arg(filename), 4000)`；
-  2. 工程载入完成处 → `showMessage(tr("Loaded: %1").arg(fileName), 4000)`；
-  3. `Engine::initProgress(const QString&)`（`include/Engine.h:118`，已有信号，启动阶段用于 splash）同时转发到状态栏。
-- 常驻段：`statusBar()->addPermanentWidget(new QLabel(...))` 显示采样率/CPU（数据源已存在，`CPULoadWidget` 与 `AudioEngine` 都在读）。
-- 统一超时 4000 ms。
+**实现**
+- `MainWindow` 构造里启用 `statusBar()`（`MainWindow` 本来就是 `QMainWindow`，central widget 不变，只是高度少 20px），关闭 size grip。
+- 新增两个槽：`showStatusHint(text)` / `clearStatusHint(text)`。后者只有在"当前提示仍是自己"时才清空，
+  避免从控件 A 移到控件 B 时出现闪烁。
+- 三类数值控件在 `enterEvent`/`leaveEvent` 里调用它，文案按控件族区分（见下）。
+- `guiSaveProjectAs()` 成功后在状态栏显示 `Saved: <path>`，4 秒后消失。
 
-**验收**：保存后状态栏出现"已保存 <路径>"并 4 秒后消失；无新增模态框；关闭状态栏不影响任何布局（`MainWindow` 是 QMainWindow，无需改 central widget）。
+**为什么用状态栏而不是 tooltip**：`FloatModelEditorBase` 的悬停提示是**实时数值**
+（`floatingTextType()` 在悬停时返回 `Dynamic`），设成静态文案会把数值读数顶掉。
+状态栏与浮层在空间上分开：浮层给值，状态栏给"能做什么"。
 
-**不做**：不改 `TextFloat`，不改导出对话框。
+**文案**
+
+| 控件 | 提示 |
+| --- | --- |
+| 旋钮（`FloatModelEditorBase`） | Drag to adjust · Shift+wheel coarse · Ctrl+wheel fine · Middle-click resets · Double-click to type a value |
+| 推子（`Fader`） | Drag to adjust · Wheel 1 dB · Shift+wheel coarse · Ctrl+wheel fine · Middle-click resets · Double-click to type a value |
+| 工具栏滑块（`AutomatableSlider`） | Drag to adjust · Wheel steps · Double-click to type a value |
+
+修饰键文案用 `UI_CTRL_KEY`，macOS 上显示 ⌘。
+
+**实测**（`doc/ui-ux-shots/t1-4-status-hints.png`）：悬停旋钮/推子/滑块分别显示对应文案，
+移开后清空；整窗截图见 `t1-4-status-bar.png`。
+
+**不做**：不改 `TextFloat`，不改导出对话框；加载完成提示留待以后。
 
 ---
 
