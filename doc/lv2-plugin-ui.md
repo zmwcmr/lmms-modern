@@ -67,3 +67,26 @@ enabled again.
   Sample-accurate plugin parameters are VST2-only for now; core LV2 has no
   standard parameter event with a sample position. MIDI atom events still keep
   their block-relative frame offsets.
+- Plugins taken from Flatpak runtimes and symlinked into `~/.lv2` can load, but
+  their data files are not visible outside the sandbox. Surge, for example,
+  looks for `~/.local/share/surge` or `/usr/share/surge`; without that link
+  its UI reports a skin error and stays black. Link the runtime's `files/share`
+  directory into the path the plugin expects, or install a native build.
+
+## Flatpak plugin bundles
+
+Flatpak audio runtimes install their LV2 bundles under
+`~/.local/share/flatpak/runtime/org.freedesktop.LinuxAudio.Plugins.*/.../files/lv2`.
+Symlinking those bundles into `~/.lv2` is enough for scanning and audio, but
+the plugin's resource lookup still uses paths outside the runtime:
+
+```bash
+# Surge XT
+ln -s "$(readlink -f ~/.lv2/Surge.lv2)/../../share/surge" \
+      ~/.local/share/surge
+```
+
+The same pattern applies to other bundles that ship banks, skins or kits.
+Check the plugin's log output first; a missing resource usually produces an
+explicit path in the error message.
+
