@@ -53,6 +53,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-10 | ✅ 已实现 | 仅编译验证；tooltip 需在交互式桌面悬停复核 |
 | T1-4 | ✅ 已实现 | 状态栏 + 三类控件悬停提示，截图验证（`t1-4-status-hints.png`） |
 | T1-3 | ✅ 已实现 | Alt+滚轮实测 0.05 dB（普通滚轮 1 dB） |
+| T1-5 | ✅ 已实现 | 12 → 10 经 UI 写入配置；缺省 100 已确认 |
 
 ### 实施中发现并修正的两个问题
 
@@ -329,17 +330,27 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ---
 
-### T1-5 撤销步数可配置
+### T1-5 撤销步数可配置（已实现）
 
-**现象**：`src/core/ProjectJournal.cpp:42` 写死 `MAX_UNDO_STATES = 100`，源码注释写着 TODO 要可配置。
+**现象**：`ProjectJournal.cpp` 写死 `MAX_UNDO_STATES = 100`，源码注释本来就有
+`// TODO: make this configurable in settings`。
 
-**改动点**
-- `ConfigManager` 读取 `ui/undosteps`，缺省 100，范围 [10, 1000]；`ProjectJournal` 构造时取一次。
-- `SetupDialog` General 页 GUI 分组加一个 `QSpinBox`（该分组已有 11 个复选框，见 `SetupDialog.cpp:236-256`）。
+**实现**
+- `ProjectJournal` 去掉静态常量，改为 `DefaultUndoStates/MinUndoStates/MaxUndoStates`
+  三个常量和成员 `m_maxUndoStates`；构造时从 `ui/undosteps` 读取（缺省 100），
+  用 `std::clamp` 限到 [10, 1000]。
+- 新增 `setMaxUndoStates()`：设值时立即裁剪已有历史，所以调小不需要等下一次操作。
+- `SetupDialog` General 页 GUI 分组新增 "Undo steps" `QSpinBox`（范围取自同一组常量），
+  在 `accept()` 里写回配置并对当前 `ProjectJournal` 立即生效。
 
-**兼容性**：新配置项有默认值，旧配置文件无需迁移。
+**实测**
+- 配置里写 `undosteps="12"` 启动 → 对话框显示 **12**（`t1-5-undo-steps.png`）。
+- 点两次下箭头（12 → 10）→ 点 OK → 正常退出后配置文件为 `undosteps="10"`。
+- 配置里没有这个键 → 日志确认日志实例取到 **100**（默认值未变）。
+- 超出范围由 `std::clamp` 处理（5 → 10，5000 → 1000）。
 
-**验收**：改成 10 后连做 12 步操作，只能撤销 10 次；重启后设置保留；不改设置时行为与现在一致。
+**限制**：对话框里的键盘输入在这个无窗口管理器的截图环境里进不去，所以"输入框直接打字"
+这一步没做端到端测试，改用鼠标点上下箭头完成同样的写入验证。
 
 ---
 

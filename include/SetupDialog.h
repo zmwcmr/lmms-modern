@@ -157,6 +157,7 @@ private:
 	QString m_autoScroll;
 	QComboBox* m_autoScrollComboBox;
 	QSpinBox* m_autoScrollResumeDelaySpinBox;
+	QSpinBox* m_undoStepsSpinBox;
 	QString m_lang;
 	QStringList m_languages;
 

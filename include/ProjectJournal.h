@@ -44,7 +44,10 @@ class JournallingObject;
 class ProjectJournal
 {
 public:
-	static const int MAX_UNDO_STATES;
+	//! Number of undo states used when the configuration does not set one.
+	static constexpr int DefaultUndoStates = 100;
+	static constexpr int MinUndoStates = 10;
+	static constexpr int MaxUndoStates = 1000;
 
 	ProjectJournal();
 	virtual ~ProjectJournal() = default;
@@ -56,6 +59,11 @@ public:
 	bool canRedo() const;
 
 	void addJournalCheckPoint( JournallingObject *jo );
+
+	//! Sets how many undo states are kept. Values outside the supported range
+	//! are clamped. Called when the setting changes.
+	void setMaxUndoStates( int states );
+	int maxUndoStates() const { return m_maxUndoStates; }
 
 	bool isJournalling() const
 	{
@@ -122,6 +130,7 @@ private:
 	std::set<jo_id_t> m_unregisteredIds;
 
 	CheckPointStack m_undoCheckPoints;
+	int m_maxUndoStates = DefaultUndoStates;
 	CheckPointStack m_redoCheckPoints;
 
 	bool m_journalling;

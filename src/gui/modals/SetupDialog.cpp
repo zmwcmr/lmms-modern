@@ -303,6 +303,15 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	guiGroupLayout->addWidget(new QLabel{tr("Auto-scroll resume delay"), guiGroupBox});
 	guiGroupLayout->addWidget(m_autoScrollResumeDelaySpinBox);
 
+	m_undoStepsSpinBox = new QSpinBox{guiGroupBox};
+	m_undoStepsSpinBox->setRange(ProjectJournal::MinUndoStates, ProjectJournal::MaxUndoStates);
+	m_undoStepsSpinBox->setToolTip(tr("How many undo steps are kept in memory. Larger values use more memory."));
+	m_undoStepsSpinBox->setValue(
+		ConfigManager::inst()->value("ui", "undosteps", QString::number(ProjectJournal::DefaultUndoStates)).toInt());
+
+	guiGroupLayout->addWidget(new QLabel{tr("Undo steps"), guiGroupBox});
+	guiGroupLayout->addWidget(m_undoStepsSpinBox);
+
 	generalControlsLayout->addWidget(guiGroupBox);
 
 	generalControlsLayout->addSpacing(10);
@@ -980,6 +989,12 @@ void SetupDialog::accept()
 					QString::number(m_printNoteLabels));
 	ConfigManager::inst()->setValue("ui", "showfaderticks",
 					QString::number(m_showFaderTicks));
+	ConfigManager::inst()->setValue("ui", "undosteps",
+					QString::number(m_undoStepsSpinBox->value()));
+	if (Engine::projectJournal())
+	{
+		Engine::projectJournal()->setMaxUndoStates(m_undoStepsSpinBox->value());
+	}
 	ConfigManager::inst()->setValue("ui", "compacttrackbuttons",
 					QString::number(m_compactTrackButtons));
 	ConfigManager::inst()->setValue("ui", "oneinstrumenttrackwindow",

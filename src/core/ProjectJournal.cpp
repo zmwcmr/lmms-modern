@@ -22,10 +22,12 @@
  *
  */
 
+#include <algorithm>
 #include <cstdlib>
 #include <QDomElement>
 
 #include "ProjectJournal.h"
+#include "ConfigManager.h"
 #include "Engine.h"
 #include "JournallingObject.h"
 #include "lmms_math.h"
@@ -39,14 +41,27 @@ namespace lmms
 //! and newly created IDs (have the bit set)
 static const int EO_ID_MSB = 1 << 23;
 
-const int ProjectJournal::MAX_UNDO_STATES = 100; // TODO: make this configurable in settings
-
 ProjectJournal::ProjectJournal() :
 	m_joIDs(),
 	m_undoCheckPoints(),
 	m_redoCheckPoints(),
 	m_journalling( false )
 {
+	setMaxUndoStates( ConfigManager::inst()->value(
+		"ui", "undosteps", QString::number( DefaultUndoStates ) ).toInt() );
+}
+
+
+void ProjectJournal::setMaxUndoStates( int states )
+{
+	m_maxUndoStates = std::clamp( states, MinUndoStates, MaxUndoStates );
+
+	// Apply the new limit right away so that lowering it takes effect without
+	// waiting for the next action.
+	if( m_undoCheckPoints.size() > m_maxUndoStates )
+	{
+		m_undoCheckPoints.remove( 0, m_undoCheckPoints.size() - m_maxUndoStates );
+	}
 }
 
 
@@ -128,9 +143,9 @@ void ProjectJournal::addJournalCheckPoint( JournallingObject *jo )
 		jo->saveState( dataFile, dataFile.content() );
 
 		m_undoCheckPoints.push( CheckPoint( jo->id(), dataFile ) );
-		if( m_undoCheckPoints.size() > MAX_UNDO_STATES )
+		if( m_undoCheckPoints.size() > m_maxUndoStates )
 		{
-			m_undoCheckPoints.remove( 0, m_undoCheckPoints.size() - MAX_UNDO_STATES );
+			m_undoCheckPoints.remove( 0, m_undoCheckPoints.size() - m_maxUndoStates );
 		}
 	}
 }
