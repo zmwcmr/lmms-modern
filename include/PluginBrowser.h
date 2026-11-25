@@ -31,6 +31,7 @@
 #include "Plugin.h"
 
 class QTreeWidget;
+class QLineEdit;
 
 namespace lmms::gui
 {
@@ -44,14 +45,17 @@ public:
 
 private slots:
 	void onFilterChanged( const QString & filter );
+	void reloadPlugins();
 
 private:
 	void addPlugins();
+	void rescanPlugins();
 	void updateRootVisibility( int index );
 	void updateRootVisibilities();
 
 	QWidget * m_view;
 	QTreeWidget * m_descTree;
+	QLineEdit * m_searchBar;
 };
 
 
@@ -63,6 +67,9 @@ public:
 	PluginDescWidget( const PluginKey & _pk, QWidget * _parent );
 	QString name() const;
 	void openInNewInstrumentTrack(QString value);
+
+signals:
+	void rescanRequested();
 
 protected:
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))

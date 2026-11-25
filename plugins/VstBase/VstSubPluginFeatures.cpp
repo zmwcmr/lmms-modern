@@ -74,6 +74,16 @@ VstSubPluginFeatures::VstSubPluginFeatures(Plugin::Type type) :
 {
 }
 
+bool VstSubPluginFeatures::canRescan() const
+{
+	return true;
+}
+
+void VstSubPluginFeatures::rescan()
+{
+	VstList::inst()->rescan();
+}
+
 void VstSubPluginFeatures::fillDescriptionWidget(QWidget* parent, const Key* key) const
 {
 	const auto* metadata = metadataForKey(*key);

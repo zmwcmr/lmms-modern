@@ -23,8 +23,9 @@ when 32-bit VST support is enabled.
 The scan is incremental: a plugin is re-probed only when its modification time
 or size changes. Files which are not loadable VST2 plugins are kept in the
 cache as `invalid` and are not shown in the plugin browser. Deleting the cache
-file forces a full re-scan on the next start; **Rescan** in the plugin browser
-does the same without restarting LMMS.
+file forces a full re-scan on the next start; **Rescan VST plugins** in the
+instrument browser and **Rescan** in the Add effect dialog do the same without
+restarting LMMS.
 
 ## How plugins are loaded
 

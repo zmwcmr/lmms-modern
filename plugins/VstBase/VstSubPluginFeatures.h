@@ -42,6 +42,9 @@ public:
 
 	void listSubPluginKeys(const Plugin::Descriptor* desc, KeyList& keyList) const override;
 
+	bool canRescan() const override;
+	void rescan() override;
+
 	QString displayName(const Key& key) const override;
 	QString description(const Key& key) const override;
 

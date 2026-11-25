@@ -47,20 +47,11 @@
 namespace lmms::gui
 {
 
-EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
-	QDialog(parent),
-	m_effectKeys(),
-	m_currentSelection(),
-	m_sourceModel(),
-	m_model(),
-	m_descriptionWidget(nullptr),
-	m_pluginList(new QTableView(this)),
-	m_scrollArea(new QScrollArea(this))
+void EffectSelectDialog::loadPlugins()
 {
-	setWindowTitle(tr("Add effect"));
-	resize(640, 480);
-	
-	setWindowIcon(embed::getIconPixmap("setup_audio"));
+	m_effectKeys.clear();
+	m_sourceModel.clear();
+	m_currentSelection = EffectKey();
 
 	// Query effects
 	EffectKeyList subPluginEffectKeys;
@@ -99,6 +90,25 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 		m_sourceModel.setItem(row, 1, new QStandardItem(type));
 		++row;
 	}
+}
+
+
+EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
+	QDialog(parent),
+	m_effectKeys(),
+	m_currentSelection(),
+	m_sourceModel(),
+	m_model(),
+	m_descriptionWidget(nullptr),
+	m_pluginList(new QTableView(this)),
+	m_scrollArea(new QScrollArea(this))
+{
+	setWindowTitle(tr("Add effect"));
+	resize(640, 480);
+
+	setWindowIcon(embed::getIconPixmap("setup_audio"));
+
+	loadPlugins();
 
 	// Setup filtering
 	m_model.setSourceModel(&m_sourceModel);
@@ -123,6 +133,39 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 
 		connect(button, &QPushButton::clicked, this, [this, searchString] {
 			m_model.setEffectTypeFilter(searchString);
+			updateSelection();
+		});
+	}
+
+	bool canRescan = false;
+	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
+	{
+		if (desc->subPluginFeatures && desc->subPluginFeatures->canRescan())
+		{
+			canRescan = true;
+			break;
+		}
+	}
+	if (canRescan)
+	{
+		auto* rescanButton = new QPushButton(tr("Rescan"), this);
+		rescanButton->setFixedSize(50, 50);
+		rescanButton->setFocusPolicy(Qt::NoFocus);
+		rescanButton->setToolTip(tr("Rescan VST plugins"));
+		leftSectionLayout->addWidget(rescanButton);
+		connect(rescanButton, &QPushButton::clicked, this, [this] {
+			QApplication::setOverrideCursor(Qt::WaitCursor);
+			for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
+			{
+				if (auto* features = desc->subPluginFeatures;
+					features && features->canRescan())
+				{
+					features->rescan();
+				}
+			}
+			QApplication::restoreOverrideCursor();
+			loadPlugins();
+			m_pluginList->sortByColumn(0, Qt::AscendingOrder);
 			updateSelection();
 		});
 	}

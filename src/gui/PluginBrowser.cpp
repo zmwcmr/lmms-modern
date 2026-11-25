@@ -24,13 +24,16 @@
 
 #include "PluginBrowser.h"
 
+#include <QApplication>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPushButton>
 #include <QStyleOption>
+#include <QTimer>
 #include <QTreeWidget>
 
 #include "embed.h"
@@ -67,11 +70,11 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 								m_view );
 	hint->setWordWrap( true );
 
-	auto searchBar = new QLineEdit(m_view);
-	searchBar->setPlaceholderText(tr("Search"));
-	searchBar->setMaxLength(64);
-	searchBar->setClearButtonEnabled(true);
-	searchBar->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
+	m_searchBar = new QLineEdit(m_view);
+	m_searchBar->setPlaceholderText(tr("Search"));
+	m_searchBar->setMaxLength(64);
+	m_searchBar->setClearButtonEnabled(true);
+	m_searchBar->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
 
 	m_descTree = new QTreeWidget( m_view );
 	m_descTree->setColumnCount( 1 );
@@ -79,11 +82,30 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	m_descTree->setIndentation( 10 );
 	m_descTree->setSelectionMode( QAbstractItemView::NoSelection );
 
-	connect( searchBar, SIGNAL( textEdited( const QString& ) ),
+	connect( m_searchBar, SIGNAL( textEdited( const QString& ) ),
 			this, SLOT( onFilterChanged( const QString& ) ) );
 
 	view_layout->addWidget( hint );
-	view_layout->addWidget( searchBar );
+	view_layout->addWidget( m_searchBar );
+
+	bool canRescan = false;
+	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Instrument))
+	{
+		if (desc->subPluginFeatures && desc->subPluginFeatures->canRescan())
+		{
+			canRescan = true;
+			break;
+		}
+	}
+	if (canRescan)
+	{
+		auto* rescanButton = new QPushButton(tr("Rescan plugins"), m_view);
+		rescanButton->setToolTip(tr("Scan for newly installed VST plugins"));
+		connect(rescanButton, &QPushButton::clicked,
+			this, &PluginBrowser::rescanPlugins);
+		view_layout->addWidget(rescanButton);
+	}
+
 	view_layout->addWidget( m_descTree );
 
 	// Add plugins to the tree
@@ -111,6 +133,30 @@ void PluginBrowser::updateRootVisibilities()
 	{
 		updateRootVisibility( rootIndex );
 	}
+}
+
+
+void PluginBrowser::rescanPlugins()
+{
+	QApplication::setOverrideCursor(Qt::WaitCursor);
+	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Instrument))
+	{
+		if (auto* features = desc->subPluginFeatures;
+			features && features->canRescan())
+		{
+			features->rescan();
+		}
+	}
+	QApplication::restoreOverrideCursor();
+	reloadPlugins();
+}
+
+
+void PluginBrowser::reloadPlugins()
+{
+	addPlugins();
+	updateRootVisibilities();
+	onFilterChanged(m_searchBar->text());
 }
 
 
@@ -155,7 +201,11 @@ void PluginBrowser::addPlugins()
 	{
 		const auto item = new QTreeWidgetItem();
 		root->addChild(item);
-		m_descTree->setItemWidget(item, 0, new PluginDescWidget(key, m_descTree));
+		const auto widget = new PluginDescWidget(key, m_descTree);
+		connect(widget, &PluginDescWidget::rescanRequested, this, [this] {
+			QTimer::singleShot(0, this, &PluginBrowser::reloadPlugins);
+		});
+		m_descTree->setItemWidget(item, 0, widget);
 	};
 
 	// Remove any existing plugins from the tree
@@ -301,6 +351,18 @@ void PluginDescWidget::contextMenuEvent(QContextMenuEvent* e)
 		tr("Send to new instrument track"),
 		[=, this]{ openInNewInstrumentTrack(m_pluginKey.desc->name); }
 	);
+
+	if (auto* features = m_pluginKey.desc->subPluginFeatures;
+		features && features->canRescan())
+	{
+		contextMenu.addAction(tr("Rescan plugins"), [this, features] {
+			QApplication::setOverrideCursor(Qt::WaitCursor);
+			features->rescan();
+			QApplication::restoreOverrideCursor();
+			emit rescanRequested();
+		});
+	}
+
 	contextMenu.exec(e->globalPos());
 }
 

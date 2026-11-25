@@ -197,6 +197,17 @@ public:
 			{
 			}
 
+			//! Whether the sub-plugin list can be refreshed at runtime.
+			virtual bool canRescan() const
+			{
+				return false;
+			}
+
+			//! Refresh the sub-plugin list. Only called when canRescan() is true.
+			virtual void rescan()
+			{
+			}
+
 
 		private:
 			// You can add values mapped by "Key" below
