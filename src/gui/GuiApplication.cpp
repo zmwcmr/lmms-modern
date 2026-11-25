@@ -43,6 +43,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QDir>
+#include <QEvent>
 #include <QtGlobal>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -65,6 +66,37 @@ namespace lmms
 
 namespace gui
 {
+
+namespace
+{
+
+//! Copies a widget's tooltip into its accessible name so that screen readers
+//! can announce icon-only controls. Qt emits ToolTipChange whenever
+//! QWidget::setToolTip() is called, i.e. while the UI is being constructed.
+class AccessibleNameSync : public QObject
+{
+public:
+	explicit AccessibleNameSync(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override
+	{
+		if (event->type() == QEvent::ToolTipChange)
+		{
+			if (auto* widget = qobject_cast<QWidget*>(watched))
+			{
+				if (widget->accessibleName().isEmpty() && !widget->toolTip().isEmpty())
+				{
+					widget->setAccessibleName(widget->toolTip());
+				}
+			}
+		}
+		return QObject::eventFilter(watched, event);
+	}
+};
+
+} // namespace
+
 
 GuiApplication* getGUI()
 {
@@ -154,6 +186,10 @@ GuiApplication::GuiApplication()
 	s_instance = this;
 
 	displayInitProgress(tr("Preparing UI"));
+
+	// Give every widget that only has a tooltip an accessible name as well,
+	// so that screen readers can identify icon-only controls.
+	qApp->installEventFilter(new AccessibleNameSync(this));
 
 	m_mainWindow = new MainWindow;
 	connect(m_mainWindow, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
