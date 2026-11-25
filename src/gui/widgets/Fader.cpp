@@ -46,7 +46,8 @@
 
 #include "Fader.h"
 
-#include <QInputDialog>
+#include "InlineValueEditor.h"
+
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
@@ -127,36 +128,21 @@ void Fader::adjustByDecibelDelta(float value)
 
 void Fader::adjustByDialog()
 {
-	bool ok;
-
 	if (modelIsLinear())
 	{
-		auto maxDB = ampToDbfs(model()->maxValue());
-		const auto currentValue = model()->value() <= 0. ? c_faderMinDb : ampToDbfs(model()->value());
-
-		float enteredValue = QInputDialog::getDouble(this, tr("Set value"),
-							tr("Please enter a new value between %1 and %2:").arg(c_faderMinDb).arg(maxDB),
-							currentValue, c_faderMinDb, maxDB, model()->getDigitCount(), &ok);
-
-		if (ok)
-		{
-			model()->setValue(dbfsToAmp(enteredValue));
-		}
-		return;
+		// The model stores an amplitude but the user types decibels
+		InlineValueEditor::showEditor(this, model(),
+			[](float amp) { return amp <= 0.f ? c_faderMinDb : ampToDbfs(amp); },
+			[](float db) { return dbfsToAmp(db); },
+			1);
 	}
 	else
 	{
-		// The model already is in dB
-		auto minv = model()->minValue() * m_conversionFactor;
-		auto maxv = model()->maxValue() * m_conversionFactor;
-		float enteredValue = QInputDialog::getDouble(this, tr("Set value"),
-							tr("Please enter a new value between %1 and %2:").arg(minv).arg(maxv),
-							model()->getRoundedValue() * m_conversionFactor, minv, maxv, model()->getDigitCount(), &ok);
-
-		if (ok)
-		{
-			model()->setValue(enteredValue / m_conversionFactor);
-		}
+		// The model already is in dB, only the conversion factor differs
+		const float factor = m_conversionFactor;
+		InlineValueEditor::showEditor(this, model(),
+			[factor](float value) { return value * factor; },
+			[factor](float value) { return value / factor; });
 	}
 }
 

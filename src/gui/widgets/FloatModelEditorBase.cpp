@@ -27,12 +27,12 @@
 #include "FloatModelEditorBase.h"
 
 #include <QApplication>
-#include <QInputDialog>
 #include <QPainter>
 #include <QTimerEvent>
 
 #include "lmms_math.h"
 #include "DeprecationHelper.h"
+#include "InlineValueEditor.h"
 #include "CaptionMenu.h"
 #include "ControllerConnection.h"
 #include "GuiApplication.h"
@@ -499,24 +499,7 @@ auto FloatModelEditorBase::floatingTextType() const -> FloatingTextType
 
 void FloatModelEditorBase::enterValue()
 {
-	bool ok = false;
-	const float newVal = QInputDialog::getDouble(
-		this,
-		tr("Set value"),
-		tr("Please enter a new value between %1 and %2:")
-			.arg(model()->minValue())
-			.arg(model()->maxValue()),
-		model()->getRoundedValue(),
-		model()->minValue(),
-		model()->maxValue(),
-		model()->getDigitCount(),
-		&ok
-	);
-
-	if (ok)
-	{
-		model()->setValue(newVal);
-	}
+	InlineValueEditor::showEditor(this, model());
 }
 
 

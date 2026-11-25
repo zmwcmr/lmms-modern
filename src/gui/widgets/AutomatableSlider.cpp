@@ -26,9 +26,9 @@
 #include "AutomatableSlider.h"
 
 #include <QMouseEvent>
-#include <QInputDialog>
 
 #include "CaptionMenu.h"
+#include "InlineValueEditor.h"
 
 
 namespace lmms::gui
@@ -116,18 +116,7 @@ void AutomatableSlider::mouseDoubleClickEvent(QMouseEvent*) { enterValue(); }
 
 void AutomatableSlider::enterValue()
 {
-	bool ok;
-	const int newVal = QInputDialog::getInt(
-		this, tr("Set value"),
-		tr("Please enter a new value between %1 and %2:")
-			.arg(model()->minValue())
-			.arg(model()->maxValue()),
-		model()->value(),
-		model()->minValue(),
-		model()->maxValue(),
-		model()->step<int>(), &ok);
-
-	if (ok) { model()->setValue(newVal); }
+	InlineValueEditor::showEditor(this, model(), {}, {}, 0);
 }
 
 

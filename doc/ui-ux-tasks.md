@@ -253,12 +253,19 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 **现象**：双击 = 弹模态输入框（`FloatModelEditorBase.cpp:500`、`Fader.cpp:128`）；归位只能右键（`AutomatableModelView.cpp:62`）；修饰键无任何说明。
 
-**改动点（已修订：不再改双击行为）**
-- **不做**双击归位。`AutomatableModelView::mousePressEvent`（`:173`）已经用中键实现归位，
-  双击继续用于精确输入；把双击改成归位会白白丢掉最顺手的数值输入方式。
-- 只做可发现性：给 `Knob`/`Fader` 补 tooltip，写明真实手势：
-  `"拖动调整 · Shift 拖动复制 · Ctrl 更细 · 中键归位 · 双击输入数值"`（用 `UI_CTRL_KEY` 而非字面量）。
-- 模态数值框 → 就地编辑属于独立任务（见下），不在本项内。
+**结论（已实现）**
+- **不做**双击归位。中键已经能归位（`AutomatableModelView.cpp:173`），双击留给精确输入。
+- **双击的模态框已改为就地编辑**：新增 `InlineValueEditor`，覆盖
+  `FloatModelEditorBase::enterValue()`、`Fader::adjustByDialog()`、`AutomatableSlider::enterValue()`。
+  Enter 提交、Esc 取消、失焦提交；推子仍以 dB 显示，滑块按整数显示。
+- **不做静态 tooltip**：`FloatModelEditorBase` 的悬浮提示是实时数值（`floatingTextType()`），
+  设成静态文案会把数值读数顶掉。手势说明放进文档 `doc/ui-ux-gestures.md`，不进控件。
+
+**实测**（Xephyr + xwd）：
+- 旋钮：双击 → 出现 `1.00` 的绿色输入框（`t1-2-knob-inline.png`）；输入 `0` → `t1-2-knob-typed.png`；
+  Enter → 旋钮转到 0（`t1-2-knob-committed.png`）。
+- 推子：双击 → 出现 `0.0`（dB）；输入 12 + Enter → 推子到 +12 dB（`t1-2-fader-inline.png`）。
+- Esc 取消路径：代码路径为 `cancel()`，不做数值提交。
 
 **风险**：行为变化。缓解：先在本分支试两周；`Ctrl+双击` 保留原行为，等于没有功能损失。
 
