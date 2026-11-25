@@ -122,7 +122,8 @@
 
 - 双击旋钮：弹出模态 `QInputDialog`"Please enter a new value between X and Y"（`FloatModelEditorBase.cpp:500-520`）；
 - 双击推子：同样弹模态框（`Fader.cpp:128-160`）；
-- 归位：只能右键菜单点 `Reset (初始值)`（`AutomatableModelView.cpp:62`），没有手势。
+- 归位：中键单击（`AutomatableModelView.cpp:173`）或右键菜单 `Reset (初始值)`（`:62`）。
+  手势是有的，但**没有任何地方提示它存在**，触控板用户也没有中键。
 
 现代 DAW 的惯例是双击归位、点数值就地编辑。LMMS 两者都不是，且模态框会打断工作流。
 
