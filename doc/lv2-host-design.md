@@ -1,7 +1,7 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document, split into two stages: a remote plugin instance with a
-floating UI, then cross-process embedding. No host process code exists yet.
+Status: design document. The plugin instance and its UI run in one host child
+and the UI always uses a separate X11 window. No host process code exists yet.
 
 ## Goal
 
@@ -182,12 +182,12 @@ New IDs, all below the LV2 host base:
 
 | ID | Direction | Payload |
 | --- | --- | --- |
-| `IdLv2Instantiate` | host to child | URI, sample rate, block size, UI mode, parent XID |
+| `IdLv2Instantiate` | host to child | URI, sample rate, block size |
 | `IdLv2PortInfo` | child to host | port index, type, direction, flags, default/min/max |
 | `IdLv2InstantiateFailed` | child to host | issue list (missing feature, failed instantiate) |
 | `IdLv2Ready` | child to host | instance is running |
 | `IdLv2Latency` | child to host | latency in frames (only on change) |
-| `IdLv2ShowUI` | host to child | parent XID (0 in stage 1), scale factor |
+| `IdLv2ShowUI` | host to child | scale factor |
 | `IdLv2HideUI` | host to child | none |
 | `IdLv2DestroyUI` | host to child | none |
 | `IdLv2UiGeometry` | child to host | x, y, width, height |
@@ -245,14 +245,13 @@ see "Why the plugin instance is the unit of isolation". A UI crash is the most
 common LV2 failure, so keeping the UI out of the LMMS process is the whole point
 of this milestone.
 
-Stage 1 shows the UI as a top-level window:
+The UI is always a top-level X11 window:
 
-- Floating mode: the child owns a top-level X11 window. It reports geometry and
-  the host moves/hides it through messages; `WM_DELETE_WINDOW` is handled in the
-  child and reported as `IdLv2UiClosed`.
-- Embedded mode in stage 1 falls back to that separate window, with the
-  container replaced by a **Show UI** placeholder. Native Linux VST2 behaves the
-  same way today, so this is not a new user experience.
+- The child owns the window. It reports geometry and the host moves/hides it
+  through messages; `WM_DELETE_WINDOW` is handled in the child and reported as
+  `IdLv2UiClosed`.
+- Embedding in an MDI subwindow is out of scope: the in-process embedded mode
+  was removed, and the host only needs a window to show and hide.
 - Wayland: the child opens an XWayland window; `DISPLAY` is forwarded.
 - Scale factor: the host sends the device pixel ratio; the child sets
   `ui:scaleFactor` and `ui:windowTitle` before instantiating the UI.
@@ -263,22 +262,10 @@ Stage 1 shows the UI as a top-level window:
 - Plugin-to-UI control changes are pushed to the child's UI inside `run()`'s
   post-processing, as `Lv2Proc` does today.
 
-Stage 2 adds embedding:
-
-- the host passes the X11 window ID of the LMMS container to `IdLv2ShowUI`;
-  the child creates the suil UI with that XID as `ui:parent`. Reparenting
-  across processes is normal X11 behaviour, and `RemoteVstPlugin`'s `xembed`
-  path proves the mechanism.
-- Sizing parity: `ui:resize` is forwarded to the subwindow together with the
-  title-bar allowance, workspace clamping and scroll bars that exist today.
-- Wayland keeps the floating XWayland window because native Wayland embedding
-  is not supported.
-
-In both stages a UI crash terminates the child and therefore the DSP instance.
-The host closes the container, marks the plugin failed, and offers **Reload**.
-Splitting UI and DSP into two children is only worth doing for plugins with a
-serialized UI channel (Zyn Fusion); it is an optional follow-up, not part of
-the milestone.
+A UI crash terminates the child and therefore the DSP instance. The host closes
+the window, marks the plugin failed, and offers **Reload**. Splitting UI and DSP
+into two children is only worth doing for plugins with a serialized UI channel
+(Zyn Fusion); it is an optional follow-up, not part of the milestone.
 
 ## State and presets
 
@@ -362,14 +349,12 @@ Automated checks:
 
 Manual matrix additions:
 
-- xcb embedded UI, floating UI and XWayland floating UI,
+- xcb floating UI and XWayland floating UI,
 - Surge XT native UI (the most complex UI tested so far),
 - a plugin with worker threads,
 - force-kill during playback and during export.
 
 ## Staged implementation
-
-### Stage 1: remote instance with a floating UI
 
 1. **Scaffold.** `lmms-lv2-host` executable, `Lv2ProcClient` with FIFO setup,
    process start/watcher, shared segment allocation and a no-op block loop.
@@ -380,24 +365,13 @@ Manual matrix additions:
 3. **MIDI.** Move MIDI atom input/output and forwarding. Acceptance: fake MIDI
    plugin drives another track.
 4. **UI.** suil in the child, top-level window, scale factor, close/destroy.
-   Embedded mode shows a **Show UI** placeholder instead of the container.
    Acceptance: every audited plugin opens, Surge XT resizes and closes, and a UI
    crash does not kill LMMS.
 5. **State, presets, failure UX.** State bundles over the filesystem, preset
-   loading, reload path, crash notification, in-process fallback. Acceptance:
-   full test matrix and ASan run.
+   loading, reload path, crash notification, in-process fallback and the
+   `pluginUiIsUnstable()` demotion. Acceptance: full test matrix and ASan run.
 
-### Stage 2: embedded UI and parity
-
-6. **Embedding.** Pass the container XID with `IdLv2ShowUI`, create the suil UI
-   with `ui:parent`, and reparent it into the MDI subwindow. Acceptance: the
-   audit matrix opens embedded and floating with the current sizes.
-7. **Parity.** Resize forwarding, title-bar allowance, workspace clamping,
-   scroll bars, `LMMS_LV2_UI_SCALE`, reopen after a DSP crash and the
-   `pluginUiIsUnstable()` demotion. Acceptance: UI crash closes the container
-   but LMMS and the project survive.
-
-Each stage keeps the in-process path selectable so a regression can be bisected
+Each step keeps the in-process path selectable so a regression can be bisected
 quickly.
 
 ## Risks
@@ -408,9 +382,10 @@ quickly.
 - **Plugin initialization hangs.** `dlopen` and `instantiate` can block on
   global locks or display servers; the instantiate timeout and watchdog are
   required, not optional.
-- **Cross-process X11 (stage 2).** Reparenting and focus handling differ between
-  window managers. Keep floating mode as the fallback and test at least one
-  tiling WM.
+- **Separate window only.** The UI cannot be embedded any more; all plugin
+  windows behave like the native Linux VST2 editors and can be covered by other
+  applications. This is the documented trade-off for keeping
+  `instance-access` valid in the child.
 - **State files.** Paths inside state bundles must stay portable; the manifest
   needs relative names, not temporary absolute paths.
 - **Packaging.** The new binary must be installed and discoverable in AppImage
@@ -419,8 +394,6 @@ quickly.
   in the child. That is contained to the child and is the accepted trade-off for
   keeping `instance-access` valid. Splitting them is only possible for plugins
   with a serialized UI channel.
-- **Stage 1 UX regression.** Embedded mode opens a separate window until stage 2
-  lands. Document it in the release notes so it is not reported as a bug.
 - **Feature parity.** `Lv2Proc` currently handles options, worker scheduling,
   latency reporting and UI notifications. The child must reach parity before
   the in-process path can be demoted to a fallback.

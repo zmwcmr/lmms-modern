@@ -233,13 +233,11 @@ QString ConfigManager::vstEmbedMethod() const
 
 QString ConfigManager::lv2UiEmbedMethod() const
 {
-	const QString current = value("ui", "lv2uimethod", "auto");
-	if (current == "auto" || current == "embedded"
-		|| current == "floating" || current == "disabled")
-	{
-		return current;
-	}
-	return "auto";
+	// Embedded hosting was removed; the UI always opens in its own X11
+	// window. The old "auto" and "embedded" values map to "floating" so saved
+	// settings keep working, and "disabled" still switches the native UI off.
+	const QString current = value("ui", "lv2uimethod", "floating");
+	return current == "disabled" ? current : QStringLiteral("floating");
 }
 
 bool ConfigManager::hasWorkingDir() const

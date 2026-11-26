@@ -482,8 +482,6 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	pluginsLayout->addWidget(lv2UiLabel);
 
 	auto* lv2UiComboBox = new QComboBox(pluginsBox);
-	lv2UiComboBox->addItem(tr("Automatically choose"), "auto");
-	lv2UiComboBox->addItem(tr("Embed in LMMS window"), "embedded");
 	lv2UiComboBox->addItem(tr("Open in a separate window"), "floating");
 	lv2UiComboBox->addItem(tr("Disabled"), "disabled");
 	lv2UiComboBox->setCurrentIndex(lv2UiComboBox->findData(

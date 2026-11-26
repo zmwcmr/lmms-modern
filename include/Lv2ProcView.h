@@ -99,14 +99,11 @@ private:
 
 	//! Whether a supported native UI exists for this plugin
 	bool hasPluginUi() const;
-	bool useFloatingWindow() const;
 	void createUi();
 	void destroyUi();
 	void setUiVisible(bool visible);
 	void updateUi();
 	void resizeUiToPlugin();
-	void resizeUiWindow(int width, int height);
-	void clampUiWindowToWorkspace();
 	int resizeUiRequest(int width, int height);
 	void applyUiResize(int width, int height);
 	void updateToggleButton();
@@ -125,8 +122,6 @@ private:
 #ifdef LMMS_HAVE_SUIL
 	SuilHost* m_uiHost = nullptr;
 	SuilInstance* m_uiInstance = nullptr;
-	QWidget* m_uiHostWidget = nullptr;
-	QMdiSubWindow* m_uiWindow = nullptr;
 	QTimer* m_uiTimer = nullptr;
 
 	// The plugin UI may keep pointers to these features for its whole

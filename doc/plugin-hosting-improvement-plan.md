@@ -38,7 +38,7 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 ### Known gaps
 
 1. LV2 UI and DSP run in the LMMS process; P6.4 RemoteLv2 moves both into a
-   host child in two stages.
+   host child.
 2. Track-to-channel PDC is implemented, but send and master compensation is
    still missing.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
@@ -297,7 +297,7 @@ Acceptance:
 
 Estimate: 3-5 weeks.
 
-### P6.4: RemoteLv2 process isolation (two stages)
+### P6.4: RemoteLv2 process isolation
 
 Goal: a crashing LV2 plugin, UI included, must not kill LMMS.
 
@@ -321,7 +321,11 @@ The unit of isolation is consequently the plugin instance, not the UI: a
 because both sides live in the child. `doc/lv2-host-design.md` holds the
 protocol.
 
-#### Stage 1: remote instance, floating UI
+The UI always opens in its own X11 window. Embedding it in an MDI subwindow was
+removed together with the in-process UI path, so this milestone has no
+window-ID or XEmbed work.
+
+Tasks:
 
 - [ ] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
       options, worker and state features, run ports and atom events.
@@ -330,31 +334,18 @@ protocol.
 - [ ] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
       watchdog, crash notification, reload.
 - [ ] Create the suil UI in the child and show it as a top-level X11 window;
-      forward geometry, visibility, close, `ui:scaleFactor` and idle.
+      forward geometry, visibility, close, `ui:scaleFactor` and idle. Wayland
+      uses an XWayland window, as today.
 - [ ] Exchange state and factory presets over the filesystem.
-- [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`.
+- [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`; it also uses a
+      separate window because embedding is gone.
+- [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
 - [ ] Add fake test plugins that crash in UI and in DSP.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
-  save/load round trip, `kill -9` of the child leaves LMMS alive, and every
-  audited plugin opens its UI in the child. A UI crash also kills the DSP, but
-  only inside the child.
-
-#### Stage 2: embedded UI and parity
-
-- [ ] Pass the MDI container XID as `ui:parent` and let the child reparent its
-      X11 window (XEmbed), for instrument tabs and effect dialogs.
-- [ ] Keep the current sizing behaviour across the boundary: `ui:resize`
-      forwarding, title-bar allowance, workspace clamping, scroll bars and
-      `LMMS_LV2_UI_SCALE`.
-- [ ] Wayland: floating XWayland window, as documented today.
-- [ ] UI crash closes the container and leaves the track recoverable; offer
-      **Reload** for both UI and DSP crashes.
-- [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
-- Acceptance: the audit matrix opens embedded and floating, Surge XT resizes
-  and closes, a UI crash does not kill LMMS, and the project still saves.
-- Optional, not required for done: split UI and DSP into separate children for
-  plugins with a serialized UI channel (Zyn Fusion), if UI crashes turn out to
-  be frequent.
+  save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
+  plugin opens its UI in the child, and a UI crash only takes the child down.
+- Optional follow-up: split UI and DSP into separate children for plugins with
+  a serialized UI channel (Zyn Fusion), if UI crashes turn out to be frequent.
 
 Files:
 
@@ -369,7 +360,7 @@ new: plugins/Lv2Host/Lv2Host.cpp
 tests/plugins/ (fake crashing LV2 bundles)
 ```
 
-Estimate: stage 1 4-6 weeks, stage 2 3-4 weeks.
+Estimate: 4-6 weeks.
 
 ### P6.5: Sidechain and multi-bus
 
@@ -426,14 +417,13 @@ Estimate: 2-3 weeks.
 2. P6.1 MIDI output
 3. P6.2 PDC
 4. P6.3 sample-accurate automation
-5. P6.4 RemoteLv2 isolation (stage 1 floating, stage 2 embedded)
+5. P6.4 RemoteLv2 isolation
 6. P6.5 multi-bus
 7. P6.6 hardening
 
 P6.0 and P6.1 can run in parallel. P6.2 should start with a design spike before
 touching the audio graph. P6.4 should not start until the generic host protocol
-is agreed, because it will later be reused for VST3; stage 1 must land before
-stage 2, because cross-process embedding is the riskier half.
+is agreed, because it will later be reused for VST3.
 
 ## What not to do in this plan
 
@@ -452,7 +442,7 @@ stage 2, because cross-process embedding is the riskier half.
 - A manual matrix covers:
   - VST2 instrument/effect,
   - LV2 instrument/effect,
-  - xcb embedded and Wayland floating UI,
+  - LV2 floating UI on xcb and XWayland,
   - MIDI out,
   - PDC,
   - sample-accurate automation,
