@@ -89,3 +89,17 @@ SET_TARGET_PROPERTIES(vst3-remote-host-test PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
 )
 ENDIF()
+
+IF(LMMS_BUILD_LINUX)
+	ADD_LIBRARY(fake-vst3 SHARED fake-vst3.cpp)
+	TARGET_INCLUDE_DIRECTORIES(fake-vst3 PRIVATE ../)
+	SET_TARGET_PROPERTIES(fake-vst3 PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "fake-vst3"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins/fake-vst3.vst3/Contents/x86_64-linux"
+	)
+	ADD_DEPENDENCIES(vst3-host-test fake-vst3)
+	ADD_DEPENDENCIES(vst3-remote-host-test fake-vst3)
+	ADD_DEPENDENCIES(lmms-vst3-scanner fake-vst3)
+
+ENDIF()

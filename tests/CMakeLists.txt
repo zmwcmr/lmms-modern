@@ -54,3 +54,22 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_features(${LMMS_TEST_NAME} PRIVATE cxx_std_20)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
+
+if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
+	set(FAKE_VST3_BUNDLE "${CMAKE_BINARY_DIR}/plugins/fake-vst3.vst3")
+	set(FAKE_VST3_INSTRUMENT_ID "112233445566778899aabbccddee0001")
+	set(FAKE_VST3_EFFECT_ID "112233445566778899aabbccddee0002")
+
+	add_test(NAME vst3-scanner-fake
+		COMMAND $<TARGET_FILE:lmms-vst3-scanner> --json "${FAKE_VST3_BUNDLE}"
+			--output "${CMAKE_CURRENT_BINARY_DIR}/fake-scan.json")
+	add_test(NAME vst3-host-fake-instrument
+		COMMAND $<TARGET_FILE:vst3-host-test> "${FAKE_VST3_BUNDLE}"
+			"${FAKE_VST3_INSTRUMENT_ID}")
+	add_test(NAME vst3-host-fake-effect
+		COMMAND $<TARGET_FILE:vst3-host-test> "${FAKE_VST3_BUNDLE}"
+			"${FAKE_VST3_EFFECT_ID}" 0.5 --effect)
+	add_test(NAME vst3-remote-host-fake-instrument
+		COMMAND $<TARGET_FILE:vst3-remote-host-test> "${FAKE_VST3_BUNDLE}"
+			"${FAKE_VST3_INSTRUMENT_ID}")
+endif()

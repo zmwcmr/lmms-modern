@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.8 invalidates remote state snapshots after parameters, programs,
-units or MIDI. P6 documentation and platform guards are in progress.
+Status: P6 now has a fake VST3 module and automated scanner/host/remote tests.
+Cross-platform packaging remains out of scope for this pass.
 
 ## 1. Goal
 
@@ -267,9 +267,24 @@ handling its own event source.
 - Saving a project therefore asks the DSP host for a fresh state instead of
   reusing a stale snapshot.
 
+### P6.1: Fake VST3 module and automated tests
+
+- `plugins/Vst3Base/tests/fake-vst3.cpp` builds a real VST3 module with one
+  instrument and one effect class.
+- The module implements the Travesty C ABI, a stereo main bus, one gain
+  parameter, component/controller state and the required factory interfaces.
+- CTest runs:
+  - `vst3-scanner-fake`
+  - `vst3-host-fake-instrument`
+  - `vst3-host-fake-effect`
+  - `vst3-remote-host-fake-instrument`
+- The fake bundle is installed in the build tree as
+  `plugins/fake-vst3.vst3/Contents/x86_64-linux/fake-vst3.so`.
+
+Verified: all four tests pass without any installed third-party VST3 plugin.
+
 Still open:
 
-- fake VST3 test module for automated scanner/host tests,
 - a CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
 - AppImage/Windows/macOS packaging verification,
 - final cleanup of the in-process fallback.
@@ -608,7 +623,8 @@ Deliverables:
 - [x] Wayland remote editor via a floating XWayland window,
 - [x] DSP watchdog and automatic restart,
 - [x] editor-host watchdog and restart,
-- [x] IRunLoop and timer support for editor hosts.
+- [x] IRunLoop and timer support for editor hosts,
+- [x] fake VST3 module and automated tests.
 
 Estimate: 3-5 weeks.
 

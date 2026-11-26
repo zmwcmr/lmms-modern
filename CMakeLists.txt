@@ -695,7 +695,7 @@ endif()
 
 IF(WANT_VST3)
 	SET(LMMS_HAVE_VST3 TRUE)
-	SET(STATUS_VST3 "OK (P5.7: editor run loop + timers)")
+	SET(STATUS_VST3 "OK (P6: fake module + automated tests)")
 ELSE()
 	SET(STATUS_VST3 "Not built, as requested")
 ENDIF()
