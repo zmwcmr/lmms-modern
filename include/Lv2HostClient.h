@@ -168,6 +168,8 @@ private:
 	bool m_failed = true;
 	bool m_stopping = false;
 	bool m_uiOpen = false;
+	int m_lastExitCode = 0;
+	int m_lastExitStatus = 0;
 	QString m_error;
 #ifndef SYNC_WITH_SHM_FIFO
 	int m_serverSocket = -1;

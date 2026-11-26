@@ -221,6 +221,13 @@ int logPrintf(LV2_Log_Handle, LV2_URID, const char* fmt, ...)
 	return result;
 }
 
+int logVPrintf(LV2_Log_Handle, LV2_URID, const char* fmt, va_list args)
+{
+	const int result = std::vfprintf(stderr, fmt, args);
+	std::fputc('\n', stderr);
+	return result;
+}
+
 /*! Small URID map; the child only needs stable IDs for the features it
  *  passes to the plugin.
  */
@@ -435,12 +442,13 @@ private:
 	LV2_Feature m_boundedFeature{};
 	LV2_Feature m_logFeature{};
 	LV2_Feature m_workerFeature{};
-	LV2_Options_Option m_options[4]{};
+	LV2_Options_Option m_options[6]{};
 	LV2_Log_Log m_log{};
 	LV2_Worker_Schedule* m_schedule = nullptr;
 	float m_optionSampleRate = 0.0f;
 	int32_t m_optionMinBlock = 0;
 	int32_t m_optionMaxBlock = 0;
+	int32_t m_optionSequenceSize = 1 << 15;
 
 	std::vector<float> m_controlValues;
 	std::vector<float> m_portScratch;
@@ -1463,13 +1471,25 @@ bool Lv2HostProcess::instantiate()
 		m_urids.map(LV2_BUF_SIZE__maxBlockLength),
 		sizeof(int32_t), intType, &m_optionMaxBlock
 	};
-	m_options[3] = LV2_Options_Option{LV2_OPTIONS_INSTANCE, 0, 0, 0, 0, nullptr};
+	m_options[3] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		m_urids.map(LV2_BUF_SIZE__nominalBlockLength),
+		sizeof(int32_t), intType, &m_optionMaxBlock
+	};
+	m_options[4] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		m_urids.map(LV2_BUF_SIZE__sequenceSize),
+		sizeof(int32_t), intType, &m_optionSequenceSize
+	};
+	m_options[5] = LV2_Options_Option{LV2_OPTIONS_INSTANCE, 0, 0, 0, 0, nullptr};
 
 	m_mapFeature = LV2_Feature{LV2_URID__map, m_urids.mapFeature()};
 	m_unmapFeature = LV2_Feature{LV2_URID__unmap, m_urids.unmapFeature()};
 	m_optionsFeature = LV2_Feature{LV2_OPTIONS__options, m_options};
 	m_boundedFeature = LV2_Feature{LV2_BUF_SIZE__boundedBlockLength, nullptr};
-	m_log = LV2_Log_Log{this, logPrintf};
+	m_log.handle = this;
+	m_log.printf = logPrintf;
+	m_log.vprintf = logVPrintf;
 	m_logFeature = LV2_Feature{LV2_LOG__log, &m_log};
 	m_schedule = m_worker.scheduleFeature();
 	m_workerFeature = LV2_Feature{LV2_WORKER__schedule, m_schedule};

@@ -353,9 +353,11 @@ Tasks:
   close). DrumGizmo renders at 750x740 and ZynAddSubFX (DPF/OpenGL) at
   1181x659; DPF UIs need the child to push the control values on every idle
   tick, otherwise they stay blank. State and factory presets round-trip
-  through the child (base64 project format unchanged). The default flip,
-  reload UX and packaging check are still missing; only the first two audio
-  ports are routed.
+  through the child (base64 project format unchanged). The remote UI matrix
+  (DrumGizmo, ZynAddSubFX, OB-Xf, Pianoteq 8 STAGE, sfizz, Surge XT) matches
+  the in-process sizes and renders, and `Lv2HostClientTest` passes under
+  AddressSanitizer. Only the reload UX, the default flip and the packaging
+  check remain; only the first two audio ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.

@@ -80,6 +80,10 @@ window decorations are additional.
   this, the UI stayed at the 1x1 size of its initial X11 window.
 - The LV2 UI is always a separate X11 window. The former embedded mode was
   removed; see the window mode table above.
+- With `LMMS_LV2_REMOTE=1` the same plugins were audited with the UI hosted by
+  the `lmms-lv2-host` child process: DrumGizmo, ZynAddSubFX, OB-Xf, Pianoteq 8
+  STAGE, sfizz and Surge XT all opened at the sizes in the table above and
+  rendered non-black content.
 - The MDI workspace scroll bars are enabled on demand, so a subwindow larger
   than the workspace can be panned instead of leaving part of it unreachable.
 

@@ -26,8 +26,10 @@
 
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QCoreApplication>
 #include <QProcess>
 #include <QTemporaryDir>
+#include <QThread>
 
 #include <lilv/lilv.h>
 
@@ -109,6 +111,8 @@ private slots:
 	void matchesInProcessGain();
 	void forwardsMidiEvents();
 	void stateRoundTrip();
+	//! Manual UI audit: LMMS_LV2_UI_AUDIT_URI=<uri> opens the child UI for 15 s.
+	void uiSmoke();
 };
 
 
@@ -358,6 +362,38 @@ void Lv2HostClientTest::stateRoundTrip()
 			QVERIFY(std::abs(out[i] - in[i] * 0.25f) < 1e-6f);
 		}
 	}
+}
+
+
+void Lv2HostClientTest::uiSmoke()
+{
+	const QByteArray uri = qgetenv("LMMS_LV2_UI_AUDIT_URI");
+	if (uri.isEmpty())
+	{
+		QSKIP("set LMMS_LV2_UI_AUDIT_URI to open a plugin UI");
+	}
+
+	Lv2HostClient client;
+	QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+		QString::fromUtf8(uri), 48000, BlockSize, 30000),
+		qPrintable(client.errorString()));
+	QVERIFY(client.showUi(1.0f));
+
+	std::vector<float> silence(BlockSize, 0.0f);
+	const float* in[2] = { silence.data(), silence.data() };
+	float* out[2] = { silence.data(), silence.data() };
+
+	QElapsedTimer timer;
+	timer.start();
+	while (timer.elapsed() < 15000)
+	{
+		client.processBlock(in, out, BlockSize);
+		QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+		QThread::msleep(30);
+	}
+
+	client.destroyUi();
+	client.stop();
 }
 
 

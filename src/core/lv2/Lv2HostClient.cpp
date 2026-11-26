@@ -59,6 +59,12 @@ Lv2HostClient::Lv2HostClient(QObject* parent) :
 	m_process()
 {
 	m_process.setProcessChannelMode(QProcess::ForwardedChannels);
+	connect(&m_process,
+		QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+		this, [this](int code, QProcess::ExitStatus status) {
+			m_lastExitCode = code;
+			m_lastExitStatus = static_cast<int>(status);
+		}, Qt::DirectConnection);
 
 	// Writing to a child that has just died must not raise SIGPIPE and take
 	// the host down with it.
@@ -560,6 +566,10 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 	{
 		if (isInvalid())
 		{
+			m_process.waitForFinished(500);
+			qWarning() << "LV2 host transport invalidated; process state"
+				<< m_process.state() << "exit code" << m_process.exitCode()
+				<< "exit status" << m_process.exitStatus();
 			if (m_error.isEmpty())
 			{
 				markFailed(tr("The LV2 host process died"));
@@ -589,6 +599,10 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 
 		if (isInvalid())
 		{
+			m_process.waitForFinished(500);
+			qWarning() << "LV2 host transport invalidated; process state"
+				<< m_process.state() << "exit code" << m_process.exitCode()
+				<< "exit status" << m_process.exitStatus();
 			if (m_error.isEmpty())
 			{
 				markFailed(tr("The LV2 host process died"));
@@ -600,6 +614,8 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 		{
 			if (!m_stopping)
 			{
+				qWarning() << "LV2 host exited with code" << m_lastExitCode
+					<< "status" << m_lastExitStatus;
 				emit crashed();
 			}
 			if (m_error.isEmpty())

@@ -419,13 +419,14 @@ Manual matrix additions:
 4. **UI.** suil in the child, top-level window, scale factor, close/destroy.
    Acceptance: every audited plugin opens, Surge XT resizes and closes, and a UI
    crash does not kill LMMS.
-   - status: partial. `LMMS_LV2_REMOTE=1` starts the child UI, the window is
-     owned by the child, `ui:parent`/instance-access/data-access/scale/resize/
-     idle/WM-close are wired, and the child keeps the Zyn asset root as its
-     working directory during UI creation and idle. DrumGizmo opens and renders
-     at 750x740, ZynAddSubFX (DPF/OpenGL) renders at 1181x659 once the child
-     pushes the control values to the UI. The remaining work for the default
-     flip is state/presets and packaging.
+   - status: done for the audited plugins. `LMMS_LV2_REMOTE=1` starts the
+     child UI, the window is owned by the child, and
+     `ui:parent`/instance-access/data-access/scale/resize/idle/WM-close are
+     wired. The child keeps the Zyn asset root as its working directory during
+     UI creation and idle, and pushes control values on every idle tick (DPF
+     UIs stay blank otherwise). The audited plugins open at the same sizes as
+     in-process and render: DrumGizmo 750x740, ZynAddSubFX 1181x659, OB-Xf
+     1150x576, Pianoteq 8 STAGE 864x888, sfizz 775x515, Surge XT 1141x711.
 5. **State, presets, failure UX.** State bundles over the filesystem, preset
    loading, reload path, crash notification, in-process fallback and the
    `pluginUiIsUnstable()` demotion. Acceptance: full test matrix and ASan run.
@@ -447,6 +448,11 @@ quickly.
 - **Plugin initialization hangs.** `dlopen` and `instantiate` can block on
   global locks or display servers; the instantiate timeout and watchdog are
   required, not optional.
+- **Host features must be complete.** `LV2_Log_Log` has both `printf` and
+  `vprintf`; sfizz calls the `vprintf` variant during instantiate and crashes
+  on a null pointer if only `printf` is set. Keep the option set in sync with
+  the in-process host (`sampleRate`, min/max/nominal block length, sequence
+  size) as well.
 - **Separate window only.** The UI cannot be embedded any more; all plugin
   windows behave like the native Linux VST2 editors and can be covered by other
   applications. This is the documented trade-off for keeping
