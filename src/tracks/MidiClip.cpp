@@ -100,7 +100,8 @@ void MidiClip::resizeToFirstTrack()
 				const auto currentClipIt = std::ranges::find(instrumentTrackClips, this);
 				unsigned int currentClip = currentClipIt != instrumentTrackClips.end() ?
 					std::distance(instrumentTrackClips.begin(), currentClipIt) : -1;
-				m_steps = static_cast<MidiClip*>(track->getClip(currentClip))->m_steps;
+				m_steps = std::min(1024,
+					static_cast<MidiClip*>(track->getClip(currentClip))->m_steps);
 			}
 			break;
 		}
@@ -683,8 +684,8 @@ void MidiClip::changeTimeSignature()
 		}
 	}
 	last_pos = last_pos.nextFullBar() * TimePos::ticksPerBar();
-	m_steps = std::max<tick_t>(TimePos::stepsPerBar(),
-				last_pos.getBar() * TimePos::stepsPerBar());
+	m_steps = std::min(1024, std::max<int>(TimePos::stepsPerBar(),
+				last_pos.getBar() * TimePos::stepsPerBar()));
 	updateLength();
 }
 
