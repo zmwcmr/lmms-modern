@@ -94,8 +94,10 @@ window decorations are additional.
 - Qt5/GTK-only UIs are not supported by the current host.
 - Atom events are queued with a mutex; the audio-thread path is not fully
   real-time safe yet.
-- A UI crash runs in-process and can take LMMS down with it. Out-of-process
-  UI hosting is future work.
+- A UI crash runs in-process and can take LMMS down with it. The installed UIs
+  take `instance-access` (a raw DSP pointer), so the UI cannot move to a child
+  process on its own. P6.4 RemoteLv2 moves the DSP and the UI together, first
+  with a floating window, then with embedding; see `lv2-host-design.md`.
 - LV2 control ports are block-rate: a parameter change takes effect at the
   start of the next `run()` cycle, not at a sample offset inside the block.
   Sample-accurate plugin parameters are VST2-only for now; core LV2 has no

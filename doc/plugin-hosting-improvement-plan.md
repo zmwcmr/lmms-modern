@@ -37,7 +37,8 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 
 ### Known gaps
 
-1. LV2 UI and DSP run in the LMMS process.
+1. LV2 UI and DSP run in the LMMS process; P6.4 RemoteLv2 moves both into a
+   host child in two stages.
 2. Track-to-channel PDC is implemented, but send and master compensation is
    still missing.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
@@ -296,31 +297,64 @@ Acceptance:
 
 Estimate: 3-5 weeks.
 
-### P6.4: LV2 process isolation
+### P6.4: RemoteLv2 process isolation (two stages)
 
-Goal: a crashing LV2 UI or DSP must not kill LMMS.
+Goal: a crashing LV2 plugin, UI included, must not kill LMMS.
 
-Tasks:
+Why the UI cannot be moved out on its own:
 
-- [x] Design a generic plugin host process interface (audio, parameters, MIDI,
-      state, UI window ID).
-  - current status: `doc/lv2-host-design.md` defines one child process per
-    plugin instance, the control FIFO, the shared audio/MIDI/control segment,
-    the block handshake, X11 UI hosting, state exchange over the filesystem,
-    crash/reload policy and a staged implementation with fake test plugins.
-- [ ] Implement `lmms-lv2-host`:
-  - instantiate the plugin,
-  - provide LV2 features (map/unmap, options, worker, state),
-  - create the X11 editor and expose its window ID,
-  - forward audio/control/atom events.
-- [ ] Implement the LMMS-side client with shared memory and a control socket.
-- [ ] Reuse the VST2 remote-host lifecycle rules:
-  - parent-death signal,
-  - timeout/watchdog,
-  - crash notification and UI close,
-  - reload/reopen path.
-- [ ] Keep the current in-process path as a fallback or debug option.
-- [ ] Add a test plugin that deliberately crashes in UI and in DSP.
+- `instance-access` hands the UI a raw pointer to the DSP instance. A pointer
+  has no meaning in another process.
+- `data-access` is process-local as well: the extdata pointer and everything it
+  returns live in the host address space.
+- Only serialized channels survive the boundary: atom ports, `state:interface`,
+  shared memory, or a plugin-specific protocol such as Zyn Fusion's OSC/UDP.
+
+The installed plugins confirm the scope: DrumGizmo, sfizz, OB-Xf, Pianoteq 8
+STAGE, Surge XT and Surge XT Effects declare `instance-access` as a required
+UI feature. A UI-only remote host would therefore cover almost nothing; Zyn
+Fusion (DPF UI over OSC) is the exception.
+
+The unit of isolation is consequently the plugin instance, not the UI: a
+`lmms-lv2-host` child runs the DSP and the UI in one process, the way
+`RemoteVstPlugin` already does for VST2. `instance-access` keeps working
+because both sides live in the child. `doc/lv2-host-design.md` holds the
+protocol.
+
+#### Stage 1: remote instance, floating UI
+
+- [ ] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
+      options, worker and state features, run ports and atom events.
+- [ ] Implement `Lv2ProcClient` on the VST2 remote transport: control FIFO,
+      shared audio/MIDI/control segment, block handshake, `QProcess` watcher.
+- [ ] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
+      watchdog, crash notification, reload.
+- [ ] Create the suil UI in the child and show it as a top-level X11 window;
+      forward geometry, visibility, close, `ui:scaleFactor` and idle.
+- [ ] Exchange state and factory presets over the filesystem.
+- [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`.
+- [ ] Add fake test plugins that crash in UI and in DSP.
+- Acceptance: audio parity with the in-process path, PDC unchanged, project
+  save/load round trip, `kill -9` of the child leaves LMMS alive, and every
+  audited plugin opens its UI in the child. A UI crash also kills the DSP, but
+  only inside the child.
+
+#### Stage 2: embedded UI and parity
+
+- [ ] Pass the MDI container XID as `ui:parent` and let the child reparent its
+      X11 window (XEmbed), for instrument tabs and effect dialogs.
+- [ ] Keep the current sizing behaviour across the boundary: `ui:resize`
+      forwarding, title-bar allowance, workspace clamping, scroll bars and
+      `LMMS_LV2_UI_SCALE`.
+- [ ] Wayland: floating XWayland window, as documented today.
+- [ ] UI crash closes the container and leaves the track recoverable; offer
+      **Reload** for both UI and DSP crashes.
+- [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
+- Acceptance: the audit matrix opens embedded and floating, Surge XT resizes
+  and closes, a UI crash does not kill LMMS, and the project still saves.
+- Optional, not required for done: split UI and DSP into separate children for
+  plugins with a serialized UI channel (Zyn Fusion), if UI crashes turn out to
+  be frequent.
 
 Files:
 
@@ -330,17 +364,12 @@ src/gui/Lv2ProcView.*
 plugins/Lv2Instrument/Lv2Instrument.*
 plugins/Lv2Effect/Lv2Effect.*
 new: src/core/lv2/Lv2HostClient.*
+new: src/core/lv2/Lv2HostProtocol.h
 new: plugins/Lv2Host/Lv2Host.cpp
+tests/plugins/ (fake crashing LV2 bundles)
 ```
 
-Acceptance:
-
-- Killing the LV2 host does not kill LMMS.
-- The plugin can be reopened after a UI crash.
-- Audio continues or the track is safely muted after a DSP crash.
-- The project still saves/loads.
-
-Estimate: 6-8 weeks.
+Estimate: stage 1 4-6 weeks, stage 2 3-4 weeks.
 
 ### P6.5: Sidechain and multi-bus
 
@@ -397,13 +426,14 @@ Estimate: 2-3 weeks.
 2. P6.1 MIDI output
 3. P6.2 PDC
 4. P6.3 sample-accurate automation
-5. P6.4 LV2 isolation
+5. P6.4 RemoteLv2 isolation (stage 1 floating, stage 2 embedded)
 6. P6.5 multi-bus
 7. P6.6 hardening
 
 P6.0 and P6.1 can run in parallel. P6.2 should start with a design spike before
 touching the audio graph. P6.4 should not start until the generic host protocol
-is agreed, because it will later be reused for VST3.
+is agreed, because it will later be reused for VST3; stage 1 must land before
+stage 2, because cross-process embedding is the riskier half.
 
 ## What not to do in this plan
 
