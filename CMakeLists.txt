@@ -105,6 +105,7 @@ OPTION(WANT_TAP		"Include Tom's Audio Processing LADSPA plugins" ON)
 OPTION(WANT_VST		"Include VST support" ON)
 OPTION(WANT_VST_32	"Include 32-bit Windows VST support" ON)
 OPTION(WANT_VST_64	"Include 64-bit Windows VST support" ON)
+OPTION(WANT_VST3	"Include native VST3 support" ON)
 OPTION(WANT_WINMM	"Include WinMM MIDI support" OFF)
 OPTION(WANT_DEBUG_FPE	"Debug floating point exceptions" OFF)
 option(WANT_ASAN 	"Enable AddressSanitizer" OFF)
@@ -281,7 +282,7 @@ else()
 	set(STATUS_QT6 "Disabled")
 endif()
 
-find_package(Qt${QT_VERSION_MAJOR} ${LMMS_QT_MIN_VERSION} COMPONENTS Core Gui Widgets Xml Svg REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} ${LMMS_QT_MIN_VERSION} COMPONENTS Core Gui Widgets Xml Svg Network REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS LinguistTools QUIET)
 
 message(STATUS "Using Qt version: ${Qt${QT_VERSION_MAJOR}_VERSION}")
@@ -698,6 +699,13 @@ if(WANT_VST)
 	endif()
 endif()
 
+IF(WANT_VST3)
+	SET(LMMS_HAVE_VST3 TRUE)
+	SET(STATUS_VST3 "OK (P6 complete for this pass; packaging deferred)")
+ELSE()
+	SET(STATUS_VST3 "Not built, as requested")
+ENDIF()
+
 IF(WANT_DEBUG_FPE)
 	IF(LMMS_BUILD_LINUX OR LMMS_BUILD_APPLE)
 		SET(LMMS_DEBUG_FPE TRUE)
@@ -959,6 +967,7 @@ MESSAGE(
 "* VST plugin host             : ${STATUS_VST}\n"
 "  * 32-bit Windows host       : ${STATUS_VST_32}\n"
 "  * 64-bit Windows host       : ${STATUS_VST_64}\n"
+"* VST3 plugin host            : ${STATUS_VST3}\n"
 "* CALF LADSPA plugins         : ${STATUS_CALF}\n"
 "* CAPS LADSPA plugins         : ${STATUS_CAPS}\n"
 "* CMT LADSPA plugins          : ${STATUS_CMT}\n"

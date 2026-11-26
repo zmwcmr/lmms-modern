@@ -52,6 +52,8 @@ public:
 	~TabWidget() override = default;
 
 	void addTab(QWidget* w, const QString& name, const char* pixmap = nullptr, int idx = -1);
+	//! Remove a tab without deleting its widget
+	void removeTab(int idx);
 
 	void setActiveTab(int idx);
 

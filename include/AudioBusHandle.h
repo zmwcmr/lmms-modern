@@ -26,11 +26,14 @@
 #ifndef LMMS_AUDIO_BUS_HANDLE_H
 #define LMMS_AUDIO_BUS_HANDLE_H
 
+#include <atomic>
 #include <memory>
+
 #include <QString>
 #include <QMutex>
 
 #include "AudioBuffer.h"
+#include "DelayLine.h"
 #include "PlayHandle.h"
 
 namespace lmms
@@ -71,6 +74,13 @@ public:
 	const QString& name() const { return m_name; }
 	void setName(const QString& newName);
 
+	//! Processing latency of the source and the track effect chain
+	f_cnt_t latency() const;
+	//! Latency of the instrument feeding this bus, in samples
+	void setSourceLatency(f_cnt_t latency) { m_sourceLatency = latency; }
+	//! Additional delay needed to align this bus with its mixer channel
+	void setDelayFrames(f_cnt_t delay) { m_delayLine.setDelayFrames(delay); }
+
 	EffectChain* effects() { return m_effects.get(); }
 	bool processEffects();
 
@@ -85,6 +95,8 @@ public:
 	bool isCorrupted() const { return m_corrupted.load(std::memory_order_relaxed); }
 
 private:
+	void applyDelay(f_cnt_t frames);
+
 	volatile bool m_bufferUsage;
 
 	AudioBuffer m_buffer;
@@ -107,6 +119,9 @@ private:
 	BoolModel* m_mutedModel;
 	
 	std::atomic<bool> m_corrupted = false;
+
+	std::atomic<f_cnt_t> m_sourceLatency{0};
+	DelayLine m_delayLine;
 
 	friend class AudioEngine;
 	friend class AudioEngineWorkerThread;

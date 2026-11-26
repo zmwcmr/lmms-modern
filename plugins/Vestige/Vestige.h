@@ -27,10 +27,17 @@
 #define _VESTIGE_H
 
 
+#include <atomic>
+#include <mutex>
+#include <vector>
+
 #include <QMutex>
+#include <QPointer>
+#include <QSet>
 
 #include "Instrument.h"
 #include "InstrumentView.h"
+#include "MidiEvent.h"
 #include "SubWindow.h"
 
 
@@ -58,7 +65,8 @@ class VestigeInstrument : public Instrument
 {
 	Q_OBJECT
 public:
-	VestigeInstrument( InstrumentTrack * _instrument_track );
+	VestigeInstrument( InstrumentTrack * _instrument_track,
+			const Plugin::Descriptor::SubPluginFeatures::Key* key = nullptr );
 	virtual ~VestigeInstrument();
 
 	virtual void play( SampleFrame* _working_buffer );
@@ -72,26 +80,45 @@ public:
 
 	virtual bool handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset = 0 );
 
+	f_cnt_t latency() const override;
+
 	virtual gui::PluginView* instantiateView( QWidget * _parent );
 
 protected slots:
 	void setParameter( lmms::Model * action );
 	void handleConfigChange( QString cls, QString attr, QString value );
 	void reloadPlugin();
+	void handleParameterAutomated( int index, float value );
+	void handleParameterGestureBegin( int index );
+	void handleParameterGestureEnd( int index );
 
 private:
 	void closePlugin();
+	void drainMidiOutQueue();
+	//! Send one parameter value, or a sample-accurate curve when automated
+	void sendParameter(int index, FloatModel* model);
 
 
 	VstPlugin * m_plugin;
-	QMutex m_pluginMutex;
+	mutable QMutex m_pluginMutex;
 
 	QString m_pluginDLL;
 	gui::SubWindow* m_subWindow;
 	QScrollArea * m_scrollArea;
 	FloatModel ** knobFModel;
-	QObject * p_subWindow;
+	QPointer<QObject> p_subWindow;
 	int paramCount;
+
+	//! True while a plugin-originated parameter change is being applied
+	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	//! Last audio period in which a parameter curve was sent
+	std::vector<long> m_lastParameterPeriod;
+	//! Parameters with an active beginEdit/endEdit gesture
+	QSet<int> m_parameterGestures;
+
+	//! MIDI output produced by the plugin, consumed on the audio thread
+	std::mutex m_midiOutMutex;
+	std::vector<MidiEvent> m_midiOutQueue;
 
 
 	friend class gui::VestigeInstrumentView;

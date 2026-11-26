@@ -235,6 +235,9 @@ public:
 	static QStringList availableVstEmbedMethods();
 	QString vstEmbedMethod() const;
 
+	//! LV2 UI embedding: "auto", "embedded", "floating" or "disabled"
+	QString lv2UiEmbedMethod() const;
+
 	// Returns true if the working dir (e.g. ~/lmms) exists on disk.
 	bool hasWorkingDir() const;
 

@@ -28,6 +28,8 @@
 #include "Instrument.h"
 #include "PluginView.h"
 
+#include <QPointer>
+
 
 namespace lmms::gui
 {
@@ -56,6 +58,9 @@ public:
 
 	InstrumentTrackWindow * instrumentTrackWindow();
 
+private:
+	//! Window that owns this view; auto-cleared if the window dies first
+	QPointer<QWidget> m_owningWindow;
 } ;
 
 

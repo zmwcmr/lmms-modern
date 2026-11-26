@@ -42,6 +42,10 @@
 
 #ifdef LMMS_BUILD_LINUX
 
+#include <csignal>
+#include <sys/prctl.h>
+#include <unistd.h>
+
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -89,6 +93,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <queue>
 #include <string>
@@ -171,9 +176,9 @@ class RemoteVstPlugin : public RemotePluginClient
 {
 public:
 #ifdef SYNC_WITH_SHM_FIFO
-	RemoteVstPlugin( const std::string& _shm_in, const std::string& _shm_out );
+	RemoteVstPlugin( const std::string& _shm_in, const std::string& _shm_out, bool skipInit = false );
 #else
-	RemoteVstPlugin( const char * socketPath );
+	RemoteVstPlugin( const char * socketPath, bool skipInit = false );
 #endif
 	virtual ~RemoteVstPlugin();
 
@@ -366,6 +371,7 @@ public:
 
 	void idle();
 	void processUIThreadMessages();
+	void flushMidiOutEvents();
 #ifdef NATIVE_LINUX_VST
 	void sendX11Idle();
 #endif
@@ -436,6 +442,7 @@ private:
 
 
 	std::string m_shortName;
+	std::string m_pluginDir;
 
 #ifndef NATIVE_LINUX_VST
 	HINSTANCE m_libInst;
@@ -477,10 +484,22 @@ private:
 
 	using VstMidiEventList = std::vector<VstMidiEvent>;
 	VstMidiEventList m_midiEvents;
+	VstMidiEventList m_midiOutEvents;
 
 	bpm_t m_bpm;
 	double m_currentSamplePos;
 	int m_currentProgram;
+	//! Last latency value reported to the host, in samples
+	int m_lastReportedLatency = -1;
+
+	struct ParameterEvent
+	{
+		int frame;
+		int index;
+		float value;
+	};
+	//! Sample-offset parameter changes waiting for the next block
+	std::vector<ParameterEvent> m_parameterEvents;
 
 	//! Host to plugin synchronisation data structure
 	struct Sync
@@ -491,16 +510,19 @@ private:
 	};
 
 	Sync m_sync;
+	bool m_skipInit;
+	//! Directory with the plugin's UI data files (e.g. Zyn Fusion assets)
+	std::string m_uiDataDir;
 };
 
 
 
 
 #ifdef SYNC_WITH_SHM_FIFO
-RemoteVstPlugin::RemoteVstPlugin( const std::string& _shm_in, const std::string& _shm_out ) :
+RemoteVstPlugin::RemoteVstPlugin( const std::string& _shm_in, const std::string& _shm_out, bool skipInit ) :
 	RemotePluginClient( _shm_in, _shm_out ),
 #else
-RemoteVstPlugin::RemoteVstPlugin( const char * socketPath ) :
+RemoteVstPlugin::RemoteVstPlugin( const char * socketPath, bool skipInit ) :
 	RemotePluginClient( socketPath ),
 #endif
 	m_libInst( nullptr ),
@@ -519,7 +541,8 @@ RemoteVstPlugin::RemoteVstPlugin( const char * socketPath ) :
 	m_midiEvents(),
 	m_bpm( 0 ),
 	m_currentSamplePos( 0 ),
-	m_currentProgram(-1)
+	m_currentProgram(-1),
+	m_skipInit(skipInit)
 {
 	__plugin = this;
 
@@ -676,6 +699,21 @@ bool RemoteVstPlugin::processMessage( const message & _m )
 			//sendMessage( IdVstSetParameter );
 			break;
 
+		case IdVstParameterEvents:
+		{
+			const int index = _m.getInt( 0 );
+			const int count = std::max( 0, _m.getInt( 1 ) );
+			for( int i = 0; i < count; ++i )
+			{
+				m_parameterEvents.push_back( {
+					_m.getInt( 2 + 2 * i ),
+					index,
+					_m.getFloat( 3 + 2 * i )
+				} );
+			}
+			break;
+		}
+
 		case IdVstLoadAllParameterDisplays:
 			loadAllParameterDisplays();
 			break;
@@ -730,6 +768,15 @@ bool RemoteVstPlugin::processMessage( const message & _m )
 
 void RemoteVstPlugin::init( const std::string & _plugin_file )
 {
+	// Make the directory available before loading: some plugins query it from
+	// their VSTPluginMain() or effOpen handler.
+	const std::filesystem::path pluginPath( _plugin_file );
+	m_pluginDir = pluginPath.parent_path().string();
+	if( m_pluginDir.empty() )
+	{
+		m_pluginDir = ".";
+	}
+
 	if( load( _plugin_file ) == false )
 	{
 		sendMessage( IdVstFailedLoadingPlugin );
@@ -749,9 +796,12 @@ void RemoteVstPlugin::init( const std::string & _plugin_file )
 
 	setResumed( true );
 
-	debugMessage( "creating editor\n" );
-	initEditor();
-	debugMessage( "editor successfully created\n" );
+	if( !m_skipInit )
+	{
+		debugMessage( "creating editor\n" );
+		initEditor();
+		debugMessage( "editor successfully created\n" );
+	}
 
 
 	// now post some information about our plugin
@@ -769,6 +819,11 @@ void RemoteVstPlugin::init( const std::string & _plugin_file )
 					addString( pluginProductString() ) );
 	sendMessage( message( IdVstParameterCount ).
 					addInt( m_plugin->numParams ) );
+
+	if( m_plugin->flags & effFlagsIsSynth )
+	{
+		sendMessage( message( IdVstIsSynth ) );
+	}
 
 	sendMessage( IdInitDone );
 
@@ -890,7 +945,36 @@ void RemoteVstPlugin::initEditor()
 	XMapWindow(m_display, m_window);
 	XFlush(m_display);
 
+	// Plugins such as Zyn Fusion resolve UI assets relative to the current
+	// working directory. The remote process only hosts this one editor.
+	if (!m_uiDataDir.empty() && chdir(m_uiDataDir.c_str()) != 0)
+	{
+		debugMessage("Could not change to plugin data directory: "
+			+ m_uiDataDir + "\n");
+	}
+
 	pluginDispatch(effEditOpen, 0, (intptr_t) m_display, (void*) m_window);
+
+	// Some plugins only report their real editor size after the editor has
+	// been opened. Re-read the rectangle so the window is not stuck at the
+	// pre-open default.
+	ERect* openedRect = nullptr;
+	pluginDispatch(effEditGetRect, 0, 0, &openedRect);
+	if (openedRect)
+	{
+		const int width = openedRect->right - openedRect->left;
+		const int height = openedRect->bottom - openedRect->top;
+		if (width > 0 && height > 0
+			&& (width != m_windowWidth || height != m_windowHeight))
+		{
+			m_windowWidth = width;
+			m_windowHeight = height;
+			XResizeWindow(m_display, m_window,
+				static_cast<unsigned int>(width),
+				static_cast<unsigned int>(height));
+			XFlush(m_display);
+		}
+	}
 
 	XSelectInput(m_display, m_window, SubstructureNotifyMask | ButtonPressMask | ButtonReleaseMask
 			| ButtonMotionMask | ExposureMask | KeyPressMask);
@@ -968,6 +1052,28 @@ void RemoteVstPlugin::destroyEditor()
 
 bool RemoteVstPlugin::load( const std::string & _plugin_file )
 {
+#ifdef NATIVE_LINUX_VST
+	// Zyn Fusion and similar plugins load their UI assets relative to the
+	// working directory. Prefer the install root that contains qml/, font/
+	// and schema/; otherwise stay in the plugin's own directory.
+	{
+		std::error_code ec;
+		std::filesystem::path pluginPath =
+			std::filesystem::weakly_canonical(_plugin_file, ec);
+		if (ec) { pluginPath = _plugin_file; }
+		std::filesystem::path dir = pluginPath.parent_path();
+		m_uiDataDir = dir.string();
+		for (int depth = 0; depth < 4 && !dir.empty(); ++depth)
+		{
+			if (std::filesystem::exists(dir / "qml" / "MainWindow.qml"))
+			{
+				m_uiDataDir = dir.string();
+				break;
+			}
+			dir = dir.parent_path();
+		}
+	}
+#endif
 #ifndef NATIVE_LINUX_VST
 	if ((m_libInst = LoadLibraryW(toWString(_plugin_file).get())) == nullptr)
 	{
@@ -1033,8 +1139,13 @@ bool RemoteVstPlugin::load( const std::string & _plugin_file )
 	};
 
 	sendMessage( message( IdVstPluginUniqueID ).addString( id ) );
+	m_lastReportedLatency = std::max( 0, static_cast<int>( m_plugin->initialDelay ) );
+	sendMessage( message( IdVstLatency ).addInt( m_lastReportedLatency ) );
 
-	pluginDispatch( effOpen );
+	if( !m_skipInit )
+	{
+		pluginDispatch( effOpen );
+	}
 
 	return true;
 }
@@ -1044,45 +1155,25 @@ bool RemoteVstPlugin::load( const std::string & _plugin_file )
 
 void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 {
-	// first we gonna post all MIDI-events we enqueued so far
-	if( m_midiEvents.size() )
-	{
-		// since MIDI-events are not received immediately, we
-		// have to have them stored somewhere even after
-		// dispatcher-call, so we create static copies of the
-		// data and post them
-#define MIDI_EVENT_BUFFER_COUNT		1024
-		static char eventsBuffer[sizeof( VstEvents ) + sizeof( VstMidiEvent * ) * MIDI_EVENT_BUFFER_COUNT];
-		static VstMidiEvent vme[MIDI_EVENT_BUFFER_COUNT];
+	const int blockSize = bufferSize();
 
-		// first sort events chronologically, since some plugins
-		// (e.g. Sinnah) can hang if they're out of order
-		// TODO: Sort on the server side instead
-		std::stable_sort( m_midiEvents.begin(), m_midiEvents.end(),
-				[]( const VstMidiEvent &a, const VstMidiEvent &b )
-				{
-					return a.deltaFrames < b.deltaFrames;
-				} );
-
-		auto events = (VstEvents*)eventsBuffer;
-		events->reserved = 0;
-		events->numEvents = m_midiEvents.size();
-
-		int idx = 0;
-		for( VstMidiEventList::iterator it = m_midiEvents.begin(); it != m_midiEvents.end(); ++it, ++idx )
+	// Some plugins (e.g. Sinnah) can hang if MIDI events are not ordered
+	// chronologically.
+	std::stable_sort( m_midiEvents.begin(), m_midiEvents.end(),
+		[]( const VstMidiEvent &a, const VstMidiEvent &b )
 		{
-			memcpy( &vme[idx], &*it, sizeof( VstMidiEvent ) );
-			events->events[idx] = (VstEvent *) &vme[idx];
-		}
-
-		m_midiEvents.clear();
-		pluginDispatch( effProcessEvents, 0, 0, events );
-	}
-
-	// now we're ready to fetch sound from VST-plugin
+			return a.deltaFrames < b.deltaFrames;
+		} );
 
 	if( !tryLockShm() )
 	{
+		// The shared audio buffer is busy. Keep the final parameter values
+		// rather than dropping automation, and retry MIDI next period.
+		for( const auto & event : m_parameterEvents )
+		{
+			m_plugin->setParameter( m_plugin, event.index, event.value );
+		}
+		m_parameterEvents.clear();
 		return;
 	}
 
@@ -1092,38 +1183,195 @@ void RemoteVstPlugin::process( const SampleFrame* _in, SampleFrame* _out )
 		return;
 	}
 
-	for( int i = 0; i < inputCount(); ++i )
+	// Split the block at every parameter event so changes land on the exact
+	// frame. Without events this reduces to one processReplacing() call.
+	std::vector<int> splitFrames;
+	splitFrames.reserve( m_parameterEvents.size() + 2 );
+	splitFrames.push_back( 0 );
+	for( const auto & event : m_parameterEvents )
 	{
-		m_inputs[i] = &((float *) _in)[i * bufferSize()];
+		const int frame = std::clamp( event.frame, 0, blockSize - 1 );
+		if( frame > 0 )
+		{
+			splitFrames.push_back( frame );
+		}
 	}
+	std::sort( splitFrames.begin(), splitFrames.end() );
+	splitFrames.erase(
+		std::unique( splitFrames.begin(), splitFrames.end() ),
+		splitFrames.end() );
+	splitFrames.push_back( blockSize );
 
-	for( int i = 0; i < outputCount(); ++i )
+	std::sort( m_parameterEvents.begin(), m_parameterEvents.end(),
+		[]( const auto & a, const auto & b )
+		{
+			return a.frame < b.frame;
+		} );
+
+	std::size_t nextEvent = 0;
+	auto applyEventsUntil = [&]( int frame )
 	{
-		m_outputs[i] = &((float *) _out)[i * bufferSize()];
-		memset( m_outputs[i], 0, bufferSize() * sizeof( float ) );
-	}
+		while( nextEvent < m_parameterEvents.size() )
+		{
+			const auto & event = m_parameterEvents[nextEvent];
+			const int eventFrame = std::clamp( event.frame, 0, blockSize - 1 );
+			if( eventFrame > frame )
+			{
+				break;
+			}
+			m_plugin->setParameter( m_plugin, event.index, event.value );
+			++nextEvent;
+		}
+	};
+
+	std::size_t nextMidi = 0;
+	auto processMidiRange = [&]( int startFrame, int endFrame )
+	{
+		if( nextMidi >= m_midiEvents.size() )
+		{
+			return;
+		}
+
+#define MIDI_EVENT_BUFFER_COUNT		1024
+		static char eventsBuffer[sizeof( VstEvents ) + sizeof( VstMidiEvent * ) * MIDI_EVENT_BUFFER_COUNT];
+		static VstMidiEvent vme[MIDI_EVENT_BUFFER_COUNT];
+
+		auto events = (VstEvents*)eventsBuffer;
+		events->reserved = 0;
+		events->numEvents = 0;
+
+		while( nextMidi < m_midiEvents.size()
+			&& events->numEvents < MIDI_EVENT_BUFFER_COUNT )
+		{
+			const VstMidiEvent & event = m_midiEvents[nextMidi];
+			if( event.deltaFrames >= endFrame )
+			{
+				break;
+			}
+			memcpy( &vme[events->numEvents], &event, sizeof( VstMidiEvent ) );
+			vme[events->numEvents].deltaFrames = std::max(
+				0, std::min( event.deltaFrames, blockSize - 1 ) - startFrame );
+			events->events[events->numEvents] = (VstEvent *) &vme[events->numEvents];
+			++events->numEvents;
+			++nextMidi;
+		}
+
+		if( events->numEvents > 0 )
+		{
+			pluginDispatch( effProcessEvents, 0, 0, events );
+		}
+	};
+
+	auto processRange = [&]( int startFrame, int frames )
+	{
+		if( frames <= 0 )
+		{
+			return;
+		}
+
+		for( int i = 0; i < inputCount(); ++i )
+		{
+			m_inputs[i] = &((float *) _in)[i * blockSize + startFrame];
+		}
+
+		for( int i = 0; i < outputCount(); ++i )
+		{
+			m_outputs[i] = &((float *) _out)[i * blockSize + startFrame];
+			memset( m_outputs[i], 0, frames * sizeof( float ) );
+		}
 
 #ifdef OLD_VST_SDK
-	if( m_plugin->flags & effFlagsCanReplacing )
-	{
-		m_plugin->processReplacing( m_plugin, m_inputs, m_outputs,
-								bufferSize() );
-	}
-	else
-	{
-		m_plugin->process( m_plugin, m_inputs, m_outputs,
-								bufferSize() );
-	}
+		if( m_plugin->flags & effFlagsCanReplacing )
+		{
+			m_plugin->processReplacing( m_plugin, m_inputs, m_outputs, frames );
+		}
+		else
+		{
+			m_plugin->process( m_plugin, m_inputs, m_outputs, frames );
+		}
 #else
-	m_plugin->processReplacing(m_plugin, m_inputs, m_outputs, bufferSize());
+		m_plugin->processReplacing( m_plugin, m_inputs, m_outputs, frames );
 #endif
+	};
+
+	applyEventsUntil( 0 );
+
+	int position = 0;
+	for( std::size_t i = 1; i < splitFrames.size(); ++i )
+	{
+		const int next = splitFrames[i];
+		processMidiRange( position, next );
+		processRange( position, next - position );
+		position = next;
+		applyEventsUntil( position );
+	}
+
+	m_parameterEvents.clear();
+	m_midiEvents.clear();
 
 	unlockShm();
 
-	m_currentSamplePos += bufferSize();
+	// A plugin may change initialDelay while it runs, for example when a
+	// look-ahead control is automated. Report the new value once per change so
+	// the host can rebuild its latency graph without polling the plugin.
+	const int latency =
+		std::max( 0, static_cast<int>( m_plugin->initialDelay ) );
+	if( latency != m_lastReportedLatency )
+	{
+		m_lastReportedLatency = latency;
+		sendMessage( message( IdVstLatency ).addInt( latency ) );
+	}
+
+	flushMidiOutEvents();
+
+	m_currentSamplePos += blockSize;
 }
 
 
+
+
+void RemoteVstPlugin::flushMidiOutEvents()
+{
+	if (m_midiOutEvents.empty())
+	{
+		return;
+	}
+
+	// TODO: move the IPC send off the audio thread. The queue is bounded,
+	// but sendMessage() still takes the transport mutex here.
+	for (const VstMidiEvent& event : m_midiOutEvents)
+	{
+		const uint8_t status = static_cast<uint8_t>(event.midiData[0]);
+		int size = 3;
+		switch (status & 0xF0)
+		{
+		case 0x80: case 0x90: case 0xA0: case 0xB0: case 0xE0:
+			size = 3;
+			break;
+		case 0xC0: case 0xD0:
+			size = 2;
+			break;
+		default:
+			// SysEx and system messages are not forwarded yet.
+			size = 0;
+			break;
+		}
+		if (size == 0)
+		{
+			continue;
+		}
+
+		message m(IdVstMidiOut);
+		m.addInt(event.deltaFrames);
+		m.addInt(size);
+		for (int i = 0; i < size; ++i)
+		{
+			m.addInt(static_cast<int>(static_cast<uint8_t>(event.midiData[i])));
+		}
+		sendMessage(m);
+	}
+	m_midiOutEvents.clear();
+}
 
 
 void RemoteVstPlugin::processMidiEvent( const MidiEvent& event, const f_cnt_t offset )
@@ -1804,10 +2052,9 @@ int RemoteVstPlugin::updateInOutCount()
 
 /* TODO:
  * - complete audioMasterGetTime-handling (bars etc.)
- * - implement audioMasterProcessEvents
  * - audioMasterGetVendorVersion: return LMMS-version (config.h!)
- * - audioMasterGetDirectory: return either VST-plugin-dir or LMMS-workingdir
- * - audioMasterOpenFileSelector: show QFileDialog?
+ * - audioMasterOpenFileSelector: forward the request to the host so it can
+ *   show a QFileDialog and fill in VstFileSelect
  */
 intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 					int32_t _index, intptr_t _value,
@@ -1831,7 +2078,15 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 	{
 		case audioMasterAutomate:
 			SHOW_CALLBACK( "amc: audioMasterAutomate\n" );
-			// index, value, returns 0
+			// index, value
+			// TODO: queue parameter changes and flush them from the
+			// processing thread so plugins that automate from their DSP do
+			// not block on IPC.
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterAutomated)
+					.addInt(_index).addFloat(_opt));
+			}
 			return 0;
 
 		case audioMasterVersion:
@@ -1933,7 +2188,21 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 
 		case audioMasterProcessEvents:
 			SHOW_CALLBACK( "amc: audioMasterProcessEvents\n" );
-			// VstEvents* in <ptr>
+			if (__plugin && _ptr)
+			{
+				const auto* events = static_cast<const VstEvents*>(_ptr);
+				const int count = std::min<int>(events->numEvents, 1024);
+				for (int i = 0; i < count; ++i)
+				{
+					const auto* event = reinterpret_cast<const VstMidiEvent*>(
+						events->events[i]);
+					if (event && event->type == kVstMidiType
+						&& __plugin->m_midiOutEvents.size() < 4096)
+					{
+						__plugin->m_midiOutEvents.push_back(*event);
+					}
+				}
+			}
 			return 0;
 
 		case audioMasterIOChanged:
@@ -2084,7 +2353,11 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 			//    thread
 			// other: not defined, but probably pre-empting user
 			//        thread.
-			return 0;
+#ifdef NATIVE_LINUX_VST
+			return pthread_equal(pthread_self(), __processingThreadId) ? 2 : 1;
+#else
+			return GetCurrentThreadId() == __processingThreadId ? 2 : 1;
+#endif
 
 		case audioMasterGetAutomationState:
 			SHOW_CALLBACK( "amc: audioMasterGetAutomationState\n" );
@@ -2143,9 +2416,13 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 
 		case audioMasterCanDo:
 			SHOW_CALLBACK("amc: audioMasterCanDo\n");
+			if (!p) { return 0; }
 			return !(std::strcmp(p, "sendVstEvents")
 				&& std::strcmp(p, "sendVstMidiEvent")
 				&& std::strcmp(p, "sendVstTimeInfo")
+				&& std::strcmp(p, "receiveVstEvents")
+				&& std::strcmp(p, "receiveVstMidiEvent")
+				&& std::strcmp(p, "receiveVstTimeInfo")
 				&& std::strcmp(p, "sizeWindow")
 				&& std::strcmp(p, "supplyIdle"));
 
@@ -2156,7 +2433,10 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 		case audioMasterGetDirectory:
 			SHOW_CALLBACK( "amc: audioMasterGetDirectory\n" );
 			// get plug directory, FSSpec on MAC, else char*
-			return 0;
+			return __plugin && !__plugin->m_pluginDir.empty()
+				? reinterpret_cast<intptr_t>(
+					const_cast<char*>(__plugin->m_pluginDir.c_str()))
+				: 0;
 
 		case audioMasterUpdateDisplay:
 			SHOW_CALLBACK( "amc: audioMasterUpdateDisplay\n" );
@@ -2168,25 +2448,33 @@ intptr_t RemoteVstPlugin::hostCallback( AEffect * _effect, int32_t _opcode,
 #endif
 			return 0;
 
-#if kVstVersion > 2
 		case audioMasterBeginEdit:
 			SHOW_CALLBACK( "amc: audioMasterBeginEdit\n" );
 			// begin of automation session (when mouse down),
 			// parameter index in <index>
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterGestureBegin)
+					.addInt(_index));
+			}
 			return 0;
 
 		case audioMasterEndEdit:
 			SHOW_CALLBACK( "amc: audioMasterEndEdit\n" );
 			// end of automation session (when mouse up),
 			// parameter index in <index>
+			if (__plugin)
+			{
+				__plugin->sendMessage(message(IdVstParameterGestureEnd)
+					.addInt(_index));
+			}
 			return 0;
 
 		case audioMasterOpenFileSelector:
 			SHOW_CALLBACK( "amc: audioMasterOpenFileSelector\n" );
-			// open a fileselector window with VstFileSelect*
-			// in <ptr>
+			// Not supported yet. Returning 0 makes plugins fall back to their
+			// own file dialog instead of receiving an incomplete VstFileSelect.
 			return 0;
-#endif
 		default:
 			SHOW_CALLBACK( "amd: not handled" );
 			break;
@@ -2305,6 +2593,7 @@ void * RemoteVstPlugin::processingThread(void * _param)
 		if( m.id == IdStartProcessing
 			|| m.id == IdMidiEvent
 			|| m.id == IdVstSetParameter
+			|| m.id == IdVstParameterEvents
 			|| m.id == IdVstSetTempo)
 		{
 			_this->processMessage( m );
@@ -2477,6 +2766,17 @@ LRESULT CALLBACK RemoteVstPlugin::wndProc( HWND hwnd, UINT uMsg,
 
 int main( int _argc, char * * _argv )
 {
+#ifdef LMMS_BUILD_LINUX
+	// The remote plugin owns its own X11 window. If LMMS is killed with
+	// SIGKILL, make sure the kernel terminates this process as well instead
+	// of leaving an orphaned plugin window behind.
+	prctl(PR_SET_PDEATHSIG, SIGTERM);
+	if (getppid() == 1)
+	{
+		return 1;
+	}
+#endif
+
 	using lmms::RemoteVstPlugin;
 
 #ifdef SYNC_WITH_SHM_FIFO
@@ -2540,6 +2840,7 @@ int main( int _argc, char * * _argv )
 	}
 
 #endif
+	bool skipInit = false;
 	{
 	#ifdef SYNC_WITH_SHM_FIFO
 		int embedMethodIndex = 3;
@@ -2547,6 +2848,10 @@ int main( int _argc, char * * _argv )
 		int embedMethodIndex = 2;
 	#endif
 		std::string embedMethod = _argv[embedMethodIndex];
+		if( embedMethodIndex + 1 < _argc )
+		{
+			skipInit = _argv[embedMethodIndex+1][0] != '0';
+		}
 
 		if ( embedMethod == "none" )
 		{
@@ -2590,9 +2895,9 @@ int main( int _argc, char * * _argv )
 	// constructor automatically will process messages until it receives
 	// a IdVstLoadPlugin message and processes it
 #ifdef SYNC_WITH_SHM_FIFO
-	__plugin = new RemoteVstPlugin( _argv[1], _argv[2] );
+	__plugin = new RemoteVstPlugin( _argv[1], _argv[2], skipInit );
 #else
-	__plugin = new RemoteVstPlugin( _argv[1] );
+	__plugin = new RemoteVstPlugin( _argv[1], skipInit );
 #endif
 
 	if( __plugin->isInitialized() )

@@ -109,6 +109,8 @@ public:
 
 	void initDevices();
 	void clear();
+	//! Request All Notes Off on the next processing block (e.g. after a seek)
+	void requestNoteOffAll();
 	void clearNewPlayHandles();
 
 
@@ -146,6 +148,10 @@ public:
 	}
 
 	void removeAudioBusHandle(AudioBusHandle* busHandle);
+	const std::vector<AudioBusHandle*>& audioBusHandles() const
+	{
+		return m_audioBusHandles;
+	}
 
 
 	// MIDI-client-stuff
@@ -411,6 +417,7 @@ private:
 	AudioEngineProfiler m_profiler;
 
 	std::atomic<bool> m_clearSignal;
+	std::atomic<bool> m_noteOffSignal{false};
 	std::atomic<bool> m_sanitizationEnabled = false;
 
 	std::recursive_mutex m_changeMutex;

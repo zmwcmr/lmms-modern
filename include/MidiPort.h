@@ -26,6 +26,9 @@
 #ifndef LMMS_MIDI_PORT_H
 #define LMMS_MIDI_PORT_H
 
+#include <atomic>
+#include <vector>
+
 #include <QString>
 #include <QList>
 #include <QMap>
@@ -33,6 +36,7 @@
 #include "Midi.h"
 #include "TimePos.h"
 #include "AutomatableModel.h"
+#include "ComboBoxModel.h"
 
 namespace lmms
 {
@@ -113,6 +117,8 @@ public:
 
 	void processInEvent( const MidiEvent& event, const TimePos& time = TimePos() );
 	void processOutEvent( const MidiEvent& event, const TimePos& time = TimePos() );
+	//! Send All Notes Off to the external MIDI output only
+	void sendAllNotesOff();
 
 
 	void saveSettings( QDomDocument& doc, QDomElement& thisElement ) override;
@@ -138,6 +144,9 @@ public:
 
 	void invalidateCilent();
 
+	//! Rebuild the list of internal MIDI output targets
+	void refreshMidiOutTargets();
+
 	gui::MidiPortMenu* m_readablePortsMenu;
 	gui::MidiPortMenu* m_writablePortsMenu;
 
@@ -150,6 +159,7 @@ private slots:
 	void updateReadablePorts();
 	void updateWritablePorts();
 	void updateOutputProgram();
+	void updateMidiOutTarget();
 
 
 private:
@@ -169,9 +179,17 @@ private:
 	IntModel m_baseVelocityModel;
 	BoolModel m_readableModel;
 	BoolModel m_writableModel;
+	ComboBoxModel m_midiOutTargetModel;
 
 	Map m_readablePorts;
 	Map m_writablePorts;
+
+	//! Song-level track indices shown in m_midiOutTargetModel; -1 = none
+	std::vector<int> m_midiOutTargetTrackIndices;
+	std::atomic<int> m_midiOutTargetTrackIndex{-1};
+	bool m_refreshingMidiOutTargets = false;
+
+	void routeMidiOutToTrack(const MidiEvent& event, const TimePos& time);
 
 
 	friend class gui::ControllerConnectionDialog;

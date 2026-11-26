@@ -1,7 +1,7 @@
 /*
  * Lv2Proc.h - Lv2 processor class
  *
- * Copyright (c) 2019-2022 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
+ * Copyright (c) 2019-2024 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
  *
  * This file is part of LMMS - https://lmms.io
  *
@@ -30,12 +30,22 @@
 #ifdef LMMS_HAVE_LV2
 
 #include <lilv/lilv.h>
+#include <lv2/state/state.h>
+#include <array>
+#include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <vector>
+
+#include <QTemporaryDir>
 
 #include <ringbuffer/ringbuffer.h>
 
-#include "LinkedModelGroups.h"
+#include "LocklessRingBuffer.h"
+#include "ModelGroup.h"
 #include "LmmsSemaphore.h"
 #include "Lv2Basics.h"
 #include "Lv2Features.h"
@@ -48,6 +58,8 @@
 namespace lmms
 {
 
+class AutomatableModel;
+class MidiEvent;
 class PluginIssue;
 class SampleFrame;
 
@@ -55,14 +67,37 @@ class SampleFrame;
 namespace Lv2Ports
 {
 	struct Audio;
+	struct Control;
 	struct PortBase;
 	struct AtomSeq;
 }
 
+/**
+	Class representing one Lv2 processor, i.e. one Lv2 handle.
+	For mono plugins, L/R channel routing is being used
+	(this includes techniques like upmixing and downmixing).
 
-//! Class representing one Lv2 processor, i.e. one Lv2 handle.
-//! For Mono effects, 1 Lv2ControlBase references 2 Lv2Proc.
-class Lv2Proc : public LinkedModelGroup
+	This class provides everything Lv2 effect and instrument have in common.
+	It's not named Lv2Plugin, because
+	* it does not inherit Instrument
+	* the Plugin subclass Effect does not inherit this class
+
+	This class would usually be a Model subclass. However, Qt doesn't allow
+	this:
+	* inheriting only from Model will cause diamond inheritance for QObject,
+	  which will cause errors with Q_OBJECT
+	* making this a direct subclass of Instrument resp. EffectControls would
+	  require CRTP, which would make this class a template class, which would
+	  conflict with Q_OBJECT
+
+	The consequence is that this class can neither inherit QObject or Model, nor
+	Instrument or EffectControls, which means in fact:
+	* this class contains no signals or slots, but it offers stubs for slots
+	  that shall be called by child classes
+	* this class can not override virtuals of Instrument or EffectControls, so
+	  it will offer functions that must be called by virtuals in its child class
+*/
+class LMMS_EXPORT Lv2Proc : public ModelGroup
 {
 	friend class Lv2ProcSuspender;
 public:
@@ -72,10 +107,15 @@ public:
 	/*
 		ctor/dtor/reload
 	*/
-	Lv2Proc(const LilvPlugin* plugin, Model *parent);
-	~Lv2Proc() override;
+	Lv2Proc(Model *parent, const QString &uri);
+	~Lv2Proc();
 	void reload();
 	void onSampleRateChanged();
+
+	//! Save port values and, if supported, the plugin's state extension
+	void saveSettings(QDomDocument& doc, QDomElement& that);
+	//! Load port values and, if present, the plugin's state extension
+	void loadSettings(const QDomElement& that);
 
 	/*
 		port access
@@ -113,6 +153,35 @@ public:
 	void dumpPorts();
 
 	/*
+		factory presets
+	*/
+	struct Preset
+	{
+		QString label;
+		QString uri;
+	};
+
+	//! Presets from the plugin bundle that apply to this plugin
+	const std::vector<Preset>& presets() const { return m_presets; }
+	//! Restore a factory preset; must be called from the GUI thread
+	bool loadPreset(std::size_t index);
+
+	//! One MIDI message emitted on the plugin's MIDI output port
+	struct MidiOutEvent
+	{
+		uint32_t offset = 0;
+		std::array<uint8_t, 3> data{};
+		uint8_t size = 0;
+	};
+
+	//! MIDI events produced since the last clear; audio-thread only
+	const std::vector<MidiOutEvent>& midiOutEvents() const
+	{
+		return m_midiOutEvents;
+	}
+	void clearMidiOutEvents() { m_midiOutEvents.clear(); }
+
+	/*
 		utils for the run thread
 	*/
 
@@ -122,50 +191,79 @@ public:
 
 	//! @brief Bring values from all ports to the LMMS core
 	void copyModelsToCore();
-
 	//! @brief Copy buffer passed by the core into our ports
-	//! @param buf buffer of sample frames, each sample frame is something like a
-	//! `float[<number-of-procs> * <channels per proc>]` array.
-	//! @param firstChan The offset for @p buf where we have to read our first channel.
-	//! This marks the first sample in each sample frame where we read from.
-	//! If we are the 2nd of 2 mono procs, this can be greater than 0.
-	//! @param num Number of channels we must read from @p buf (starting at @p offset)
+	//! @param buf buffer of sample frames, each sample frame is something like
+	//!   a `float[<number-of-procs> * <channels per proc>]` array.
 	//! @param frames The length of @p buf
-	void copyBuffersFromCore(const SampleFrame* buf, unsigned firstChan, unsigned num, f_cnt_t frames);
+	void copyBuffersFromCore(const SampleFrame* buf, f_cnt_t frames);
 
 	//! @brief Copy our ports into buffers passed by the core
-	//! @param buf buffer of sample frames, each sample frame is something like a
-	//! `float[<number-of-procs> * <channels per proc>]` array.
-	//! @param firstChan The offset for @p buf where we have to write our first channel.
-	//! This marks the first sample in each sample frame where we write to.
-	//! If we are the 2nd of 2 mono procs, this can be greater than 0.
-	//! @param num Number of channels we must write to @p buf (starting at @p offset)
-	void copyBuffersToCore(SampleFrame* buf, unsigned firstChan, unsigned num, f_cnt_t frames) const;
+	//! @param buf buffer of sample frames, each sample frame is something like
+	//!   a `float[<number-of-procs> * <channels per proc>]` array.
+	//! @param frames The length of @p buf
+	void copyBuffersToCore(SampleFrame* buf, f_cnt_t frames) const;
 
 	//! @brief Run the Lv2 plugin instance for @p frames frames
 	//! @param frames The number of frames to run
 	void run(f_cnt_t frames);
 
-	void handleMidiInputEvent(const class MidiEvent &event,
+	void handleMidiInputEvent(const MidiEvent &event,
 		const TimePos &time, f_cnt_t offset);
 
 	/*
 		misc
 	 */
-	class AutomatableModel *modelAtPort(const QString &uri); // unused currently
-	std::size_t controlCount() const { return LinkedModelGroup::modelNum(); }
+	AutomatableModel *modelAtPort(const QString &uri); // unused currently
+	std::size_t controlCount() const { return ModelGroup::size(); }
 	bool hasNoteInput() const;
+	//! Processing latency reported by the plugin, in samples
+	f_cnt_t latency() const { return m_latency.load(std::memory_order_relaxed); }
+	const LilvPlugin* getPlugin() const { return m_plugin; }
+	bool hasGui() const { return m_hasGUI; }
+
+	/*
+		UI support
+	*/
+	LilvUIs* getUis() const { return lilv_plugin_get_uis(m_plugin); }
+	const char* pluginUri() const { return lilv_node_as_uri(lilv_plugin_get_uri(m_plugin)); }
+	std::size_t getIdOfPort(const char* symbol) const;
+	std::size_t portNum() const { return m_ports.size(); }
+	Lv2Ports::PortBase* port(std::size_t idx) { return m_ports[idx].get(); }
+	const Lv2Ports::PortBase* port(std::size_t idx) const { return m_ports[idx].get(); }
+	//! Called by the UI when the user moves a control
+	void setControlFromUi(uint32_t portIndex, float value);
+	//! Handle any event sent by the plugin UI (float control or atom event)
+	bool writeUiEvent(uint32_t portIndex, uint32_t protocol,
+		uint32_t size, const void* buffer);
+	struct UiEvent
+	{
+		uint32_t index = 0;
+		uint32_t protocol = 0;
+		std::vector<char> data;
+	};
+	//! Start forwarding plugin -> UI events
+	void connectToPluginEvents();
+	//! Stop forwarding plugin -> UI events
+	void setUiActive(bool active) { m_uiActive = active; }
+	//! Take all queued plugin -> UI events
+	std::vector<UiEvent> takeUiEvents();
+	//! Let the view detach its native UI before the plugin instance dies
+	void setViewDetacher(std::function<void()> detacher) { m_viewDetacher = std::move(detacher); }
+
+	const LilvInstance* getInstanceForInstanceFeatureOnly() const { return m_instance; }
+	const LV2_Feature* mapFeature() const { return m_features.feature(LV2_URID__map); }
+	const LV2_Feature* unmapFeature() const { return m_features.feature(LV2_URID__unmap); }
+	const LV2_Feature* optionsFeature() const { return m_features.feature(LV2_OPTIONS__options); }
+	LV2_Extension_Data_Feature* extdataFeature() { return &m_features.m_extData; }
 
 protected:
-	/*
-		load and save
-	*/
-	//! Create ports and instance, connect ports, activate plugin
-	void initPlugin();
-	//! Deactivate instance
-	void shutdownPlugin();
+	//! To be called by `Plugin::loadFile` overrides
+	void loadFile(const QString &file) { (void)file; }
+	//! XML DOM Node name
+	QString nodeName() const { return "lv2controls"; }
 
 private:
+	// lv2
 	const LilvPlugin* m_plugin;
 	LilvInstance* m_instance = nullptr;
 	Lv2Features m_features;
@@ -196,6 +294,46 @@ private:
 
 	// other
 	static int32_t defaultEvbufSize() { return 1 << 15; /* ardour uses this*/ }
+	bool m_hasGUI = false;
+
+	//! Per-instance directory for files created via state:makePath.
+	//! It lives as long as the plugin instance so restored samples etc.
+	//! remain available.
+	std::unique_ptr<QTemporaryDir> m_stateDir;
+	//! Serializes run() against state save/restore
+	std::mutex m_stateMutex;
+	LV2_State_Make_Path m_makePath;
+	LV2_State_Free_Path m_freePath;
+	LV2_State_Map_Path m_mapPath;
+
+	//! Called by the view to detach its native UI before shutdown
+	std::function<void()> m_viewDetacher;
+
+	//! Output control port carrying the plugin latency, if any
+	Lv2Ports::Control* m_latencyPort = nullptr;
+	std::atomic<f_cnt_t> m_latency{0};
+
+	//! Plugin -> UI event queue (atom events, etc.)
+	std::mutex m_uiEventMutex;
+	std::deque<UiEvent> m_uiEvents;
+	std::atomic<bool> m_uiActive{false};
+	bool sendToUi(uint32_t portIndex, uint32_t type, uint32_t size, const void* body);
+
+	//! Factory presets exposed by the plugin bundle
+	std::vector<Preset> m_presets;
+	void scanPresets();
+
+	//! MIDI output collected in run(); consumed on the audio thread
+	std::vector<MidiOutEvent> m_midiOutEvents;
+	void collectMidiOutEvent(uint32_t offset, const uint8_t* data, uint32_t size);
+
+	void saveState(QDomDocument& doc, QDomElement& that);
+	void loadState(const QDomElement& that);
+
+	static char* makePath(LV2_State_Make_Path_Handle handle, const char* path);
+	static void freePath(LV2_State_Free_Path_Handle handle, char* path);
+	static char* absolutePath(LV2_State_Map_Path_Handle handle, const char* path);
+	static char* abstractPath(LV2_State_Map_Path_Handle handle, const char* path);
 
 	//! models for the controls, sorted by port symbols
 	//! @note These are not owned, but rather link to the models in
@@ -205,6 +343,10 @@ private:
 	void initMOptions(); //!< initialize m_options
 	void initPluginSpecificFeatures();
 
+	//! Create ports and instance, connect ports, activate plugin
+	void initPlugin();
+	//! Deactivate instance
+	void shutdownPlugin();
 	//! load a file in the plugin, but don't do anything in LMMS
 	void loadFileInternal(const QString &file);
 	//! allocate m_ports, fill all with metadata, and assign meaning of ports

@@ -32,8 +32,8 @@
 #include <map>
 #include <string_view>
 #include <vector>
-
 #include <lv2/core/lv2.h>
+#include <lv2/data-access/data-access.h>
 
 namespace lmms
 {
@@ -72,6 +72,11 @@ public:
 	}
 	//! Clear everything
 	void clear();
+	//! Look up a feature by URI; returns nullptr if not present
+	const LV2_Feature* feature(const char* uri) const;
+
+	//! data-access feature data; used by UIs, not part of the feature map
+	LV2_Extension_Data_Feature m_extData{};
 
 private:
 	//! feature storage

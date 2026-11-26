@@ -178,7 +178,7 @@ static void installCrashHandler()
 	std::signal( SIGILL, crashHandler );
 	std::signal( SIGFPE, crashHandler );
 }
-#endif
+#endif // LMMS_HAVE_EXECINFO
 
 static inline QString baseName( const QString & file )
 {

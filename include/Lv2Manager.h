@@ -122,6 +122,8 @@ public:
 	Iterator end() { return m_lv2InfoMap.end(); }
 
 	UridMap& uridMap() { return m_uridMap; }
+	//! lilv world used for plugin metadata and state (de)serialization
+	LilvWorld* world() const { return m_world; }
 	const Lv2UridCache& uridCache() const { return m_uridCache; }
 	const std::set<std::string_view>& supportedFeatureURIs() const
 	{
@@ -134,6 +136,11 @@ public:
 	static bool pluginIsUnstable(const char* pluginUri)
 	{
 		return unstablePlugins.contains(pluginUri);
+	}
+	//! Plugins whose native UI is known to crash the host
+	static bool pluginUiIsUnstable(const char* pluginUri)
+	{
+		return unstableUiPlugins.find(pluginUri) != unstableUiPlugins.end();
 	}
 	static bool pluginIsOnlyUsefulWithUi(const char* pluginUri)
 	{
@@ -163,6 +170,7 @@ private:
 
 	// static
 	static const std::set<std::string_view> unstablePlugins;
+	static const std::set<std::string_view> unstableUiPlugins;
 	static const std::set<std::string_view> pluginsOnlyUsefulWithUi;
 	static const std::set<std::string_view> unstablePluginsBuffersizeLessEqual32;
 

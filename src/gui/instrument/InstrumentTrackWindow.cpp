@@ -311,7 +311,12 @@ void InstrumentTrackWindow::resizeEvent(QResizeEvent * event) {
 
 InstrumentTrackWindow::~InstrumentTrackWindow()
 {
-	delete m_instrumentView;
+	if (m_instrumentView)
+	{
+		m_tabWidget->removeTab(0);
+		delete m_instrumentView;
+		m_instrumentView = nullptr;
+	}
 
 	if (parentWidget())
 	{
@@ -345,9 +350,12 @@ void InstrumentTrackWindow::modelChanged()
 
 	m_track->disconnect( SIGNAL(nameChanged()), this );
 	m_track->disconnect( SIGNAL(instrumentChanged()), this );
+	m_track->disconnect( SIGNAL(instrumentAboutToBeReplaced()), this );
 
 	connect( m_track, SIGNAL(nameChanged()),
 			this, SLOT(updateName()));
+	connect( m_track, SIGNAL(instrumentAboutToBeReplaced()),
+			this, SLOT(clearInstrumentView()), Qt::DirectConnection);
 	connect( m_track, SIGNAL(instrumentChanged()),
 			this, SLOT(updateInstrumentView()));
 
@@ -460,10 +468,32 @@ void InstrumentTrackWindow::updateName()
 
 
 
+void InstrumentTrackWindow::clearInstrumentView()
+{
+	// Destroy the old view while its instrument is still alive. Several
+	// plugin views (VST, LV2) keep pointers into the instrument and its
+	// models, so deleting them after the instrument causes a use-after-free.
+	if (m_instrumentView)
+	{
+		// TabWidget stores a raw pointer; drop it before the widget dies so
+		// paint/resize events cannot touch freed memory during destruction.
+		m_tabWidget->removeTab(0);
+		delete m_instrumentView;
+		m_instrumentView = nullptr;
+	}
+}
+
+
+
+
 void InstrumentTrackWindow::updateInstrumentView()
 {
-	delete m_instrumentView;
-	m_instrumentView = nullptr;
+	if (m_instrumentView)
+	{
+		m_tabWidget->removeTab(0);
+		delete m_instrumentView;
+		m_instrumentView = nullptr;
+	}
 	if( m_track->m_instrument != nullptr )
 	{
 		m_instrumentView = m_track->m_instrument->createView( m_tabWidget );

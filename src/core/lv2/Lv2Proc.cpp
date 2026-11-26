@@ -26,12 +26,26 @@
 
 #ifdef LMMS_HAVE_LV2
 
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <stdexcept>
+#include <lv2/core/lv2.h>
 #include <lv2/midi/midi.h>
 #include <lv2/atom/atom.h>
+#include <lv2/presets/presets.h>
 #include <lv2/resize-port/resize-port.h>
+#include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
 #include <QDebug>
+#include <QDir>
+#include <QDirIterator>
+#include <QDomDocument>
+#include <QDomElement>
+#include <QFile>
+#include <QFileInfo>
 #include <QtGlobal>
 #include <algorithm>
 
@@ -46,11 +60,17 @@
 #include "Lv2Evbuf.h"
 #include "MidiEvent.h"
 #include "MidiEventToByteSeq.h"
+#include "ModelVisitor.h"
 #include "NoCopyNoMove.h"
 
 
 namespace lmms
 {
+
+
+
+
+
 
 
 // container for everything required to store MIDI events going to the plugin
@@ -64,12 +84,59 @@ struct MidiInputEvent
 
 
 
+namespace
+{
+void setModelFromControlValue(AutomatableModel* model,
+	const std::vector<float>& scalePointMap, float value)
+{
+	struct SetModelVisitor : ModelVisitor
+	{
+		const std::vector<float>* m_scalePointMap = nullptr;
+		float m_val = 0.f;
+
+		void visit(FloatModel& m) override { m.setValue(m_val); }
+		void visit(IntModel& m) override { m.setValue(m_val); }
+		void visit(BoolModel& m) override { m.setValue(m_val); }
+		void visit(ComboBoxModel& m) override
+		{
+			if (!m_scalePointMap || m_scalePointMap->empty())
+			{
+				m.setValue(m_val);
+				return;
+			}
+
+			float bestDist = std::numeric_limits<float>::max();
+			std::size_t bestIdx = 0;
+			for (std::size_t idx = 0; idx < m_scalePointMap->size(); ++idx)
+			{
+				const float dist = std::fabs((*m_scalePointMap)[idx] - m_val);
+				if (dist < bestDist)
+				{
+					bestDist = dist;
+					bestIdx = idx;
+				}
+			}
+			m.setValue(static_cast<float>(bestIdx));
+		}
+	};
+
+	SetModelVisitor visitor;
+	visitor.m_scalePointMap = &scalePointMap;
+	visitor.m_val = value;
+	model->accept(visitor);
+}
+}
+
+
+
+
 Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 	std::vector<PluginIssue>& issues)
 {
 	unsigned maxPorts = lilv_plugin_get_num_ports(plugin);
 	enum { inCount, outCount, maxCount };
 	auto audioChannels = std::array<unsigned, maxCount>{}; // audio input and output count
+	auto optionalAudioChannels = std::array<unsigned, maxCount>{}; // optional audio ports
 	auto midiChannels = std::array<unsigned, maxCount>{}; // MIDI input and output count
 
 	const char* pluginUri = lilv_node_as_uri(lilv_plugin_get_uri(plugin));
@@ -100,14 +167,22 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		std::vector<PluginIssue> tmp = meta.get(plugin, portNum);
 		std::move(tmp.begin(), tmp.end(), std::back_inserter(issues));
 
-		bool portMustBeUsed =
-			!portIsSideChain(plugin,
-							lilv_plugin_get_port_by_index(plugin, portNum)) &&
-			!meta.m_optional;
-		if (meta.m_type == Lv2Ports::Type::Audio && portMustBeUsed)
+		const bool sideChain = portIsSideChain(plugin,
+			lilv_plugin_get_port_by_index(plugin, portNum));
+		const bool portMustBeUsed = !sideChain && !meta.m_optional;
+		if (meta.m_type == Lv2Ports::Type::Audio)
 		{
-			++audioChannels[meta.m_flow == Lv2Ports::Flow::Output
-				? outCount : inCount];
+			if (portMustBeUsed)
+			{
+				++audioChannels[meta.m_flow == Lv2Ports::Flow::Output
+					? outCount : inCount];
+			}
+			else if (!sideChain)
+			{
+				++optionalAudioChannels[
+					meta.m_flow == Lv2Ports::Flow::Output
+						? outCount : inCount];
+			}
 		}
 		else if(meta.m_type == Lv2Ports::Type::AtomSeq && portMustBeUsed)
 		{
@@ -116,14 +191,11 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		}
 	}
 
-	if (audioChannels[inCount] > 2)
-		issues.emplace_back(PluginIssueType::TooManyInputChannels,
-			std::to_string(audioChannels[inCount]));
-	if (audioChannels[outCount] == 0)
+	// LMMS only consumes the first stereo pair. Extra audio ports remain
+	// connected to their own buffers so the plugin can run, but their data is
+	// ignored. This matches the VST2 host's behaviour.
+	if (audioChannels[outCount] == 0 && optionalAudioChannels[outCount] == 0)
 		issues.emplace_back(PluginIssueType::NoOutputChannel);
-	else if (audioChannels[outCount] > 2)
-		issues.emplace_back(PluginIssueType::TooManyOutputChannels,
-			std::to_string(audioChannels[outCount]));
 
 	if (midiChannels[inCount] > 1)
 		issues.emplace_back(PluginIssueType::TooManyMidiInputChannels,
@@ -160,11 +232,9 @@ Plugin::Type Lv2Proc::check(const LilvPlugin *plugin,
 		}
 	}
 
-	return (audioChannels[inCount] > 2 || audioChannels[outCount] > 2)
-		? Plugin::Type::Undefined
-		: (audioChannels[inCount] > 0)
-			? Plugin::Type::Effect
-			: Plugin::Type::Instrument;
+	return (audioChannels[inCount] > 0)
+		? Plugin::Type::Effect
+		: Plugin::Type::Instrument;
 }
 
 
@@ -191,21 +261,38 @@ private:
 
 
 
-Lv2Proc::Lv2Proc(const LilvPlugin *plugin, Model* parent) :
-	LinkedModelGroup(parent),
-	m_plugin(plugin),
+Lv2Proc::Lv2Proc(Model* parent, const QString &uri) :
+	ModelGroup(parent),
+	m_plugin(Engine::getLv2Manager()->getPlugin(uri)),
 	m_workLock(1),
 	m_midiInputBuf(m_maxMidiInputEvents),
-	m_midiInputReader(m_midiInputBuf)
+	m_midiInputReader(m_midiInputBuf),
+	m_makePath{this, &Lv2Proc::makePath},
+	m_freePath{nullptr, &Lv2Proc::freePath},
+	m_mapPath{this, &Lv2Proc::absolutePath, &Lv2Proc::abstractPath}
 {
+	if (!m_plugin)
+	{
+		qCritical() << "No Lv2 plugin found for URI" << uri;
+		throw std::runtime_error("No Lv2 plugin found for given URI");
+	}
 	createPorts();
 	initPlugin();
+	scanPresets();
 }
 
 
 
 
-Lv2Proc::~Lv2Proc() { shutdownPlugin(); }
+Lv2Proc::~Lv2Proc()
+{
+	if (m_viewDetacher)
+	{
+		m_viewDetacher();
+		m_viewDetacher = nullptr;
+	}
+	shutdownPlugin();
+}
 
 
 
@@ -228,19 +315,197 @@ void Lv2Proc::dumpPorts()
 
 
 
+void Lv2Proc::scanPresets()
+{
+	m_presets.clear();
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode presetType = mgr->uri(LV2_PRESETS__Preset);
+	AutoLilvNode labelPredicate = mgr->uri(LILV_NS_RDFS "label");
+	AutoLilvNodes related(lilv_plugin_get_related(m_plugin, presetType.get()));
+	if (!related)
+	{
+		return;
+	}
+
+	LILV_FOREACH(nodes, it, related.get())
+	{
+		const LilvNode* node = lilv_nodes_get(related.get(), it);
+		if (!lilv_node_is_uri(node))
+		{
+			continue;
+		}
+
+		QString label;
+		auto fetchLabel = [&]() -> QString
+		{
+			LilvNode* labelNode = lilv_world_get(
+				mgr->world(), node, labelPredicate.get(), nullptr);
+			if (!labelNode)
+			{
+				return {};
+			}
+			QString text;
+			if (lilv_node_is_string(labelNode))
+			{
+				text = QString::fromUtf8(
+					lilv_node_as_string(labelNode)).trimmed();
+			}
+			lilv_node_free(labelNode);
+			return text;
+		};
+
+		label = fetchLabel();
+		if (label.isEmpty())
+		{
+			// Older bundles (e.g. mda) only store the label in the file
+			// referenced by rdfs:seeAlso.
+			lilv_world_load_resource(mgr->world(), node);
+			label = fetchLabel();
+		}
+
+		const QString uri = QString::fromUtf8(lilv_node_as_uri(node));
+		if (label.isEmpty())
+		{
+			label = uri.section(QLatin1Char('#'), -1);
+			if (label.isEmpty())
+			{
+				label = uri;
+			}
+		}
+		m_presets.push_back({label, uri});
+	}
+
+	std::sort(m_presets.begin(), m_presets.end(),
+		[](const Preset& a, const Preset& b)
+		{
+			const int cmp = QString::localeAwareCompare(a.label, b.label);
+			return cmp < 0 || (cmp == 0 && a.uri < b.uri);
+		});
+}
+
+
+
+
+bool Lv2Proc::loadPreset(std::size_t index)
+{
+	if (!m_instance || index >= m_presets.size())
+	{
+		return false;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	const QByteArray presetUri = m_presets[index].uri.toUtf8();
+	AutoLilvNode presetNode(lilv_new_uri(mgr->world(), presetUri.constData()));
+	if (!presetNode)
+	{
+		return false;
+	}
+
+	if (lilv_world_load_resource(mgr->world(), presetNode.get()) < 0)
+	{
+		qWarning() << "Could not load LV2 preset resource"
+			<< m_presets[index].uri;
+	}
+
+	LilvState* state = lilv_state_new_from_world(
+		mgr->world(), mgr->uridMap().mapFeature(), presetNode.get());
+	if (!state)
+	{
+		qWarning() << "Could not create LV2 state for preset"
+			<< m_presets[index].uri;
+		return false;
+	}
+
+	struct RestoredValue
+	{
+		std::size_t portIndex;
+		float value;
+	};
+	struct RestoreContext
+	{
+		Lv2Proc* proc;
+		std::vector<RestoredValue>* values;
+	};
+
+	std::vector<RestoredValue> restoredValues;
+	RestoreContext context{this, &restoredValues};
+
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		lilv_state_restore(state, m_instance,
+			[](const char* portSymbol, void* userData, const void* value,
+				uint32_t size, uint32_t)
+			{
+				auto* ctx = static_cast<RestoreContext*>(userData);
+				if (!ctx || !ctx->proc || !ctx->values || !portSymbol
+					|| !value || size != sizeof(float))
+				{
+					return;
+				}
+
+				const std::size_t portIndex =
+					ctx->proc->getIdOfPort(portSymbol);
+				if (portIndex >= ctx->proc->portNum())
+				{
+					return;
+				}
+
+				auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(
+					ctx->proc->port(portIndex));
+				if (!ctrl)
+				{
+					return;
+				}
+
+				ctrl->m_val = *static_cast<const float*>(value);
+				ctx->values->push_back({portIndex, ctrl->m_val});
+			},
+			&context, 0, nullptr);
+	}
+	lilv_state_free(state);
+
+	for (const RestoredValue& restored : restoredValues)
+	{
+		auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(port(restored.portIndex));
+		if (ctrl && ctrl->m_connectedModel)
+		{
+			setModelFromControlValue(ctrl->m_connectedModel.get(),
+				ctrl->m_scalePointMap, restored.value);
+		}
+	}
+
+	return true;
+}
+
+
+
+
 void Lv2Proc::copyModelsFromCore()
 {
 	struct FloatFromModelVisitor : public ConstModelVisitor
 	{
-		const std::vector<float>* m_scalePointMap; // in
-		float m_res; // out
+		const std::vector<float>* m_scalePointMap = nullptr; // in
+		float m_res = 0.f; // out
 		void visit(const FloatModel& m) override { m_res = m.value(); }
 		void visit(const IntModel& m) override {
 			m_res = static_cast<float>(m.value()); }
 		void visit(const BoolModel& m) override {
 			m_res = static_cast<float>(m.value()); }
-		void visit(const ComboBoxModel& m) override {
-			m_res = (*m_scalePointMap)[static_cast<std::size_t>(m.value())]; }
+		void visit(const ComboBoxModel& m) override
+		{
+			// Plugins may advertise lv2:enumeration without scale points.
+			// Never index an empty or too-short scale point map.
+			if (m_scalePointMap == nullptr || m_scalePointMap->empty())
+			{
+				m_res = 0.f;
+				return;
+			}
+			const std::size_t index = static_cast<std::size_t>(
+				std::max(0, m.value()));
+			m_res = (*m_scalePointMap)[
+				std::min(index, m_scalePointMap->size() - 1)];
+		}
 	};
 
 	struct Copy : public Lv2Ports::Visitor
@@ -325,45 +590,488 @@ void Lv2Proc::copyModelsToCore()
 
 
 
-void Lv2Proc::copyBuffersFromCore(const SampleFrame* buf,
-									unsigned firstChan, unsigned num,
-									f_cnt_t frames)
+void Lv2Proc::copyBuffersFromCore(const SampleFrame* buf, f_cnt_t frames)
 {
-	inPorts().m_left->copyBuffersFromCore(buf, firstChan, frames);
-	if (num > 1)
+	if (!inPorts().m_left)
 	{
-		// if the caller requests to take input from two channels, but we only
-		// have one input channel... take medium of left and right for
-		// mono input
-		// (this happens if we have two outputs and only one input)
-		if (inPorts().m_right)
-		{
-			inPorts().m_right->copyBuffersFromCore(buf, firstChan + 1, frames);
-		}
-		else
-		{
-			inPorts().m_left->averageWithBuffersFromCore(buf, firstChan + 1, frames);
-		}
+		return;
+	}
+
+	inPorts().m_left->copyBuffersFromCore(buf, 0, frames);
+	if (inPorts().m_right)
+	{
+		inPorts().m_right->copyBuffersFromCore(buf, 1, frames);
+	}
+	else
+	{
+		// LMMS is always stereo, but the effect can only do mono
+		// => merge both input buffers together on left port
+		inPorts().m_left->averageWithBuffersFromCore(buf, 1, frames);
 	}
 }
 
 
 
 
-void Lv2Proc::copyBuffersToCore(SampleFrame* buf,
-								unsigned firstChan, unsigned num,
-								f_cnt_t frames) const
+void Lv2Proc::copyBuffersToCore(SampleFrame* buf, f_cnt_t frames) const
 {
-	outPorts().m_left->copyBuffersToCore(buf, firstChan + 0, frames);
-	if (num > 1)
+	if (!outPorts().m_left)
 	{
-		// if the caller requests to copy into two channels, but we only have
-		// one output channel, duplicate our output
-		// (this happens if we have two inputs and only one output)
-		Lv2Ports::Audio* ap = outPorts().m_right
-			? outPorts().m_right : outPorts().m_left;
-		ap->copyBuffersToCore(buf, firstChan + 1, frames);
+		// No audio output was registered; keep the track silent instead of
+		// dereferencing a null port.
+		for (f_cnt_t f = 0; f < frames; ++f)
+		{
+			buf[f][0] = 0.f;
+			buf[f][1] = 0.f;
+		}
+		return;
 	}
+
+	outPorts().m_left->copyBuffersToCore(buf, 0, frames);
+	// if the caller requests to copy into two channels, but we only have
+	// one output channel, duplicate our output
+	// (this happens if we have two inputs and only one output)
+	Lv2Ports::Audio* ap = outPorts().m_right
+		? outPorts().m_right : outPorts().m_left;
+	ap->copyBuffersToCore(buf, 1, frames);
+}
+
+
+
+
+std::size_t Lv2Proc::getIdOfPort(const char* symbol) const
+{
+	for (std::size_t i = 0; i < m_ports.size(); ++i)
+	{
+		const auto* port = m_ports[i].get();
+		const char* portSymbol = lilv_node_as_string(
+			lilv_port_get_symbol(port->m_plugin, port->m_port));
+		if (portSymbol && std::strcmp(portSymbol, symbol) == 0)
+		{
+			return i;
+		}
+	}
+	return static_cast<std::size_t>(-1);
+}
+
+
+
+
+void Lv2Proc::setControlFromUi(uint32_t portIndex, float value)
+{
+	if (portIndex >= m_ports.size())
+	{
+		return;
+	}
+
+	auto* ctrl = Lv2Ports::dcast<Lv2Ports::Control>(m_ports[portIndex].get());
+	if (!ctrl || !ctrl->m_connectedModel)
+	{
+		return;
+	}
+
+	ctrl->m_val = value;
+	setModelFromControlValue(ctrl->m_connectedModel.get(),
+		ctrl->m_scalePointMap, value);
+}
+
+
+
+
+bool Lv2Proc::writeUiEvent(uint32_t portIndex, uint32_t protocol,
+	uint32_t size, const void* buffer)
+{
+	if (protocol == 0)
+	{
+		if (size != sizeof(float) || !buffer)
+		{
+			return false;
+		}
+		setControlFromUi(portIndex, *static_cast<const float*>(buffer));
+		return true;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	const LV2_URID atomEvent = mgr->uridMap().map(LV2_ATOM__eventTransfer);
+	if (protocol != atomEvent)
+	{
+		qWarning() << "Unsupported LV2 UI event: protocol" << protocol
+			<< "size" << size;
+		return false;
+	}
+
+	if (portIndex >= m_ports.size() || !buffer || size < sizeof(LV2_Atom))
+	{
+		return false;
+	}
+
+	const auto* atom = static_cast<const LV2_Atom*>(buffer);
+	if (atom->size > size - sizeof(LV2_Atom))
+	{
+		return false;
+	}
+
+	auto* atomSeq = dcast<Lv2Ports::AtomSeq>(m_ports[portIndex].get());
+	if (!atomSeq)
+	{
+		return false;
+	}
+
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+	auto it = lv2_evbuf_end(atomSeq->m_buf.get());
+	lv2_evbuf_write(&it, 0, atom->type, atom->size,
+		static_cast<const uint8_t*>(LV2_ATOM_BODY_CONST(atom)));
+	return true;
+}
+
+
+
+
+void Lv2Proc::connectToPluginEvents()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_uiEventMutex);
+		m_uiEvents.clear();
+	}
+	m_uiActive.store(true, std::memory_order_relaxed);
+}
+
+
+
+
+std::vector<Lv2Proc::UiEvent> Lv2Proc::takeUiEvents()
+{
+	std::deque<UiEvent> events;
+	{
+		std::lock_guard<std::mutex> lock(m_uiEventMutex);
+		events.swap(m_uiEvents);
+	}
+
+	std::vector<UiEvent> result;
+	result.reserve(events.size());
+	for (auto& event : events)
+	{
+		result.push_back(std::move(event));
+	}
+	return result;
+}
+
+
+
+
+bool Lv2Proc::sendToUi(uint32_t portIndex, uint32_t type, uint32_t size,
+	const void* body)
+{
+	if (!m_uiActive.load(std::memory_order_relaxed))
+	{
+		return false;
+	}
+
+	constexpr std::size_t maxBodySize = 4096;
+	if (size > maxBodySize || (size > 0 && !body))
+	{
+		qWarning() << "Dropping oversized LV2 UI event for port" << portIndex
+			<< "size" << size;
+		return false;
+	}
+
+	const LV2_URID atomEvent =
+		Engine::getLv2Manager()->uridMap().map(LV2_ATOM__eventTransfer);
+
+	std::lock_guard<std::mutex> lock(m_uiEventMutex);
+	if (m_uiEvents.size() >= 256)
+	{
+		qWarning() << "Plugin => UI queue overflow for port" << portIndex;
+		return false;
+	}
+
+	UiEvent event;
+	event.index = portIndex;
+	event.protocol = atomEvent;
+	event.data.resize(sizeof(LV2_Atom) + size);
+	auto* atom = reinterpret_cast<LV2_Atom*>(event.data.data());
+	atom->size = size;
+	atom->type = type;
+	if (size > 0)
+	{
+		std::memcpy(event.data.data() + sizeof(LV2_Atom), body, size);
+	}
+	m_uiEvents.push_back(std::move(event));
+	return true;
+}
+
+
+
+
+void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
+{
+	ModelGroup::saveSettings(doc, that);
+	saveState(doc, that);
+}
+
+
+
+
+void Lv2Proc::loadSettings(const QDomElement& that)
+{
+	ModelGroup::loadSettings(that);
+	loadState(that);
+}
+
+
+
+
+namespace
+{
+char* duplicateCString(const QByteArray& str)
+{
+	auto* result = static_cast<char*>(std::malloc(static_cast<std::size_t>(str.size()) + 1));
+	if (result)
+	{
+		std::memcpy(result, str.constData(), static_cast<std::size_t>(str.size()) + 1);
+	}
+	return result;
+}
+}
+
+
+
+
+void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
+{
+	if (!m_instance || !m_plugin || !m_stateDir)
+	{
+		return;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	if (!lilv_plugin_has_extension_data(m_plugin, stateIface.get()))
+	{
+		return;
+	}
+
+	QTemporaryDir saveDir(QDir::tempPath() + "/lmms-lv2save-XXXXXX");
+	if (!saveDir.isValid())
+	{
+		qWarning() << "Could not create temporary LV2 save directory";
+		return;
+	}
+
+	const QByteArray savePath = saveDir.path().toUtf8();
+	const QByteArray scratchPath = m_stateDir ? m_stateDir->path().toUtf8() : QByteArray();
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		LilvState* state = lilv_state_new_from_instance(
+			m_plugin, m_instance, mgr->uridMap().mapFeature(),
+			scratchPath.isEmpty() ? nullptr : scratchPath.constData(),
+			savePath.constData(), savePath.constData(), savePath.constData(),
+			nullptr, nullptr, 0, nullptr);
+		if (!state)
+		{
+			qWarning() << "Could not save LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+			return;
+		}
+
+		const int ret = lilv_state_save(
+			mgr->world(), mgr->uridMap().mapFeature(), mgr->uridMap().unmapFeature(),
+			state, nullptr, savePath.constData(), "state.ttl");
+		lilv_state_free(state);
+		if (ret != 0)
+		{
+			qWarning() << "Could not write LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name)
+				<< "(error" << ret << ")";
+			return;
+		}
+	}
+
+	QDomElement stateElem = doc.createElement("lv2state");
+	stateElem.setAttribute("version", 1);
+
+	const QDir dir(saveDir.path());
+	QDirIterator it(saveDir.path(), QDir::Files | QDir::NoDotAndDotDot,
+		QDirIterator::Subdirectories);
+	bool anyFile = false;
+	while (it.hasNext())
+	{
+		const QString path = it.next();
+		const QString rel = dir.relativeFilePath(path);
+		if (rel == "manifest.ttl")
+		{
+			continue;
+		}
+
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			qWarning() << "Could not read LV2 state file" << path;
+			continue;
+		}
+
+		QDomElement fileElem = doc.createElement("file");
+		fileElem.setAttribute("name", rel);
+		fileElem.appendChild(doc.createTextNode(
+			QString::fromLatin1(file.readAll().toBase64())));
+		stateElem.appendChild(fileElem);
+		anyFile = true;
+	}
+
+	if (anyFile)
+	{
+		that.appendChild(stateElem);
+	}
+}
+
+
+
+
+void Lv2Proc::loadState(const QDomElement& that)
+{
+	const QDomElement stateElem = that.firstChildElement("lv2state");
+	if (stateElem.isNull() || !m_instance || !m_plugin)
+	{
+		return;
+	}
+
+	const int version = stateElem.attribute("version", "0").toInt();
+	if (version != 1)
+	{
+		qWarning() << "Unsupported LV2 state version" << version;
+		return;
+	}
+
+	auto stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+	if (!stateDir->isValid())
+	{
+		qWarning() << "Could not create temporary LV2 state directory";
+		return;
+	}
+
+	for (QDomElement fileElem = stateElem.firstChildElement("file");
+		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
+	{
+		const QString name = fileElem.attribute("name");
+		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
+		{
+			qWarning() << "Ignoring invalid LV2 state file name" << name;
+			continue;
+		}
+
+		const QString path = QDir(stateDir->path()).filePath(name);
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		QFile file(path);
+		if (!file.open(QIODevice::WriteOnly))
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return;
+		}
+		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return;
+		}
+	}
+
+	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
+	if (!QFileInfo::exists(statePath))
+	{
+		qWarning() << "LV2 state has no state.ttl";
+		return;
+	}
+
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	LilvState* state = lilv_state_new_from_file(
+		mgr->world(), mgr->uridMap().mapFeature(), nullptr,
+		statePath.toUtf8().constData());
+	if (!state)
+	{
+		qWarning() << "Could not load LV2 state from" << statePath;
+		return;
+	}
+
+	m_stateDir = std::move(stateDir);
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		LV2_Feature mapPathFeature{LV2_STATE__mapPath, &m_mapPath};
+		LV2_Feature makePathFeature{LV2_STATE__makePath, &m_makePath};
+		LV2_Feature freePathFeature{LV2_STATE__freePath, &m_freePath};
+		const LV2_Feature* features[] = {
+			&mapPathFeature, &makePathFeature, &freePathFeature, nullptr
+		};
+		lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
+	}
+	lilv_state_free(state);
+
+	copyModelsFromCore();
+}
+
+
+
+
+char* Lv2Proc::makePath(LV2_State_Make_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !self->m_stateDir->isValid() || !path || !*path)
+	{
+		return nullptr;
+	}
+
+	const QString full = QDir(self->m_stateDir->path()).filePath(QString::fromUtf8(path));
+	if (!QDir().mkpath(QFileInfo(full).absolutePath()))
+	{
+		return nullptr;
+	}
+	return duplicateCString(full.toUtf8());
+}
+
+
+
+
+void Lv2Proc::freePath(LV2_State_Free_Path_Handle, char* path)
+{
+	std::free(path);
+}
+
+
+
+
+char* Lv2Proc::absolutePath(LV2_State_Map_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !path || !*path)
+	{
+		return duplicateCString(QByteArray());
+	}
+
+	if (QDir::isAbsolutePath(QString::fromUtf8(path)))
+	{
+		return duplicateCString(QByteArray(path));
+	}
+
+	return duplicateCString(
+		QDir(self->m_stateDir->path()).filePath(QString::fromUtf8(path)).toUtf8());
+}
+
+
+
+
+char* Lv2Proc::abstractPath(LV2_State_Map_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2Proc*>(handle);
+	if (!self || !self->m_stateDir || !path || !*path)
+	{
+		return duplicateCString(QByteArray());
+	}
+
+	const QString absPath = QString::fromUtf8(path);
+	const QString stateDir = QDir(self->m_stateDir->path()).absolutePath();
+	if (absPath.startsWith(stateDir + '/'))
+	{
+		return duplicateCString(absPath.mid(stateDir.size() + 1).toUtf8());
+	}
+	return duplicateCString(QByteArray(path));
 }
 
 
@@ -371,6 +1079,9 @@ void Lv2Proc::copyBuffersToCore(SampleFrame* buf,
 
 void Lv2Proc::run(f_cnt_t frames)
 {
+	// State save/restore must not run concurrently with the plugin instance
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+
 	if (m_worker)
 	{
 		// Process any worker replies
@@ -379,11 +1090,101 @@ void Lv2Proc::run(f_cnt_t frames)
 
 	lilv_instance_run(m_instance, static_cast<uint32_t>(frames));
 
+	if (m_latencyPort)
+	{
+		m_latency.store(
+			std::max<f_cnt_t>(0, static_cast<f_cnt_t>(std::lround(m_latencyPort->m_val))),
+			std::memory_order_relaxed);
+	}
+
+	m_midiOutEvents.clear();
+	const uint32_t midiEventType = Engine::getLv2Manager()->
+		uridCache()[Lv2UridCache::Id::midi_MidiEvent];
+
+	// Forward atom output events (MIDI, patch messages, meters, ...) to the UI
+	for (std::size_t p = 0; p < m_ports.size(); ++p)
+	{
+		auto* port = m_ports[p].get();
+		if (port->m_flow != Lv2Ports::Flow::Output
+			|| port->m_type != Lv2Ports::Type::AtomSeq)
+		{
+			continue;
+		}
+
+		auto* atomSeq = dcast<Lv2Ports::AtomSeq>(port);
+		if (!atomSeq)
+		{
+			continue;
+		}
+
+		for (auto i = lv2_evbuf_begin(atomSeq->m_buf.get());
+			lv2_evbuf_is_valid(i); i = lv2_evbuf_next(i))
+		{
+			uint32_t frames = 0;
+			uint32_t type = 0;
+			uint32_t size = 0;
+			uint8_t* body = nullptr;
+			if (!lv2_evbuf_get(i, &frames, &type, &size, &body))
+			{
+				continue;
+			}
+			if (atomSeq == m_midiOut && type == midiEventType)
+			{
+				collectMidiOutEvent(frames, body, size);
+			}
+			sendToUi(static_cast<uint32_t>(p), type, size, body);
+		}
+	}
+
 	if (m_worker)
 	{
 		// Notify the plugin the run() cycle is finished
 		m_worker->notifyPluginThatRunFinished();
 	}
+}
+
+
+
+
+void Lv2Proc::collectMidiOutEvent(uint32_t offset, const uint8_t* data,
+	uint32_t size)
+{
+	if (!data || size == 0 || m_midiOutEvents.size() >= 1024)
+	{
+		return;
+	}
+
+	const uint8_t status = data[0];
+	if (status < 0x80)
+	{
+		// Running status is not expected in LV2 MIDI atoms.
+		return;
+	}
+
+	switch (status & 0xF0)
+	{
+	case 0x80:
+	case 0x90:
+	case 0xA0:
+	case 0xB0:
+	case 0xE0:
+		if (size < 3) { return; }
+		break;
+	case 0xC0:
+	case 0xD0:
+		if (size < 2) { return; }
+		break;
+	default:
+		// SysEx and system messages are not routed yet.
+		return;
+	}
+
+	MidiOutEvent event;
+	event.offset = offset;
+	event.size = static_cast<uint8_t>((status & 0xF0) == 0xC0
+		|| (status & 0xF0) == 0xD0 ? 2 : 3);
+	std::copy(data, data + event.size, event.data.begin());
+	m_midiOutEvents.push_back(event);
 }
 
 
@@ -445,6 +1246,10 @@ void Lv2Proc::initPlugin()
 
 	if (m_instance)
 	{
+		// Data-access feature for plugin UIs (extension_data of the plugin)
+		m_features.m_extData.data_access =
+			lilv_instance_get_descriptor(m_instance)->extension_data;
+
 		if (m_worker)
 		{
 			const auto iface = static_cast<const LV2_Worker_Interface*>(
@@ -542,8 +1347,27 @@ void Lv2Proc::initPluginSpecificFeatures()
 	initMOptions();
 	m_features[LV2_OPTIONS__options] = const_cast<LV2_Options_Option*>(m_options.feature());
 
-	// worker (if plugin has worker extension)
 	Lv2Manager* mgr = Engine::getLv2Manager();
+
+	// state: some plugins create files at instantiate time (state:makePath).
+	// Keep those files for the lifetime of this instance.
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	AutoLilvNode makePath = mgr->uri(LV2_STATE__makePath);
+	if (lilv_plugin_has_extension_data(m_plugin, stateIface.get())
+		|| lilv_plugin_has_feature(m_plugin, makePath.get()))
+	{
+		m_stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+		m_features[LV2_STATE__makePath] = &m_makePath;
+		m_features[LV2_STATE__freePath] = &m_freePath;
+		if (!m_stateDir->isValid())
+		{
+			qWarning() << "Could not create temporary LV2 state directory;"
+				<< "plugins requiring state:makePath at instantiate time may fail";
+			m_stateDir.reset();
+		}
+	}
+
+	// worker (if plugin has worker extension)
 	if (lilv_plugin_has_extension_data(m_plugin, mgr->uri(LV2_WORKER__interface).get()))
 	{
 		bool threaded = !Engine::audioEngine()->renderOnly();
@@ -619,12 +1443,10 @@ void Lv2Proc::createPort(std::size_t portNum)
 						break;
 					case Lv2Ports::Vis::Enumeration:
 					{
-						ComboBoxModel* comboModel = new ComboBoxModel(nullptr, dispName);
-
+						std::map<float, const char*> scalePointMap;
 						{
 							AutoLilvScalePoints sps (static_cast<LilvScalePoints*>(lilv_port_get_scale_points(m_plugin, lilvPort)));
 							// temporary map, since lilv may return scale points in random order
-							std::map<float, const char*> scalePointMap;
 							LILV_FOREACH(scale_points, i, sps.get())
 							{
 								const LilvScalePoint* sp = lilv_scale_points_get(sps.get(), i);
@@ -632,11 +1454,32 @@ void Lv2Proc::createPort(std::size_t portNum)
 								const char* s = lilv_node_as_string(lilv_scale_point_get_label(sp));
 								scalePointMap[f] = s;
 							}
-							for (const auto& [f,s] : scalePointMap)
-							{
-								ctrl->m_scalePointMap.push_back(f);
-								comboModel->addItem(s);
-							}
+						}
+
+						// Some plugins mark integer controls as lv2:enumeration
+						// but do not provide scale points (e.g. sfizz). A combo
+						// box without entries would index an empty map when the
+						// parameter values are copied to the plugin.
+						if (scalePointMap.empty())
+						{
+							const float range = meta.max(sr) - meta.min(sr);
+							const bool integralValues =
+								meta.def() == std::floor(meta.def())
+								&& meta.min(sr) == std::floor(meta.min(sr))
+								&& meta.max(sr) == std::floor(meta.max(sr));
+							const float stepSize = integralValues
+								? 1.0f : std::max(range / 1000.0f, 0.01f);
+							ctrl->m_connectedModel.reset(
+								new FloatModel(meta.def(), meta.min(sr),
+									meta.max(sr), stepSize, nullptr, dispName));
+							break;
+						}
+
+						ComboBoxModel* comboModel = new ComboBoxModel(nullptr, dispName);
+						for (const auto& [f,s] : scalePointMap)
+						{
+							ctrl->m_scalePointMap.push_back(f);
+							comboModel->addItem(s);
 						}
 						for(std::size_t i = 0; i < ctrl->m_scalePointMap.size(); ++i)
 						{
@@ -749,11 +1592,27 @@ void Lv2Proc::createPorts()
 					amo);
 				m_proc->addModel(amo, ctrl.uri());
 			}
+			else if (ctrl.m_flow == Lv2Ports::Flow::Output)
+			{
+				AutoLilvNode designation = Engine::getLv2Manager()->
+					uri(LV2_CORE__designation);
+				AutoLilvNode latency = Engine::getLv2Manager()->
+					uri(LV2_CORE__latency);
+				AutoLilvNodes values(lilv_port_get_value(
+					m_proc->m_plugin, ctrl.m_port, designation.get()));
+				if (values && lilv_nodes_contains(values.get(), latency.get()))
+				{
+					m_proc->m_latencyPort = &ctrl;
+				}
+			}
 		}
 
 		void visit(Lv2Ports::Audio& audio) override
 		{
-			if (audio.mustBeUsed())
+			// Optional audio ports still have to be usable: some instruments
+			// (e.g. OB-Xd) mark their only outputs as connectionOptional.
+			// Sidechain ports are intentionally not routed here.
+			if (!audio.isSideChain())
 			{
 				StereoPortRef dummy;
 				StereoPortRef* portRef = &dummy;

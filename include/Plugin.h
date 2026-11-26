@@ -29,6 +29,7 @@
 #include <QMap>
 
 #include "JournallingObject.h"
+#include "LmmsTypes.h"
 #include "Model.h"
 
 
@@ -88,7 +89,7 @@ public:
 	//! Descriptor holds information about a plugin - every external plugin
 	//! has to instantiate such a Descriptor in an extern "C"-section so that
 	//! the plugin-loader is able to access information about the plugin
-	struct Descriptor
+	struct LMMS_EXPORT Descriptor
 	{
 		const char * name;
 		const char * displayName;
@@ -132,7 +133,7 @@ public:
 					SubPluginFeatures, which are like values
 					in a key-value map).
 			*/
-			struct Key
+			struct LMMS_EXPORT Key
 			{
 				using AttributeMap = QMap<QString, QString>;
 
@@ -197,6 +198,17 @@ public:
 			{
 			}
 
+			//! Whether the sub-plugin list can be refreshed at runtime.
+			virtual bool canRescan() const
+			{
+				return false;
+			}
+
+			//! Refresh the sub-plugin list. Only called when canRescan() is true.
+			virtual void rescan()
+			{
+			}
+
 
 		private:
 			// You can add values mapped by "Key" below
@@ -246,6 +258,9 @@ public:
 	);
 
 	~Plugin() override = default;
+
+	//! Processing latency in samples
+	virtual f_cnt_t latency() const { return 0; }
 
 	//! Return display-name out of sub plugin or descriptor
 	QString displayName() const override;

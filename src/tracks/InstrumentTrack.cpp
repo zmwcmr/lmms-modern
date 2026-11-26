@@ -43,6 +43,8 @@
 #include "Pitch.h"
 #include "Song.h"
 
+#include <QTimer>
+
 namespace lmms
 {
 
@@ -124,6 +126,23 @@ InstrumentTrack::InstrumentTrack(TrackContainer* tc) :
 	connect(&m_pitchModel, SIGNAL(dataChanged()), this, SLOT(updatePitch()), Qt::DirectConnection);
 	connect(&m_pitchRangeModel, SIGNAL(dataChanged()), this, SLOT(updatePitchRange()), Qt::DirectConnection);
 	connect(&m_mixerChannelModel, SIGNAL(dataChanged()), this, SLOT(updateMixerChannel()), Qt::DirectConnection);
+	connect(this, &InstrumentTrack::instrumentChanged, this, [this] {
+		m_audioBusHandle.setSourceLatency(
+			m_instrument != nullptr ? m_instrument->latency() : 0);
+	});
+
+	// Some plugins change their reported latency at runtime (for example
+	// after a look-ahead parameter changes). Query it on the GUI thread and
+	// publish the value through the lock-free bus field instead of blocking
+	// the audio thread on a plugin mutex.
+	auto* latencyTimer = new QTimer(this);
+	latencyTimer->setInterval(500);
+	latencyTimer->setTimerType(Qt::CoarseTimer);
+	connect(latencyTimer, &QTimer::timeout, this, [this] {
+		m_audioBusHandle.setSourceLatency(
+			m_instrument != nullptr ? m_instrument->latency() : 0);
+	});
+	latencyTimer->start();
 
 	autoAssignMidiDevice(true);
 }
@@ -460,6 +479,15 @@ void InstrumentTrack::processInEvent( const MidiEvent& event, const TimePos& tim
 		qWarning("InstrumentTrack: unhandled MIDI event %d", event.type());
 	}
 
+}
+
+
+
+
+void InstrumentTrack::routeMidiOutEvent(const MidiEvent& event,
+	const TimePos& time)
+{
+	m_midiPort.processOutEvent(event, time);
 }
 
 
@@ -981,6 +1009,7 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 				}
 				else
 				{
+					emit instrumentAboutToBeReplaced();
 					delete m_instrument;
 					m_instrument = nullptr;
 					m_instrument = Instrument::instantiate(
@@ -1012,6 +1041,7 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 					ControllerConnection::classNodeName() != node.nodeName() &&
 					!node.toElement().hasAttribute( "id" ))
 			{
+				emit instrumentAboutToBeReplaced();
 				delete m_instrument;
 				m_instrument = nullptr;
 				m_instrument = Instrument::instantiate(
@@ -1095,6 +1125,7 @@ Instrument * InstrumentTrack::loadInstrument(const QString & _plugin_name,
 	silenceAllNotes( true );
 
 	lock();
+	emit instrumentAboutToBeReplaced();
 	delete m_instrument;
 	m_instrument = nullptr;
 	m_unknownInstrumentXml.clear();

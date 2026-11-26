@@ -217,6 +217,12 @@ public:
 		return getPlayPos(m_playMode);
 	}
 
+	//! Frame offset of the current automation update within the audio period
+	f_cnt_t currentFrameOffsetInPeriod() const
+	{
+		return m_currentFrameOffsetInPeriod.load(std::memory_order_relaxed);
+	}
+
 	void setPlayPos(tick_t ticks, PlayMode playMode)
 	{
 		getTimeline(playMode).setTicks(ticks);
@@ -457,6 +463,8 @@ private:
 	TimePos m_exportLoopEnd;
 	TimePos m_exportSongEnd;
 	TimePos m_exportEffectiveLength;
+	//! Frame offset of the last automation update in the current period
+	std::atomic<f_cnt_t> m_currentFrameOffsetInPeriod{0};
 
 	std::shared_ptr<Scale> m_scales[MaxScaleCount];
 	std::shared_ptr<Keymap> m_keymaps[MaxKeymapCount];

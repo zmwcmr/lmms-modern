@@ -109,14 +109,33 @@ bool AudioBusHandle::processEffects()
 }
 
 
+f_cnt_t AudioBusHandle::latency() const
+{
+	return m_sourceLatency.load(std::memory_order_relaxed)
+		+ (m_effects ? m_effects->latency() : 0);
+}
+
+
+
+
+void AudioBusHandle::applyDelay(f_cnt_t frames)
+{
+	m_delayLine.process(m_buffer.groupBuffers(0), frames);
+}
+
+
+
+
 void AudioBusHandle::doProcessing()
 {
+	const f_cnt_t fpp = Engine::audioEngine()->framesPerPeriod();
+
 	if (m_mutedModel && m_mutedModel->value())
 	{
+		m_buffer.silenceAllChannels();
+		applyDelay(fpp);
 		return;
 	}
-
-	const f_cnt_t fpp = Engine::audioEngine()->framesPerPeriod();
 
 	// clear the buffer
 	m_buffer.silenceAllChannels();
@@ -252,6 +271,7 @@ void AudioBusHandle::doProcessing()
 
 	// handle effects
 	const bool anyOutputAfterEffects = processEffects();
+	applyDelay(fpp);
 	if (anyOutputAfterEffects || m_bufferUsage)
 	{
 		// TODO: improve the flow here - convert to pull model

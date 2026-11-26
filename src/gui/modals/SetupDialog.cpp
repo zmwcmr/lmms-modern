@@ -491,6 +491,23 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 			this, SLOT(vstEmbedMethodChanged()));
 	pluginsLayout->addWidget(m_vstEmbedComboBox);
 
+	auto* lv2UiLabel = new QLabel(tr("LV2 plugins UI:"), pluginsBox);
+	pluginsLayout->addWidget(lv2UiLabel);
+
+	auto* lv2UiComboBox = new QComboBox(pluginsBox);
+	lv2UiComboBox->addItem(tr("Automatically choose"), "auto");
+	lv2UiComboBox->addItem(tr("Embed in LMMS window"), "embedded");
+	lv2UiComboBox->addItem(tr("Open in a separate window"), "floating");
+	lv2UiComboBox->addItem(tr("Disabled"), "disabled");
+	lv2UiComboBox->setCurrentIndex(lv2UiComboBox->findData(
+		ConfigManager::inst()->lv2UiEmbedMethod()));
+	connect(lv2UiComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, [lv2UiComboBox](int) {
+			ConfigManager::inst()->setValue("ui", "lv2uimethod",
+				lv2UiComboBox->currentData().toString());
+		});
+	pluginsLayout->addWidget(lv2UiComboBox);
+
 	m_vstAlwaysOnTopCheckBox = addCheckBox(tr("Keep plugin windows on top when not embedded"), pluginsBox, pluginsLayout,
 		m_vstAlwaysOnTop, SLOT(toggleVSTAlwaysOnTop(bool)), false);
 

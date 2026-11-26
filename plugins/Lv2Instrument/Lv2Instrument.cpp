@@ -1,7 +1,7 @@
 /*
  * Lv2Instrument.cpp - implementation of LV2 instrument
  *
- * Copyright (c) 2018-2023 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
+ * Copyright (c) 2018-2024 Johannes Lorenz <jlsf2013$users.sourceforge.net, $=@>
  *
  * This file is part of LMMS - https://lmms.io
  *
@@ -80,7 +80,7 @@ Lv2Instrument::Lv2Instrument(InstrumentTrack *instrumentTrackArg,
 		Flag::IsSingleStreamed
 #endif
 	),
-	Lv2ControlBase(this, key->attributes["uri"])
+	Lv2Proc(this, key->attributes["uri"])
 {
 	clearRunningNotes();
 
@@ -108,7 +108,7 @@ Lv2Instrument::~Lv2Instrument()
 
 void Lv2Instrument::reload()
 {
-	Lv2ControlBase::reload();
+	Lv2Proc::reload();
 	clearRunningNotes();
 	emit modelChanged();
 }
@@ -139,7 +139,7 @@ void Lv2Instrument::onSampleRateChanged()
 
 void Lv2Instrument::saveSettings(QDomDocument &doc, QDomElement &that)
 {
-	Lv2ControlBase::saveSettings(doc, that);
+	Lv2Proc::saveSettings(doc, that);
 }
 
 
@@ -147,7 +147,7 @@ void Lv2Instrument::saveSettings(QDomDocument &doc, QDomElement &that)
 
 void Lv2Instrument::loadSettings(const QDomElement &that)
 {
-	Lv2ControlBase::loadSettings(that);
+	Lv2Proc::loadSettings(that);
 }
 
 
@@ -155,7 +155,7 @@ void Lv2Instrument::loadSettings(const QDomElement &that)
 
 void Lv2Instrument::loadFile(const QString &file)
 {
-	Lv2ControlBase::loadFile(file);
+	Lv2Proc::loadFile(file);
 }
 
 
@@ -187,14 +187,43 @@ void Lv2Instrument::playNote(NotePlayHandle *nph, SampleFrame*)
 
 void Lv2Instrument::play(SampleFrame* buf)
 {
-	copyModelsFromLmms();
+	copyModelsFromCore();
 
 	f_cnt_t fpp = Engine::audioEngine()->framesPerPeriod();
 
 	run(fpp);
 
-	copyModelsToLmms();
-	copyBuffersToLmms(buf, fpp);
+	if (auto* track = instrumentTrack())
+	{
+		track->audioBusHandle()->setSourceLatency(latency());
+	}
+
+	for (const MidiOutEvent& event : midiOutEvents())
+	{
+		if (event.size == 0)
+		{
+			continue;
+		}
+
+		const uint8_t status = event.data[0];
+		const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+		const auto channel = static_cast<int8_t>(status & 0x0F);
+		const auto param1 = event.size > 1
+			? static_cast<int16_t>(event.data[1]) : 0;
+		const auto param2 = event.size > 2
+			? static_cast<int16_t>(event.data[2]) : 0;
+
+		if (auto* track = instrumentTrack())
+		{
+			track->routeMidiOutEvent(
+				MidiEvent(type, channel, param1, param2, nullptr,
+					MidiEvent::Source::Internal), TimePos());
+		}
+	}
+	clearMidiOutEvents();
+
+	copyModelsToCore();
+	copyBuffersToCore(buf, fpp);
 }
 
 
@@ -219,7 +248,7 @@ void Lv2Instrument::updatePitchRange()
 
 QString Lv2Instrument::nodeName() const
 {
-	return Lv2ControlBase::nodeName();
+	return Lv2Proc::nodeName();
 }
 
 
@@ -235,7 +264,7 @@ namespace gui
 
 Lv2InsView::Lv2InsView(Lv2Instrument *_instrument, QWidget *_parent) :
 	InstrumentView(_instrument, _parent),
-	Lv2ViewBase(this, _instrument)
+	Lv2ProcView(this, _instrument)
 {
 	setAutoFillBackground(true);
 	if (m_reloadPluginButton) {
@@ -304,7 +333,7 @@ void Lv2InsView::hideEvent(QHideEvent *event)
 
 void Lv2InsView::modelChanged()
 {
-	Lv2ViewBase::modelChanged(castModel<Lv2Instrument>());
+	Lv2ProcView::modelChanged(castModel<Lv2Instrument>());
 	connect(castModel<Lv2Instrument>(), &Lv2Instrument::modelChanged,
 		this, [this](){ this->modelChanged();} );
 }

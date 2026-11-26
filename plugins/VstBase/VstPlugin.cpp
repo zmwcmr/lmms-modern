@@ -35,6 +35,7 @@
 #include <QTemporaryFile>
 #include <QTimerEvent>
 
+#include <algorithm>
 #include <cstring>
 
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
@@ -144,13 +145,16 @@ enum class ExecutableType
 	Unknown, Win32, Win64, Linux64,
 };
 
-VstPlugin::VstPlugin( const QString & _plugin ) :
+VstPlugin::VstPlugin( const QString & _plugin, bool skipInit ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
-	m_embedMethod( (gui::getGUI() != nullptr)
-			? ConfigManager::inst()->vstEmbedMethod()
-			: "headless" ),
+	m_embedMethod( skipInit
+			? QStringLiteral("headless")
+			: ( (gui::getGUI() != nullptr)
+				? ConfigManager::inst()->vstEmbedMethod()
+				: QStringLiteral("headless") ) ),
 	m_version( 0 ),
+	m_isSynth( false ),
 	m_currentProgram()
 {
 	setSplittedChannels( true );
@@ -188,14 +192,14 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 	switch(pluginType)
 	{
 	case ExecutableType::Win64:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: RemoteVstPlugin64
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_64, skipInit ); // Default: RemoteVstPlugin64
 		break;
 	case ExecutableType::Win32:
-		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32 ); // Default: 32/RemoteVstPlugin32
+		tryLoad( REMOTE_VST_PLUGIN_FILEPATH_32, skipInit ); // Default: 32/RemoteVstPlugin32
 		break;
 #ifdef LMMS_BUILD_LINUX
 	case ExecutableType::Linux64:
-		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64 ); // Default: NativeLinuxRemoteVstPlugin32
+		tryLoad( NATIVE_LINUX_REMOTE_VST_PLUGIN_FILEPATH_64, skipInit ); // Default: NativeLinuxRemoteVstPlugin32
 		break;
 #endif
 	default:
@@ -203,17 +207,20 @@ VstPlugin::VstPlugin( const QString & _plugin ) :
 		return;
 	}
 
-	setTempo( Engine::getSong()->getTempo() );
+	if( !skipInit )
+	{
+		setTempo( Engine::getSong()->getTempo() );
 
-	connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
-			this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
-	connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
-				this, SLOT( updateSampleRate() ) );
+		connect( Engine::getSong(), SIGNAL( tempoChanged( lmms::bpm_t ) ),
+				this, SLOT( setTempo( lmms::bpm_t ) ), Qt::DirectConnection );
+		connect( Engine::audioEngine(), SIGNAL( sampleRateChanged() ),
+					this, SLOT( updateSampleRate() ) );
 
-	// update once per second
-	m_idleTimer.start( 1000 );
-	connect( &m_idleTimer, SIGNAL( timeout() ),
-				this, SLOT( idleUpdate() ) );
+		// update once per second
+		m_idleTimer.start( 1000 );
+		connect( &m_idleTimer, SIGNAL( timeout() ),
+					this, SLOT( idleUpdate() ) );
+	}
 }
 
 
@@ -227,9 +234,10 @@ VstPlugin::~VstPlugin()
 
 
 
-void VstPlugin::tryLoad( const QString &remoteVstPluginExecutable )
+void VstPlugin::tryLoad( const QString &remoteVstPluginExecutable, bool skipInit )
 {
-	init( remoteVstPluginExecutable, false, {m_embedMethod} );
+	init( remoteVstPluginExecutable, false,
+		{m_embedMethod, QString::number(skipInit ? 1 : 0)} );
 
 	waitForHostInfoGotten();
 	if( failed() )
@@ -514,8 +522,41 @@ bool VstPlugin::processMessage( const message & _m )
 			break;
 
 		case IdVstPluginUniqueID:
-			// TODO: display graphically in case of failure
-			printf("unique ID: %s\n", _m.getString().c_str() );
+			m_uniqueID = _m.getQString();
+			break;
+
+		case IdVstIsSynth:
+			m_isSynth = true;
+			break;
+
+		case IdVstLatency:
+			m_latency = std::max(0, _m.getInt(0));
+			break;
+
+		case IdVstMidiOut:
+		{
+			const int deltaFrames = _m.getInt(0);
+			const int size = std::clamp(_m.getInt(1), 0, 4);
+			QByteArray data;
+			data.reserve(size);
+			for (int i = 0; i < size; ++i)
+			{
+				data.append(static_cast<char>(_m.getInt(2 + i) & 0xFF));
+			}
+			emit midiOutEvent(deltaFrames, data);
+			break;
+		}
+
+		case IdVstParameterAutomated:
+			emit parameterAutomated(_m.getInt(0), _m.getFloat(1));
+			break;
+
+		case IdVstParameterGestureBegin:
+			emit parameterGestureBegin(_m.getInt(0));
+			break;
+
+		case IdVstParameterGestureEnd:
+			emit parameterGestureEnd(_m.getInt(0));
 			break;
 
 		case IdVstParameterDump:
@@ -687,6 +728,29 @@ void VstPlugin::setParam( int i, float f )
 	lock();
 	sendMessage( message( IdVstSetParameter ).addInt( i ).addFloat( f ) );
 	//waitForMessage( IdVstSetParameter, true );
+	unlock();
+}
+
+
+
+
+void VstPlugin::setParamEvents( int i, const std::vector<ParameterEvent> & events )
+{
+	if( events.empty() )
+	{
+		return;
+	}
+
+	lock();
+	message m( IdVstParameterEvents );
+	m.addInt( i );
+	m.addInt( static_cast<int>( events.size() ) );
+	for( const auto & event : events )
+	{
+		m.addInt( event.frame );
+		m.addFloat( event.value );
+	}
+	sendMessage( m );
 	unlock();
 }
 

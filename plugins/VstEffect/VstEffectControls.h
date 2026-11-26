@@ -28,7 +28,12 @@
 #include "EffectControls.h"
 
 
+#include <atomic>
+#include <vector>
+
 #include <QObject>
+#include <QPointer>
+#include <QSet>
 
 class QGridLayout;
 class QPaintEvent;
@@ -41,6 +46,7 @@ namespace lmms
 
 
 class VstEffect;
+class VstPlugin;
 
 namespace gui
 {
@@ -68,6 +74,9 @@ public:
 
 	gui::EffectControlDialog* createView() override;
 
+	//! Connect to a newly loaded plugin instance
+	void connectToPlugin(VstPlugin* plugin);
+
 
 protected slots:
 	void updateMenu();
@@ -78,11 +87,17 @@ protected slots:
 	void rolrPreset();
 	void selPreset();
 	void setParameter( lmms::Model * action );
+	void handleParameterAutomated( int index, float value );
+	void handleParameterGestureBegin( int index );
+	void handleParameterGestureEnd( int index );
 
 protected:
 	virtual void paintEvent( QPaintEvent * _pe );
 
 private:
+	//! Send one parameter value, or a sample-accurate curve when automated
+	void sendParameter( int index, FloatModel * model );
+
 	VstEffect * m_effect;
 
 	QPushButton * m_selPresetButton;
@@ -92,7 +107,7 @@ private:
 	std::vector<FloatModel*> knobFModel;
 	int paramCount;
 
-	QObject * ctrHandle;
+	QPointer<QObject> ctrHandle;
 
 	int lastPosInMenu;
 //	QLabel * m_presetLabel;
@@ -101,6 +116,11 @@ private:
 	friend class gui::ManageVSTEffectView;
 
 	bool m_vstGuiVisible;
+
+	std::atomic<bool> m_updatingParametersFromPlugin{false};
+	//! Last audio period in which a parameter curve was sent
+	std::vector<long> m_lastParameterPeriod;
+	QSet<int> m_parameterGestures;
 } ;
 
 

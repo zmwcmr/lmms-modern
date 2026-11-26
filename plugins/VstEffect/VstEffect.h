@@ -47,6 +47,8 @@ public:
 
 	ProcessStatus processImpl(SampleFrame* buf, const f_cnt_t frames) override;
 
+	f_cnt_t latency() const override;
+
 	EffectControls * controls() override
 	{
 		return &m_vstControls;
@@ -59,7 +61,7 @@ private:
 	void closePlugin();
 
 	QSharedPointer<VstPlugin> m_plugin;
-	QMutex m_pluginMutex;
+	mutable QMutex m_pluginMutex;
 	EffectKey m_key;
 
 	VstEffectControls m_vstControls;

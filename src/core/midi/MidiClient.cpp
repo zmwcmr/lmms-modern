@@ -101,6 +101,17 @@ void MidiClient::subscribeWritablePort( MidiPort* , const QString& , bool )
 
 
 
+void MidiClient::noteOffAll()
+{
+	for( MidiPort* port : m_midiPorts )
+	{
+		port->sendAllNotesOff();
+	}
+}
+
+
+
+
 void MidiClientRaw::parseData( const unsigned char c )
 {
 	/*********************************************************************/
@@ -259,6 +270,28 @@ void MidiClientRaw::processOutEvent(const MidiEvent& event, const TimePos&, cons
 			sendByte(event.type() | event.channel());
 			sendByte(event.key());
 			sendByte(event.velocity());
+			break;
+
+		case MidiControlChange:
+			sendByte(event.type() | event.channel());
+			sendByte(event.controllerNumber());
+			sendByte(event.controllerValue());
+			break;
+
+		case MidiProgramChange:
+			sendByte(event.type() | event.channel());
+			sendByte(event.program());
+			break;
+
+		case MidiChannelPressure:
+			sendByte(event.type() | event.channel());
+			sendByte(event.channelPressure());
+			break;
+
+		case MidiPitchBend:
+			sendByte(event.type() | event.channel());
+			sendByte(event.pitchBend() & 0x7F);
+			sendByte((event.pitchBend() >> 7) & 0x7F);
 			break;
 
 		default:

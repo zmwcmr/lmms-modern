@@ -199,13 +199,23 @@ QStringList ConfigManager::availableVstEmbedMethods()
 {
 	QStringList methods;
 	methods.append("none");
+#if defined(LMMS_BUILD_WIN32) || defined(LMMS_BUILD_APPLE)
 	methods.append("qt");
+#elif defined(LMMS_BUILD_LINUX)
+	// QWindow::fromWinId() needs an X11 window ID. A plugin window from a
+	// separate X11 process cannot be embedded into a native Wayland surface;
+	// trying it leaves a black widget and can crash on teardown. On Wayland
+	// the plugin keeps its own XWayland window, which is the "none" mode.
+	if (QGuiApplication::platformName() == "xcb")
+	{
+		methods.append("qt");
+	}
+#endif
 #ifdef LMMS_BUILD_WIN32
 	methods.append("win32");
 #endif
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
-	if (static_cast<QGuiApplication*>(QApplication::instance())->
-		platformName() == "xcb")
+	if (QGuiApplication::platformName() == "xcb")
 	{
 		methods.append("xembed");
 	}
@@ -219,6 +229,17 @@ QString ConfigManager::vstEmbedMethod() const
 	QString defaultMethod = "none";
 	QString currentMethod = value("ui", "vstembedmethod", defaultMethod);
 	return methods.contains(currentMethod) ? currentMethod : defaultMethod;
+}
+
+QString ConfigManager::lv2UiEmbedMethod() const
+{
+	const QString current = value("ui", "lv2uimethod", "auto");
+	if (current == "auto" || current == "embedded"
+		|| current == "floating" || current == "disabled")
+	{
+		return current;
+	}
+	return "auto";
 }
 
 bool ConfigManager::hasWorkingDir() const

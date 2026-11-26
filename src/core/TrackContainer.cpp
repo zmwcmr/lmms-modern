@@ -27,6 +27,7 @@
 #include <QCoreApplication>
 #include <QProgressDialog>
 #include <QDomElement>
+#include <QReadLocker>
 #include <QWriteLocker>
 
 #include <algorithm>
@@ -153,6 +154,19 @@ void TrackContainer::loadSettings( const QDomElement & _this )
 			pd = nullptr;
 		}
 	}
+}
+
+
+
+
+Track* TrackContainer::trackAt(int index) const
+{
+	QReadLocker lock(&m_tracksMutex);
+	if (index < 0 || index >= static_cast<int>(m_tracks.size()))
+	{
+		return nullptr;
+	}
+	return m_tracks[index];
 }
 
 

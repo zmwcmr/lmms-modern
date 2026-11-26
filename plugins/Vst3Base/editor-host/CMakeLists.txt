@@ -1,0 +1,31 @@
+ADD_EXECUTABLE(lmms-vst3-editor-host
+	editor_host_main.cpp
+	../Vst3Host.cpp
+	../Vst3Module.cpp
+)
+
+TARGET_INCLUDE_DIRECTORIES(lmms-vst3-editor-host
+	PRIVATE
+		../
+		../travesty
+		"${CMAKE_CURRENT_BINARY_DIR}/../vst3base"
+)
+
+TARGET_LINK_LIBRARIES(lmms-vst3-editor-host
+	Qt${QT_VERSION_MAJOR}::Widgets
+	Qt${QT_VERSION_MAJOR}::Network
+)
+IF(APPLE)
+	FIND_LIBRARY(COREFOUNDATION_FRAMEWORK CoreFoundation)
+	IF(COREFOUNDATION_FRAMEWORK)
+		TARGET_LINK_LIBRARIES(lmms-vst3-editor-host "${COREFOUNDATION_FRAMEWORK}")
+	ENDIF()
+ENDIF()
+
+SET_TARGET_PROPERTIES(lmms-vst3-editor-host PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
+)
+
+INSTALL(TARGETS lmms-vst3-editor-host
+	RUNTIME DESTINATION "${PLUGIN_DIR}"
+)

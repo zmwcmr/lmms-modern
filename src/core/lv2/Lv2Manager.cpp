@@ -31,6 +31,7 @@
 #include <lilv/lilv.h>
 #include <lv2/buf-size/buf-size.h>
 #include <lv2/options/options.h>
+#include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
 #include <QDebug>
 #include <QElapsedTimer>
@@ -39,7 +40,7 @@
 #include "ConfigManager.h"
 #include "Engine.h"
 #include "Plugin.h"
-#include "Lv2ControlBase.h"
+#include "Lv2Proc.h"
 #include "Lv2Options.h"
 #include "PluginIssue.h"
 
@@ -71,6 +72,16 @@ const std::set<std::string_view> Lv2Manager::unstablePlugins =
 	// unstable
 	"urn:juced:DrumSynth"
 };
+
+const std::set<std::string_view> Lv2Manager::unstableUiPlugins =
+{
+	// Surge XT was removed after the UI lifetime and resize fixes: it now
+	// passes ASan and repeated open/close tests in LMMS. Keep this list for
+	// future regressions.
+};
+
+
+
 
 const std::set<std::string_view> Lv2Manager::pluginsOnlyUsefulWithUi =
 {
@@ -177,6 +188,8 @@ Lv2Manager::Lv2Manager() :
 	m_supportedFeatureURIs.insert(LV2_URID__map);
 	m_supportedFeatureURIs.insert(LV2_URID__unmap);
 	m_supportedFeatureURIs.insert(LV2_OPTIONS__options);
+	m_supportedFeatureURIs.insert(LV2_STATE__makePath);
+	m_supportedFeatureURIs.insert(LV2_STATE__freePath);
 	m_supportedFeatureURIs.insert(LV2_WORKER__schedule);
 	// min/max is always passed in the options
 	m_supportedFeatureURIs.insert(LV2_BUF_SIZE__boundedBlockLength);
@@ -247,7 +260,7 @@ void Lv2Manager::initPlugins()
 		const LilvPlugin* curPlug = lilv_plugins_get(plugins, itr);
 
 		std::vector<PluginIssue> issues;
-		Plugin::Type type = Lv2ControlBase::check(curPlug, issues);
+		Plugin::Type type = Lv2Proc::check(curPlug, issues);
 		std::ranges::sort(issues);
 		issues.erase(std::ranges::unique(issues).begin(), issues.end());
 		if (m_debug && issues.size())
@@ -336,7 +349,16 @@ AutoLilvNodes Lv2Manager::findNodes(const LilvNode *subject,
 
 bool Lv2Manager::wantUi()
 {
+#ifdef LMMS_HAVE_SUIL
+	const char* disable = getenv("LMMS_DISABLE_LV2_UI");
+	if (disable && *disable)
+	{
+		return false;
+	}
+	return ConfigManager::inst()->lv2UiEmbedMethod() != "disabled";
+#else
 	return false;
+#endif
 }
 
 
