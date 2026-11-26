@@ -33,6 +33,7 @@
 #include <QLocalSocket>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QTimer>
 
 #include "Vst3Host.h"
 
@@ -52,6 +53,10 @@ Vst3RemoteEditorClient::Vst3RemoteEditorClient(
 	m_host(host),
 	m_parentWindow(parentWindow)
 {
+	m_watchdog = new QTimer(this);
+	m_watchdog->setInterval(2000);
+	connect(m_watchdog, &QTimer::timeout, this,
+		&Vst3RemoteEditorClient::onWatchdog);
 }
 
 Vst3RemoteEditorClient::~Vst3RemoteEditorClient()
@@ -61,6 +66,10 @@ Vst3RemoteEditorClient::~Vst3RemoteEditorClient()
 
 bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 {
+	stop();
+	m_stopping = false;
+	m_title = title;
+
 	if (m_host == nullptr)
 	{
 		if (error != nullptr)
@@ -117,10 +126,10 @@ bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 		connect(m_socket, &QLocalSocket::readyRead,
 			this, &Vst3RemoteEditorClient::handleSocketData);
 		connect(m_socket, &QLocalSocket::disconnected, this, [this] {
-			if (m_running && editorClosed)
+			if (!m_stopping)
 			{
 				m_running = false;
-				editorClosed();
+				m_ready = false;
 			}
 		});
 		sendState();
@@ -137,13 +146,10 @@ bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 		});
 	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
 		this, [this](int, QProcess::ExitStatus) {
-			if (m_running)
+			if (!m_stopping)
 			{
 				m_running = false;
-				if (editorClosed)
-				{
-					editorClosed();
-				}
+				m_ready = false;
 			}
 		});
 
@@ -167,6 +173,11 @@ bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 	}
 
 	m_running = true;
+	m_started = true;
+	if (m_watchdog != nullptr)
+	{
+		m_watchdog->start();
+	}
 	return true;
 }
 
@@ -177,6 +188,13 @@ bool Vst3RemoteEditorClient::isRunning() const
 
 void Vst3RemoteEditorClient::stop()
 {
+	m_stopping = true;
+	if (m_watchdog != nullptr)
+	{
+		m_watchdog->stop();
+	}
+	m_started = false;
+	m_restartAttempts = 0;
 	if (m_socket != nullptr)
 	{
 		QJsonObject message;
@@ -210,6 +228,7 @@ void Vst3RemoteEditorClient::stop()
 	m_running = false;
 	m_ready = false;
 	m_readBuffer.clear();
+	m_stopping = false;
 }
 
 void Vst3RemoteEditorClient::sendResize(int width, int height)
@@ -223,6 +242,35 @@ void Vst3RemoteEditorClient::sendResize(int width, int height)
 	message.insert(QStringLiteral("width"), width);
 	message.insert(QStringLiteral("height"), height);
 	sendMessage(message);
+}
+
+void Vst3RemoteEditorClient::onWatchdog()
+{
+	if (m_stopping || !m_started || m_running)
+	{
+		return;
+	}
+	if (m_restartAttempts >= 3)
+	{
+		if (editorClosed)
+		{
+			editorClosed();
+		}
+		stop();
+		return;
+	}
+	const int attempts = m_restartAttempts + 1;
+	m_restartAttempts = attempts;
+	QString error;
+	if (!start(m_title, &error))
+	{
+		m_started = true;
+		m_restartAttempts = attempts;
+		if (editorError)
+		{
+			editorError(error);
+		}
+	}
 }
 
 QString Vst3RemoteEditorClient::editorHostExecutable()
@@ -288,6 +336,7 @@ void Vst3RemoteEditorClient::handleMessage(const QJsonObject& message)
 	if (type == QLatin1String("ready") || type == QLatin1String("resize"))
 	{
 		m_ready = true;
+		m_restartAttempts = 0;
 		const int width = message.value(QStringLiteral("width")).toInt();
 		const int height = message.value(QStringLiteral("height")).toInt();
 		if (width > 0 && height > 0 && editorResized)
@@ -330,10 +379,12 @@ void Vst3RemoteEditorClient::sendState()
 	}
 	QJsonObject message;
 	message.insert(QStringLiteral("type"), QStringLiteral("state"));
+	m_stateComponent = m_host->componentState();
+	m_stateController = m_host->controllerState();
 	message.insert(QStringLiteral("component"),
-		QString::fromLatin1(m_host->componentState().toBase64()));
+		QString::fromLatin1(m_stateComponent.toBase64()));
 	message.insert(QStringLiteral("controller"),
-		QString::fromLatin1(m_host->controllerState().toBase64()));
+		QString::fromLatin1(m_stateController.toBase64()));
 	sendMessage(message);
 }
 

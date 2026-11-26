@@ -37,6 +37,7 @@ class QJsonObject;
 class QLocalServer;
 class QLocalSocket;
 class QProcess;
+class QTimer;
 
 namespace lmms
 {
@@ -74,15 +75,24 @@ private:
 	void handleSocketData();
 	void handleMessage(const QJsonObject& message);
 	void sendState();
+	bool startProcess(QString* error);
+	void onWatchdog();
 
 	Vst3HostBase* m_host = nullptr;
 	quintptr m_parentWindow = 0;
 	QLocalServer* m_server = nullptr;
 	QLocalSocket* m_socket = nullptr;
 	QProcess* m_process = nullptr;
+	QTimer* m_watchdog = nullptr;
 	QByteArray m_readBuffer;
+	QString m_title;
+	QByteArray m_stateComponent;
+	QByteArray m_stateController;
+	int m_restartAttempts = 0;
 	bool m_running = false;
 	bool m_ready = false;
+	bool m_started = false;
+	bool m_stopping = false;
 };
 
 } // namespace lmms

@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5 complete; P6 documentation and cross-platform build guards are in
-progress.
+Status: P5.6 adds editor-host restart. P6 documentation and platform guards
+are in progress.
 
 ## 1. Goal
 
@@ -237,12 +237,23 @@ editor host.
 - The remote host tests are Linux-only; CoreFoundation is linked for the macOS
   scanner/host/editor targets.
 
+### P5.6: Editor host watchdog
+
+- `Vst3RemoteEditorClient` now restarts a crashed editor host on the same parent
+  window, with up to three attempts.
+- The editor window stays open during a restart; only three consecutive
+  failures trigger the normal close path.
+- `VST3_EDITOR_TEST_SECONDS` extends the editor smoke test for restart tests.
+
+Verified by killing `lmms-vst3-editor-host` while the editor is open; a new
+editor host appears and the window remains usable.
+
 Still open:
 
 - fake VST3 test module for automated scanner/host tests,
 - a CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
 - AppImage/Windows/macOS packaging verification,
-- editor-host auto-restart and final cleanup of the in-process fallback.
+- final cleanup of the in-process fallback.
 
 ## 2. What Ardour and Carla teach us
 
@@ -576,7 +587,8 @@ Deliverables:
 - [x] state snapshot round-trip from the DSP host,
 - [x] make the remote path the default on xcb and Wayland,
 - [x] Wayland remote editor via a floating XWayland window,
-- [x] DSP watchdog and automatic restart.
+- [x] DSP watchdog and automatic restart,
+- [x] editor-host watchdog and restart.
 
 Estimate: 3-5 weeks.
 

@@ -77,7 +77,12 @@ int main(int argc, char* argv[])
 		window.show();
 	}
 
-	QTimer::singleShot(3000, &application, &QApplication::quit);
+	int seconds = qEnvironmentVariableIntValue("VST3_EDITOR_TEST_SECONDS");
+	if (seconds <= 0)
+	{
+		seconds = 3;
+	}
+	QTimer::singleShot(seconds * 1000, &application, &QApplication::quit);
 	application.exec();
 
 	QTextStream(stdout) << "editor-open=" << host->isEditorOpen()
