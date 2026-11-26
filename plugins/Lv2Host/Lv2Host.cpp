@@ -59,6 +59,7 @@
 #include <lv2/buf-size/buf-size.h>
 #include <lv2/core/lv2.h>
 #include <lv2/log/log.h>
+#include <lv2/midi/midi.h>
 #include <lv2/options/options.h>
 #include <lv2/parameters/parameters.h>
 #include <lv2/urid/urid.h>
@@ -305,6 +306,8 @@ private:
 	void sendPortInfo();
 	void processBlock();
 	void echoBlock();
+	void buildMidiInput();
+	void sendMidiOutput();
 	void sendFailed(const std::string& reason);
 
 	SharedMemory<float[]> m_audio;
@@ -336,6 +339,9 @@ private:
 	std::vector<float> m_portScratch;
 	std::vector<std::vector<uint8_t>> m_atomBuffers;
 	std::vector<float> m_audioScratch;
+	std::vector<lv2host::MidiEventData> m_pendingMidi;
+	int m_midiInPort = -1;
+	int m_midiOutPort = -1;
 	int m_latencyPort = -1;
 	float m_latencyValue = 0.0f;
 	int m_reportedLatency = -1;
@@ -428,6 +434,10 @@ bool Lv2HostProcess::processMessage(const message& m)
 			return true;
 		}
 
+		case lv2host::IdMidiEvents:
+			m_pendingMidi = lv2host::decodeMidiEvents(m.getString(0));
+			return true;
+
 		case IdStartProcessing:
 			processBlock();
 			sendMessage(message(IdProcessingDone));
@@ -463,6 +473,7 @@ void Lv2HostProcess::processBlock()
 		return;
 	}
 
+	buildMidiInput();
 	m_worker.run();
 
 	// Plugins with fewer than two output ports leave the remaining planes
@@ -473,6 +484,7 @@ void Lv2HostProcess::processBlock()
 		(lv2host::AudioSegment::floatCount(frames) - outputOffset) * sizeof(float));
 
 	lilv_instance_run(m_instance, static_cast<uint32_t>(m_frames));
+	sendMidiOutput();
 
 	if (m_latencyPort >= 0)
 	{
@@ -496,6 +508,95 @@ void Lv2HostProcess::echoBlock()
 	float* output = m_audio.get() + lv2host::AudioSegment::outputOffset(frames);
 	std::memcpy(output, input,
 		lv2host::AudioSegment::channels * frames * sizeof(float));
+}
+
+
+
+
+void Lv2HostProcess::buildMidiInput()
+{
+	if (m_midiInPort < 0)
+	{
+		m_pendingMidi.clear();
+		return;
+	}
+
+	auto& buffer = m_atomBuffers[m_midiInPort];
+	auto* sequence = reinterpret_cast<LV2_Atom_Sequence*>(buffer.data());
+	sequence->atom.type = m_urids.map(LV2_ATOM__Sequence);
+	sequence->atom.size = sizeof(LV2_Atom_Sequence_Body);
+	sequence->body.unit = 0;
+	sequence->body.pad = 0;
+
+	uint8_t* out = buffer.data() + sizeof(LV2_Atom) + sizeof(LV2_Atom_Sequence_Body);
+	const uint8_t* const end = buffer.data() + buffer.size();
+	const LV2_URID midiType = m_urids.map(LV2_MIDI__MidiEvent);
+
+	for (const auto& event : m_pendingMidi)
+	{
+		const std::size_t total = sizeof(LV2_Atom_Event) + event.data.size();
+		if (out + total > end)
+		{
+			break;
+		}
+		auto* atomEvent = reinterpret_cast<LV2_Atom_Event*>(out);
+		atomEvent->time.frames = static_cast<int64_t>(event.frame);
+		atomEvent->body.size = static_cast<uint32_t>(event.data.size());
+		atomEvent->body.type = midiType;
+		std::memcpy(out + sizeof(LV2_Atom_Event),
+			event.data.data(), event.data.size());
+		out += total;
+		sequence->atom.size += static_cast<uint32_t>(total);
+	}
+	m_pendingMidi.clear();
+}
+
+
+
+
+void Lv2HostProcess::sendMidiOutput()
+{
+	if (m_midiOutPort < 0)
+	{
+		return;
+	}
+
+	auto& buffer = m_atomBuffers[m_midiOutPort];
+	auto* sequence = reinterpret_cast<LV2_Atom_Sequence*>(buffer.data());
+	const LV2_URID sequenceType = m_urids.map(LV2_ATOM__Sequence);
+
+	std::vector<lv2host::MidiEventData> events;
+	if (sequence->atom.type == sequenceType
+		&& sequence->atom.size > sizeof(LV2_Atom_Sequence_Body))
+	{
+		const uint8_t* cursor =
+			buffer.data() + sizeof(LV2_Atom) + sizeof(LV2_Atom_Sequence_Body);
+		const uint8_t* const end = cursor
+			+ (sequence->atom.size - sizeof(LV2_Atom_Sequence_Body));
+		while (cursor + sizeof(LV2_Atom_Event) <= end)
+		{
+			const auto* atomEvent = reinterpret_cast<const LV2_Atom_Event*>(cursor);
+			const std::size_t total = sizeof(LV2_Atom_Event) + atomEvent->body.size;
+			if (cursor + total > end)
+			{
+				break;
+			}
+			events.push_back(lv2host::MidiEventData{
+				static_cast<uint32_t>(atomEvent->time.frames),
+				std::vector<uint8_t>(cursor + sizeof(LV2_Atom_Event), cursor + total)});
+			cursor += total;
+		}
+	}
+	if (!events.empty())
+	{
+		sendMessage(message(lv2host::IdMidiOut)
+			.addString(lv2host::encodeMidiEvents(events)));
+	}
+
+	sequence->atom.type = sequenceType;
+	sequence->atom.size = sizeof(LV2_Atom_Sequence_Body);
+	sequence->body.unit = 0;
+	sequence->body.pad = 0;
 }
 
 
@@ -696,10 +797,20 @@ void Lv2HostProcess::connectPorts()
 		else if (lilv_port_is_a(m_plugin, port, atomClass))
 		{
 			m_atomBuffers[i].assign(8192, 0);
-			auto* atom = reinterpret_cast<LV2_Atom*>(m_atomBuffers[i].data());
-			atom->size = 0;
-			atom->type = m_urids.map(LV2_ATOM__Sequence);
+			auto* sequence = reinterpret_cast<LV2_Atom_Sequence*>(m_atomBuffers[i].data());
+			sequence->atom.type = m_urids.map(LV2_ATOM__Sequence);
+			sequence->atom.size = sizeof(LV2_Atom_Sequence_Body);
+			sequence->body.unit = 0;
+			sequence->body.pad = 0;
 			lilv_instance_connect_port(m_instance, i, m_atomBuffers[i].data());
+			if (isInput && m_midiInPort < 0)
+			{
+				m_midiInPort = static_cast<int>(i);
+			}
+			else if (!isInput && m_midiOutPort < 0)
+			{
+				m_midiOutPort = static_cast<int>(i);
+			}
 		}
 		else
 		{

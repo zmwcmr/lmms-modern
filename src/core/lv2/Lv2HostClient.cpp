@@ -33,6 +33,7 @@
 #include <QUuid>
 
 #include <cstdio>
+#include <iterator>
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
@@ -89,6 +90,8 @@ bool Lv2HostClient::start(const QString& hostExecutable, const QString& pluginUr
 	m_error.clear();
 	m_failed = true;
 	m_ports.clear();
+	m_pendingMidi.clear();
+	m_midiOutput.clear();
 	m_latency = 0;
 
 	if (sampleRate == 0 || framesPerBlock == 0 || timeoutMs <= 0)
@@ -319,6 +322,14 @@ bool Lv2HostClient::processBlock(const float* const* in, float* const* out, f_cn
 		std::memset(output + ch * channelSamples, 0, planeBytes);
 	}
 
+	m_midiOutput.clear();
+	if (!m_pendingMidi.empty())
+	{
+		sendMessage(message(lv2host::IdMidiEvents)
+			.addString(lv2host::encodeMidiEvents(m_pendingMidi)));
+		m_pendingMidi.clear();
+	}
+
 	sendMessage(message(IdStartProcessing));
 
 	if (!waitForReply(IdProcessingDone, 5000))
@@ -367,6 +378,15 @@ bool Lv2HostClient::processMessage(const message& m)
 			m_latency = m.getInt(0);
 			break;
 
+		case lv2host::IdMidiOut:
+		{
+			auto events = lv2host::decodeMidiEvents(m.getString(0));
+			m_midiOutput.insert(m_midiOutput.end(),
+				std::make_move_iterator(events.begin()),
+				std::make_move_iterator(events.end()));
+			break;
+		}
+
 		default:
 			break;
 	}
@@ -386,6 +406,14 @@ bool Lv2HostClient::setControlValue(int portIndex, float value)
 		.addInt(portIndex)
 		.addFloat(value));
 	return true;
+}
+
+
+
+
+void Lv2HostClient::setMidiEvents(std::vector<lv2host::MidiEventData> events)
+{
+	m_pendingMidi = std::move(events);
 }
 
 

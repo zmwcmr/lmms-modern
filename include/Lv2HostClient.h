@@ -102,6 +102,12 @@ public:
 	//! Send a control-port value to the child. Applied at the next block.
 	bool setControlValue(int portIndex, float value);
 
+	//! Queue MIDI events for the next processBlock() call.
+	void setMidiEvents(std::vector<lv2host::MidiEventData> events);
+
+	//! MIDI events produced by the last processBlock() call.
+	const std::vector<lv2host::MidiEventData>& midiOutput() const { return m_midiOutput; }
+
 	//! Latency reported by the child in frames, 0 when unknown.
 	int latency() const { return m_latency; }
 
@@ -131,6 +137,8 @@ private:
 	QProcess m_process;
 	SharedMemory<float[]> m_audio;
 	std::vector<Lv2HostPort> m_ports;
+	std::vector<lv2host::MidiEventData> m_pendingMidi;
+	std::vector<lv2host::MidiEventData> m_midiOutput;
 	int m_latency = 0;
 	sample_rate_t m_sampleRate = 0;
 	f_cnt_t m_framesPerBlock = 0;

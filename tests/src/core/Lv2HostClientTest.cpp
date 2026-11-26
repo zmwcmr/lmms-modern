@@ -99,6 +99,7 @@ private slots:
 	void echoesInputBlock();
 	void survivesChildKill();
 	void matchesInProcessGain();
+	void forwardsMidiEvents();
 };
 
 
@@ -244,6 +245,44 @@ void Lv2HostClientTest::matchesInProcessGain()
 		QVERIFY(std::abs(outLeft[i] - refLeft[i]) < 1e-6f);
 		QVERIFY(std::abs(outRight[i] - refRight[i]) < 1e-6f);
 	}
+
+	client.stop();
+}
+
+
+void Lv2HostClientTest::forwardsMidiEvents()
+{
+	qputenv("LV2_PATH",
+		QFileInfo(QString::fromUtf8(LMMS_FAKE_LV2_MIDI_BUNDLE))
+			.absolutePath().toUtf8());
+
+	Lv2HostClient client;
+	QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+		QStringLiteral("http://lmms.io/lv2/fake-midi"), 44100, BlockSize, 15000),
+		qPrintable(client.errorString()));
+	QCOMPARE(client.ports().size(), std::size_t{6});
+
+	client.setMidiEvents({
+		lv2host::MidiEventData{32, {0x90, 60, 100}},
+		lv2host::MidiEventData{192, {0x80, 60, 0}},
+	});
+
+	std::vector<float> buffer(BlockSize, 0.0f);
+	const float* in[2] = { buffer.data(), buffer.data() };
+	float* out[2] = { buffer.data(), buffer.data() };
+	QVERIFY(client.processBlock(in, out, BlockSize));
+
+	const auto& output = client.midiOutput();
+	QCOMPARE(output.size(), std::size_t{2});
+	QCOMPARE(output[0].frame, 32u);
+	QCOMPARE(output[1].frame, 192u);
+	QVERIFY(output[0].data == std::vector<uint8_t>({ 0x90, 60, 100 }));
+	QVERIFY(output[1].data == std::vector<uint8_t>({ 0x80, 60, 0 }));
+
+	// Events belong to one block; the next block must not repeat them.
+	client.setMidiEvents({});
+	QVERIFY(client.processBlock(in, out, BlockSize));
+	QVERIFY(client.midiOutput().empty());
 
 	client.stop();
 }

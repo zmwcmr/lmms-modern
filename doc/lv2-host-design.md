@@ -1,9 +1,10 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document. The transport and the DSP step are implemented: the
-child instantiates the plugin with lilv, reports its ports, applies control
-values and runs the audio. Atom events, state and the UI are still to come. The
-UI always uses a separate X11 window.
+Status: design document. The transport, the DSP step and MIDI/atom forwarding
+are implemented: the child instantiates the plugin with lilv, reports its
+ports, applies control values, runs the audio and forwards MIDI events in both
+directions. State, presets and the UI are still to come. The UI always uses a
+separate X11 window.
 
 ## Goal
 
@@ -184,15 +185,19 @@ The first version keeps the VST2 sequence:
 
 1. Host fills `audioIn` and sends pending `IdControlValue` messages.
 2. Host sends `IdStartProcessing`.
-3. Child applies the control values, runs the plugin and collects the audio
-   outputs (MIDI atom forwarding comes with `IdAtomEvent`).
-4. Child sends `IdProcessingDone`.
-5. Host copies `audioOut` and reads the reported latency/control values.
+3. Child builds the atom sequence for the MIDI input port, applies the
+   control values, runs the plugin, collects the audio outputs and parses the
+   MIDI output sequence.
+4. Child sends `IdMidiOut` (when the plugin produced events) and
+   `IdProcessingDone`.
+5. Host copies `audioOut`, collects the MIDI output and reads the reported
+   latency/control values.
 
-Control changes travel as messages in this step. Moving them into versioned
-slots inside the segment is a performance optimization that only matters once
-the child publishes many continuously moving output controls; the message path
-is block-rate either way.
+Control changes and MIDI events travel as messages in this step. Moving them
+into versioned slots and rings inside the segment is a performance optimization
+that only matters once the child publishes many continuously moving output
+controls; the message path is block-rate either way. The first atom input and
+output ports are used for MIDI; other atom ports still get an empty sequence.
 
 This costs one inter-process round trip per block per plugin, which VST2
 already pays. If profiling shows it matters, the next step is a double-buffered
@@ -212,6 +217,8 @@ The transport reuses the generic IDs from `RemotePluginBase.h`
 | `IdPortInfo` | child to host | index, symbol, name, kind, input, default/min/max | implemented |
 | `IdControlValue` | host to child | port index, value | implemented |
 | `IdLatency` | child to host | latency in frames (only on change) | implemented |
+| `IdMidiEvents` | host to child | encoded MIDI event list (frame, size, bytes) | implemented |
+| `IdMidiOut` | child to host | encoded MIDI event list | implemented |
 | `IdAtomEvent` | both | port index, size, protocol, bytes | planned |
 | `IdShowUI` / `IdHideUI` / `IdDestroyUI` | host to child | scale factor / none | planned |
 | `IdUiGeometry` / `IdUiClosed` | child to host | x, y, width, height / reason | planned |
@@ -397,6 +404,10 @@ Manual matrix additions:
      routed; extra ports get scratch buffers.
 3. **MIDI.** Move MIDI atom input/output and forwarding. Acceptance: fake MIDI
    plugin drives another track.
+   - status: done for the first atom input/output pair. `IdMidiEvents` builds
+     the input sequence with the child's URIDs, `IdMidiOut` returns the events
+     the plugin wrote; `Lv2HostClientTest` checks frames and bytes with a fake
+     MIDI echo plugin.
 4. **UI.** suil in the child, top-level window, scale factor, close/destroy.
    Acceptance: every audited plugin opens, Surge XT resizes and closes, and a UI
    crash does not kill LMMS.

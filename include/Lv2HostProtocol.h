@@ -26,6 +26,10 @@
 #define LMMS_LV2_HOST_PROTOCOL_H
 
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
 
 #include "RemotePluginBase.h"
 
@@ -50,7 +54,79 @@ enum MessageId : int
 	IdControlValue,
 	//! child -> host: plugin latency in frames (only sent on change)
 	IdLatency,
+	//! host -> child: binary list of MIDI events for the next block
+	IdMidiEvents,
+	//! child -> host: binary list of MIDI events produced by the last block
+	IdMidiOut,
 };
+
+//! One MIDI event with a block-relative frame offset.
+struct MidiEventData
+{
+	uint32_t frame = 0;
+	std::vector<uint8_t> data;
+};
+
+/*! Encode a MIDI event list for the message channel.
+ *
+ *  Layout (host-endian, both sides run on the same machine):
+ *  `uint32 count` followed by `uint32 frame`, `uint32 size`, `size` bytes for
+ *  every event. The message transport is binary safe, so no base64 is needed.
+ */
+inline std::string encodeMidiEvents(const std::vector<MidiEventData>& events)
+{
+	std::string blob;
+	blob.reserve(4 + events.size() * 8);
+	const auto appendU32 = [&blob](uint32_t value) {
+		blob.append(reinterpret_cast<const char*>(&value), sizeof(value));
+	};
+	appendU32(static_cast<uint32_t>(events.size()));
+	for (const auto& event : events)
+	{
+		appendU32(event.frame);
+		appendU32(static_cast<uint32_t>(event.data.size()));
+		blob.append(reinterpret_cast<const char*>(event.data.data()), event.data.size());
+	}
+	return blob;
+}
+
+//! Decode a blob produced by encodeMidiEvents(); truncation stops decoding.
+inline std::vector<MidiEventData> decodeMidiEvents(const std::string& blob)
+{
+	std::vector<MidiEventData> events;
+	std::size_t offset = 0;
+	const auto readU32 = [&blob, &offset](uint32_t& value) {
+		if (offset + sizeof(value) > blob.size())
+		{
+			return false;
+		}
+		std::memcpy(&value, blob.data() + offset, sizeof(value));
+		offset += sizeof(value);
+		return true;
+	};
+
+	uint32_t count = 0;
+	if (!readU32(count))
+	{
+		return events;
+	}
+	events.reserve(count);
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		MidiEventData event;
+		uint32_t size = 0;
+		if (!readU32(event.frame) || !readU32(size) || offset + size > blob.size())
+		{
+			break;
+		}
+		event.data.assign(
+			reinterpret_cast<const uint8_t*>(blob.data() + offset),
+			reinterpret_cast<const uint8_t*>(blob.data() + offset + size));
+		offset += size;
+		events.push_back(std::move(event));
+	}
+	return events;
+}
 
 /*! Layout of the stereo planar audio segment.
  *
