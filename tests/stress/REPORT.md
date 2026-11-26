@@ -255,6 +255,8 @@ rejected gracefully (“project is empty”) in well under a second.
   volume), all addressed in the generator; the final reruns are clean.
 - 45-minute final soak on the latest build: 826 cases, 0 failures,
   average RSS 223.6 MB (max 399 MB).
+- 1-hour final soak on the latest build: 1,169 cases, 0 failures,
+  average RSS 223.1 MB (max 563 MB).
 
 ### Plugin isolation
 
