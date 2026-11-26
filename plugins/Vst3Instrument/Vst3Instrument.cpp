@@ -251,6 +251,12 @@ bool Vst3Instrument::setProgram(int index)
 	return m_host != nullptr && m_host->setProgram(index);
 }
 
+bool Vst3Instrument::setUnit(int unitId)
+{
+	QMutexLocker locker(&m_mutex);
+	return m_host != nullptr && m_host->selectUnit(unitId);
+}
+
 void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 {
 	parent.setAttribute(QStringLiteral("file"), m_file);
@@ -262,6 +268,10 @@ void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 		if (m_host->currentProgram() >= 0)
 		{
 			parent.setAttribute(QStringLiteral("program"), m_host->currentProgram());
+		}
+		if (m_host->currentUnit() >= 0)
+		{
+			parent.setAttribute(QStringLiteral("unit"), m_host->currentUnit());
 		}
 		const auto component = m_host->componentState();
 		const auto controller = m_host->controllerState();
@@ -306,6 +316,10 @@ void Vst3Instrument::loadSettings(const QDomElement& parent)
 	if (parent.hasAttribute(QStringLiteral("program")))
 	{
 		setProgram(parent.attribute(QStringLiteral("program")).toInt());
+	}
+	if (parent.hasAttribute(QStringLiteral("unit")))
+	{
+		setUnit(parent.attribute(QStringLiteral("unit")).toInt());
 	}
 }
 

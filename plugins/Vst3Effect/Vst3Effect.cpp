@@ -173,6 +173,10 @@ void Vst3Effect::saveSettings(QDomDocument& doc, QDomElement& parent)
 		{
 			parent.setAttribute(QStringLiteral("program"), m_host->currentProgram());
 		}
+		if (m_host->currentUnit() >= 0)
+		{
+			parent.setAttribute(QStringLiteral("unit"), m_host->currentUnit());
+		}
 		const auto component = m_host->componentState();
 		const auto controller = m_host->controllerState();
 		if (!component.isEmpty())
@@ -220,6 +224,10 @@ void Vst3Effect::loadSettings(const QDomElement& parent)
 	if (parent.hasAttribute(QStringLiteral("program")))
 	{
 		m_controls.setProgram(parent.attribute(QStringLiteral("program")).toInt());
+	}
+	if (parent.hasAttribute(QStringLiteral("unit")))
+	{
+		m_controls.setUnit(parent.attribute(QStringLiteral("unit")).toInt());
 	}
 }
 

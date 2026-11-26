@@ -91,6 +91,8 @@ int main(int argc, char* argv[])
 		<< " parameters=" << host.parameters().size()
 		<< " programs=" << host.programCount()
 		<< " current-program=" << host.currentProgram()
+		<< " units=" << host.units().size()
+		<< " current-unit=" << host.currentUnit()
 		<< " latency=" << host.latencySamples() << '\n';
 	if (host.programCount() > 0)
 	{

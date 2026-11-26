@@ -98,4 +98,14 @@ bool Vst3EffectControls::setProgram(int index)
 	return m_effect->host()->setProgram(index);
 }
 
+bool Vst3EffectControls::setUnit(int unitId)
+{
+	if (m_effect == nullptr || m_effect->host() == nullptr)
+	{
+		return false;
+	}
+	QMutexLocker locker(&m_effect->hostMutex());
+	return m_effect->host()->selectUnit(unitId);
+}
+
 } // namespace lmms

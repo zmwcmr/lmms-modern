@@ -110,6 +110,23 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 		layout->addWidget(programBox);
 	}
 
+	if (host->units().size() > 1)
+	{
+		layout->addWidget(new QLabel(tr("Unit"), this));
+		auto* unitBox = new QComboBox(this);
+		for (const auto& unit : host->units())
+		{
+			unitBox->addItem(unit.name, unit.id);
+		}
+		unitBox->setCurrentIndex(std::max(0,
+			unitBox->findData(host->currentUnit())));
+		connect(unitBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [vst3Instrument, unitBox](int index) {
+				vst3Instrument->setUnit(unitBox->itemData(index).toInt());
+			});
+		layout->addWidget(unitBox);
+	}
+
 	if (host->hasEditor())
 	{
 		auto* editorButton = new QPushButton(tr("Open editor"), this);

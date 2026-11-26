@@ -110,6 +110,23 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		layout->addWidget(programBox);
 	}
 
+	if (auto* host = controls->host(); host != nullptr && host->units().size() > 1)
+	{
+		layout->addWidget(new QLabel(tr("Unit"), this));
+		auto* unitBox = new QComboBox(this);
+		for (const auto& unit : host->units())
+		{
+			unitBox->addItem(unit.name, unit.id);
+		}
+		unitBox->setCurrentIndex(std::max(0,
+			unitBox->findData(host->currentUnit())));
+		connect(unitBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [controls, unitBox](int index) {
+				controls->setUnit(unitBox->itemData(index).toInt());
+			});
+		layout->addWidget(unitBox);
+	}
+
 	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
 	{
 		auto* editorButton = new QPushButton(tr("Open editor"), this);

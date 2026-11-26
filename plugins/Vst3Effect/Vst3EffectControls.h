@@ -65,6 +65,7 @@ public:
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	Vst3Host* host() const;
 	bool setProgram(int index);
+	bool setUnit(int unitId);
 
 private:
 	Vst3Effect* m_effect;

@@ -49,6 +49,13 @@ namespace lmms
 class VST3BASE_EXPORT Vst3Host
 {
 public:
+	struct Unit
+	{
+		int id = 0;
+		int parentId = -1;
+		QString name;
+	};
+
 	struct Parameter
 	{
 		uint32_t id = 0;
@@ -111,6 +118,10 @@ public:
 	QString programName(int index) const;
 	int currentProgram() const;
 	bool setProgram(int index);
+
+	const std::vector<Unit>& units() const;
+	int currentUnit() const;
+	bool selectUnit(int unitId);
 
 	//! Queue a parameter change for the next process() call.
 	void queueParameter(uint32_t id, double value, int sampleOffset);

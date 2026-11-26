@@ -61,6 +61,7 @@ public:
 	QMutex& hostMutex() { return m_mutex; }
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	bool setProgram(int index);
+	bool setUnit(int unitId);
 
 private:
 	bool openPlugin(const QString& file, const QString& classId);

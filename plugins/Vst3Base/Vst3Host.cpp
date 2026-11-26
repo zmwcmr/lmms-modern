@@ -728,6 +728,10 @@ struct Vst3Host::Impl
 	int programStepCount = 0;
 	bool hasProgramParameter = false;
 
+	std::vector<Unit> units;
+	int selectedUnit = -1;
+	v3_unit_information** unitInformation = nullptr;
+
 	std::vector<int> inputBusChannels;
 	std::vector<int> outputBusChannels;
 	int mainInputBus = -1;
@@ -996,6 +1000,11 @@ void Vst3Host::Impl::unload()
 		component = nullptr;
 	}
 
+	if (unitInformation != nullptr)
+	{
+		v3_cpp_obj_unref(unitInformation);
+		unitInformation = nullptr;
+	}
 	if (module.factory3() != nullptr)
 	{
 		v3_cpp_obj_unref(module.factory3());
@@ -1169,6 +1178,8 @@ void Vst3Host::Impl::setupPrograms()
 	programParameterId = 0;
 	programStepCount = 0;
 	hasProgramParameter = false;
+	units.clear();
+	selectedUnit = -1;
 
 	for (const auto& parameter : parameters)
 	{
@@ -1181,22 +1192,47 @@ void Vst3Host::Impl::setupPrograms()
 		}
 	}
 
-	v3_unit_information** unitInformation = nullptr;
-	if (controller != nullptr
-		&& v3_cpp_obj_query_interface(controller, v3_unit_information_iid,
-			&unitInformation) != V3_OK)
+	if (unitInformation == nullptr)
 	{
-		unitInformation = nullptr;
-	}
-	if (unitInformation == nullptr && component != nullptr
-		&& v3_cpp_obj_query_interface(component, v3_unit_information_iid,
-			&unitInformation) != V3_OK)
-	{
-		unitInformation = nullptr;
+		if (controller != nullptr
+			&& v3_cpp_obj_query_interface(controller, v3_unit_information_iid,
+				&unitInformation) != V3_OK)
+		{
+			unitInformation = nullptr;
+		}
+		if (unitInformation == nullptr && component != nullptr
+			&& v3_cpp_obj_query_interface(component, v3_unit_information_iid,
+				&unitInformation) != V3_OK)
+		{
+			unitInformation = nullptr;
+		}
 	}
 
 	if (unitInformation != nullptr)
 	{
+		const int unitCount = v3_cpp_obj(unitInformation)->get_unit_count(
+			unitInformation);
+		for (int unit = 0; unit < unitCount; ++unit)
+		{
+			v3_unit_info info = {};
+			if (v3_cpp_obj(unitInformation)->get_unit_info(
+					unitInformation, unit, &info) != V3_OK)
+			{
+				continue;
+			}
+			Unit entry;
+			entry.id = info.id;
+			entry.parentId = info.parent_unit_id;
+			entry.name = fromStr128(info.name);
+			if (entry.name.isEmpty())
+			{
+				entry.name = QStringLiteral("Unit %1").arg(unit + 1);
+			}
+			units.push_back(std::move(entry));
+		}
+		selectedUnit = v3_cpp_obj(unitInformation)->get_selected_unit(
+			unitInformation);
+
 		const int listCount = v3_cpp_obj(unitInformation)->get_program_list_count(
 			unitInformation);
 		for (int list = 0; list < listCount; ++list)
@@ -1223,7 +1259,6 @@ void Vst3Host::Impl::setupPrograms()
 				programNames.push_back(programName);
 			}
 		}
-		v3_cpp_obj_unref(unitInformation);
 	}
 
 	if (programNames.empty() && programStepCount > 0)
@@ -1605,6 +1640,31 @@ bool Vst3Host::setProgram(int index)
 		? static_cast<double>(index) / static_cast<double>(m_impl->programStepCount)
 		: 0.0;
 	return setParameterNormalised(m_impl->programParameterId, normalised);
+}
+
+const std::vector<Vst3Host::Unit>& Vst3Host::units() const
+{
+	return m_impl->units;
+}
+
+int Vst3Host::currentUnit() const
+{
+	return m_impl->selectedUnit;
+}
+
+bool Vst3Host::selectUnit(int unitId)
+{
+	if (m_impl->unitInformation == nullptr)
+	{
+		return false;
+	}
+	if (v3_cpp_obj(m_impl->unitInformation)->select_unit(
+			m_impl->unitInformation, unitId) != V3_OK)
+	{
+		return false;
+	}
+	m_impl->selectedUnit = unitId;
+	return true;
 }
 
 void Vst3Host::queueParameter(uint32_t id, double value, int sampleOffset)
