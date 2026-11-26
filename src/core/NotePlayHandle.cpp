@@ -193,6 +193,14 @@ void NotePlayHandle::play( SampleFrame* _working_buffer )
 		return;
 	}
 
+	// A malformed project/time signature can make the computed offset
+	// negative, which would make instruments index before their working
+	// buffer.
+	if( offset() < 0 )
+	{
+		setOffset( 0 );
+	}
+
 	// if the note offset falls over to next period, then don't start playback yet
 	if( offset() >= Engine::audioEngine()->framesPerPeriod() )
 	{
@@ -353,9 +361,11 @@ f_cnt_t NotePlayHandle::framesLeftForCurrentPeriod() const
 {
 	if( m_totalFramesPlayed == 0 )
 	{
-		return std::min(framesLeft(), Engine::audioEngine()->framesPerPeriod() - offset());
+		return std::max<f_cnt_t>(0,
+			std::min(framesLeft(), Engine::audioEngine()->framesPerPeriod() - offset()));
 	}
-	return std::min(framesLeft(), Engine::audioEngine()->framesPerPeriod());
+	return std::max<f_cnt_t>(0,
+		std::min(framesLeft(), Engine::audioEngine()->framesPerPeriod()));
 }
 
 

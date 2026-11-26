@@ -164,7 +164,27 @@ other had an enormous clip length (billions of bar lines).
 **Evidence:** `gui-huge-clip-length.mmp` and
 `gui-unbounded-pattern-steps.mmp` now start and quit in ~3 s.
 
-### 11. Deeply nested XML crashed the project loader
+### 11. Intermittent SIGSEGV in AudioFileProcessor playback
+
+**Symptom:** one numeric-fuzz case (non-finite automation values) produced a
+SIGSEGV in `AudioFileProcessor::playNote()` while passing a pointer
+`_working_buffer + offset` to `Sample::play()`.
+
+**Root cause:** a malformed/non-finite time or automation value can produce a
+negative note offset or a negative per-period frame count. The playback code
+only handled offsets that were too large, not negative ones, and
+`framesLeftForCurrentPeriod()` could return a negative count.
+
+**Fix:** clamp negative offsets to zero in `NotePlayHandle::play()`, and clamp
+the per-period frame count to at least zero. This protects all instruments,
+not only AudioFileProcessor.
+
+**Evidence:** the reproducer is in
+`corpus/regressions/afp-note-offset-crash.mmp`; it ran 20 release and 10 ASan
+times cleanly afterwards. The original crash was intermittent, so it is kept
+as a fuzz regression case.
+
+### 12. Deeply nested XML crashed the project loader
 
 **Symptom:**
 - 100,000 nested elements → SIGSEGV inside
@@ -219,6 +239,8 @@ rejected gracefully (“project is empty”) in well under a second.
 - 50 ASan GUI cycles with plugins: 49 pass, 1 timeout caused by the
   zero-length-pattern grid loop (fixed); the reproducer now passes.
 - 200 release GUI start/load/quit cycles: 200 pass.
+- 30-minute idle ASan GUI soak with a mixed real-plugin project: RSS stable
+  at 993–996 MB, clean SIGINT exit (3), no LMMS leaks.
 - GUI start/load/quit is now part of `gui_smoke.py`.
 
 ### Soak
@@ -244,6 +266,8 @@ No LMMS crash or hang was observed.
 - 10,000 simultaneous notes in one bar: ~9 s.
 - 50,000+ simultaneous notes in one bar: CPU-bound, >5 min; not a crash.
 - 100 load/save cycles: ~3.4 s, max RSS 47 MB (no growth over 1000 cycles).
+- 64 Dexed VST3 instances: ~16 s, 2.1 GB RSS, 419 FDs.
+- 128 Dexed VST3 instances: ~37 s, 4.2 GB RSS, 803 FDs; no crash.
 - Deep XML: rejected before parser recursion.
 
 ## Remaining / future work
