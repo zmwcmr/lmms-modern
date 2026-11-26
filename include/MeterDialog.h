@@ -45,8 +45,11 @@ public:
 
 	void modelChanged() override;
 
+protected:
+	void paintEvent(QPaintEvent* event) override;
 
 private:
+	QString m_caption;
 	LcdSpinBox * m_numerator;
 	LcdSpinBox * m_denominator;
 
