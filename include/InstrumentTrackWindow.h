@@ -25,6 +25,7 @@
 #ifndef LMMS_GUI_INSTRUMENT_TRACK_WINDOW_H
 #define LMMS_GUI_INSTRUMENT_TRACK_WINDOW_H
 
+#include <QPointer>
 #include <QWidget>
 
 #include "InstrumentTrack.h"
@@ -156,7 +157,7 @@ private:
 
 	// tab-widget with all children
 	TabWidget * m_tabWidget;
-	PluginView * m_instrumentView;
+	QPointer<PluginView> m_instrumentView;
 	InstrumentSoundShapingView * m_ssView;
 	InstrumentFunctionNoteStackingView* m_noteStackingView;
 	InstrumentFunctionArpeggioView* m_arpeggioView;
