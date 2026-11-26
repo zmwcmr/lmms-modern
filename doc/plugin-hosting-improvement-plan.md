@@ -39,8 +39,9 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 
 1. LV2 UI and DSP run in the LMMS process; P6.4 RemoteLv2 moves both into a
    host child.
-2. Track-to-channel PDC is implemented, but send and master compensation is
-   still missing.
+2. PDC aligns track buses and mixer sends, and exports trim the master chain
+   latency from the start of the stream. The latency values are not yet shown
+   in the UI.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
    internal target track; longer routing chains are still missing.
 4. VST2 sample-accurate parameter automation is implemented for instruments and
