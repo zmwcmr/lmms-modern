@@ -511,6 +511,8 @@ private:
 
 	Sync m_sync;
 	bool m_skipInit;
+	//! Directory with the plugin's UI data files (e.g. Zyn Fusion assets)
+	std::string m_uiDataDir;
 };
 
 
@@ -943,6 +945,14 @@ void RemoteVstPlugin::initEditor()
 	XMapWindow(m_display, m_window);
 	XFlush(m_display);
 
+	// Plugins such as Zyn Fusion resolve UI assets relative to the current
+	// working directory. The remote process only hosts this one editor.
+	if (!m_uiDataDir.empty() && chdir(m_uiDataDir.c_str()) != 0)
+	{
+		debugMessage("Could not change to plugin data directory: "
+			+ m_uiDataDir + "\n");
+	}
+
 	pluginDispatch(effEditOpen, 0, (intptr_t) m_display, (void*) m_window);
 
 	// Some plugins only report their real editor size after the editor has
@@ -1042,6 +1052,28 @@ void RemoteVstPlugin::destroyEditor()
 
 bool RemoteVstPlugin::load( const std::string & _plugin_file )
 {
+#ifdef NATIVE_LINUX_VST
+	// Zyn Fusion and similar plugins load their UI assets relative to the
+	// working directory. Prefer the install root that contains qml/, font/
+	// and schema/; otherwise stay in the plugin's own directory.
+	{
+		std::error_code ec;
+		std::filesystem::path pluginPath =
+			std::filesystem::weakly_canonical(_plugin_file, ec);
+		if (ec) { pluginPath = _plugin_file; }
+		std::filesystem::path dir = pluginPath.parent_path();
+		m_uiDataDir = dir.string();
+		for (int depth = 0; depth < 4 && !dir.empty(); ++depth)
+		{
+			if (std::filesystem::exists(dir / "qml" / "MainWindow.qml"))
+			{
+				m_uiDataDir = dir.string();
+				break;
+			}
+			dir = dir.parent_path();
+		}
+	}
+#endif
 #ifndef NATIVE_LINUX_VST
 	if ((m_libInst = LoadLibraryW(toWString(_plugin_file).get())) == nullptr)
 	{

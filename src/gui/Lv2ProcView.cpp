@@ -34,6 +34,8 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -87,6 +89,26 @@ namespace
 {
 XErrorHandler g_previousXErrorHandler = nullptr;
 
+// Some plugin UIs (Zyn Fusion) look for qml/, font/ and schema/ relative to
+// the current directory. Walk up from the bundle until the asset root is
+// found; return an empty string for ordinary bundles.
+QString findUiDataRoot(const QString& bundleDir)
+{
+	// Bundle paths are often symlinks into an install tree; resolve them
+	// before walking up to the asset root.
+	const QString canonical = QFileInfo(bundleDir).canonicalFilePath();
+	QDir dir(canonical.isEmpty() ? bundleDir : canonical);
+	for (int depth = 0; depth < 4; ++depth)
+	{
+		if (QFile::exists(dir.filePath(QStringLiteral("qml/MainWindow.qml"))))
+		{
+			return dir.absolutePath();
+		}
+		if (!dir.cdUp()) { break; }
+	}
+	return {};
+}
+
 int lmmsXErrorHandler(Display* display, XErrorEvent* event)
 {
 	if (event->error_code == BadWindow || event->error_code == BadDrawable)
@@ -99,6 +121,13 @@ int lmmsXErrorHandler(Display* display, XErrorEvent* event)
 	return g_previousXErrorHandler
 		? g_previousXErrorHandler(display, event)
 		: 0;
+}
+
+// UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
+// ui:resize. Clamp them before they reach the plugin, which may assert.
+int clampUiDimension(int value, int maximum)
+{
+	return std::clamp(value, 1, std::max(maximum, 1));
 }
 }
 #endif
@@ -580,6 +609,15 @@ void Lv2ProcView::createUi()
 	AutoLilvPtr<char> binaryPath(lilv_file_uri_parse(
 		lilv_node_as_uri(lilv_ui_get_binary_uri(ui)), nullptr));
 
+	// Zyn Fusion loads qml/ and libzest.so relative to the working directory.
+	// Switch to its asset root while the UI is being created, then restore the
+	// process-wide directory immediately.
+	const QString oldCwd = QDir::currentPath();
+	const QString dataRoot = findUiDataRoot(
+		QString::fromLocal8Bit(bundlePath.get()));
+	const bool cwdChanged = !dataRoot.isEmpty()
+		&& QDir::setCurrent(dataRoot);
+
 	m_uiInstance = suil_instance_new(
 		m_uiHost,
 		this,
@@ -590,6 +628,11 @@ void Lv2ProcView::createUi()
 		bundlePath.get(),
 		binaryPath.get(),
 		features);
+
+	if (cwdChanged)
+	{
+		QDir::setCurrent(oldCwd);
+	}
 
 	if (!m_uiInstance)
 	{
@@ -820,6 +863,9 @@ void Lv2ProcView::applyUiResize(int width, int height)
 	if (m_x11Window && m_x11Display)
 	{
 		Display* dpy = static_cast<Display*>(m_x11Display);
+		const int screen = DefaultScreen(dpy);
+		width = clampUiDimension(width, DisplayWidth(dpy, screen) - 80);
+		height = clampUiDimension(height, DisplayHeight(dpy, screen) - 120);
 		XResizeWindow(dpy, m_x11Window, static_cast<unsigned>(width),
 			static_cast<unsigned>(height));
 		m_lastUiWidth = width;
@@ -828,6 +874,9 @@ void Lv2ProcView::applyUiResize(int width, int height)
 		return;
 	}
 #endif
+
+	width = clampUiDimension(width, 16384);
+	height = clampUiDimension(height, 16384);
 
 	if (m_uiHostWidget)
 	{
@@ -915,6 +964,8 @@ void Lv2ProcView::resizePluginChild(int width, int height)
 	{
 		return;
 	}
+	width = clampUiDimension(width, 16384);
+	height = clampUiDimension(height, 16384);
 	bool ownDisplay = false;
 	Display* dpy = static_cast<Display*>(m_x11Display);
 	if (!dpy)
@@ -962,8 +1013,10 @@ void Lv2ProcView::updateUi()
 	if (m_uiHostWidget && m_uiResizable)
 	{
 		const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-		const int width = static_cast<int>(std::lround(m_uiHostWidget->width() * dpr));
-		const int height = static_cast<int>(std::lround(m_uiHostWidget->height() * dpr));
+		const int width = clampUiDimension(
+			static_cast<int>(std::lround(m_uiHostWidget->width() * dpr)), 16384);
+		const int height = clampUiDimension(
+			static_cast<int>(std::lround(m_uiHostWidget->height() * dpr)), 16384);
 		if (width != m_lastUiWidth || height != m_lastUiHeight)
 		{
 			resizePluginChild(width, height);
