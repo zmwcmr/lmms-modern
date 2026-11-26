@@ -35,6 +35,7 @@
 #include <QStyleOption>
 #include <QVariant>
 
+#include "ConfigManager.h"
 #include "embed.h"
 #include "LmmsPalette.h"
 #include "LmmsStyle.h"
@@ -46,6 +47,12 @@ namespace lmms::gui
 
 
 QPalette * LmmsStyle::s_palette = nullptr;
+
+int LmmsStyle::uiAnimationDuration(const QWidget* widget, int maximum)
+{
+	if (!ConfigManager::inst()->uiAnimationsEnabled()) { return 0; }
+	return qBound(0, widget->style()->styleHint(QStyle::SH_Widget_Animation_Duration, nullptr, widget), maximum);
+}
 
 namespace
 {

@@ -44,11 +44,22 @@ namespace lmms::gui
 namespace
 {
 	constexpr int MIN_BAR_LABEL_DISTANCE = 35;
+
+	auto selectionCursorPixmap(std::string_view name) -> QPixmap
+	{
+		auto pixmap = embed::getIconPixmap(name);
+		if (pixmap.devicePixelRatio() == 1.0) { return pixmap; }
+		pixmap = pixmap.scaled(embed::logicalSize(pixmap), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		pixmap.setDevicePixelRatio(1.0);
+		return pixmap;
+	}
 }
 
 TimeLineWidget::TimeLineWidget(const int xoff, const int yoff, const float ppb, Timeline& timeline,
 		const TimePos& begin, QWidget* parent) :
 	QWidget{parent},
+	m_cursorSelectLeft{selectionCursorPixmap("cursor_select_left"), 0, 16},
+	m_cursorSelectRight{selectionCursorPixmap("cursor_select_right"), 32, 16},
 	m_xOffset{xoff},
 	m_ppb{ppb},
 	m_timeline{&timeline},

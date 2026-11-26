@@ -49,7 +49,7 @@ EnvelopeGraph::EnvelopeGraph(QWidget* parent) :
 	m_markerFillColor(153, 175, 255),
 	m_markerOutlineColor(0, 0, 0)
 {
-	setMinimumSize(m_envGraph.size());
+	setMinimumSize(embed::logicalSize(m_envGraph));
 }
 
 void EnvelopeGraph::modelChanged()

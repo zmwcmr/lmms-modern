@@ -25,7 +25,10 @@
 #ifndef LMMS_GUI_TOOL_BUTTON_H
 #define LMMS_GUI_TOOL_BUTTON_H
 
+#include <memory>
+
 #include <QToolButton>
+#include <QVariantAnimation>
 
 namespace lmms::gui
 {
@@ -43,6 +46,17 @@ public:
 	{ }
 
 	~ToolButton() override = default;
+
+	void setHoverTransitionEnabled(bool enabled);
+
+protected:
+	bool event(QEvent* event) override;
+	void paintEvent(QPaintEvent* event) override;
+
+private:
+	void animateHover(qreal target);
+
+	std::unique_ptr<QVariantAnimation> m_hoverAnimation;
 
 } ;
 

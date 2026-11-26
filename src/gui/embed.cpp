@@ -90,13 +90,22 @@ auto loadPixmap(const QString& name, int width, int height, const char* const* x
 {
 	if (xpm) { return QPixmap{xpm}; }
 
-	const auto resourceName = QDir::isAbsolutePath(name) ? name : "artwork:" + name;
-
-	// Prefer SVGs explicitly. QImageReader resolves an extension-less name by
-	// probing formats in order, so a PNG left behind in a theme directory that
-	// shadows the current theme would win over the theme's SVG (for example
-	// while the default theme is being migrated from PNG to SVG).
-	if (!resourceName.endsWith(".svg", Qt::CaseInsensitive))
+	auto resourceName = name;
+	if (!QDir::isAbsolutePath(name))
+	{
+		resourceName = "artwork:" + name;
+		for (const auto& path : QDir::searchPaths("artwork"))
+		{
+			const auto candidate = QDir(path).filePath(name);
+			if (QFile::exists(candidate + ".svg")) { return loadSvgPixmap(candidate, width, height); }
+			if (QImageReader(candidate).canRead())
+			{
+				resourceName = candidate;
+				break;
+			}
+		}
+	}
+	else if (!name.endsWith(".svg", Qt::CaseInsensitive))
 	{
 		const auto svgName = resourceName + ".svg";
 		if (QFile::exists(svgName)) { return loadSvgPixmap(svgName, width, height); }

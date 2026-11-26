@@ -15,6 +15,10 @@ set(LMMS_TESTS
 	src/core/SongAutomationTest.cpp
 	src/core/TimelineTest.cpp
 	src/core/ValidationTest.cpp
+	src/core/InlineValueEditorTest.cpp
+	src/gui/SideBarWorkspaceTest.cpp
+	src/gui/ToolButtonTest.cpp
+	src/gui/DropDownInteractionTest.cpp
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp
 	src/tracks/MidiClipTest.cpp

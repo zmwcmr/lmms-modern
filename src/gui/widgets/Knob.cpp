@@ -76,6 +76,7 @@ Knob::Knob( QWidget * _parent, const QString & _name ) :
 
 void Knob::initUi( const QString & _name )
 {
+	setCursor(Qt::SizeVerCursor);
 	onKnobNumUpdated();
 	setTotalAngle( 270.0f );
 	setInnerRadius( 1.0f );

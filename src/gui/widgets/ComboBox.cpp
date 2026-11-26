@@ -55,6 +55,10 @@ ComboBox::ComboBox( QWidget * _parent, const QString & _name ) :
 
 	connect( &m_menu, SIGNAL(triggered(QAction*)),
 				this, SLOT(setItem(QAction*)));
+	connect(&m_menu, &QMenu::aboutToHide, this, [this] {
+		m_pressed = false;
+		update();
+	});
 
 	setWindowTitle( _name );
 	doConnections();
@@ -170,29 +174,6 @@ void ComboBox::mousePressEvent( QMouseEvent* event )
 		{
 			m_pressed = true;
 			update();
-
-			m_menu.clear();
-			for( int i = 0; i < model()->size(); ++i )
-			{
-				QAction * a = m_menu.addAction( model()->itemPixmap( i ) ? model()->itemPixmap( i )->pixmap() : QPixmap(),
-													model()->itemText( i ) );
-				a->setData( i );
-			}
-
-			QPoint gpos = mapToGlobal(QPoint(0, height()));
-
-			bool const menuCanBeFullyShown = screen()->geometry().contains(QRect(gpos, m_menu.sizeHint()));
-			if (menuCanBeFullyShown)
-			{
-				m_menu.exec(gpos);
-			}
-			else
-			{
-				m_menu.exec(mapToGlobal(QPoint(width(), 0)));
-			}
-
-			m_pressed = false;
-			update();
 		}
 		else if( event->button() == Qt::LeftButton )
 		{
@@ -211,6 +192,31 @@ void ComboBox::mousePressEvent( QMouseEvent* event )
 	}
 }
 
+void ComboBox::mouseReleaseEvent(QMouseEvent* event)
+{
+	if (event->button() != Qt::LeftButton || !m_pressed || m_menu.isVisible())
+	{
+		QWidget::mouseReleaseEvent(event);
+		return;
+	}
+	if (!QRectF(rect()).contains(position(event)) || !model() || !model()->size())
+	{
+		m_pressed = false;
+		update();
+		return;
+	}
+	m_menu.clear();
+	for (int index = 0; index < model()->size(); ++index)
+	{
+		const auto* pixmap = model()->itemPixmap(index);
+		auto* action = m_menu.addAction(pixmap ? pixmap->pixmap() : QPixmap(), model()->itemText(index));
+		action->setData(index);
+	}
+	const auto below = mapToGlobal(QPoint(0, height()));
+	m_menu.popup(screen()->geometry().contains(QRect(below, m_menu.sizeHint()))
+		? below : mapToGlobal(QPoint(width(), 0)));
+	event->accept();
+}
 
 
 

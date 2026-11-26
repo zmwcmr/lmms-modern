@@ -6201,6 +6201,11 @@ Bitte stellen Sie sicher, dass Sie Leserechte auf diese Datei sowie das Verzeich
 <context>
     <name>lmms::gui::AutomatableSlider</name>
     <message>
+        <location filename="../../src/gui/widgets/AutomatableSlider.cpp" line="90"/>
+        <source>Drag the handle or click the track to adjust. Double-click to enter a value.</source>
+        <translation>Zum Anpassen den Regler ziehen oder auf die Schiene klicken. Zum Eingeben eines Werts doppelklicken.</translation>
+    </message>
+    <message>
         <location filename="../../src/gui/widgets/AutomatableSlider.cpp" line="121"/>
         <source>Set value</source>
         <translation>Wert setzen</translation>
@@ -8190,6 +8195,11 @@ Bitte stellen Sie sicher, dass Sie Schreibrechte sowohl auf die Datei als auch d
 </context>
 <context>
     <name>lmms::gui::Fader</name>
+    <message>
+        <location filename="../../src/gui/widgets/Fader.cpp" line="583"/>
+        <source>Drag the handle or click the track to move it. Double-click to enter a value.</source>
+        <translation>Den Fader ziehen oder auf die gewünschte Position auf der Schiene klicken. Zum Eingeben eines Werts doppelklicken.</translation>
+    </message>
     <message>
         <location filename="../../src/gui/widgets/Fader.cpp" line="91"/>
         <source>Volume:</source>
@@ -10355,7 +10365,19 @@ Bitte stellen Sie sicher, dass Sie Schreibrechte sowohl auf die Datei als auch d
     </message>
 </context>
 <context>
+    <name>lmms::gui::InlineValueEditor</name>
+    <message>
+        <source>Range: %1 to %2</source>
+        <translation>Bereich: %1 bis %2</translation>
+    </message>
+</context>
+<context>
     <name>lmms::gui::LcdSpinBox</name>
+    <message>
+        <location filename="../../src/gui/widgets/LcdSpinBox.cpp" line="90"/>
+        <source>Drag or scroll to adjust. Double-click to enter a value.</source>
+        <translation>Zum Anpassen ziehen oder das Mausrad verwenden. Zum Eingeben eines Werts doppelklicken.</translation>
+    </message>
     <message>
         <location filename="../../src/gui/widgets/LcdSpinBox.cpp" line="166"/>
         <source>Set value</source>
@@ -15168,9 +15190,9 @@ Latenz: %2 ms</translation>
 <context>
     <name>lmms::gui::TimeDisplayWidget</name>
     <message>
-        <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="53"/>
-        <source>Time units</source>
-        <translation>Zeiteinheiten</translation>
+        <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="54"/>
+        <source>Click to switch the time display format.</source>
+        <translation>Klicken, um das Zeitanzeigeformat zu wechseln.</translation>
     </message>
     <message>
         <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="69"/>

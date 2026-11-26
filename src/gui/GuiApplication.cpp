@@ -32,6 +32,7 @@
 #include "AutomationEditor.h"
 #include "ConfigManager.h"
 #include "ControllerRackView.h"
+#include "DropDownInteraction.h"
 #include "MixerView.h"
 #include "MainWindow.h"
 #include "MicrotunerConfig.h"
@@ -281,6 +282,7 @@ GuiApplication::GuiApplication()
 	// Standard dialogs otherwise use the platform icon theme, which does not
 	// match LMMS' flat artwork.
 	qApp->installEventFilter(new StandardDialogIconSync(this));
+	qApp->installEventFilter(new DropDownInteraction(this));
 
 	// Prompt the user to create the LMMS working directory (e.g.
 	// ~/Documents/lmms) if it doesn't exist. This is done after the style is

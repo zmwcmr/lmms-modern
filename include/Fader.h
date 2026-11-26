@@ -135,6 +135,9 @@ protected:
 	void leaveEvent(QEvent* event) override;
 
 private:
+	bool event(QEvent* event) override;
+	void updateHoverCursor(const QPoint& pos);
+	QRect knobHitRect() const;
 	QString statusHint() const;
 	void contextMenuEvent(QContextMenuEvent* me) override;
 	void mousePressEvent(QMouseEvent* ev) override;

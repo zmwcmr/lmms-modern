@@ -216,8 +216,8 @@ private:
 	QColor m_barLineColor = QColor{192, 192, 192};
 	QColor m_barNumberColor = m_barLineColor.darker(120);
 
-	QCursor m_cursorSelectLeft = QCursor{embed::getIconPixmap("cursor_select_left"), 0, 16};
-	QCursor m_cursorSelectRight = QCursor{embed::getIconPixmap("cursor_select_right"), 32, 16};
+	QCursor m_cursorSelectLeft;
+	QCursor m_cursorSelectRight;
 
 	// Width of the unused region on the widget's left (above track labels or piano)
 	int m_xOffset;

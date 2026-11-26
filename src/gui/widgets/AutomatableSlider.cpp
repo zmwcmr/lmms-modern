@@ -26,8 +26,11 @@
 #include "AutomatableSlider.h"
 
 #include <QMouseEvent>
+#include <QStyleOptionSlider>
+#include <QToolTip>
 
 #include "CaptionMenu.h"
+#include "DeprecationHelper.h"
 #include "GuiApplication.h"
 #include "InlineValueEditor.h"
 #include "MainWindow.h"
@@ -44,6 +47,8 @@ AutomatableSlider::AutomatableSlider( QWidget * _parent,
 	m_showStatus( false )
 {
 	setWindowTitle( _name );
+	setAttribute(Qt::WA_Hover);
+	setCursor(Qt::ArrowCursor);
 
 	connect( this, SIGNAL(valueChanged(int)),
 					this, SLOT(changeValue(int)));
@@ -56,6 +61,39 @@ AutomatableSlider::AutomatableSlider( QWidget * _parent,
 
 
 
+
+void AutomatableSlider::updateHoverCursor(const QPoint& pos)
+{
+	QStyleOptionSlider option;
+	initStyleOption(&option);
+	const bool overHandle = isEnabled()
+		&& style()->hitTestComplexControl(QStyle::CC_Slider, &option, pos, this) == QStyle::SC_SliderHandle;
+	const auto shape = overHandle
+		? (orientation() == Qt::Horizontal ? Qt::SizeHorCursor : Qt::SizeVerCursor)
+		: Qt::ArrowCursor;
+	if (cursor().shape() != shape)
+	{
+		setCursor(shape);
+	}
+}
+
+bool AutomatableSlider::event(QEvent* event)
+{
+	if (event->type() == QEvent::HoverEnter || event->type() == QEvent::HoverMove)
+	{
+		updateHoverCursor(position(static_cast<QHoverEvent*>(event)));
+	}
+	else if (event->type() == QEvent::ToolTip && isEnabled())
+	{
+		const auto* help = static_cast<QHelpEvent*>(event);
+		const auto description = toolTip().isEmpty() ? windowTitle() : toolTip();
+		const auto hint = tr("Drag the handle or click the track to adjust. Double-click to enter a value.");
+		QToolTip::showText(help->globalPos(),
+			description.isEmpty() ? hint : description + QLatin1Char('\n') + hint, this);
+		return true;
+	}
+	return QSlider::event(event);
+}
 
 void AutomatableSlider::contextMenuEvent( QContextMenuEvent * _me )
 {
@@ -101,6 +139,7 @@ void AutomatableSlider::mouseReleaseEvent( QMouseEvent * _me )
 
 	m_showStatus = false;
 	QSlider::mouseReleaseEvent( _me );
+	updateHoverCursor(position(_me));
 }
 
 
@@ -167,6 +206,10 @@ void AutomatableSlider::modelChanged()
 
 void AutomatableSlider::changeValue( int _value )
 {
+	if (underMouse())
+	{
+		updateHoverCursor(mapFromGlobal(QCursor::pos()));
+	}
 	model()->setValue( _value );
 	emit logicValueChanged( model()->value() );
 }

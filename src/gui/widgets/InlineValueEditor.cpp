@@ -92,6 +92,13 @@ QString InlineValueEditor::rangeHint(float minimum, float maximum, const QString
 void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
 	const ValueTransform& toDisplay, const ValueTransform& fromDisplay, int decimals)
 {
+	showEditorWithHint(control, model, hint, toDisplay, fromDisplay, decimals, -1);
+}
+
+
+void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
+	const ValueTransform& toDisplay, const ValueTransform& fromDisplay, int decimals, int anchorBottom)
+{
 	if (!control || !model) { return; }
 
 	// Only one editor at a time per window, otherwise a double click on a
@@ -106,6 +113,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 
 	auto* editor = new InlineValueEditor(control->window());
 	editor->m_model = model;
+	connect(model, &QObject::destroyed, editor, &InlineValueEditor::cancel);
 	editor->m_toDisplay = toDisplay;
 	editor->m_fromDisplay = fromDisplay;
 	editor->m_decimals = decimals < 0 ? decimalsFor(model) : decimals;
@@ -122,7 +130,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 	const int width = std::max(control->width(), MinWidth);
 	const int height = std::max(control->fontMetrics().height() + 8, MinHeight);
 	int x = topLeft.x() + (control->width() - width) / 2;
-	int y = topLeft.y() + (control->height() - height) / 2;
+	int y = topLeft.y() + (anchorBottom < 0 ? (control->height() - height) / 2 : anchorBottom - height);
 	x = std::clamp(x, HorizontalMargin, std::max(window->width() - width - HorizontalMargin, HorizontalMargin));
 	y = std::clamp(y, HorizontalMargin, std::max(window->height() - height - HorizontalMargin, HorizontalMargin));
 	editor->setGeometry(x, y, width, height);
@@ -151,7 +159,11 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 		const int hintX = std::clamp(x, HorizontalMargin,
 			std::max(HorizontalMargin, window->width() - label->width() - HorizontalMargin));
 		int hintY = y - label->height();
-		if (hintY < HorizontalMargin) { hintY = y + height; }
+		if (hintY < HorizontalMargin)
+		{
+			hintY = y + height;
+			if (anchorBottom >= 0) { hintY += control->fontMetrics().height(); }
+		}
 		hintY = std::clamp(hintY, HorizontalMargin,
 			std::max(HorizontalMargin, window->height() - label->height() - HorizontalMargin));
 		label->move(hintX, hintY);
@@ -211,7 +223,7 @@ void InlineValueEditor::commit()
 
 	bool ok = false;
 	const float typed = LocaleHelper::toFloat(text(), &ok);
-	if (ok)
+	if (ok && m_model)
 	{
 		float value = m_fromDisplay ? m_fromDisplay(typed) : typed;
 		value = std::clamp(value, m_model->minValue<float>(), m_model->maxValue<float>());

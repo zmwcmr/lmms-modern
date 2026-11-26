@@ -55,6 +55,7 @@ protected:
 	//! Text shown in the status bar while the mouse hovers over the slider.
 	QString statusHint() const;
 
+	bool event(QEvent* event) override;
 	void contextMenuEvent( QContextMenuEvent * _me ) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseReleaseEvent( QMouseEvent * _me ) override;
@@ -71,6 +72,7 @@ protected:
 
 
 private:
+	void updateHoverCursor(const QPoint& pos);
 	bool m_showStatus;
 	void enterValue();
 
