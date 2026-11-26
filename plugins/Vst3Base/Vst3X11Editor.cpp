@@ -77,6 +77,9 @@ Vst3X11Editor::Vst3X11Editor(Vst3HostBase* host, const QString& title,
 	m_wmDelete = XInternAtom(display, "WM_DELETE_WINDOW", False);
 	XSetWMProtocols(display, m_window, &m_wmDelete, 1);
 	XMapWindow(display, m_window);
+	// Flush before the editor host starts: it connects to the same X server
+	// and must find the parent window, and the WM must see the map request.
+	XSync(display, False);
 
 	if (remoteEditor)
 	{
@@ -158,6 +161,7 @@ void Vst3X11Editor::raise()
 	if (display != nullptr && m_window != 0)
 	{
 		XRaiseWindow(display, m_window);
+		XFlush(display);
 	}
 }
 
@@ -167,6 +171,7 @@ void Vst3X11Editor::activate()
 	if (display != nullptr && m_window != 0)
 	{
 		XSetInputFocus(display, m_window, RevertToParent, CurrentTime);
+		XFlush(display);
 	}
 }
 
@@ -227,6 +232,7 @@ void Vst3X11Editor::resizeFromPlugin(int width, int height)
 	m_resizing = true;
 	XResizeWindow(display, m_window, static_cast<unsigned int>(width),
 		static_cast<unsigned int>(height));
+	XFlush(display);
 	m_resizing = false;
 }
 

@@ -28,6 +28,7 @@
 #include <QVBoxLayout>
 
 #include "Vst3EditorWidget.h"
+#include "Vst3Host.h"
 #include "Vst3RemoteEditorWidget.h"
 #include "Vst3X11Editor.h"
 
@@ -97,6 +98,17 @@ Vst3EditorWindow* Vst3EditorWindow::open(
 		window->show();
 	}
 	return window;
+}
+
+bool Vst3EditorWindow::isSupported(Vst3HostBase* host)
+{
+	if (host == nullptr || !host->hasEditor())
+	{
+		return false;
+	}
+	return Vst3RemoteEditorWidget::isSupported()
+		|| Vst3EditorWidget::isSupported()
+		|| Vst3X11Editor::isAvailable();
 }
 
 void Vst3EditorWindow::raiseEditor()

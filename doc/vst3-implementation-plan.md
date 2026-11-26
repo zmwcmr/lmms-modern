@@ -1,8 +1,8 @@
 # VST3 support implementation plan
 
 Status: P6 is complete for this pass, including fake-plugin tests, automation
-round-trip coverage and a documented in-process fallback. Cross-platform
-packaging remains deferred by request.
+round-trip coverage, unified editor availability and a documented in-process
+fallback. Cross-platform packaging remains deferred by request.
 
 ## 1. Goal
 
@@ -254,6 +254,17 @@ handling its own event source.
   after parameter, program, unit or MIDI changes.
 - Saving a project therefore asks the DSP host for a fresh state instead of
   reusing a stale snapshot.
+
+### P6.2: Unified GUI availability on Wayland
+
+- `<Vst3EditorWindow::isSupported>` considers the remote xcb editor, the
+  embedded xcb editor and the floating X11/XWayland editor.
+- Instrument and effect views enable **Open editor** based on that unified
+  check instead of requiring the whole Qt application to run on xcb.
+- The X11 editor window is flushed/synchronized after mapping so the window
+  manager sees it and the editor host can attach to an existing window.
+- Verified by opening the Surge XT editor from a Wayland LMMS session; the
+  native GUI is displayed in an XWayland window.
 
 ### P6.1: Fake VST3 module and automated tests
 

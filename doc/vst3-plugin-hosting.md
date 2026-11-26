@@ -68,15 +68,19 @@ marked unsupported by the scanner.
 ## Editors
 
 The original plugin editor is available from **Open editor** in the
-instrument view and the effect dialog.
+instrument view and the effect dialog. The button is enabled whenever any
+editor backend is usable, not only when the Qt platform itself is `xcb`.
 
 - On `xcb`, the editor is embedded in a native X11 child window.
-- On Wayland, LMMS creates a floating X11 window through XWayland.
+- On Wayland, LMMS creates a floating X11 window through XWayland. The window
+  is mapped and synchronized before the editor host attaches to it.
+- If neither xcb nor XWayland is available, the button stays disabled and
+  explains that an X11 or XWayland display is required.
 - Editors run in `lmms-vst3-editor-host`, a separate process. An editor crash
   closes the editor window but does not take down LMMS.
 - Keyboard and scroll input are handled by the native plugin window.
-
-Plugins that require an `IRunLoop` or timer host are not fully supported yet.
+- `IRunLoop` file descriptors and timers are supported (`QSocketNotifier` and
+  `QTimer`).
 
 ## Out-of-process DSP
 

@@ -36,7 +36,6 @@
 #include "AutomatableModel.h"
 #include "Knob.h"
 #include "Vst3EffectControls.h"
-#include "Vst3EditorWidget.h"
 #include "Vst3EditorWindow.h"
 #include "Vst3Host.h"
 
@@ -130,11 +129,12 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
 	{
 		auto* editorButton = new QPushButton(tr("Open editor"), this);
-		editorButton->setEnabled(Vst3EditorWidget::isSupported());
-		if (!Vst3EditorWidget::isSupported())
+		const bool editorSupported = Vst3EditorWindow::isSupported(host);
+		editorButton->setEnabled(editorSupported);
+		if (!editorSupported)
 		{
 			editorButton->setToolTip(
-				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
+				tr("The VST3 editor requires X11 or an XWayland display."));
 		}
 		connect(editorButton, &QPushButton::clicked, this, [this, controls] {
 			if (m_editorWindow != nullptr)
