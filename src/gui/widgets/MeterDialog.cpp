@@ -29,6 +29,7 @@
 #include <QVBoxLayout>
 
 #include "MeterDialog.h"
+#include "FontHelper.h"
 #include "MeterModel.h"
 #include "LcdSpinBox.h"
 
@@ -40,6 +41,35 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 	QWidget( _parent ),
 	ModelView( nullptr, this )
 {
+	m_numerator = new LcdSpinBox(2, this, tr("Meter Numerator"));
+	m_denominator = new LcdSpinBox(2, this, tr("Meter Denominator"));
+	m_numerator->setToolTip(tr("Meter numerator"));
+	m_denominator->setToolTip(tr("Meter denominator"));
+
+	if (_simple)
+	{
+		auto layout = new QVBoxLayout(this);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->setSpacing(0);
+		setToolTip(tr("Time signature"));
+
+		auto digits = new QHBoxLayout;
+		digits->setSpacing(2);
+		digits->addStretch();
+		digits->addWidget(m_numerator);
+		digits->addWidget(new QLabel(QStringLiteral("/"), this));
+		digits->addWidget(m_denominator);
+		digits->addStretch();
+		layout->addLayout(digits);
+
+		auto caption = new QLabel(tr("TIME SIG"), this);
+		caption->setFont(adjustedToPixelSize(caption->font(), DEFAULT_FONT_SIZE));
+		caption->setAlignment(Qt::AlignCenter);
+		caption->setFixedHeight(9);
+		layout->addWidget(caption);
+		return;
+	}
+
 	auto vlayout = new QVBoxLayout(this);
 	vlayout->setSpacing( 0 );
 	vlayout->setContentsMargins(0, 0, 0, 0);
@@ -50,18 +80,10 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 	num_layout->setContentsMargins(0, 0, 0, 0);
 
 
-	m_numerator = new LcdSpinBox( 2, num, tr( "Meter Numerator" ) );
-	m_numerator->setToolTip(tr("Meter numerator"));
-
 	num_layout->addWidget( m_numerator );
 
-	if( !_simple )
-	{
-		auto num_label = new QLabel(tr("Meter Numerator"), num);
-		QFont f = num_label->font();
-		num_layout->addSpacing( 5 );
-		num_layout->addWidget( num_label );
-	}
+	num_layout->addSpacing( 5 );
+	num_layout->addWidget(new QLabel(tr("Meter Numerator"), num));
 	num_layout->addStretch();
 
 	auto den = new QWidget(this);
@@ -69,26 +91,13 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 	den_layout->setSpacing( 0 );
 	den_layout->setContentsMargins(0, 0, 0, 0);
 
-	m_denominator = new LcdSpinBox( 2, den, tr( "Meter Denominator" ) );
-	m_denominator->setToolTip(tr("Meter denominator"));
-	if( _simple )
-	{
-		m_denominator->setLabel( tr( "TIME SIG" ) );
-	}
-
 	den_layout->addWidget( m_denominator );
-
-	if( !_simple )
-	{
-		auto den_label = new QLabel(tr("Meter Denominator"), den);
-		QFont f = den_label->font();
-		den_layout->addSpacing( 5 );
-		den_layout->addWidget( den_label );
-	}
+	den_layout->addSpacing( 5 );
+	den_layout->addWidget(new QLabel(tr("Meter Denominator"), den));
 	den_layout->addStretch();
 
 
-	vlayout->addSpacing( _simple ? 1 : 3 );
+	vlayout->addSpacing( 3 );
 	vlayout->addWidget( num );
 	vlayout->addSpacing( 2 );
 	vlayout->addWidget( den );
