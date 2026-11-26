@@ -1009,6 +1009,7 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 				}
 				else
 				{
+					emit instrumentAboutToBeReplaced();
 					delete m_instrument;
 					m_instrument = nullptr;
 					m_instrument = Instrument::instantiate(
@@ -1040,6 +1041,7 @@ void InstrumentTrack::loadTrackSpecificSettings( const QDomElement & thisElement
 					ControllerConnection::classNodeName() != node.nodeName() &&
 					!node.toElement().hasAttribute( "id" ))
 			{
+				emit instrumentAboutToBeReplaced();
 				delete m_instrument;
 				m_instrument = nullptr;
 				m_instrument = Instrument::instantiate(
@@ -1123,6 +1125,7 @@ Instrument * InstrumentTrack::loadInstrument(const QString & _plugin_name,
 	silenceAllNotes( true );
 
 	lock();
+	emit instrumentAboutToBeReplaced();
 	delete m_instrument;
 	m_instrument = nullptr;
 	m_unknownInstrumentXml.clear();

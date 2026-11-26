@@ -346,9 +346,12 @@ void InstrumentTrackWindow::modelChanged()
 
 	m_track->disconnect( SIGNAL(nameChanged()), this );
 	m_track->disconnect( SIGNAL(instrumentChanged()), this );
+	m_track->disconnect( SIGNAL(instrumentAboutToBeReplaced()), this );
 
 	connect( m_track, SIGNAL(nameChanged()),
 			this, SLOT(updateName()));
+	connect( m_track, SIGNAL(instrumentAboutToBeReplaced()),
+			this, SLOT(clearInstrumentView()), Qt::DirectConnection);
 	connect( m_track, SIGNAL(instrumentChanged()),
 			this, SLOT(updateInstrumentView()));
 
@@ -457,6 +460,18 @@ void InstrumentTrackWindow::updateName()
 	}
 }
 
+
+
+
+
+void InstrumentTrackWindow::clearInstrumentView()
+{
+	// Destroy the old view while its instrument is still alive. Several
+	// plugin views (VST, LV2) keep pointers into the instrument and its
+	// models, so deleting them after the instrument causes a use-after-free.
+	delete m_instrumentView;
+	m_instrumentView = nullptr;
+}
 
 
 

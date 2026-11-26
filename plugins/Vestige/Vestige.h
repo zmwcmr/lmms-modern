@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <QMutex>
+#include <QPointer>
 #include <QSet>
 
 #include "Instrument.h"
@@ -105,7 +106,7 @@ private:
 	gui::SubWindow* m_subWindow;
 	QScrollArea * m_scrollArea;
 	FloatModel ** knobFModel;
-	QObject * p_subWindow;
+	QPointer<QObject> p_subWindow;
 	int paramCount;
 
 	//! True while a plugin-originated parameter change is being applied

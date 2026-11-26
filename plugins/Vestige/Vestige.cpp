@@ -1276,12 +1276,17 @@ void ManageVestigeInstrumentView::displayAutomatedOnly( void )
 
 ManageVestigeInstrumentView::~ManageVestigeInstrumentView()
 {
+	// Delete the knobs first: their ModelView destructor still looks at the
+	// model, and the models are owned by the instrument.
 	if( m_vi->knobFModel != nullptr )
 	{
 		for( int i = 0; i < m_vi->paramCount; i++ )
 		{
-			delete m_vi->knobFModel[ i ];
 			delete m_vstKnobs[i];
+		}
+		for( int i = 0; i < m_vi->paramCount; i++ )
+		{
+			delete m_vi->knobFModel[ i ];
 		}
 	}
 

@@ -647,8 +647,11 @@ ManageVSTEffectView::~ManageVSTEffectView()
 	{
 		for( int i = 0; i < m_vi2->paramCount; i++ )
 		{
-			delete m_vi2->knobFModel[ i ];
 			delete m_vstKnobs[i];
+		}
+		for( int i = 0; i < m_vi2->paramCount; i++ )
+		{
+			delete m_vi2->knobFModel[ i ];
 		}
 	}
 

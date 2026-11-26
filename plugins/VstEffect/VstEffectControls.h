@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 
 class QGridLayout;
@@ -106,7 +107,7 @@ private:
 	std::vector<FloatModel*> knobFModel;
 	int paramCount;
 
-	QObject * ctrHandle;
+	QPointer<QObject> ctrHandle;
 
 	int lastPosInMenu;
 //	QLabel * m_presetLabel;

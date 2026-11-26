@@ -108,6 +108,7 @@ public slots:
 	void textChanged( const QString & _new_name );
 	void toggleVisibility( bool _on );
 	void updateName();
+	void clearInstrumentView();
 	void updateInstrumentView();
 
 

@@ -263,6 +263,8 @@ public:
 	FloatModel* midiCCModel(int index) const { return m_midiCCModel[index].get(); }
 
 signals:
+	//! Emitted before the current instrument is deleted, so views can detach
+	void instrumentAboutToBeReplaced();
 	void instrumentChanged();
 	void midiNoteOn( const lmms::Note& );
 	void midiNoteOff( const lmms::Note& );
