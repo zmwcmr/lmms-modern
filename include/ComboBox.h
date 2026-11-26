@@ -65,6 +65,9 @@ public:
 	//! its longest item, so long translations are not elided.
 	void setMinimumContentWidth(int width);
 
+	//! Shows an icon inside the field and opens the menu on any plain left click.
+	void setFieldIcon(const QPixmap& icon);
+
 public slots:
 	void selectNext();
 	void selectPrevious();

@@ -25,6 +25,7 @@
 
 #include <array>
 
+#include <QAbstractButton>
 #include <QApplication>
 #include <QFile>
 #include <QFileInfo>
@@ -151,6 +152,16 @@ void drawPath( QPainter *p, const QPainterPath &path,
 		p->strokePath(path, QPen(borderCol, 2));
 }
 
+
+
+void LmmsStyle::polish(QWidget* widget)
+{
+	QProxyStyle::polish(widget);
+	if (qobject_cast<QAbstractButton*>(widget) && !widget->testAttribute(Qt::WA_SetCursor))
+	{
+		widget->setCursor(Qt::PointingHandCursor);
+	}
+}
 
 
 LmmsStyle::LmmsStyle() :
@@ -376,6 +387,10 @@ int LmmsStyle::pixelMetric( PixelMetric _metric, const QStyleOption * _option,
 
 		case QStyle::PM_ToolBarItemSpacing:
 			return 2;
+
+		case QStyle::PM_ToolBarExtensionExtent:
+			if (_widget && _widget->property("lmmsWideOverflowButton").toBool()) { return 28; }
+			return QProxyStyle::pixelMetric(_metric, _option, _widget);
 
 		case QStyle::PM_TitleBarHeight:
 			return 24;

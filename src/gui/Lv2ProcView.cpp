@@ -23,6 +23,7 @@
  */
 
 #include "Lv2ProcView.h"
+#include "DeprecationHelper.h"
 
 #ifdef LMMS_HAVE_LV2
 
@@ -39,6 +40,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMdiSubWindow>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QThread>
@@ -65,7 +67,6 @@
 #include "Controls.h"
 #include "embed.h"
 #include "Engine.h"
-#include "FontHelper.h"
 #include "GuiApplication.h"
 #include "lmms_math.h"
 #include "Lv2Manager.h"
@@ -85,6 +86,34 @@ namespace lmms::gui
 
 namespace
 {
+class PresetComboBox : public QComboBox
+{
+public:
+	using QComboBox::QComboBox;
+
+protected:
+	void mousePressEvent(QMouseEvent* event) override
+	{
+		if (event->button() == Qt::LeftButton)
+		{
+			event->accept();
+			return;
+		}
+		QComboBox::mousePressEvent(event);
+	}
+
+	void mouseReleaseEvent(QMouseEvent* event) override
+	{
+		if (event->button() == Qt::LeftButton)
+		{
+			event->accept();
+			if (QRectF(rect()).contains(position(event)) && count() > 0) { showPopup(); }
+			return;
+		}
+		QComboBox::mouseReleaseEvent(event);
+	}
+};
+
 // UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
 // ui:resize. Clamp them before they reach the plugin, which may assert.
 int clampUiDimension(int value, int maximum)
@@ -186,7 +215,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	if (proc && !proc->presets().empty())
 	{
 		auto* presetLabel = new QLabel(QObject::tr("Preset:"), meAsWidget);
-		m_presetCombo = new QComboBox(meAsWidget);
+		m_presetCombo = new PresetComboBox(meAsWidget);
 		m_presetCombo->setSizeAdjustPolicy(
 			QComboBox::AdjustToMinimumContentsLengthWithIcon);
 		m_presetCombo->setMinimumContentsLength(24);
@@ -217,6 +246,8 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 			});
 	}
 
+	if (!m_presetCombo) { btnBox->addStretch(); }
+
 	if (hasPluginUi())
 	{
 		m_toggleUIButton = new QPushButton(QObject::tr("Show GUI"),
@@ -224,10 +255,9 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		m_toggleUIButton->setObjectName("btn");
 		m_toggleUIButton->setCheckable(true);
 		m_toggleUIButton->setChecked(false);
-		m_toggleUIButton->setFont(adjustedToPixelSize(m_toggleUIButton->font(), SMALL_FONT_SIZE));
+		m_toggleUIButton->setToolTip(QObject::tr("Open or close the plugin's own interface"));
 		btnBox->addWidget(m_toggleUIButton, 0);
 	}
-	btnBox->addStretch(1);
 
 	meAsWidget->setAcceptDrops(true);
 
@@ -262,6 +292,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		|| m_presetCombo)
 	{
 		auto* buttonBar = new QWidget(meAsWidget);
+		btnBox->setContentsMargins(0, 0, 0, 0);
 		// ControlLayout sorts items by object name. This key sorts after the
 		// search bar but before regular controls, and requests a full row.
 		buttonBar->setObjectName("!lv2ButtonBar");

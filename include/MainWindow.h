@@ -35,7 +35,7 @@
 
 class QAction;
 class QDomElement;
-class QGridLayout;
+class QHBoxLayout;
 
 namespace lmms
 {
@@ -62,7 +62,7 @@ public:
 		return m_toolBar;
 	}
 
-	int addWidgetToToolBar( QWidget * _w, int _row = -1, int _col = -1 );
+	void addWidgetToToolBar(QWidget* widget);
 	void addSpacingToToolBar( int _size );
 
 	// wrap the widget with a window decoration and add it to the workspace
@@ -223,7 +223,7 @@ private:
 	MovableQMdiArea * m_workspace;
 
 	QWidget * m_toolBar;
-	QGridLayout * m_toolBarLayout;
+	QHBoxLayout* m_toolBarLayout;
 
 	struct keyModifiers
 	{

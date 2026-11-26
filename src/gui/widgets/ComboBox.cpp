@@ -95,6 +95,11 @@ QSize ComboBox::sizeHint() const
 		// Pixmaps are scaled to 16 px height when painted.
 		width += 16 + 3;
 	}
+	const auto fieldIcon = property("_lmms_fieldIcon").value<QPixmap>();
+	if (!fieldIcon.isNull())
+	{
+		width += embed::logicalSize(fieldIcon).width() + 4;
+	}
 	return QSize(width, DEFAULT_HEIGHT);
 }
 
@@ -109,6 +114,14 @@ void ComboBox::setMinimumContentWidth(int width)
 }
 
 
+
+
+void ComboBox::setFieldIcon(const QPixmap& icon)
+{
+	setProperty("_lmms_fieldIcon", icon);
+	updateGeometry();
+	update();
+}
 
 
 void ComboBox::selectNext()
@@ -153,7 +166,7 @@ void ComboBox::mousePressEvent( QMouseEvent* event )
 
 	if( event->button() == Qt::LeftButton && ! ( event->modifiers() & Qt::ControlModifier ) )
 	{
-		if (pos.x() > width() - CB_ARROW_BTN_WIDTH)
+		if (property("_lmms_fieldIcon").isValid() || pos.x() > width() - CB_ARROW_BTN_WIDTH)
 		{
 			m_pressed = true;
 			update();
@@ -227,9 +240,22 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 
 	style()->drawPrimitive( QStyle::PE_Frame, &opt, &p, this );
 
-	auto arrow = m_pressed ? m_arrowSelected : m_arrow;
-
-	p.drawPixmap(width() - CB_ARROW_BTN_WIDTH + 3, 4, arrow);
+	const auto fieldIcon = property("_lmms_fieldIcon");
+	if (fieldIcon.isValid())
+	{
+		const int x = width() - CB_ARROW_BTN_WIDTH / 2;
+		const int y = height() / 2;
+		p.setRenderHint(QPainter::Antialiasing);
+		p.setPen(QPen(textColor(), 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+		const QPoint chevron[] = {{x - 3, y - 2}, {x, y + 1}, {x + 3, y - 2}};
+		p.drawPolyline(chevron, 3);
+		p.setRenderHint(QPainter::Antialiasing, false);
+	}
+	else
+	{
+		const auto& arrow = m_pressed ? m_arrowSelected : m_arrow;
+		p.drawPixmap(width() - CB_ARROW_BTN_WIDTH + 3, 4, arrow);
+	}
 
 	if( model() && model()->size() > 0 )
 	{
@@ -237,6 +263,13 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 		p.setClipRect( QRect( 4, 2, width() - CB_ARROW_BTN_WIDTH - 8, height() - 2 ) );
 		QPixmap pm = model()->currentData() ?  model()->currentData()->pixmap() : QPixmap();
 		int tx = 5;
+		const auto prefix = fieldIcon.value<QPixmap>();
+		if (!prefix.isNull())
+		{
+			const auto size = embed::logicalSize(prefix);
+			p.drawPixmap(tx, (height() - size.height()) / 2, prefix);
+			tx += size.width() + 4;
+		}
 		if( !pm.isNull() )
 		{
 			if( pm.height() > 16 )

@@ -49,7 +49,7 @@ Oscilloscope::Oscilloscope( QWidget * _p ) :
 	m_otherChannelsColor(71, 253, 133),
 	m_clippingColor(255, 64, 64)
 {
-	setFixedSize( m_background.width(), m_background.height() );
+	setFixedSize(m_background.width(), 30);
 	setActive( ConfigManager::inst()->value( "ui", "displaywaveform").toInt() );
 
 	const f_cnt_t frames = Engine::audioEngine()->framesPerPeriod();
@@ -157,7 +157,7 @@ void Oscilloscope::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
 
-	p.drawPixmap( 0, 0, m_background );
+	p.drawPixmap(rect(), m_background);
 
 	if( m_active && !Engine::getSong()->isExporting() )
 	{
@@ -201,8 +201,6 @@ void Oscilloscope::paintEvent( QPaintEvent * )
 	else
 	{
 		p.setPen(m_hintTextColor);
-		// The oscilloscope background is fixed-size artwork, so the hint text
-		// keeps the design size.
 		QFont hintFont = p.font();
 		hintFont.setPixelSize(DEFAULT_FONT_SIZE);
 		p.setFont(hintFont);
