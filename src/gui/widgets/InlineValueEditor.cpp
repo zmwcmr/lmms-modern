@@ -27,11 +27,14 @@
 #include <algorithm>
 #include <cmath>
 
+#include <QApplication>
 #include <QFontMetrics>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMouseEvent>
 
 #include "AutomatableModel.h"
+#include "DeprecationHelper.h"
 #include "LocaleHelper.h"
 
 namespace lmms::gui
@@ -127,6 +130,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 	editor->show();
 	editor->raise();
 	editor->setFocus(Qt::MouseFocusReason);
+	qApp->installEventFilter(editor);
 
 	if (!hint.trimmed().isEmpty())
 	{
@@ -155,6 +159,23 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 		label->show();
 		label->raise();
 	}
+}
+
+
+bool InlineValueEditor::eventFilter(QObject* watched, QEvent* event)
+{
+	if (event->type() == QEvent::MouseButtonPress
+		|| event->type() == QEvent::MouseButtonDblClick
+		|| event->type() == QEvent::NonClientAreaMouseButtonPress)
+	{
+		const auto* mouseEvent = static_cast<QMouseEvent*>(event);
+		if (!rect().contains(mapFromGlobal(globalPosition(mouseEvent))))
+		{
+			commit();
+		}
+	}
+
+	return QLineEdit::eventFilter(watched, event);
 }
 
 

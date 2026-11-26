@@ -70,7 +70,6 @@ protected:
 
 private:
 	void layoutSetup(const QString &style = QString("19green"));
-	void enterValue();
 	float getStep() const;
 
 	LcdWidget m_wholeDisplay;

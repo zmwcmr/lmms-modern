@@ -43,9 +43,8 @@ namespace gui
  *
  * It replaces the modal QInputDialog that used to be opened on double click.
  * The editor is a child of the control's window, so it can be wider than a
- * knob or a fader without being clipped. Enter commits, Escape cancels and
- * losing the focus commits as well, which matches what users expect from
- * inline editors in other applications.
+ * knob or a fader without being clipped. Enter, a click outside the editor,
+ * or losing focus commits the value. Escape cancels.
  */
 class LMMS_EXPORT InlineValueEditor : public QLineEdit
 {
@@ -72,6 +71,7 @@ public:
 	static QString rangeHint(float minimum, float maximum, const QString& unit = {});
 
 protected:
+	bool eventFilter(QObject* watched, QEvent* event) override;
 	void keyPressEvent(QKeyEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;
 
