@@ -107,6 +107,11 @@ public:
 	bool setParameterNormalised(uint32_t id, double value);
 	double parameterNormalised(uint32_t id) const;
 
+	int programCount() const;
+	QString programName(int index) const;
+	int currentProgram() const;
+	bool setProgram(int index);
+
 	//! Queue a parameter change for the next process() call.
 	void queueParameter(uint32_t id, double value, int sampleOffset);
 

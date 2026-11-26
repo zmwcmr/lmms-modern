@@ -64,6 +64,7 @@ public:
 	const QStringList& parameterNames() const { return m_parameterNames; }
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	Vst3Host* host() const;
+	bool setProgram(int index);
 
 private:
 	Vst3Effect* m_effect;

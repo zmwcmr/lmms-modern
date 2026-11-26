@@ -169,6 +169,10 @@ void Vst3Effect::saveSettings(QDomDocument& doc, QDomElement& parent)
 
 	if (m_host != nullptr)
 	{
+		if (m_host->currentProgram() >= 0)
+		{
+			parent.setAttribute(QStringLiteral("program"), m_host->currentProgram());
+		}
 		const auto component = m_host->componentState();
 		const auto controller = m_host->controllerState();
 		if (!component.isEmpty())
@@ -213,6 +217,10 @@ void Vst3Effect::loadSettings(const QDomElement& parent)
 	}
 	m_controls.refreshParameters();
 	m_controls.loadSettings(parent);
+	if (parent.hasAttribute(QStringLiteral("program")))
+	{
+		m_controls.setProgram(parent.attribute(QStringLiteral("program")).toInt());
+	}
 }
 
 extern "C"

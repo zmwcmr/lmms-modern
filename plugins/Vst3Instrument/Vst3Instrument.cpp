@@ -245,6 +245,12 @@ bool Vst3Instrument::handleMidiEvent(const MidiEvent& event,
 	return true;
 }
 
+bool Vst3Instrument::setProgram(int index)
+{
+	QMutexLocker locker(&m_mutex);
+	return m_host != nullptr && m_host->setProgram(index);
+}
+
 void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 {
 	parent.setAttribute(QStringLiteral("file"), m_file);
@@ -253,6 +259,10 @@ void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 
 	if (m_host != nullptr)
 	{
+		if (m_host->currentProgram() >= 0)
+		{
+			parent.setAttribute(QStringLiteral("program"), m_host->currentProgram());
+		}
 		const auto component = m_host->componentState();
 		const auto controller = m_host->controllerState();
 		if (!component.isEmpty())
@@ -293,6 +303,10 @@ void Vst3Instrument::loadSettings(const QDomElement& parent)
 	}
 	m_parameterModels.refreshFromHost();
 	m_parameterModels.loadSettings(parent);
+	if (parent.hasAttribute(QStringLiteral("program")))
+	{
+		setProgram(parent.attribute(QStringLiteral("program")).toInt());
+	}
 }
 
 QString Vst3Instrument::nodeName() const

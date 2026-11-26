@@ -24,6 +24,7 @@
 
 #include "Vst3EffectControlDialog.h"
 
+#include <QComboBox>
 #include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -93,6 +94,20 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		scrollArea->setWidget(parameterWidget);
 		scrollArea->setMinimumSize(420, 300);
 		layout->addWidget(scrollArea);
+	}
+
+	if (auto* host = controls->host(); host != nullptr && host->programCount() > 1)
+	{
+		layout->addWidget(new QLabel(tr("Program"), this));
+		auto* programBox = new QComboBox(this);
+		for (int index = 0; index < host->programCount(); ++index)
+		{
+			programBox->addItem(host->programName(index));
+		}
+		programBox->setCurrentIndex(std::max(0, host->currentProgram()));
+		connect(programBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [controls](int index) { controls->setProgram(index); });
+		layout->addWidget(programBox);
 	}
 
 	if (auto* host = controls->host(); host != nullptr && host->hasEditor())

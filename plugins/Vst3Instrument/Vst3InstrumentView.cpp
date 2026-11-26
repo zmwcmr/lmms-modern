@@ -24,6 +24,7 @@
 
 #include "Vst3InstrumentView.h"
 
+#include <QComboBox>
 #include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
@@ -93,6 +94,20 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 		scrollArea->setWidget(parameterWidget);
 		scrollArea->setMinimumSize(420, 260);
 		layout->addWidget(scrollArea);
+	}
+
+	if (host->programCount() > 1)
+	{
+		layout->addWidget(new QLabel(tr("Program"), this));
+		auto* programBox = new QComboBox(this);
+		for (int index = 0; index < host->programCount(); ++index)
+		{
+			programBox->addItem(host->programName(index));
+		}
+		programBox->setCurrentIndex(std::max(0, host->currentProgram()));
+		connect(programBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+			this, [vst3Instrument](int index) { vst3Instrument->setProgram(index); });
+		layout->addWidget(programBox);
 	}
 
 	if (host->hasEditor())

@@ -60,6 +60,7 @@ public:
 	Vst3Host* host() const { return m_host.get(); }
 	QMutex& hostMutex() { return m_mutex; }
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
+	bool setProgram(int index);
 
 private:
 	bool openPlugin(const QString& file, const QString& classId);

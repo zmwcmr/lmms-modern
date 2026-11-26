@@ -43,6 +43,7 @@
 #include "travesty/factory.h"
 #include "travesty/host.h"
 #include "travesty/message.h"
+#include "travesty/unit.h"
 #include "travesty/view.h"
 
 namespace
@@ -722,6 +723,10 @@ struct Vst3Host::Impl
 
 	std::vector<Parameter> parameters;
 	std::map<uint32_t, double> parameterValues;
+	std::vector<QString> programNames;
+	uint32_t programParameterId = 0;
+	int programStepCount = 0;
+	bool hasProgramParameter = false;
 
 	std::vector<int> inputBusChannels;
 	std::vector<int> outputBusChannels;
@@ -765,6 +770,7 @@ struct Vst3Host::Impl
 
 	void queryClassInfo(const v3_tuid classId);
 	void setupParameters();
+	void setupPrograms();
 	void setupBuses();
 	bool setupProcessing();
 	void ensureBufferSize(int frames);
@@ -922,6 +928,7 @@ bool Vst3Host::Impl::load(const QString& bundlePath,
 	maxBlockSize = newMaxBlockSize > 0 ? newMaxBlockSize : 512;
 
 	setupParameters();
+	setupPrograms();
 	setupBuses();
 	if (!setupProcessing())
 	{
@@ -1005,6 +1012,9 @@ void Vst3Host::Impl::unload()
 
 	parameters.clear();
 	parameterValues.clear();
+	programNames.clear();
+	programParameterId = 0;
+	programStepCount = 0;
 	inputBusChannels.clear();
 	outputBusChannels.clear();
 	inputBusBuffers.clear();
@@ -1104,6 +1114,9 @@ void Vst3Host::Impl::setupParameters()
 {
 	parameters.clear();
 	parameterValues.clear();
+	programNames.clear();
+	programParameterId = 0;
+	programStepCount = 0;
 	if (controller == nullptr)
 	{
 		return;
@@ -1147,6 +1160,78 @@ void Vst3Host::Impl::setupParameters()
 		value = std::clamp(value, 0.0, 1.0);
 		parameterValues[parameter.id] = value;
 		parameters.push_back(std::move(parameter));
+	}
+}
+
+void Vst3Host::Impl::setupPrograms()
+{
+	programNames.clear();
+	programParameterId = 0;
+	programStepCount = 0;
+	hasProgramParameter = false;
+
+	for (const auto& parameter : parameters)
+	{
+		if ((parameter.flags & V3_PARAM_PROGRAM_CHANGE) != 0)
+		{
+			programParameterId = parameter.id;
+			programStepCount = std::max(0, parameter.stepCount);
+			hasProgramParameter = true;
+			break;
+		}
+	}
+
+	v3_unit_information** unitInformation = nullptr;
+	if (controller != nullptr
+		&& v3_cpp_obj_query_interface(controller, v3_unit_information_iid,
+			&unitInformation) != V3_OK)
+	{
+		unitInformation = nullptr;
+	}
+	if (unitInformation == nullptr && component != nullptr
+		&& v3_cpp_obj_query_interface(component, v3_unit_information_iid,
+			&unitInformation) != V3_OK)
+	{
+		unitInformation = nullptr;
+	}
+
+	if (unitInformation != nullptr)
+	{
+		const int listCount = v3_cpp_obj(unitInformation)->get_program_list_count(
+			unitInformation);
+		for (int list = 0; list < listCount; ++list)
+		{
+			v3_program_list_info info = {};
+			if (v3_cpp_obj(unitInformation)->get_program_list_info(
+					unitInformation, list, &info) != V3_OK)
+			{
+				continue;
+			}
+			for (int program = 0; program < info.programCount; ++program)
+			{
+				v3_str_128 name = {};
+				QString programName;
+				if (v3_cpp_obj(unitInformation)->get_program_name(
+						unitInformation, info.id, program, name) == V3_OK)
+				{
+					programName = fromStr128(name);
+				}
+				if (programName.isEmpty())
+				{
+					programName = QStringLiteral("Program %1").arg(program + 1);
+				}
+				programNames.push_back(programName);
+			}
+		}
+		v3_cpp_obj_unref(unitInformation);
+	}
+
+	if (programNames.empty() && programStepCount > 0)
+	{
+		for (int program = 0; program <= programStepCount; ++program)
+		{
+			programNames.push_back(QStringLiteral("Program %1").arg(program + 1));
+		}
 	}
 }
 
@@ -1478,6 +1563,48 @@ double Vst3Host::parameterNormalised(uint32_t id) const
 {
 	const auto it = m_impl->parameterValues.find(id);
 	return it != m_impl->parameterValues.end() ? it->second : 0.0;
+}
+
+int Vst3Host::programCount() const
+{
+	return static_cast<int>(m_impl->programNames.size());
+}
+
+QString Vst3Host::programName(int index) const
+{
+	if (index < 0 || static_cast<size_t>(index) >= m_impl->programNames.size())
+	{
+		return {};
+	}
+	return m_impl->programNames[static_cast<size_t>(index)];
+}
+
+int Vst3Host::currentProgram() const
+{
+	if (!m_impl->hasProgramParameter || m_impl->programStepCount <= 0)
+	{
+		return -1;
+	}
+	const auto it = m_impl->parameterValues.find(m_impl->programParameterId);
+	if (it == m_impl->parameterValues.end())
+	{
+		return -1;
+	}
+	return std::clamp(static_cast<int>(std::lround(it->second
+		* static_cast<double>(m_impl->programStepCount))),
+		0, std::max(0, programCount() - 1));
+}
+
+bool Vst3Host::setProgram(int index)
+{
+	if (index < 0 || index >= programCount() || !m_impl->hasProgramParameter)
+	{
+		return false;
+	}
+	const double normalised = m_impl->programStepCount > 0
+		? static_cast<double>(index) / static_cast<double>(m_impl->programStepCount)
+		: 0.0;
+	return setParameterNormalised(m_impl->programParameterId, normalised);
 }
 
 void Vst3Host::queueParameter(uint32_t id, double value, int sampleOffset)

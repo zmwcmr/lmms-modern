@@ -1,8 +1,8 @@
 # VST3 support implementation plan
 
 Status: P4 native editor implemented for X11 (xcb) and XWayland floating
-windows. P3 component state save/load now works for the tested plugins;
-program/unit handling and round-trip tests remain.
+windows. P3 component state and program selection work; unit hierarchies and
+round-trip tests remain.
 
 ## 1. Goal
 
@@ -443,7 +443,8 @@ Deliverables:
 - [x] parameter models and automation (per-block and sample-offset queue),
 - [x] component state save/load (verified with sfizz, Surge XT and Dexed),
 - [~] controller-only state streams,
-- [ ] program/unit basics,
+- [x] program lists and program selection (Dexed: 32 programs),
+- [~] unit hierarchies and unit selection,
 - [ ] project round-trip tests.
 
 Estimate: 2-3 weeks.

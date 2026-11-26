@@ -24,6 +24,8 @@
 
 #include "Vst3EffectControls.h"
 
+#include <QMutexLocker>
+
 #include "Vst3Effect.h"
 #include "Vst3EffectControlDialog.h"
 #include "Vst3Host.h"
@@ -84,6 +86,16 @@ void Vst3EffectControls::refreshParameters()
 Vst3Host* Vst3EffectControls::host() const
 {
 	return m_effect != nullptr ? m_effect->host() : nullptr;
+}
+
+bool Vst3EffectControls::setProgram(int index)
+{
+	if (m_effect == nullptr || m_effect->host() == nullptr)
+	{
+		return false;
+	}
+	QMutexLocker locker(&m_effect->hostMutex());
+	return m_effect->host()->setProgram(index);
 }
 
 } // namespace lmms

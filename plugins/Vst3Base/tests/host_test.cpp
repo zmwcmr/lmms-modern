@@ -89,7 +89,19 @@ int main(int argc, char* argv[])
 		<< " version=" << host.version()
 		<< " instrument=" << host.isInstrument()
 		<< " parameters=" << host.parameters().size()
+		<< " programs=" << host.programCount()
+		<< " current-program=" << host.currentProgram()
 		<< " latency=" << host.latencySamples() << '\n';
+	if (host.programCount() > 0)
+	{
+		QTextStream(stdout) << "program-0=" << host.programName(0) << '\n';
+	}
+	if (host.programCount() > 5)
+	{
+		host.setProgram(5);
+		QTextStream(stdout) << "selected-program=" << host.currentProgram()
+			<< '/' << host.programName(5) << '\n';
+	}
 
 	for (const auto& parameter : host.parameters())
 	{
