@@ -23,6 +23,11 @@
  */
  
 
+#include <QEvent>
+#include <QStyleOptionToolButton>
+#include <QStylePainter>
+
+#include "LmmsStyle.h"
 #include "ToolButton.h"
 
 namespace lmms::gui
@@ -42,6 +47,89 @@ ToolButton::ToolButton( const QPixmap & _pixmap, const QString & _tooltip,
 	}
 	setToolTip(_tooltip);
 	setIcon( _pixmap );
+}
+
+void ToolButton::setHoverTransitionEnabled(bool enabled)
+{
+	if (enabled == bool(m_hoverAnimation)) { return; }
+	if (enabled)
+	{
+		m_hoverAnimation = std::make_unique<QVariantAnimation>(this);
+		const qreal progress = isEnabled() && underMouse() ? 1.0 : 0.0;
+		m_hoverAnimation->setStartValue(progress);
+		m_hoverAnimation->setEndValue(progress);
+		m_hoverAnimation->setEasingCurve(QEasingCurve::OutCubic);
+		connect(m_hoverAnimation.get(), &QVariantAnimation::valueChanged, this, [this] { update(); });
+		connect(m_hoverAnimation.get(), &QVariantAnimation::finished, this, qOverload<>(&ToolButton::update));
+	}
+	else
+	{
+		m_hoverAnimation.reset();
+		update();
+	}
+}
+
+bool ToolButton::event(QEvent* event)
+{
+	if (m_hoverAnimation)
+	{
+		switch (event->type())
+		{
+		case QEvent::Enter: animateHover(1.0); break;
+		case QEvent::Leave: animateHover(0.0); break;
+		case QEvent::Hide:
+		case QEvent::EnabledChange:
+			m_hoverAnimation->stop();
+			m_hoverAnimation->setStartValue(0.0);
+			m_hoverAnimation->setEndValue(0.0);
+			break;
+		default: break;
+		}
+	}
+	return QToolButton::event(event);
+}
+
+void ToolButton::animateHover(qreal target)
+{
+	if (!isEnabled() || menu()) { return; }
+	const auto current = m_hoverAnimation->currentValue().toReal();
+	m_hoverAnimation->stop();
+	const int duration = LmmsStyle::uiAnimationDuration(this, 100);
+	const int remaining = qRound(duration * qAbs(target - current));
+	m_hoverAnimation->setStartValue(remaining > 0 ? current : target);
+	m_hoverAnimation->setEndValue(target);
+	if (remaining > 0)
+	{
+		m_hoverAnimation->setDuration(remaining);
+		m_hoverAnimation->start();
+	}
+}
+
+void ToolButton::paintEvent(QPaintEvent* event)
+{
+	if (!m_hoverAnimation || m_hoverAnimation->state() != QAbstractAnimation::Running || isDown() || !isEnabled()
+		|| menu() || arrowType() != Qt::NoArrow)
+	{
+		QToolButton::paintEvent(event);
+		return;
+	}
+
+	QStylePainter painter(this);
+	QStyleOptionToolButton label;
+	initStyleOption(&label);
+	auto background = label;
+	background.icon = QIcon{};
+	background.text.clear();
+	background.state &= ~QStyle::State_MouseOver;
+	painter.drawComplexControl(QStyle::CC_ToolButton, background);
+	painter.save();
+	painter.setOpacity(m_hoverAnimation->currentValue().toReal());
+	background.state |= QStyle::State_MouseOver;
+	painter.drawComplexControl(QStyle::CC_ToolButton, background);
+	painter.restore();
+
+	label.rect = style()->subControlRect(QStyle::CC_ToolButton, &label, QStyle::SC_ToolButton, this);
+	painter.drawControl(QStyle::CE_ToolButtonLabel, label);
 }
 
 

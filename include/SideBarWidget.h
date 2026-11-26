@@ -52,6 +52,8 @@ public:
 		return m_title;
 	}
 
+	QPushButton* closeButton() const { return m_closeBtn; }
+
 signals:
 	void closeButtonClicked();
 

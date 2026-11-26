@@ -60,6 +60,7 @@ public:
 					const QWidget * widget = 0 ) const override;
 
 	static QPalette * s_palette;
+	static int uiAnimationDuration(const QWidget* widget, int maximum);
 
 private:
 	QImage colorizeXpm( const char * const * xpm, const QBrush& fill ) const;

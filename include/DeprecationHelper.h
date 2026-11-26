@@ -31,6 +31,7 @@
 
 #include <QDomDocument>
 #include <QFontMetrics>
+#include <QHoverEvent>
 #include <QKeySequence>
 #include <QVariant>
 #include <QWheelEvent>
@@ -85,6 +86,16 @@ inline QPointF positionF(const QMouseEvent* me)
 	return me->position();
 #else
 	return me->localPos();
+#endif
+}
+
+//! Return the hover position relative to the receiving widget.
+inline QPoint position(const QHoverEvent* event)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+	return event->position().toPoint();
+#else
+	return event->pos();
 #endif
 }
 

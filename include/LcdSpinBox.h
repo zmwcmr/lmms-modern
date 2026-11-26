@@ -66,6 +66,7 @@ public slots:
 
 
 protected:
+	bool event(QEvent* event) override;
 	void contextMenuEvent( QContextMenuEvent * _me ) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseMoveEvent( QMouseEvent * _me ) override;
@@ -74,6 +75,8 @@ protected:
 	void mouseDoubleClickEvent( QMouseEvent * _me ) override;
 
 private:
+	QRect valueRect() const;
+
 	float m_remainder; //!< floating offset of spinbox in [-0.5, 0.5]
 	bool m_mouseMoving;
 	QPoint m_lastMousePos; //!< mouse position in last mouseMoveEvent

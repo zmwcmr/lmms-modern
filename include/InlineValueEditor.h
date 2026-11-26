@@ -28,6 +28,7 @@
 #include <functional>
 
 #include <QLineEdit>
+#include <QPointer>
 
 #include "lmms_export.h"
 
@@ -63,6 +64,9 @@ public:
 		const ValueTransform& toDisplay = {}, const ValueTransform& fromDisplay = {},
 		int decimals = -1);
 
+	static void showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
+		const ValueTransform& toDisplay, const ValueTransform& fromDisplay, int decimals, int anchorBottom);
+
 	//! Shows the editor with a visible description of the input unit and range.
 	static void showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
 		const ValueTransform& toDisplay = {}, const ValueTransform& fromDisplay = {},
@@ -81,7 +85,7 @@ private:
 	void commit();
 	void cancel();
 
-	AutomatableModel* m_model;
+	QPointer<AutomatableModel> m_model;
 	ValueTransform m_toDisplay;
 	ValueTransform m_fromDisplay;
 	int m_decimals;

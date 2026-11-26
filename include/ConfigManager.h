@@ -248,6 +248,7 @@ public:
 	bool isFavoriteItem(const QString& item);
 
 	QString value(const QString& cls, const QString& attribute, const QString& defaultVal = "") const;
+	bool uiAnimationsEnabled() const { return value("ui", "animations", "1").toInt() != 0; }
 
 	void setValue(const QString & cls, const QString & attribute,
 						const QString & value);

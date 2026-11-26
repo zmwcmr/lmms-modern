@@ -25,6 +25,7 @@
 
 #include <cmath>
 #include <QMouseEvent>
+#include <QToolTip>
 
 #include "LcdSpinBox.h"
 #include "KeyboardShortcuts.h"
@@ -44,6 +45,8 @@ LcdSpinBox::LcdSpinBox( int numDigits, QWidget* parent, const QString& name ) :
 	m_lastMousePos(),
 	m_displayOffset( 0 )
 {
+	setAttribute(Qt::WA_Hover);
+	setCursor(Qt::ArrowCursor);
 }
 
 
@@ -57,6 +60,40 @@ LcdSpinBox::LcdSpinBox( int numDigits, const QString& style, QWidget* parent, co
 	m_lastMousePos(),
 	m_displayOffset( 0 )
 {
+	setAttribute(Qt::WA_Hover);
+	setCursor(Qt::ArrowCursor);
+}
+
+QRect LcdSpinBox::valueRect() const
+{
+	return QRect(0, 0, width(), cellHeight() + 2);
+}
+
+bool LcdSpinBox::event(QEvent* event)
+{
+	if (event->type() == QEvent::HoverEnter || event->type() == QEvent::HoverMove)
+	{
+		const auto pos = position(static_cast<QHoverEvent*>(event));
+		const auto shape = isEnabled() && valueRect().contains(pos) ? Qt::SizeVerCursor : Qt::ArrowCursor;
+		if (cursor().shape() != shape)
+		{
+			setCursor(shape);
+		}
+	}
+	else if (event->type() == QEvent::ToolTip && isEnabled())
+	{
+		const auto* help = static_cast<QHelpEvent*>(event);
+		const auto area = valueRect();
+		if (area.contains(help->pos()))
+		{
+			const auto description = toolTip().isEmpty() ? windowTitle() : toolTip();
+			const auto hint = tr("Drag or scroll to adjust. Double-click to enter a value.");
+			QToolTip::showText(help->globalPos(),
+				description.isEmpty() ? hint : description + QLatin1Char('\n') + hint, this, area);
+			return true;
+		}
+	}
+	return LcdWidget::event(event);
 }
 
 void LcdSpinBox::update()
@@ -80,11 +117,9 @@ void LcdSpinBox::contextMenuEvent(QContextMenuEvent* event)
 
 void LcdSpinBox::mousePressEvent( QMouseEvent* event )
 {
-	const auto pos = position(event);
-
 	if (event->button() == Qt::LeftButton
 		&& !(event->modifiers() & KBD_COPY_MODIFIER)
-		&& pos.y() < cellHeight() + 2)
+		&& valueRect().contains(position(event)))
 	{
 		m_mouseMoving = true;
 		m_lastMousePos = globalPosition(event);
@@ -156,7 +191,8 @@ void LcdSpinBox::mouseDoubleClickEvent( QMouseEvent * )
 {
 	mouseReleaseEvent(nullptr);
 	InlineValueEditor::showEditorWithHint(this, model(),
-		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue()), {}, {}, 0);
+		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue()), {}, {}, 0,
+		height() - (hasLabel() ? LabelHeight : 0));
 }
 
 } // namespace lmms::gui

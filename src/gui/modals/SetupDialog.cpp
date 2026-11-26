@@ -107,6 +107,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 			"ui", "oneinstrumenttrackwindow").toInt()),
 	m_sideBarOnRight(ConfigManager::inst()->value(
 			"ui", "sidebaronright").toInt()),
+	m_uiAnimations(ConfigManager::inst()->uiAnimationsEnabled()),
 	m_letPreviewsFinish(ConfigManager::inst()->value(
 			"ui", "letpreviewsfinish").toInt()),
 	m_soloLegacyBehavior(ConfigManager::inst()->value(
@@ -251,6 +252,8 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 		m_oneInstrumentTrackWindow, SLOT(toggleOneInstrumentTrackWindow(bool)), true);
 	addCheckBox(tr("Show sidebar on the right-hand side"), guiGroupBox, guiGroupLayout,
 		m_sideBarOnRight, SLOT(toggleSideBarOnRight(bool)), true);
+	addCheckBox(tr("Enable interface animations"), guiGroupBox, guiGroupLayout,
+		m_uiAnimations, SLOT(toggleUiAnimations(bool)), false);
 	addCheckBox(tr("Let sample previews continue when mouse is released"), guiGroupBox, guiGroupLayout,
 		m_letPreviewsFinish, SLOT(toggleLetPreviewsFinish(bool)), false);
 	addCheckBox(tr("Mute automation tracks during solo"), guiGroupBox, guiGroupLayout,
@@ -1040,6 +1043,7 @@ void SetupDialog::accept()
 					QString::number(m_oneInstrumentTrackWindow));
 	ConfigManager::inst()->setValue("ui", "sidebaronright",
 					QString::number(m_sideBarOnRight));
+	ConfigManager::inst()->setValue("ui", "animations", QString::number(m_uiAnimations));
 	ConfigManager::inst()->setValue("ui", "letpreviewsfinish",
 					QString::number(m_letPreviewsFinish));
 	ConfigManager::inst()->setValue("app", "sololegacybehavior",
@@ -1159,6 +1163,11 @@ void SetupDialog::toggleOneInstrumentTrackWindow(bool enabled)
 void SetupDialog::toggleSideBarOnRight(bool enabled)
 {
 	m_sideBarOnRight = enabled;
+}
+
+void SetupDialog::toggleUiAnimations(bool enabled)
+{
+	m_uiAnimations = enabled;
 }
 
 

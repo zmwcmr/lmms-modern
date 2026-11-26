@@ -50,6 +50,7 @@ public:
 	void setValue(int value);
 	void setValue(float value);
 	void setLabel(const QString& label);
+	bool hasLabel() const { return !m_label.isEmpty(); }
 	QFont labelFont() const;
 	void drawLabel(QPainter& painter, const QRect& area, const QString& label) const;
 	static constexpr int LabelHeight = 9;

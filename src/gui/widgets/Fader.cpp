@@ -88,6 +88,8 @@ Fader::Fader(FloatModel* model, const QString& name, QWidget* parent, bool model
 	}
 
 	setWindowTitle(name);
+	setAttribute(Qt::WA_Hover);
+	setCursor(Qt::ArrowCursor);
 	// For now resize the widget to the size of the previous background image "fader_background.png" as it was found in the classic and default theme
 	constexpr QSize minimumSize(23, 116);
 	setMinimumSize(minimumSize);
@@ -154,6 +156,29 @@ void Fader::adjustByDialog()
 			[factor](float value) { return value * factor; },
 			[factor](float value) { return value / factor; });
 	}
+}
+
+QRect Fader::knobHitRect() const
+{
+	return QRect(0, calculateKnobPosYFromModel() - m_knobSize.height(), width(), m_knobSize.height() + 1);
+}
+
+void Fader::updateHoverCursor(const QPoint& pos)
+{
+	const auto shape = isEnabled() && model() && knobHitRect().contains(pos) ? Qt::SizeVerCursor : Qt::ArrowCursor;
+	if (cursor().shape() != shape)
+	{
+		setCursor(shape);
+	}
+}
+
+bool Fader::event(QEvent* event)
+{
+	if (event->type() == QEvent::HoverEnter || event->type() == QEvent::HoverMove)
+	{
+		updateHoverCursor(position(static_cast<QHoverEvent*>(event)));
+	}
+	return QWidget::event(event);
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -230,17 +255,14 @@ void Fader::mousePressEvent(QMouseEvent* mouseEvent)
 		}
 
 		const int localY = pos.y();
-		const auto knobLowerPosY = calculateKnobPosYFromModel();
-		const auto knobUpperPosY = knobLowerPosY - m_knobSize.height();
+		const auto knobHitArea = knobHitRect();
 
-		const auto clickedOnKnob = localY >= knobUpperPosY && localY <= knobLowerPosY;
-
-		if (clickedOnKnob)
+		if (knobHitArea.contains(pos))
 		{
 			// If the users clicked on the knob we want to compensate for the offset to the center line
 			// of the knob when dealing with mouse move events.
 			// This will make it feel like the users have grabbed the knob where they clicked.
-			const auto knobCenterPos = knobLowerPosY - (m_knobSize.height() / 2);
+			const auto knobCenterPos = knobHitArea.bottom() - (m_knobSize.height() / 2);
 			m_knobCenterOffset = localY - knobCenterPos;
 
 			// In this case we also will not call setVolumeByLocalPixelValue, i.e. we do not make any immediate
@@ -291,6 +313,10 @@ void Fader::mouseReleaseEvent(QMouseEvent* mouseEvent)
 
 	// Always reset the offset to 0 regardless of which mouse button is pressed
 	m_knobCenterOffset = 0;
+	if (mouseEvent)
+	{
+		updateHoverCursor(position(mouseEvent));
+	}
 
 	s_textFloat->hide();
 }
@@ -553,7 +579,12 @@ void Fader::updateTextFloat()
 
 void Fader::modelValueChanged()
 {
-	setToolTip(getModelValueAsDbString());
+	setToolTip(getModelValueAsDbString() + QLatin1Char('\n')
+		+ tr("Drag the handle or click the track to move it. Double-click to enter a value."));
+	if (underMouse())
+	{
+		updateHoverCursor(mapFromGlobal(QCursor::pos()));
+	}
 }
 
 QString Fader::getModelValueAsDbString() const

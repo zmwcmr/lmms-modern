@@ -6246,6 +6246,11 @@ Please make sure you have read-permission to the file and the directory containi
 <context>
     <name>lmms::gui::AutomatableSlider</name>
     <message>
+        <location filename="../../src/gui/widgets/AutomatableSlider.cpp" line="90"/>
+        <source>Drag the handle or click the track to adjust. Double-click to enter a value.</source>
+        <translation>拖动滑块或单击滑轨可调整数值，双击可直接输入。</translation>
+    </message>
+    <message>
         <location filename="../../src/gui/widgets/AutomatableSlider.cpp" line="121"/>
         <source>Set value</source>
         <translation>设置值</translation>
@@ -8235,6 +8240,11 @@ Please make sure you have write permission to the file and the directory contain
 </context>
 <context>
     <name>lmms::gui::Fader</name>
+    <message>
+        <location filename="../../src/gui/widgets/Fader.cpp" line="583"/>
+        <source>Drag the handle or click the track to move it. Double-click to enter a value.</source>
+        <translation>拖动推子可调整数值，单击滑轨可将推子移到点击位置。双击可直接输入数值。</translation>
+    </message>
     <message>
         <location filename="../../src/gui/widgets/Fader.cpp" line="91"/>
         <source>Volume:</source>
@@ -10400,7 +10410,19 @@ Please make sure you have write permission to the file and the directory contain
     </message>
 </context>
 <context>
+    <name>lmms::gui::InlineValueEditor</name>
+    <message>
+        <source>Range: %1 to %2</source>
+        <translation>范围：%1 至 %2</translation>
+    </message>
+</context>
+<context>
     <name>lmms::gui::LcdSpinBox</name>
+    <message>
+        <location filename="../../src/gui/widgets/LcdSpinBox.cpp" line="90"/>
+        <source>Drag or scroll to adjust. Double-click to enter a value.</source>
+        <translation>拖动或滚动鼠标滚轮可调整数值，双击可直接输入。</translation>
+    </message>
     <message>
         <location filename="../../src/gui/widgets/LcdSpinBox.cpp" line="166"/>
         <source>Set value</source>
@@ -13667,6 +13689,10 @@ Shift-click to open the note in Automation Editor</source>
 <context>
     <name>lmms::gui::SetupDialog</name>
     <message>
+        <source>Enable interface animations</source>
+        <translation>启用界面动画</translation>
+    </message>
+    <message>
         <location filename="../../src/gui/modals/SetupDialog.cpp" line="162"/>
         <source>Settings</source>
         <translation>设置</translation>
@@ -15212,9 +15238,9 @@ Latency: %2 ms</source>
 <context>
     <name>lmms::gui::TimeDisplayWidget</name>
     <message>
-        <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="53"/>
-        <source>Time units</source>
-        <translation>时间单位</translation>
+        <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="54"/>
+        <source>Click to switch the time display format.</source>
+        <translation>单击切换时间显示格式。</translation>
     </message>
     <message>
         <location filename="../../src/gui/widgets/TimeDisplayWidget.cpp" line="69"/>

@@ -50,7 +50,8 @@ TimeDisplayWidget::TimeDisplayWidget() :
 
 	setMaximumHeight( 32 );
 
-	setToolTip(tr("Time units"));
+	setCursor(Qt::PointingHandCursor);
+	setToolTip(tr("Click to switch the time display format."));
 
 	// update labels of LCD spinboxes
 	setDisplayMode( m_displayMode );

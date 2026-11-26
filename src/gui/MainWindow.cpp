@@ -128,7 +128,7 @@ MainWindow::MainWindow() :
 
 	auto sideBar = new SideBar(Qt::Vertical, w);
 
-	auto splitter = new QSplitter(Qt::Horizontal, w);
+	auto splitter = new SideBarSplitter(Qt::Horizontal, w);
 	splitter->setChildrenCollapsible( false );
 
 	ConfigManager* confMgr = ConfigManager::inst();
@@ -208,6 +208,8 @@ MainWindow::MainWindow() :
 	// viewport.
 	m_workspace->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	m_workspace->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	auto workspacePanel = new SideBarWorkspace(splitter, m_workspace);
+	splitter->setWorkspace(workspacePanel);
 
 	hbox->addWidget(sideBar);
 	hbox->addWidget(splitter);
@@ -215,7 +217,7 @@ MainWindow::MainWindow() :
 	// the splitter to the "left" side, or the first widgets in their list
 	if (sideBarOnRight)
 	{
-		splitter->insertWidget(0, m_workspace);
+		splitter->insertWidget(0, workspacePanel);
 		hbox->insertWidget(0, splitter);
 	}
 
@@ -508,6 +510,10 @@ void MainWindow::finalize()
 	}
 	m_toolBarLayout->insertSpacing(buttonIndex++, 8);
 	m_toolBarLayout->insertWidget(buttonIndex, m_metronomeToggle, 0, Qt::AlignVCenter);
+	for (auto* button : m_toolBar->findChildren<ToolButton*>(QString{}, Qt::FindDirectChildrenOnly))
+	{
+		if (!button->menu()) { button->setHoverTransitionEnabled(true); }
+	}
 
 	// setup-dialog opened before?
 	if( !ConfigManager::inst()->value( "app", "configured" ).toInt() )
