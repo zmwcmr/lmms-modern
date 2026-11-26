@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.3 remote DSP and editor now share one plugin instance on xcb. The
-remote path is still opt-in; the default remains in-process.
+Status: P5.3 remote DSP and editor now share one plugin instance and are the
+default on xcb. The in-process path remains for Wayland and as a fallback.
 
 ## 1. Goal
 
@@ -171,8 +171,8 @@ reports the expected size and exits cleanly without orphan processes.
 - The DSP host uses `PR_SET_PDEATHSIG` on Linux to avoid surviving a crashed
   LMMS process.
 - `vst3-remote-host-test` verifies the shared-memory path without LMMS.
-- Set `LMMS_VST3_REMOTE_DSP=1` to use the DSP host from the instrument/effect
-  wrappers. The default remains in-process.
+- The DSP host is the default on xcb. Set `LMMS_VST3_REMOTE_DSP=0` to force
+  the in-process path.
 
 Verified with Surge XT, Dexed, OB-Xf and sfizz through the standalone test and
 with Surge/Dexed LMMS renders using `LMMS_VST3_REMOTE_DSP=1`.
@@ -197,7 +197,7 @@ the remote DSP and remote editor paths.
 
 Still open:
 
-- make the remote path the default and remove the environment switch,
+- Wayland remote editor and full removal of the in-process fallback,
 - Wayland remote editor,
 - crash restart/watchdog UX,
 - state snapshot caching for very large plugin states.
@@ -532,7 +532,7 @@ Deliverables:
 - [~] watchdog/timeout behavior for the DSP host (2s timeout, no restart yet),
 - [x] remove the duplicate idle plugin instance in remote mode,
 - [x] state snapshot round-trip from the DSP host,
-- [ ] make the remote path the default.
+- [x] make the remote path the default on xcb.
 
 Estimate: 3-5 weeks.
 
