@@ -38,7 +38,7 @@
 namespace lmms
 {
 
-Vst3RemoteEditorWidget::Vst3RemoteEditorWidget(Vst3Host* host,
+Vst3RemoteEditorWidget::Vst3RemoteEditorWidget(Vst3HostBase* host,
 	std::function<void(uint32_t, double)> parameterHandler, QWidget* parent) :
 	QWidget(parent),
 	m_host(host),

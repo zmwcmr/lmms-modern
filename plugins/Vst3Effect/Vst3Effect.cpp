@@ -27,6 +27,7 @@
 #include <algorithm>
 
 #include <QDomElement>
+#include <QGuiApplication>
 #include <QStringList>
 
 #include "AudioEngine.h"
@@ -75,13 +76,7 @@ Vst3Effect::Vst3Effect(Model* parent, const Descriptor::SubPluginFeatures::Key* 
 	}
 }
 
-Vst3Effect::~Vst3Effect()
-{
-	if (m_host != nullptr)
-	{
-		m_host->setParameterChangeCallback({});
-	}
-}
+Vst3Effect::~Vst3Effect() = default;
 
 bool Vst3Effect::openPlugin()
 {
@@ -100,43 +95,37 @@ bool Vst3Effect::openPlugin()
 		blockSize = std::max<int>(engine->framesPerPeriod(), 4096);
 	}
 
-	m_host = std::make_unique<Vst3Host>();
-	QString error;
-	if (!m_host->load(file, classId, sampleRate, blockSize, &error))
-	{
-		m_host.reset();
-		m_controls.initializeParameters();
-		return false;
-	}
-	m_controls.initializeParameters();
+	const bool remoteDsp = qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1
+		&& QGuiApplication::platformName().startsWith(QStringLiteral("xcb"),
+			Qt::CaseInsensitive)
+		&& qEnvironmentVariableIsEmpty("LMMS_VST3_EDITOR_LOCAL");
 
-	if (qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1)
+	if (remoteDsp)
 	{
-		m_remoteHost = std::make_unique<Vst3RemoteHostClient>();
+		auto remote = std::make_unique<Vst3RemoteHostClient>();
 		QString remoteError;
-		if (m_remoteHost->start(file, classId, sampleRate, blockSize,
-				m_host->componentState(), m_host->controllerState(), &remoteError))
+		if (remote->load(file, classId, sampleRate, blockSize, &remoteError))
 		{
-			m_controls.setQueueCallback([this](uint32_t id, double value, int offset) {
-				if (m_remoteHost != nullptr)
-				{
-					m_remoteHost->queueParameter(id, value, offset);
-				}
-			});
-			m_host->setParameterChangeCallback([this](uint32_t id, double value) {
-				if (m_remoteHost != nullptr)
-				{
-					m_remoteHost->queueParameter(id, value, 0);
-				}
-			});
+			m_host = std::move(remote);
 		}
 		else
 		{
-			m_remoteHost.reset();
 			qWarning("VST3 remote DSP host failed: %s",
 				remoteError.toUtf8().constData());
 		}
 	}
+	if (m_host == nullptr)
+	{
+		auto local = std::make_unique<Vst3Host>();
+		QString error;
+		if (!local->load(file, classId, sampleRate, blockSize, &error))
+		{
+			m_controls.initializeParameters();
+			return false;
+		}
+		m_host = std::move(local);
+	}
+	m_controls.initializeParameters();
 
 	QStringList parameterNames;
 	for (const auto& parameter : m_host->parameters())
@@ -153,23 +142,13 @@ bool Vst3Effect::openPlugin()
 bool Vst3Effect::setProgram(int index)
 {
 	QMutexLocker locker(&m_mutex);
-	bool result = m_host != nullptr && m_host->setProgram(index);
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setProgram(index);
-	}
-	return result;
+	return m_host != nullptr && m_host->setProgram(index);
 }
 
 bool Vst3Effect::setUnit(int unitId)
 {
 	QMutexLocker locker(&m_mutex);
-	bool result = m_host != nullptr && m_host->selectUnit(unitId);
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setUnit(unitId);
-	}
-	return result;
+	return m_host != nullptr && m_host->selectUnit(unitId);
 }
 
 void Vst3Effect::setParameterValue(uint32_t id, double value)
@@ -178,10 +157,6 @@ void Vst3Effect::setParameterValue(uint32_t id, double value)
 	if (m_host != nullptr)
 	{
 		m_host->setParameterNormalised(id, value);
-	}
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->queueParameter(id, value, 0);
 	}
 }
 
@@ -215,20 +190,10 @@ Effect::ProcessStatus Vst3Effect::processImpl(SampleFrame* buf, const f_cnt_t fr
 	const double tempo = Engine::getSong() != nullptr
 		? Engine::getSong()->getTempo() : 120.0;
 	const bool playing = Engine::getSong() != nullptr && Engine::getSong()->isPlaying();
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setTempo(tempo);
-		m_remoteHost->setPlaying(playing);
-		m_remoteHost->process(m_inputLeft.data(), m_inputRight.data(),
-			m_outputLeft.data(), m_outputRight.data(), frameCount);
-	}
-	else
-	{
-		m_host->setTempo(tempo);
-		m_host->setPlaying(playing);
-		m_host->process(m_inputLeft.data(), m_inputRight.data(),
-			m_outputLeft.data(), m_outputRight.data(), frameCount);
-	}
+	m_host->setTempo(tempo);
+	m_host->setPlaying(playing);
+	m_host->process(m_inputLeft.data(), m_inputRight.data(),
+		m_outputLeft.data(), m_outputRight.data(), frameCount);
 
 	const float wet = wetLevel();
 	const float dry = dryLevel();

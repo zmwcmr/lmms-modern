@@ -32,7 +32,7 @@
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 
 /**
  * Creates a native X11 child window and lets the plugin's IPlugView attach
@@ -42,7 +42,7 @@ class Vst3Host;
 class VST3BASE_EXPORT Vst3EditorWidget : public QWidget
 {
 public:
-	explicit Vst3EditorWidget(Vst3Host* host, QWidget* parent = nullptr);
+	explicit Vst3EditorWidget(Vst3HostBase* host, QWidget* parent = nullptr);
 	~Vst3EditorWidget() override;
 
 	static bool isSupported();
@@ -58,7 +58,7 @@ protected:
 private:
 	void resizeFromPlugin(int width, int height);
 
-	Vst3Host* m_host = nullptr;
+	Vst3HostBase* m_host = nullptr;
 	bool m_open = false;
 	bool m_resizing = false;
 };

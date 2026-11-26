@@ -37,7 +37,7 @@ class QSocketNotifier;
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 
 /**
  * Creates a plain X11 top-level window through XWayland and attaches the
@@ -47,7 +47,7 @@ class Vst3Host;
 class VST3BASE_EXPORT Vst3X11Editor : public QObject
 {
 public:
-	Vst3X11Editor(Vst3Host* host, const QString& title,
+	Vst3X11Editor(Vst3HostBase* host, const QString& title,
 		std::function<void()> closed, QObject* parent = nullptr);
 	~Vst3X11Editor() override;
 
@@ -62,7 +62,7 @@ private:
 	void processEvents();
 	void resizeFromPlugin(int width, int height);
 
-	Vst3Host* m_host = nullptr;
+	Vst3HostBase* m_host = nullptr;
 	void* m_display = nullptr;
 	unsigned long m_window = 0;
 	unsigned long m_wmDelete = 0;

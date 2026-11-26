@@ -34,7 +34,7 @@
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 class Vst3RemoteEditorClient;
 
 /**
@@ -44,7 +44,7 @@ class Vst3RemoteEditorClient;
 class VST3BASE_EXPORT Vst3RemoteEditorWidget : public QWidget
 {
 public:
-	Vst3RemoteEditorWidget(Vst3Host* host,
+	Vst3RemoteEditorWidget(Vst3HostBase* host,
 		std::function<void(uint32_t, double)> parameterHandler = {},
 		QWidget* parent = nullptr);
 	~Vst3RemoteEditorWidget() override;
@@ -59,7 +59,7 @@ protected:
 	void closeEvent(QCloseEvent* event) override;
 
 private:
-	Vst3Host* m_host = nullptr;
+	Vst3HostBase* m_host = nullptr;
 	Vst3RemoteEditorClient* m_client = nullptr;
 	std::function<void(uint32_t, double)> m_parameterHandler;
 	bool m_resizing = false;

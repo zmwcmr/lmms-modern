@@ -26,6 +26,7 @@ ADD_EXECUTABLE(vst3-editor-test
 	../Vst3X11Editor.cpp
 	../Vst3RemoteEditorClient.cpp
 	../Vst3RemoteEditorWidget.cpp
+	../Vst3RemoteHostClient.cpp
 )
 
 TARGET_INCLUDE_DIRECTORIES(vst3-editor-test

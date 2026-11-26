@@ -190,12 +190,36 @@ int main(int argc, char* argv[])
 		object.insert(QStringLiteral("stepCount"), parameter.stepCount);
 		object.insert(QStringLiteral("flags"), parameter.flags);
 		object.insert(QStringLiteral("default"), parameter.defaultNormalised);
+		object.insert(QStringLiteral("value"), host.parameterNormalised(parameter.id));
 		parameters.append(object);
+	}
+	QJsonArray programs;
+	for (int index = 0; index < host.programCount(); ++index)
+	{
+		programs.append(host.programName(index));
+	}
+	QJsonArray units;
+	for (const auto& unit : host.units())
+	{
+		QJsonObject object;
+		object.insert(QStringLiteral("id"), unit.id);
+		object.insert(QStringLiteral("parentId"), unit.parentId);
+		object.insert(QStringLiteral("name"), unit.name);
+		units.append(object);
 	}
 	QJsonObject readyMessage;
 	readyMessage.insert(QStringLiteral("type"), QStringLiteral("ready"));
+	readyMessage.insert(QStringLiteral("name"), host.name());
+	readyMessage.insert(QStringLiteral("vendor"), host.vendor());
+	readyMessage.insert(QStringLiteral("version"), host.version());
+	readyMessage.insert(QStringLiteral("isInstrument"), host.isInstrument());
+	readyMessage.insert(QStringLiteral("hasEditor"), host.hasEditor());
 	readyMessage.insert(QStringLiteral("latency"), host.latencySamples());
 	readyMessage.insert(QStringLiteral("parameters"), parameters);
+	readyMessage.insert(QStringLiteral("programs"), programs);
+	readyMessage.insert(QStringLiteral("currentProgram"), host.currentProgram());
+	readyMessage.insert(QStringLiteral("units"), units);
+	readyMessage.insert(QStringLiteral("currentUnit"), host.currentUnit());
 	sendMessage(socket, readyMessage);
 
 	signal(SIGTERM, stopHandler);
@@ -272,6 +296,26 @@ int main(int argc, char* argv[])
 				host.setParameterNormalised(
 					static_cast<uint32_t>(message.value(QStringLiteral("id")).toDouble()),
 					message.value(QStringLiteral("value")).toDouble());
+			}
+			else if (type == QLatin1String("get-state"))
+			{
+				QJsonArray values;
+				for (const auto& parameter : host.parameters())
+				{
+					QJsonObject value;
+					value.insert(QStringLiteral("id"), static_cast<double>(parameter.id));
+					value.insert(QStringLiteral("value"),
+						host.parameterNormalised(parameter.id));
+					values.append(value);
+				}
+				QJsonObject message;
+				message.insert(QStringLiteral("type"), QStringLiteral("state"));
+				message.insert(QStringLiteral("component"),
+					QString::fromLatin1(host.componentState().toBase64()));
+				message.insert(QStringLiteral("controller"),
+					QString::fromLatin1(host.controllerState().toBase64()));
+				message.insert(QStringLiteral("values"), values);
+				sendMessage(socket, message);
 			}
 			else if (type == QLatin1String("program"))
 			{

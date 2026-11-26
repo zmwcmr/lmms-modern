@@ -22,12 +22,15 @@
  *
  */
 
+#include <memory>
+
 #include <QApplication>
 #include <QTextStream>
 #include <QTimer>
 
 #include "Vst3EditorWindow.h"
 #include "Vst3Host.h"
+#include "Vst3RemoteHostClient.h"
 
 int main(int argc, char* argv[])
 {
@@ -40,20 +43,35 @@ int main(int argc, char* argv[])
 		return 2;
 	}
 
-	lmms::Vst3Host host;
+	std::unique_ptr<lmms::Vst3HostBase> host;
 	QString error;
-	if (!host.load(arguments.at(1), arguments.at(2), 48000.0, 512, &error))
+	if (qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1)
 	{
-		QTextStream(stderr) << "Load failed: " << error << '\n';
-		return 1;
+		auto remote = std::make_unique<lmms::Vst3RemoteHostClient>();
+		if (!remote->load(arguments.at(1), arguments.at(2), 48000.0, 512, &error))
+		{
+			QTextStream(stderr) << "Remote load failed: " << error << '\n';
+			return 1;
+		}
+		host = std::move(remote);
 	}
-	if (!host.hasEditor())
+	else
+	{
+		auto local = std::make_unique<lmms::Vst3Host>();
+		if (!local->load(arguments.at(1), arguments.at(2), 48000.0, 512, &error))
+		{
+			QTextStream(stderr) << "Load failed: " << error << '\n';
+			return 1;
+		}
+		host = std::move(local);
+	}
+	if (!host->hasEditor())
 	{
 		QTextStream(stderr) << "Plugin has no editor\n";
 		return 3;
 	}
 
-	lmms::Vst3EditorWindow window(&host, QStringLiteral("VST3 editor test"));
+	lmms::Vst3EditorWindow window(host.get(), QStringLiteral("VST3 editor test"));
 	if (!window.isX11Forwarded())
 	{
 		window.show();
@@ -62,7 +80,7 @@ int main(int argc, char* argv[])
 	QTimer::singleShot(3000, &application, &QApplication::quit);
 	application.exec();
 
-	QTextStream(stdout) << "editor-open=" << host.isEditorOpen()
+	QTextStream(stdout) << "editor-open=" << host->isEditorOpen()
 		<< " size=" << window.width() << 'x' << window.height() << '\n';
 	return 0;
 }

@@ -40,7 +40,7 @@ namespace lmms
 
 #if defined(Q_OS_LINUX)
 
-Vst3X11Editor::Vst3X11Editor(Vst3Host* host, const QString& title,
+Vst3X11Editor::Vst3X11Editor(Vst3HostBase* host, const QString& title,
 	std::function<void()> closed, QObject* parent) :
 	QObject(parent),
 	m_host(host),
@@ -219,7 +219,7 @@ void Vst3X11Editor::processEvents()
 
 #else
 
-Vst3X11Editor::Vst3X11Editor(Vst3Host*, const QString&,
+Vst3X11Editor::Vst3X11Editor(Vst3HostBase*, const QString&,
 	std::function<void()>, QObject* parent) :
 	QObject(parent)
 {

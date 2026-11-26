@@ -36,7 +36,7 @@
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 class Vst3RemoteHostClient;
 class InstrumentTrack;
 
@@ -58,7 +58,7 @@ public:
 
 	gui::PluginView* instantiateView(QWidget* parent) override;
 
-	Vst3Host* host() const { return m_host.get(); }
+	Vst3HostBase* host() const { return m_host.get(); }
 	QMutex& hostMutex() { return m_mutex; }
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	bool setProgram(int index);
@@ -69,9 +69,8 @@ private:
 	bool openPlugin(const QString& file, const QString& classId);
 	void closePlugin();
 
-	std::unique_ptr<Vst3Host> m_host;
-	std::unique_ptr<Vst3RemoteHostClient> m_remoteHost;
-	QMutex m_mutex;
+	std::unique_ptr<Vst3HostBase> m_host;
+		QMutex m_mutex;
 	QString m_file;
 	QString m_classId;
 	Vst3ParameterModels m_parameterModels;

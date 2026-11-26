@@ -41,7 +41,7 @@ class QProcess;
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 
 /**
  * Starts `lmms-vst3-editor-host`, gives it an X11 parent window and mirrors
@@ -54,7 +54,7 @@ class VST3BASE_EXPORT Vst3RemoteEditorClient : public QObject
 {
 public:
 	Vst3RemoteEditorClient(
-		Vst3Host* host, quintptr parentWindow, QObject* parent = nullptr);
+		Vst3HostBase* host, quintptr parentWindow, QObject* parent = nullptr);
 	~Vst3RemoteEditorClient() override;
 
 	bool start(const QString& title, QString* error = nullptr);
@@ -75,7 +75,7 @@ private:
 	void handleMessage(const QJsonObject& message);
 	void sendState();
 
-	Vst3Host* m_host = nullptr;
+	Vst3HostBase* m_host = nullptr;
 	quintptr m_parentWindow = 0;
 	QLocalServer* m_server = nullptr;
 	QLocalSocket* m_socket = nullptr;

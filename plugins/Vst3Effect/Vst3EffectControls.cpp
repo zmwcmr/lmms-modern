@@ -83,7 +83,7 @@ void Vst3EffectControls::refreshParameters()
 	m_parameterModels.refreshFromHost();
 }
 
-Vst3Host* Vst3EffectControls::host() const
+Vst3HostBase* Vst3EffectControls::host() const
 {
 	return m_effect != nullptr ? m_effect->host() : nullptr;
 }

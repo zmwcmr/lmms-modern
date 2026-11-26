@@ -49,7 +49,7 @@ class FloatModel;
 class VST3BASE_EXPORT Vst3ParameterModels
 {
 public:
-	void initialize(Model* parent, Vst3Host* host);
+	void initialize(Model* parent, Vst3HostBase* host);
 	void clear();
 	void setQueueCallback(std::function<void(uint32_t, double, int)> callback);
 
@@ -64,15 +64,15 @@ public:
 
 	int count() const { return static_cast<int>(m_models.size()); }
 	FloatModel* model(int index) const;
-	const Vst3Host::Parameter& parameter(int index) const;
+	const Vst3HostBase::Parameter& parameter(int index) const;
 	const std::vector<FloatModel*>& models() const { return m_models; }
 
 private:
 	static QString settingName(uint32_t id);
 
-	Vst3Host* m_host = nullptr;
+	Vst3HostBase* m_host = nullptr;
 	std::function<void(uint32_t, double, int)> m_queueCallback;
-	std::vector<Vst3Host::Parameter> m_parameters;
+	std::vector<Vst3HostBase::Parameter> m_parameters;
 	std::vector<FloatModel*> m_models;
 	std::vector<float> m_lastValues;
 };

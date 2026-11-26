@@ -46,7 +46,7 @@ constexpr int kConnectionTimeoutMs = 5000;
 } // namespace
 
 Vst3RemoteEditorClient::Vst3RemoteEditorClient(
-	Vst3Host* host, quintptr parentWindow, QObject* parent) :
+	Vst3HostBase* host, quintptr parentWindow, QObject* parent) :
 	QObject(parent),
 	m_host(host),
 	m_parentWindow(parentWindow)

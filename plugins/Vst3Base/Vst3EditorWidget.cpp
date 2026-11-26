@@ -37,7 +37,7 @@
 namespace lmms
 {
 
-Vst3EditorWidget::Vst3EditorWidget(Vst3Host* host, QWidget* parent) :
+Vst3EditorWidget::Vst3EditorWidget(Vst3HostBase* host, QWidget* parent) :
 	QWidget(parent),
 	m_host(host)
 {

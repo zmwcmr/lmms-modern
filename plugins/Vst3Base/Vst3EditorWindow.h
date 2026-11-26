@@ -34,18 +34,18 @@
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 class Vst3EditorWidget;
 class Vst3X11Editor;
 
 class VST3BASE_EXPORT Vst3EditorWindow : public QDialog
 {
 public:
-	Vst3EditorWindow(Vst3Host* host, const QString& title,
+	Vst3EditorWindow(Vst3HostBase* host, const QString& title,
 		std::function<void(uint32_t, double)> parameterHandler = {},
 		QWidget* parent = nullptr);
 
-	static Vst3EditorWindow* open(Vst3Host* host, QWidget* parent,
+	static Vst3EditorWindow* open(Vst3HostBase* host, QWidget* parent,
 		const QString& title,
 		std::function<void(uint32_t, double)> parameterHandler = {});
 

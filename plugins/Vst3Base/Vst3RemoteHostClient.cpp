@@ -68,6 +68,8 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 {
 	stop();
 
+	m_bundlePath = bundlePath;
+	m_classId = classId;
 	const auto host = hostExecutable();
 	if (host.isEmpty())
 	{
@@ -229,8 +231,35 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 		parameter.automatable = (parameter.flags & 1) != 0;
 		parameter.readOnly = (parameter.flags & 2) != 0;
 		parameter.hidden = (parameter.flags & 16) != 0;
+		m_parameterValues[parameter.id] =
+			object.value(QStringLiteral("value")).toDouble(
+				parameter.defaultNormalised);
 		m_parameters.push_back(std::move(parameter));
 	}
+
+	m_name = ready.value(QStringLiteral("name")).toString();
+	m_vendor = ready.value(QStringLiteral("vendor")).toString();
+	m_version = ready.value(QStringLiteral("version")).toString();
+	m_isInstrument = ready.value(QStringLiteral("isInstrument")).toBool();
+	m_hasEditor = ready.value(QStringLiteral("hasEditor")).toBool();
+	m_programNames.clear();
+	for (const auto& value : ready.value(QStringLiteral("programs")).toArray())
+	{
+		m_programNames.push_back(value.toString());
+	}
+	m_currentProgram = ready.value(QStringLiteral("currentProgram")).toInt(-1);
+	m_units.clear();
+	for (const auto& value : ready.value(QStringLiteral("units")).toArray())
+	{
+		const auto object = value.toObject();
+		Unit unit;
+		unit.id = object.value(QStringLiteral("id")).toInt();
+		unit.parentId = object.value(QStringLiteral("parentId")).toInt(-1);
+		unit.name = object.value(QStringLiteral("name")).toString();
+		m_units.push_back(std::move(unit));
+	}
+	m_currentUnit = ready.value(QStringLiteral("currentUnit")).toInt(-1);
+	m_stateValid = false;
 
 	m_running = true;
 	return true;
@@ -296,8 +325,21 @@ void Vst3RemoteHostClient::stop()
 		m_audio = nullptr;
 	}
 	m_parameters.clear();
+	m_parameterValues.clear();
+	m_programNames.clear();
+	m_units.clear();
 	m_readBuffer.clear();
+	m_stateComponent.clear();
+	m_stateController.clear();
+	m_stateValid = false;
 	m_latency = 0;
+	m_currentProgram = -1;
+	m_currentUnit = -1;
+	m_name.clear();
+	m_vendor.clear();
+	m_version.clear();
+	m_isInstrument = false;
+	m_hasEditor = false;
 }
 
 bool Vst3RemoteHostClient::isRunning() const
@@ -305,16 +347,71 @@ bool Vst3RemoteHostClient::isRunning() const
 	return m_running;
 }
 
-void Vst3RemoteHostClient::queueParameter(
-	uint32_t id, double value, int sampleOffset)
+bool Vst3RemoteHostClient::load(const QString& bundlePath,
+	const QString& classId,
+	double sampleRate,
+	int maxBlockSize,
+	QString* error)
 {
-	std::lock_guard<std::mutex> lock(m_queueMutex);
-	m_pendingParameters.push_back({id, value, sampleOffset});
+	return start(bundlePath, classId, sampleRate, maxBlockSize,
+		QByteArray(), QByteArray(), error);
+}
+
+void Vst3RemoteHostClient::unload()
+{
+	stop();
+}
+
+bool Vst3RemoteHostClient::isLoaded() const
+{
+	return m_running;
+}
+
+bool Vst3RemoteHostClient::isInstrument() const
+{
+	return m_isInstrument;
+}
+
+bool Vst3RemoteHostClient::setParameterNormalised(uint32_t id, double value)
+{
+	if (m_parameterValues.find(id) == m_parameterValues.end())
+	{
+		return false;
+	}
+	value = std::clamp(value, 0.0, 1.0);
+	queueParameter(id, value, 0);
+	m_parameterValues[id] = value;
+	return true;
+}
+
+double Vst3RemoteHostClient::parameterNormalised(uint32_t id) const
+{
+	const auto it = m_parameterValues.find(id);
+	return it != m_parameterValues.end() ? it->second : 0.0;
+}
+
+int Vst3RemoteHostClient::programCount() const
+{
+	return static_cast<int>(m_programNames.size());
+}
+
+QString Vst3RemoteHostClient::programName(int index) const
+{
+	if (index < 0 || static_cast<size_t>(index) >= m_programNames.size())
+	{
+		return {};
+	}
+	return m_programNames[static_cast<size_t>(index)];
+}
+
+int Vst3RemoteHostClient::currentProgram() const
+{
+	return m_currentProgram;
 }
 
 bool Vst3RemoteHostClient::setProgram(int index)
 {
-	if (!m_running)
+	if (!m_running || index < 0 || index >= programCount())
 	{
 		return false;
 	}
@@ -322,10 +419,11 @@ bool Vst3RemoteHostClient::setProgram(int index)
 	message.insert(QStringLiteral("type"), QStringLiteral("program"));
 	message.insert(QStringLiteral("index"), index);
 	sendMessage(message);
+	m_currentProgram = index;
 	return true;
 }
 
-bool Vst3RemoteHostClient::setUnit(int unitId)
+bool Vst3RemoteHostClient::selectUnit(int unitId)
 {
 	if (!m_running)
 	{
@@ -335,7 +433,56 @@ bool Vst3RemoteHostClient::setUnit(int unitId)
 	message.insert(QStringLiteral("type"), QStringLiteral("unit"));
 	message.insert(QStringLiteral("unit"), unitId);
 	sendMessage(message);
+	m_currentUnit = unitId;
 	return true;
+}
+
+QByteArray Vst3RemoteHostClient::componentState() const
+{
+	auto* const self = const_cast<Vst3RemoteHostClient*>(this);
+	if (!self->requestState())
+	{
+		return {};
+	}
+	return m_stateComponent;
+}
+
+QByteArray Vst3RemoteHostClient::controllerState() const
+{
+	auto* const self = const_cast<Vst3RemoteHostClient*>(this);
+	if (!self->requestState())
+	{
+		return {};
+	}
+	return m_stateController;
+}
+
+bool Vst3RemoteHostClient::setState(
+	const QByteArray& componentState, const QByteArray& controllerState)
+{
+	if (!m_running)
+	{
+		return false;
+	}
+	QJsonObject message;
+	message.insert(QStringLiteral("type"), QStringLiteral("state"));
+	message.insert(QStringLiteral("component"),
+		QString::fromLatin1(componentState.toBase64()));
+	message.insert(QStringLiteral("controller"),
+		QString::fromLatin1(controllerState.toBase64()));
+	sendMessage(message);
+	m_stateValid = false;
+	return requestState();
+}
+
+void Vst3RemoteHostClient::queueParameter(
+	uint32_t id, double value, int sampleOffset)
+{
+	{
+		std::lock_guard<std::mutex> lock(m_queueMutex);
+		m_pendingParameters.push_back({id, value, sampleOffset});
+	}
+	m_parameterValues[id] = value;
 }
 
 void Vst3RemoteHostClient::queueMidi(const Vst3Host::MidiEvent& event)
@@ -469,6 +616,60 @@ QString Vst3RemoteHostClient::hostExecutable()
 		}
 	}
 	return {};
+}
+
+bool Vst3RemoteHostClient::requestState()
+{
+	if (m_stateValid)
+	{
+		return true;
+	}
+	if (m_socket == nullptr
+		|| m_socket->state() != QLocalSocket::ConnectedState)
+	{
+		return false;
+	}
+	QJsonObject request;
+	request.insert(QStringLiteral("type"), QStringLiteral("get-state"));
+	sendMessage(request);
+	while (true)
+	{
+		const int newline = m_readBuffer.indexOf('\n');
+		if (newline >= 0)
+		{
+			const auto document = QJsonDocument::fromJson(
+				m_readBuffer.left(newline));
+			m_readBuffer.remove(0, newline + 1);
+			if (!document.isObject())
+			{
+				continue;
+			}
+			const auto message = document.object();
+			if (message.value(QStringLiteral("type")).toString()
+				== QLatin1String("state"))
+			{
+				m_stateComponent = QByteArray::fromBase64(
+					message.value(QStringLiteral("component")).toString().toLatin1());
+				m_stateController = QByteArray::fromBase64(
+					message.value(QStringLiteral("controller")).toString().toLatin1());
+				for (const auto& value : message.value(QStringLiteral("values")).toArray())
+				{
+					const auto object = value.toObject();
+					const auto id = static_cast<uint32_t>(
+						object.value(QStringLiteral("id")).toDouble());
+					m_parameterValues[id] = object.value(QStringLiteral("value")).toDouble();
+				}
+				m_stateValid = true;
+				return true;
+			}
+			continue;
+		}
+		if (!m_socket->waitForReadyRead(10000))
+		{
+			return false;
+		}
+		m_readBuffer += m_socket->readAll();
+	}
 }
 
 void Vst3RemoteHostClient::sendMessage(const QJsonObject& message)

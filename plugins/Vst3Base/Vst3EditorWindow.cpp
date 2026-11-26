@@ -35,7 +35,7 @@ namespace lmms
 {
 
 Vst3EditorWindow::Vst3EditorWindow(
-	Vst3Host* host, const QString& title,
+	Vst3HostBase* host, const QString& title,
 	std::function<void(uint32_t, double)> parameterHandler, QWidget* parent) :
 	QDialog(parent)
 {
@@ -78,7 +78,7 @@ Vst3EditorWindow::Vst3EditorWindow(
 }
 
 Vst3EditorWindow* Vst3EditorWindow::open(
-	Vst3Host* host, QWidget* parent, const QString& title,
+	Vst3HostBase* host, QWidget* parent, const QString& title,
 	std::function<void(uint32_t, double)> parameterHandler)
 {
 	auto* window = new Vst3EditorWindow(

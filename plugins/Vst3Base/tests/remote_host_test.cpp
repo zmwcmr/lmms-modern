@@ -52,8 +52,16 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	const auto componentState = client.componentState();
+	const auto controllerState = client.controllerState();
 	QTextStream(stdout) << "parameters=" << client.parameters().size()
-		<< " latency=" << client.latencySamples() << '\n';
+		<< " latency=" << client.latencySamples()
+		<< " state=" << componentState.size() << '/' << controllerState.size()
+		<< '\n';
+	if (!componentState.isEmpty() || !controllerState.isEmpty())
+	{
+		client.setState(componentState, controllerState);
+	}
 
 	constexpr int blockSize = 512;
 	std::vector<float> outputLeft(blockSize);

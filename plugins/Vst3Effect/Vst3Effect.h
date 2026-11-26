@@ -36,7 +36,7 @@
 namespace lmms
 {
 
-class Vst3Host;
+class Vst3HostBase;
 class Vst3RemoteHostClient;
 
 class Vst3Effect : public Effect
@@ -56,7 +56,7 @@ public:
 	void saveSettings(QDomDocument& doc, QDomElement& parent) override;
 	void loadSettings(const QDomElement& parent) override;
 
-	Vst3Host* host() const { return m_host.get(); }
+	Vst3HostBase* host() const { return m_host.get(); }
 	QMutex& hostMutex() { return m_mutex; }
 	void setParameterValue(uint32_t id, double value);
 	bool setProgram(int index);
@@ -65,9 +65,8 @@ public:
 private:
 	bool openPlugin();
 
-	std::unique_ptr<Vst3Host> m_host;
-	std::unique_ptr<Vst3RemoteHostClient> m_remoteHost;
-	QMutex m_mutex;
+	std::unique_ptr<Vst3HostBase> m_host;
+		QMutex m_mutex;
 	EffectKey m_key;
 	Vst3EffectControls m_controls;
 

@@ -36,7 +36,7 @@
 namespace lmms
 {
 
-void Vst3ParameterModels::initialize(Model* parent, Vst3Host* host)
+void Vst3ParameterModels::initialize(Model* parent, Vst3HostBase* host)
 {
 	clear();
 	m_host = host;
@@ -196,7 +196,7 @@ FloatModel* Vst3ParameterModels::model(int index) const
 	return m_models[static_cast<size_t>(index)];
 }
 
-const Vst3Host::Parameter& Vst3ParameterModels::parameter(int index) const
+const Vst3HostBase::Parameter& Vst3ParameterModels::parameter(int index) const
 {
 	return m_parameters[static_cast<size_t>(index)];
 }

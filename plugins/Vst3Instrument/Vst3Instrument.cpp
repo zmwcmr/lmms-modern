@@ -27,6 +27,7 @@
 #include <algorithm>
 
 #include <QDomElement>
+#include <QGuiApplication>
 
 #include "AudioEngine.h"
 #include "Engine.h"
@@ -109,44 +110,37 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 		blockSize = std::max<int>(engine->framesPerPeriod(), 4096);
 	}
 
-	m_host = std::make_unique<Vst3Host>();
-	QString error;
-	if (!m_host->load(file, classId, sampleRate, blockSize, &error))
-	{
-		m_host.reset();
-		m_parameterModels.initialize(this, nullptr);
-		return false;
-	}
-	m_parameterModels.initialize(this, m_host.get());
+	const bool remoteDsp = qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1
+		&& QGuiApplication::platformName().startsWith(QStringLiteral("xcb"),
+			Qt::CaseInsensitive)
+		&& qEnvironmentVariableIsEmpty("LMMS_VST3_EDITOR_LOCAL");
 
-	if (qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1)
+	if (remoteDsp)
 	{
-		m_remoteHost = std::make_unique<Vst3RemoteHostClient>();
+		auto remote = std::make_unique<Vst3RemoteHostClient>();
 		QString remoteError;
-		if (m_remoteHost->start(file, classId, sampleRate, blockSize,
-				m_host->componentState(), m_host->controllerState(), &remoteError))
+		if (remote->load(file, classId, sampleRate, blockSize, &remoteError))
 		{
-			m_parameterModels.setQueueCallback(
-				[this](uint32_t id, double value, int offset) {
-					if (m_remoteHost != nullptr)
-					{
-						m_remoteHost->queueParameter(id, value, offset);
-					}
-				});
-			m_host->setParameterChangeCallback([this](uint32_t id, double value) {
-				if (m_remoteHost != nullptr)
-				{
-					m_remoteHost->queueParameter(id, value, 0);
-				}
-			});
+			m_host = std::move(remote);
 		}
 		else
 		{
-			m_remoteHost.reset();
 			qWarning("VST3 remote DSP host failed: %s",
 				remoteError.toUtf8().constData());
 		}
 	}
+	if (m_host == nullptr)
+	{
+		auto local = std::make_unique<Vst3Host>();
+		QString error;
+		if (!local->load(file, classId, sampleRate, blockSize, &error))
+		{
+			m_parameterModels.initialize(this, nullptr);
+			return false;
+		}
+		m_host = std::move(local);
+	}
+	m_parameterModels.initialize(this, m_host.get());
 
 	setDisplayName(m_host->name());
 	m_file = file;
@@ -157,11 +151,6 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 void Vst3Instrument::closePlugin()
 {
 	m_parameterModels.setQueueCallback({});
-	if (m_host != nullptr)
-	{
-		m_host->setParameterChangeCallback({});
-	}
-	m_remoteHost.reset();
 	m_host.reset();
 }
 
@@ -208,20 +197,10 @@ void Vst3Instrument::play(SampleFrame* workingBuffer)
 	const double tempo = Engine::getSong() != nullptr
 		? Engine::getSong()->getTempo() : 120.0;
 	const bool playing = Engine::getSong() != nullptr && Engine::getSong()->isPlaying();
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setTempo(tempo);
-		m_remoteHost->setPlaying(playing);
-		m_remoteHost->process(nullptr, nullptr, m_outputLeft.data(),
-			m_outputRight.data(), frames);
-	}
-	else
-	{
-		m_host->setTempo(tempo);
-		m_host->setPlaying(playing);
-		m_host->process(nullptr, nullptr, m_outputLeft.data(),
-			m_outputRight.data(), frames);
-	}
+	m_host->setTempo(tempo);
+	m_host->setPlaying(playing);
+	m_host->process(nullptr, nullptr, m_outputLeft.data(),
+		m_outputRight.data(), frames);
 
 	for (int frame = 0; frame < frames; ++frame)
 	{
@@ -241,7 +220,7 @@ bool Vst3Instrument::handleMidiEvent(const MidiEvent& event,
 		return false;
 	}
 
-	Vst3Host::MidiEvent midi;
+	Vst3HostBase::MidiEvent midi;
 	midi.sampleOffset = static_cast<int>(offset);
 	midi.channel = std::clamp<int>(event.channel(), 0, 15);
 
@@ -250,78 +229,61 @@ bool Vst3Instrument::handleMidiEvent(const MidiEvent& event,
 	case MidiNoteOn:
 		if (event.velocity() == 0)
 		{
-			midi.type = Vst3Host::MidiType::NoteOff;
+			midi.type = Vst3HostBase::MidiType::NoteOff;
 		}
 		else
 		{
-			midi.type = Vst3Host::MidiType::NoteOn;
+			midi.type = Vst3HostBase::MidiType::NoteOn;
 		}
 		midi.data1 = event.key();
 		midi.value = static_cast<float>(event.velocity()) / 127.0f;
 		break;
 	case MidiNoteOff:
-		midi.type = Vst3Host::MidiType::NoteOff;
+		midi.type = Vst3HostBase::MidiType::NoteOff;
 		midi.data1 = event.key();
 		midi.value = static_cast<float>(event.velocity()) / 127.0f;
 		break;
 	case MidiControlChange:
-		midi.type = Vst3Host::MidiType::ControlChange;
+		midi.type = Vst3HostBase::MidiType::ControlChange;
 		midi.data1 = event.controllerNumber();
 		midi.data2 = event.controllerValue();
 		break;
 	case MidiPitchBend:
-		midi.type = Vst3Host::MidiType::PitchBend;
+		midi.type = Vst3HostBase::MidiType::PitchBend;
 		midi.data1 = event.pitchBend() & 0x7F;
 		midi.data2 = (event.pitchBend() >> 7) & 0x7F;
 		break;
 	case MidiChannelPressure:
-		midi.type = Vst3Host::MidiType::ChannelPressure;
+		midi.type = Vst3HostBase::MidiType::ChannelPressure;
 		midi.data1 = event.channelPressure();
 		break;
 	case MidiKeyPressure:
-		midi.type = Vst3Host::MidiType::PolyPressure;
+		midi.type = Vst3HostBase::MidiType::PolyPressure;
 		midi.data1 = event.key();
 		midi.value = static_cast<float>(event.param(1) & 0x7F) / 127.0f;
 		break;
 	case MidiProgramChange:
-		midi.type = Vst3Host::MidiType::ProgramChange;
+		midi.type = Vst3HostBase::MidiType::ProgramChange;
 		midi.data1 = event.program();
 		break;
 	default:
 		return false;
 	}
 
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->queueMidi(midi);
-	}
-	else
-	{
-		m_host->queueMidi(midi);
-	}
+	m_host->queueMidi(midi);
 	return true;
 }
 
 bool Vst3Instrument::setProgram(int index)
 {
 	QMutexLocker locker(&m_mutex);
-	bool result = m_host != nullptr && m_host->setProgram(index);
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setProgram(index);
-	}
-	return result;
+	return m_host != nullptr && m_host->setProgram(index);
 }
 
 bool Vst3Instrument::setUnit(int unitId)
 {
 	QMutexLocker locker(&m_mutex);
-	bool result = m_host != nullptr && m_host->selectUnit(unitId);
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->setUnit(unitId);
-	}
-	return result;
+	return m_host != nullptr && m_host->selectUnit(unitId);
 }
 
 void Vst3Instrument::setParameterValue(uint32_t id, double value)
@@ -330,10 +292,6 @@ void Vst3Instrument::setParameterValue(uint32_t id, double value)
 	if (m_host != nullptr)
 	{
 		m_host->setParameterNormalised(id, value);
-	}
-	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
-	{
-		m_remoteHost->queueParameter(id, value, 0);
 	}
 }
 

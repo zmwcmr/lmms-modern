@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.2 shared-memory DSP host implemented as an opt-in path. The default
-still runs DSP in-process; P5.1 editor isolation is xcb-only.
+Status: P5.3 remote DSP and editor now share one plugin instance on xcb. The
+remote path is still opt-in; the default remains in-process.
 
 ## 1. Goal
 
@@ -177,13 +177,30 @@ reports the expected size and exits cleanly without orphan processes.
 Verified with Surge XT, Dexed, OB-Xf and sfizz through the standalone test and
 with Surge/Dexed LMMS renders using `LMMS_VST3_REMOTE_DSP=1`.
 
+### Implemented: P5.3 single-instance remote DSP (xcb)
+
+- `Vst3HostBase` is the common interface for the in-process `Vst3Host` and the
+  out-of-process `Vst3RemoteHostClient`.
+- When `LMMS_VST3_REMOTE_DSP=1` and the Qt platform is xcb, the wrappers
+  create only the remote host. There is no second idle plugin instance.
+- The DSP host sends name/vendor/version, bus metadata, parameter defaults,
+  program and unit lists in its ready message.
+- State is requested from the DSP host over the control socket and restored
+  through the same socket, so project state no longer depends on a local
+  plugin instance.
+- Parameter changes, programs, units and MIDI go straight to the DSP host.
+- The remote editor receives its initial state from the DSP host as well.
+
+Verified with Surge XT and Dexed through `vst3-remote-host-test`,
+`vst3-editor-test` with `LMMS_VST3_REMOTE_DSP=1`, and LMMS renders using both
+the remote DSP and remote editor paths.
+
 Still open:
 
-- the wrappers currently keep a second, idle plugin instance in LMMS for
-  state/editor/parameter metadata; removing that is the next P5 step,
-- state snapshot round-trip from the DSP host,
+- make the remote path the default and remove the environment switch,
 - Wayland remote editor,
-- crash restart/watchdog UX.
+- crash restart/watchdog UX,
+- state snapshot caching for very large plugin states.
 
 ## 2. What Ardour and Carla teach us
 
@@ -513,8 +530,9 @@ Deliverables:
 - [~] crash detection and clean child shutdown,
 - [x] `lmms-vst3-host` for DSP and shared-memory audio/MIDI IPC (opt-in),
 - [~] watchdog/timeout behavior for the DSP host (2s timeout, no restart yet),
-- [ ] remove the duplicate idle plugin instance in LMMS,
-- [ ] state snapshot round-trip from the DSP host.
+- [x] remove the duplicate idle plugin instance in remote mode,
+- [x] state snapshot round-trip from the DSP host,
+- [ ] make the remote path the default.
 
 Estimate: 3-5 weeks.
 
