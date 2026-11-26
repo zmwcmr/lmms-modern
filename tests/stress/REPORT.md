@@ -114,7 +114,7 @@ non-finite divisors.
 **Evidence:** both reproducers are in `corpus/regressions/`
 (`nonfinite-meter-sigfpe.mmp`, `nonfinite-tempo-hang.mmp`) and now render
 normally. `ValidationTest` covers non-finite model values and zero meters;
-`fuzz_numbers.py` ran 100 release + 30 ASan cases with no crashes/hangs.
+`fuzz_numbers.py` ran 400 release + 30 ASan cases with no crashes/hangs.
 
 ### 8. A FIFO/device node as sample source hung the loader
 
@@ -219,15 +219,17 @@ rejected gracefully (“project is empty”) in well under a second.
 | tiny + effects, plugin ratio 0.6 | 100 | 100 pass |
 | tiny, plugin ratio 0.5 | 300 | 300 pass |
 | medium + effects, plugin ratio 0.5 | 100 | 100 pass |
+| medium + effects, plugin ratio 0.5 | 200 | 200 pass |
+| medium + effects, plugin ratio 0.5 | 100 | 100 pass |
 
 ### ASan campaigns
 
 - 30 tiny cases with real instruments/effects: 30 pass (one silence caused by
   a mutated missing clip length; harness now treats silence as a warning for
   mutated projects).
-- 120 malformed XML cases under ASan, 500 under release: 0 crashes,
+- 320 malformed XML cases under ASan, 500 under release: 0 crashes,
   0 sanitizer reports.
-- 300 numeric edge-case projects (NaN/Inf/overflow attributes): 0 crashes,
+- 400 numeric edge-case projects (NaN/Inf/overflow attributes): 0 crashes,
   0 hangs (after the meter/tempo fixes).
 - 300 corrupted sample files (and 100 under ASan): 0 crashes.
 - Real-plugin probe (Dexed, Zyn, Surge LV2/VST3, OB-Xf, sfizz, Pianoteq):
@@ -251,6 +253,8 @@ rejected gracefully (“project is empty”) in well under a second.
   ~221–224 MB (average 222.9 MB), no crashes/hangs. Five failures were
   harness false positives (missing root `type`, mutated clip length/master
   volume), all addressed in the generator; the final reruns are clean.
+- 45-minute final soak on the latest build: 826 cases, 0 failures,
+  average RSS 223.6 MB (max 399 MB).
 
 ### Plugin isolation
 

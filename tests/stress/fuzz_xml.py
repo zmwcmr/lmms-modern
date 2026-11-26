@@ -147,6 +147,11 @@ def main(argv: list[str]) -> int:
         }
         metrics.write(json.dumps(rec) + "\n")
         metrics.flush()
+        if status == "pass":
+            try:
+                wav_path.unlink()
+            except OSError:
+                pass
         if status != "pass":
             failures += 1
             dest = failures_dir / f"fuzz-{i:06d}"
