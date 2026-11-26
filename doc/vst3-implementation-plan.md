@@ -1,6 +1,6 @@
 # VST3 support implementation plan
 
-Status: design proposal, not implemented.
+Status: P1 scanner/cache implemented; the UI rescan entry arrives with the P2 wrappers.
 
 ## 1. Goal
 
@@ -26,6 +26,46 @@ Non-goals for the first release:
 - 32-bit VST3 on Linux,
 - VST3 preset browser parity with commercial hosts,
 - replacing Carla or the existing VST2 implementation.
+
+## Progress
+
+### Implemented: P1 scanner and metadata cache
+
+The first phase is in `plugins/Vst3Base/`:
+
+- `Vst3Module` resolves the platform bundle layout and loads the module
+  through `ModuleEntry` / `GetPluginFactory` / `ModuleExit` (or the Windows
+  and macOS equivalents).
+- `Vst3Scanner` enumerates every audio class in a factory, instantiates the
+  component to read bus and MIDI counts, and checks 32-bit sample support.
+- `lmms-vst3-scanner` runs the scan in a separate process and writes JSON to a
+  file. This is important because several real plugins print banners to
+  stdout during loading.
+- `Vst3List` walks `VST3_PATH`, `~/.vst3` and the standard system directories,
+  runs the scanner with a timeout, caches results in
+  `~/.cache/lmms/vst3-list.json`, deduplicates identical bundles by SHA-256,
+  and keeps failures in the cache so a crashing bundle is not retried on every
+  launch.
+- `Vst3SubPluginFeatures` is ready to expose the scanned classes to the
+  instrument browser and the effect dialog. It is not attached to a plugin
+  descriptor yet because the `Vst3Instrument`/`Vst3Effect` wrappers are P2.
+- `WANT_VST3` (default `ON`) builds the scanner and the shared `vst3base`
+  library. There is no external dependency; the Travesty C headers are
+  vendored under `plugins/Vst3Base/travesty/`.
+
+Quick check without starting the GUI:
+
+```sh
+cmake -S . -B build -DWANT_VST3=ON
+cmake --build build --target lmms-vst3-scanner
+build/plugins/lmms-vst3-scanner --list --rescan
+```
+
+The scanner was verified on Dexed, OB-Xf, sfizz (two classes), Surge XT and
+Surge XT Effects. A deliberately broken bundle is cached as an error and does
+not abort the scan.
+
+Next: P2 (in-process stereo host, instrument and effect wrappers).
 
 ## 2. What Ardour and Carla teach us
 
@@ -287,16 +327,21 @@ Deliverables:
 
 Estimate: 1-2 weeks.
 
-### P1: Scanner and metadata cache
+### P1: Scanner and metadata cache — implemented
 
 Deliverables:
 
-- `lmms-vst3-scanner`,
-- `Vst3Module` loader,
-- `Vst3List` JSON cache,
-- bundle/class enumeration,
-- rescan entry in both plugin selection UIs,
-- timeout/crash handling.
+- [x] `lmms-vst3-scanner`,
+- [x] `Vst3Module` loader,
+- [x] `Vst3List` JSON cache,
+- [x] bundle/class enumeration,
+- [ ] rescan entry in both plugin selection UIs (needs the P2 plugin
+  descriptors; `Vst3SubPluginFeatures` already implements the rescan hook),
+- [x] timeout/crash handling.
+
+The scanner runs per bundle with a 60 second timeout. Scan failures are
+cached together with the module's mtime and size, and the cache is
+invalidated when the scanner protocol version changes.
 
 Estimate: 2-3 weeks.
 
@@ -422,9 +467,10 @@ On this machine:
 | Scan time / hangs | per-bundle timeout, cache, rescan UI |
 | Packaging size | optional build, separate scanner/host binaries |
 
-## 8. Recommended first step
+## 8. Recommended next step
 
-Do **P1 only** first: scanner, module loader and cache. It has low risk, can be
-tested independently, and gives immediate value by listing VST3 plugins without
-touching the audio engine. Once the scanner is stable, build the in-process
-stereo host (P2/P3) and only then invest in the out-of-process host (P5).
+P1 is done: scanner, module loader and cache. The next step is **P2**, the
+in-process stereo host. It adds `Vst3Host`, the `Vst3Instrument`/`Vst3Effect`
+wrappers and MIDI input, and finally exposes the scanner list and its rescan
+button through the normal plugin browser. Only after P2/P3 are stable should
+the out-of-process host (P5) be attempted.

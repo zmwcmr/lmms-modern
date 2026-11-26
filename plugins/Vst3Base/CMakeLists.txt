@@ -1,0 +1,8 @@
+if(NOT WANT_VST3)
+	RETURN()
+ENDIF()
+
+INCLUDE(BuildPlugin)
+
+ADD_SUBDIRECTORY(vst3base)
+ADD_SUBDIRECTORY(scanner)
