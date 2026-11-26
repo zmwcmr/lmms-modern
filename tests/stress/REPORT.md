@@ -131,7 +131,40 @@ to the project file itself and to the configuration file on load/save.
 `nonregular-sample-devzero.mmp` regression is replayed by
 `run.py --replay`.
 
-### 9. Deeply nested XML crashed the project loader
+### 9. Zero-length pattern hung the GUI while creating track views
+
+**Symptom:** one of 50 ASan GUI runs (a project with a 0-length pattern and
+negative meter values) never exited. The main thread was inside
+`TrackContentWidget::updateBackground()`, drawing grid lines forever.
+
+**Root cause:** the PatternEditor sets `pixelsPerBar` to 0 when the maximum
+clip length is 0. `TrackContentWidget::updateBackground()` then uses
+`x += ppb * resolution` with `ppb == 0`, an infinite loop.
+
+**Fix:** `TrackContainerView::setPixelsPerBar()` clamps to at least 1, and
+`updateBackground()` returns early for a non-positive `ppb` and sanitizes a
+non-positive/NaN snap size.
+
+**Evidence:** `corpus/regressions/gui-zero-length-pattern.mmp` now starts and
+quits in ~4 s; the ASan GUI matrix is clean afterwards.
+
+### 10. Huge pattern step counts / clip lengths froze the GUI
+
+**Symptom:** two numeric edge-case projects did not finish starting the GUI
+within 8 s. GDB showed the main thread in `MidiClipView::paintEvent()`:
+one project had 2,147,483,647 pattern steps (billions of step buttons), the
+other had an enormous clip length (billions of bar lines).
+
+**Fix:**
+- `MidiClip` clamps the loaded step count to 1..1024 (and keeps the
+  note-driven length sync clamped).
+- `MidiClipView::paintEvent()` uses a safe non-zero clip length and skips the
+  bar-line loop when `pixelsPerBar < 1` (lines would be denser than a pixel).
+
+**Evidence:** `gui-huge-clip-length.mmp` and
+`gui-unbounded-pattern-steps.mmp` now start and quit in ~3 s.
+
+### 11. Deeply nested XML crashed the project loader
 
 **Symptom:**
 - 100,000 nested elements → SIGSEGV inside
@@ -183,7 +216,9 @@ rejected gracefully (“project is empty”) in well under a second.
 
 - 50 offscreen GUI start/load/quit cycles: all pass (exit code 3 on SIGINT).
 - 20 GUI cycles with real plugins/effects: all pass.
-- 10 ASan GUI cycles with plugins: all pass.
+- 50 ASan GUI cycles with plugins: 49 pass, 1 timeout caused by the
+  zero-length-pattern grid loop (fixed); the reproducer now passes.
+- 200 release GUI start/load/quit cycles: 200 pass.
 - GUI start/load/quit is now part of `gui_smoke.py`.
 
 ### Soak

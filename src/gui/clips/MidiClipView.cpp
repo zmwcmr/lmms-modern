@@ -609,12 +609,15 @@ void MidiClipView::paintEvent( QPaintEvent * )
 	// Compute pixels per bar
 	const int baseWidth = fixedClips() ? parentWidget()->width() - 2 * BORDER_WIDTH
 						: width() - BORDER_WIDTH;
-	const float pixelsPerBar = 1.0f * baseWidth / m_clip->length() * TimePos::ticksPerBar();
+	// Never divide by zero/tiny lengths here; malformed clips can have a
+	// length of 0 or a huge value.
+	const int clipLength = std::max(1, static_cast<int>(m_clip->length()));
+	const float pixelsPerBar = 1.0f * baseWidth / clipLength * TimePos::ticksPerBar();
 
 	const int offset = m_clip->startTimeOffset();
 
 	// Length of one bar/beat in the [0,1] x [0,1] coordinate system
-	const float tickLength = 1.0f / m_clip->length();
+	const float tickLength = 1.0f / clipLength;
 
 	const int x_base = BORDER_WIDTH;
 
@@ -811,16 +814,19 @@ void MidiClipView::paintEvent( QPaintEvent * )
 	const int lineSize = 3;
 	p.setPen( c.darker( 200 ) );
 
-	for(float t = (offset % TimePos::ticksPerBar()) * pixelsPerBar / TimePos::ticksPerBar(); t < m_clip->length(); t += pixelsPerBar)
+	if (pixelsPerBar >= 1.0f)
 	{
-		p.drawLine( x_base + t - 1,
-				BORDER_WIDTH,
-				x_base + t - 1,
-				BORDER_WIDTH + lineSize );
-		p.drawLine( x_base + t - 1,
-				rect().bottom() - ( lineSize + BORDER_WIDTH ),
-				x_base + t - 1,
-				rect().bottom() - BORDER_WIDTH );
+		for(float t = (offset % TimePos::ticksPerBar()) * pixelsPerBar / TimePos::ticksPerBar(); t < clipLength; t += pixelsPerBar)
+		{
+			p.drawLine( x_base + t - 1,
+					BORDER_WIDTH,
+					x_base + t - 1,
+					BORDER_WIDTH + lineSize );
+			p.drawLine( x_base + t - 1,
+					rect().bottom() - ( lineSize + BORDER_WIDTH ),
+					x_base + t - 1,
+					rect().bottom() - BORDER_WIDTH );
+		}
 	}
 
 	// clip name

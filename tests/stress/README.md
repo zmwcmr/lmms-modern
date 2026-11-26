@@ -51,6 +51,7 @@ scan cache. Successful WAVs are deleted; failures are copied to
 | `runner.py` | Subprocess isolation, timeout, RSS/FD sampling, WAV checks |
 | `wav_check.py` | RIFF/WAV parser and audio sanity checks |
 | `fuzz_xml.py` | Byte-level project-file fuzzing through `lmms render` |
+| `fuzz_numbers.py` | NaN/Inf/overflow values in numeric project attributes |
 | `fuzz_samples.py` | Corrupted sample files referenced by a project |
 | `fuzz_midi.py` | MIDI import fuzzing (GUI import; invalid files show a dialog) |
 | `gui_smoke.py` | Start GUI, load a project, SIGINT, require clean exit |

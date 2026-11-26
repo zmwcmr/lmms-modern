@@ -341,7 +341,9 @@ bool TrackContainerView::knifeMode() const
 
 void TrackContainerView::setPixelsPerBar( int ppb )
 {
-	m_ppb = ppb;
+	// A zero/negative value makes the grid drawing loops in
+	// TrackContentWidget::updateBackground() spin forever.
+	m_ppb = std::max(1, ppb);
 
 	// tell all TrackContentWidgets to update their background tile pixmap
 	for (const auto& trackView : m_trackViews)
