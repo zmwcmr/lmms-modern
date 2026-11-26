@@ -218,13 +218,12 @@ MainWindow::MainWindow() :
 	// create global-toolbar at the top of our window
 	m_toolBar = new QWidget( main_widget );
 	m_toolBar->setObjectName( "mainToolbar" );
-	m_toolBar->setFixedHeight( 64 );
-	m_toolBar->move( 0, 0 );
+	m_toolBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
-	// add layout for organizing quite complex toolbar-layouting
-	m_toolBarLayout = new QGridLayout( m_toolBar/*, 2, 1*/ );
-	m_toolBarLayout->setContentsMargins(0, 0, 0, 0);
-	m_toolBarLayout->setSpacing( 0 );
+	m_toolBarLayout = new QHBoxLayout(m_toolBar);
+	m_toolBarLayout->setContentsMargins(5, 2, 5, 2);
+	m_toolBarLayout->setSpacing(2);
+	m_toolBarLayout->addStretch();
 
 	vbox->addWidget( m_toolBar );
 	vbox->addWidget( w );
@@ -461,16 +460,6 @@ void MainWindow::finalize()
 	m_metronomeToggle->setCheckable(true);
 	m_metronomeToggle->setChecked(Engine::getSong()->metronome().active());
 
-	m_toolBarLayout->setColumnMinimumWidth( 0, 5 );
-	m_toolBarLayout->addWidget( project_new, 0, 1 );
-	m_toolBarLayout->addWidget( project_new_from_template, 0, 2 );
-	m_toolBarLayout->addWidget( project_open, 0, 3 );
-	m_toolBarLayout->addWidget( project_open_recent, 0, 4 );
-	m_toolBarLayout->addWidget( project_save, 0, 5 );
-	m_toolBarLayout->addWidget( project_export, 0, 6 );
-	m_toolBarLayout->addWidget( m_metronomeToggle, 0, 7 );
-
-
 	// window-toolbar
 	auto song_editor_window = new ToolButton(
 		embed::getIconPixmap("songeditor"), withShortcutHint(tr("Song Editor"), 1, false), this,
@@ -501,14 +490,20 @@ void MainWindow::finalize()
 		withShortcutHint(tr("Show/hide project notes"), 7, false), this, SLOT(toggleProjectNotesWin()), m_toolBar);
 	project_notes_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_7));
 
-	m_toolBarLayout->addWidget( song_editor_window, 1, 1 );
-	m_toolBarLayout->addWidget( pattern_editor_window, 1, 2 );
-	m_toolBarLayout->addWidget( piano_roll_window, 1, 3 );
-	m_toolBarLayout->addWidget( automation_editor_window, 1, 4 );
-	m_toolBarLayout->addWidget( mixer_window, 1, 5 );
-	m_toolBarLayout->addWidget( controllers_window, 1, 6 );
-	m_toolBarLayout->addWidget( project_notes_window, 1, 7 );
-	m_toolBarLayout->setColumnStretch( 100, 1 );
+	int buttonIndex = 0;
+	for (auto* button : {project_new, project_new_from_template, project_open, project_open_recent,
+		project_save, project_export})
+	{
+		m_toolBarLayout->insertWidget(buttonIndex++, button, 0, Qt::AlignVCenter);
+	}
+	m_toolBarLayout->insertSpacing(buttonIndex++, 8);
+	for (auto* button : {song_editor_window, pattern_editor_window, piano_roll_window,
+		automation_editor_window, mixer_window, controllers_window, project_notes_window})
+	{
+		m_toolBarLayout->insertWidget(buttonIndex++, button, 0, Qt::AlignVCenter);
+	}
+	m_toolBarLayout->insertSpacing(buttonIndex++, 8);
+	m_toolBarLayout->insertWidget(buttonIndex, m_metronomeToggle, 0, Qt::AlignVCenter);
 
 	// setup-dialog opened before?
 	if( !ConfigManager::inst()->value( "app", "configured" ).toInt() )
@@ -554,18 +549,9 @@ void MainWindow::finalize()
 }
 
 
-int MainWindow::addWidgetToToolBar( QWidget * _w, int _row, int _col )
+void MainWindow::addWidgetToToolBar(QWidget* widget)
 {
-	int col = ( _col == -1 ) ? m_toolBarLayout->columnCount() + 7 : _col;
-	if( _w->height() > 32 || _row == -1 )
-	{
-		m_toolBarLayout->addWidget( _w, 0, col, 2, 1 );
-	}
-	else
-	{
-		m_toolBarLayout->addWidget( _w, _row, col );
-	}
-	return( col );
+	m_toolBarLayout->insertWidget(m_toolBarLayout->count() - 1, widget, 0, Qt::AlignVCenter);
 }
 
 
@@ -573,8 +559,7 @@ int MainWindow::addWidgetToToolBar( QWidget * _w, int _row, int _col )
 
 void MainWindow::addSpacingToToolBar( int _size )
 {
-	m_toolBarLayout->setColumnMinimumWidth( m_toolBarLayout->columnCount() +
-								7, _size );
+	m_toolBarLayout->insertSpacing(m_toolBarLayout->count() - 1, _size);
 }
 
 

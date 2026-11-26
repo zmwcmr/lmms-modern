@@ -54,12 +54,13 @@ public:
 	QSize sizeHint() const override
 	{
 		QSize s = QToolButton::sizeHint();
-		s.setWidth( s.width() + 8 );
+		s.rwidth() += ButtonPadding;
 		if( orientation() == Qt::Horizontal )
 		{
 			return s;
 		}
-		return QSize( s.height(), s.width() );
+		const QSize iconSlot = iconSlotSize();
+		return QSize( iconSlot.height(), qMax( s.width(), iconSlot.width() ) );
 	}
 
 
@@ -71,16 +72,55 @@ protected:
 		initStyleOption( &opt );
 		if( orientation() == Qt::Vertical )
 		{
-			const QSize s = sizeHint();
 			p.rotate( 270 );
-			p.translate( -s.height(), 0 );
-			opt.rect = QRect( 0, 0, s.height(), s.width() );
+			p.translate( -height(), 0 );
+			opt.rect = QRect( 0, 0, height(), width() );
+
+			auto background = opt;
+			background.icon = QIcon();
+			background.text.clear();
+			p.drawComplexControl( QStyle::CC_ToolButton, background );
+
+			// Reserve the same icon slot at the top whether or not the title is visible.
+			auto icon = opt;
+			icon.toolButtonStyle = Qt::ToolButtonIconOnly;
+			icon.text.clear();
+			icon.state &= ~(QStyle::State_Sunken | QStyle::State_On);
+			const int iconWidth = qMin( height(), iconSlotSize().width() );
+			p.save();
+			p.translate( height() - iconWidth, 0 );
+			icon.rect = QRect( 0, 0, iconWidth, width() );
+			p.drawControl( QStyle::CE_ToolButtonLabel, icon );
+			p.restore();
+
+			if( opt.toolButtonStyle == Qt::ToolButtonTextBesideIcon )
+			{
+				opt.toolButtonStyle = Qt::ToolButtonTextOnly;
+				opt.icon = QIcon();
+				opt.rect.setWidth( height() - iconWidth );
+				p.drawControl( QStyle::CE_ToolButtonLabel, opt );
+			}
+			return;
 		}
 		p.drawComplexControl( QStyle::CC_ToolButton, opt );
 	}
 
 
 private:
+	QSize iconSlotSize() const
+	{
+		QStyleOptionToolButton option;
+		initStyleOption( &option );
+		option.toolButtonStyle = Qt::ToolButtonIconOnly;
+		option.text.clear();
+		option.state &= ~(QStyle::State_Sunken | QStyle::State_On);
+		const QSize iconContents = option.iconSize + QSize( 2, 2 );
+		QSize size = style()->sizeFromContents( QStyle::CT_ToolButton, &option, iconContents, this );
+		size.rwidth() += ButtonPadding;
+		return size;
+	}
+
+	static constexpr int ButtonPadding = 8;
 	Qt::Orientation m_orientation;
 
 } ;

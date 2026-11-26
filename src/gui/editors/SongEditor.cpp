@@ -35,6 +35,7 @@
 #include <QPainter>
 #include <QScrollBar>
 #include <QSlider>
+#include <QStyleOptionToolButton>
 #include <QTimeLine>
 #include <QTimer>
 #include <QToolButton>
@@ -91,16 +92,12 @@ protected:
 			QPainter painter(m_button);
 			painter.setRenderHint(QPainter::Antialiasing, true);
 
-			if (m_button->underMouse())
-			{
-				QColor highlight = m_button->palette().color(QPalette::Highlight);
-				highlight.setAlpha(70);
-				painter.setPen(Qt::NoPen);
-				painter.setBrush(highlight);
-				painter.drawRoundedRect(m_button->rect().adjusted(1, 1, -1, -1), 3, 3);
-			}
+			QStyleOptionToolButton option;
+			option.initFrom(m_button);
+			if (m_button->isDown()) { option.state |= QStyle::State_Sunken; }
+			m_button->style()->drawPrimitive(QStyle::PE_PanelButtonTool, &option, &painter, m_button);
 
-			const qreal y = m_button->height() / 2.0;
+			const qreal y = m_button->height() / 2.0 + (m_button->isDown() ? 1 : 0);
 			const qreal x = m_button->width() / 2.0;
 			painter.setPen(Qt::NoPen);
 			painter.setBrush(m_button->palette().color(QPalette::WindowText));
@@ -196,22 +193,23 @@ SongEditor::SongEditor( Song * song ) :
 	// add some essential widgets to global tool-bar
 	QWidget * tb = getGUI()->mainWindow()->toolBar();
 
-	getGUI()->mainWindow()->addSpacingToToolBar( 40 );
+	getGUI()->mainWindow()->addSpacingToToolBar( 8 );
 
 	m_tempoSpinBox = new LcdSpinBox( 3, tb, tr( "Tempo" ) );
 	m_tempoSpinBox->setModel( &m_song->m_tempoModel );
 	m_tempoSpinBox->setLabel( tr( "TEMPO" ) );
 	m_tempoSpinBox->setToolTip(tr("Tempo in BPM"));
 
-	int tempoSpinBoxCol = getGUI()->mainWindow()->addWidgetToToolBar( m_tempoSpinBox, 0 );
-
-	getGUI()->mainWindow()->addWidgetToToolBar( new TimeDisplayWidget, 1, tempoSpinBoxCol );
+	getGUI()->mainWindow()->addWidgetToToolBar( m_tempoSpinBox );
 
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
-	m_timeSigDisplay = new MeterDialog( this, true );
+	m_timeSigDisplay = new MeterDialog( tb, true );
 	m_timeSigDisplay->setModel( &m_song->m_timeSigModel );
 	getGUI()->mainWindow()->addWidgetToToolBar( m_timeSigDisplay );
+
+	getGUI()->mainWindow()->addSpacingToToolBar( 8 );
+	getGUI()->mainWindow()->addWidgetToToolBar( new TimeDisplayWidget );
 
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
@@ -222,10 +220,10 @@ SongEditor::SongEditor( Song * song ) :
 							tr( "Master volume" ) );
 	m_masterVolumeSlider->setModel( &m_song->m_masterVolumeModel );
 	m_masterVolumeSlider->setUnit(QStringLiteral("%"));
-	m_masterVolumeSlider->setOrientation( Qt::Vertical );
+	m_masterVolumeSlider->setOrientation( Qt::Horizontal );
 	m_masterVolumeSlider->setPageStep( 1 );
-	m_masterVolumeSlider->setTickPosition( QSlider::TicksLeft );
-	m_masterVolumeSlider->setFixedSize( 26, 60 );
+	m_masterVolumeSlider->setTickPosition( QSlider::TicksBelow );
+	m_masterVolumeSlider->setFixedSize( 76, 26 );
 	m_masterVolumeSlider->setTickInterval( 50 );
 	m_masterVolumeSlider->setToolTip(tr("Master volume"));
 
@@ -250,15 +248,14 @@ SongEditor::SongEditor( Song * song ) :
 
 	auto master_pitch_lbl = new QLabel(tb);
 	master_pitch_lbl->setPixmap( embed::getIconPixmap( "master_pitch" ) );
-	master_pitch_lbl->setFixedHeight( 64 );
 
 	m_masterPitchSlider = new AutomatableSlider( tb, tr( "Global transposition" ) );
 	m_masterPitchSlider->setModel( &m_song->m_masterPitchModel );
 	m_masterPitchSlider->setUnit(tr("semitones"));
-	m_masterPitchSlider->setOrientation( Qt::Vertical );
+	m_masterPitchSlider->setOrientation( Qt::Horizontal );
 	m_masterPitchSlider->setPageStep( 1 );
-	m_masterPitchSlider->setTickPosition( QSlider::TicksLeft );
-	m_masterPitchSlider->setFixedSize( 26, 60 );
+	m_masterPitchSlider->setTickPosition( QSlider::TicksBelow );
+	m_masterPitchSlider->setFixedSize( 76, 26 );
 	m_masterPitchSlider->setTickInterval( 12 );
 	m_masterPitchSlider->setToolTip(tr("Global transposition"));
 	connect( m_masterPitchSlider, SIGNAL(logicValueChanged(int)), this,
@@ -285,11 +282,9 @@ SongEditor::SongEditor( Song * song ) :
 	vcw_layout->setContentsMargins(0, 0, 0, 0);
 	vcw_layout->setSpacing( 0 );
 
-	vcw_layout->addStretch();
 	vcw_layout->addWidget( new Oscilloscope( vc_w ) );
 
 	vcw_layout->addWidget( new CPULoadWidget( vc_w ) );
-	vcw_layout->addStretch();
 
 	getGUI()->mainWindow()->addWidgetToToolBar( vc_w );
 
@@ -1041,6 +1036,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	m_toolBar->hide();
 
 	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song editor"));
+	songToolBar->setProperty("lmmsWideOverflowButton", true);
 	songToolBar->setAcceptDrops(true);
 	connect(songToolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
 	connect(songToolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
@@ -1122,7 +1118,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	DropToolBar *zoomToolBar = songToolBar;
 
 	auto zoom_lbl = new QLabel(m_toolBar);
-	zoom_lbl->setPixmap( embed::getIconPixmap( "zoom" ) );
+	zoom_lbl->setPixmap( embed::getIconPixmap("song_editor_zoom") );
 
 	// Set slider zoom
 	m_zoomingSlider = new AutomatableSlider(m_toolBar, tr("Zoom"));
@@ -1141,14 +1137,11 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	zoomToolBar->addSeparator();
 
 	DropToolBar *snapToolBar = songToolBar;
-	auto snap_lbl = new QLabel(m_toolBar);
-	snap_lbl->setPixmap( embed::getIconPixmap( "quantize" ) );
-	snap_lbl->setToolTip( tr( "Clip snapping size" ) );
-
 	//Set up quantization/snapping selector
 	m_snappingComboBox = new ComboBox( m_toolBar );
-	m_snappingComboBox->setFixedSize( 80, ComboBox::DEFAULT_HEIGHT );
 	m_snappingComboBox->setModel(m_editor->m_snappingModel);
+	m_snappingComboBox->setFieldIcon(embed::getIconPixmap("song_editor_snap"));
+	m_snappingComboBox->setMinimumContentWidth(80);
 	m_snappingComboBox->setToolTip(tr("Clip snapping size"));
 	connect(m_editor->snappingModel(), SIGNAL(dataChanged()), this, SLOT(updateSnapLabel()));
 
@@ -1159,9 +1152,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	connect(m_setProportionalSnapAction, SIGNAL(triggered()), m_editor, SLOT(toggleProportionalSnap()));
 	connect(m_setProportionalSnapAction, SIGNAL(triggered()), this, SLOT(updateSnapLabel()));
 
-	snapToolBar->addWidget( snap_lbl );
 	snapToolBar->addWidget( m_snappingComboBox );
-	snapToolBar->addSeparator();
 	snapToolBar->addAction( m_setProportionalSnapAction );
 
 	snapToolBar->addSeparator();

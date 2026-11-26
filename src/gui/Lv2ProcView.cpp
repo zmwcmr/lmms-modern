@@ -68,7 +68,6 @@
 #include "Controls.h"
 #include "embed.h"
 #include "Engine.h"
-#include "FontHelper.h"
 #include "GuiApplication.h"
 #include "lmms_math.h"
 #include "Lv2Manager.h"
@@ -248,6 +247,8 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 			});
 	}
 
+	if (!m_presetCombo) { btnBox->addStretch(); }
+
 	if (hasPluginUi())
 	{
 		m_toggleUIButton = new QPushButton(QObject::tr("Show GUI"),
@@ -255,10 +256,9 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		m_toggleUIButton->setObjectName("btn");
 		m_toggleUIButton->setCheckable(true);
 		m_toggleUIButton->setChecked(false);
-		m_toggleUIButton->setFont(adjustedToPixelSize(m_toggleUIButton->font(), SMALL_FONT_SIZE));
+		m_toggleUIButton->setToolTip(QObject::tr("Open or close the plugin's own interface"));
 		btnBox->addWidget(m_toggleUIButton, 0);
 	}
-	btnBox->addStretch(1);
 
 	meAsWidget->setAcceptDrops(true);
 
@@ -293,6 +293,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		|| m_presetCombo)
 	{
 		auto* buttonBar = new QWidget(meAsWidget);
+		btnBox->setContentsMargins(0, 0, 0, 0);
 		// ControlLayout sorts items by object name. This key sorts after the
 		// search bar but before regular controls, and requests a full row.
 		buttonBar->setObjectName("!lv2ButtonBar");

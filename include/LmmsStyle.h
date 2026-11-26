@@ -40,6 +40,9 @@ public:
 	LmmsStyle();
 	~LmmsStyle() override = default;
 
+	using QProxyStyle::polish;
+	void polish(QWidget* widget) override;
+
 	QPalette standardPalette() const override;
 
 	void drawComplexControl(
