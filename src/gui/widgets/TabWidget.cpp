@@ -105,6 +105,35 @@ void TabWidget::addTab(QWidget* w, const QString& name, const char* pixmap, int 
 
 
 
+void TabWidget::removeTab(int idx)
+{
+	auto it = m_widgets.find(idx);
+	if (it == m_widgets.end())
+	{
+		return;
+	}
+
+	if (it.value().w)
+	{
+		it.value().w->hide();
+	}
+	m_widgets.erase(it);
+
+	if (m_activeTab == idx)
+	{
+		m_activeTab = m_widgets.isEmpty() ? 0 : m_widgets.firstKey();
+		if (!m_widgets.isEmpty())
+		{
+			m_widgets[m_activeTab].w->show();
+			m_widgets[m_activeTab].w->raise();
+		}
+	}
+	update();
+}
+
+
+
+
 void TabWidget::setActiveTab(int idx)
 {
 	if (m_widgets.contains(idx))
