@@ -413,7 +413,7 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 **Qt QSS 限制（实测）**：`font-size: 1.2em` 和 `font-size: 120%` 都被 Qt 忽略，QSS 只接受 px/pt。所以 QSS 里的字号仍是固定 px，跟随系统字体的是 C++ 绘制的文字。要让 QSS 也动态缩放，需要运行时生成样式表，另立项。
 
 **实测**
-- 当前 Xvfb 会话是 10 pt → 因子 1.11：12/10/14 → **13/11/16 px**；11 pt → 1.22；12 pt → 1.33；13.5 pt 以上封顶 1.5。
+- 当前测试会话（Xephyr `:5`，10 pt）→ 因子 1.11：12/10/14 → **13/11/16 px**；11 pt → 1.22；12 pt → 1.33；13.5 pt 以上封顶 1.5。
 - 100%：主窗口、Piano Roll、Settings 截图见 `doc/ui-ux-shots/t1-7-*.png`，无重叠或裁切；Settings 使用原生 Qt 控件，字号保持应用字体不变（符合预期）。
 - 固定底图上的标签保持 12 px（TEMPO/MIN/SEC/MSEC/TIME SIG、Click to enable），不会压过 LCD 数字；其余 C++ 文本按上面的因子放大。
 - 150%：`t1-7-hidpi-150.png`（2400×1500 屏幕，`QT_SCALE_FACTOR=1.5`），文字和布局同比放大，主窗口无重叠。
@@ -550,6 +550,26 @@ QT_SCALE_FACTOR=1.0 LANG=en_US.UTF-8 ./build/lmms
 QT_SCALE_FACTOR=1.5 LANG=zh_CN.UTF-8 ./build/lmms
 QT_SCALE_FACTOR=2.0 LANG=de_DE.UTF-8 ./build/lmms
 ```
+
+### 截图环境（固定使用 Xephyr，不用 Xvfb）
+
+```bash
+# 1. 嵌套 X 服务器，标题 "LMMS UI test"
+Xephyr :5 -screen 1600x1000x24 -ac -no-host-grab -title "LMMS UI test" &
+# 2. Xephyr 内必须有窗口管理器，否则 :focus 不触发、键盘输入进不去
+DISPLAY=:5 matchbox-window-manager \
+  -theme /tmp/opencode/rpms/usr/share/themes/Default/matchbox/theme.xml &
+# 3. 启动 LMMS
+DISPLAY=:5 QT_QPA_PLATFORM=xcb LMMS_DATA_DIR=$PWD/data \
+  LMMS_PLUGIN_DIR=$PWD/build-ui/plugins ./build-ui/lmms \
+  -c /tmp/opencode/lmmsrc.cfg --geometry 1600x1000+0+0 &
+# 4. 在真实桌面上置前 Xephyr 窗口
+DISPLAY=:0 xdotool windowactivate "$(DISPLAY=:0 xdotool search --name '^LMMS UI test$' | tail -1)"
+# 5. 截图（抓 Xephyr 内部，不是宿主机）
+DISPLAY=:5 xwd -root -silent | magick xwd:- shot.png
+```
+
+本会话的封装脚本：`/tmp/opencode/lmms-xephyr.sh [--cfg FILE] [--shot FILE]`。
 
 对比度计算（T0-3 验收用）：
 
