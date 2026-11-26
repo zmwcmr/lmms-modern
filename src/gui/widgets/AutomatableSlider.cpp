@@ -148,7 +148,9 @@ void AutomatableSlider::mouseDoubleClickEvent(QMouseEvent*) { enterValue(); }
 
 void AutomatableSlider::enterValue()
 {
-	InlineValueEditor::showEditor(this, model(), {}, {}, 0);
+	if (!model()) { return; }
+	InlineValueEditor::showEditorWithHint(this, model(),
+		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue(), m_unit), {}, {}, 0);
 }
 
 

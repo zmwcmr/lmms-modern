@@ -590,7 +590,8 @@ void VolumeKnob::enterValue()
 	const auto upperBound = ampToDbfs(magnitude / m_zeroDbfsPoint);
 	const auto zeroDbfsPoint = m_zeroDbfsPoint;
 	constexpr float lowerBound = -96.f;
-	InlineValueEditor::showEditor(this, model(),
+	InlineValueEditor::showEditorWithHint(this, model(),
+		InlineValueEditor::rangeHint(lowerBound, upperBound, QStringLiteral("dBFS")),
 		[zeroDbfsPoint](float value) {
 			const auto ratio = std::abs(value) / zeroDbfsPoint;
 			return ratio > 0.f ? ampToDbfs(ratio) : lowerBound;

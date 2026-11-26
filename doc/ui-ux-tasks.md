@@ -281,6 +281,7 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
   `FloatModelEditorBase::enterValue()`、`Fader::adjustByDialog()`、`AutomatableSlider::enterValue()`。
   Enter 提交、Esc 取消、失焦提交；推子仍以 dB 显示，滑块按整数显示。
 - `VolumeKnob::enterValue()` 也已改为就地编辑，保留 dBFS 换算、原幅值符号和输入范围。
+- 就地输入时显示该输入使用的单位和范围；推子幅值为零对应的 dB 下限显示为负无穷。没有配置单位的控件只显示范围。主音量、主音高和缩放滑块分别标明百分比、半音和步数。
 - **不做静态 tooltip**：`FloatModelEditorBase` 的悬浮提示是实时数值（`floatingTextType()`），
   设成静态文案会把数值读数顶掉。手势说明放进文档 `doc/ui-ux-gestures.md`，不进控件。
 

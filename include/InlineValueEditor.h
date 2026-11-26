@@ -64,6 +64,13 @@ public:
 		const ValueTransform& toDisplay = {}, const ValueTransform& fromDisplay = {},
 		int decimals = -1);
 
+	//! Shows the editor with a visible description of the input unit and range.
+	static void showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
+		const ValueTransform& toDisplay = {}, const ValueTransform& fromDisplay = {},
+		int decimals = -1);
+
+	static QString rangeHint(float minimum, float maximum, const QString& unit = {});
+
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;

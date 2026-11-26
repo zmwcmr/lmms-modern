@@ -48,6 +48,8 @@
 
 #include "InlineValueEditor.h"
 
+#include <limits>
+
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
@@ -133,7 +135,11 @@ void Fader::adjustByDialog()
 	if (modelIsLinear())
 	{
 		// The model stores an amplitude but the user types decibels
-		InlineValueEditor::showEditor(this, model(),
+		const auto minimum = model()->minValue() > 0.f
+			? ampToDbfs(model()->minValue()) : -std::numeric_limits<float>::infinity();
+		const auto maximum = ampToDbfs(model()->maxValue());
+		InlineValueEditor::showEditorWithHint(this, model(),
+			InlineValueEditor::rangeHint(minimum, maximum, QStringLiteral("dBFS")),
 			[](float amp) { return amp <= 0.f ? c_faderMinDb : ampToDbfs(amp); },
 			[](float db) { return dbfsToAmp(db); },
 			1);
@@ -142,7 +148,8 @@ void Fader::adjustByDialog()
 	{
 		// The model already is in dB, only the conversion factor differs
 		const float factor = m_conversionFactor;
-		InlineValueEditor::showEditor(this, model(),
+		InlineValueEditor::showEditorWithHint(this, model(),
+			InlineValueEditor::rangeHint(model()->minValue() * factor, model()->maxValue() * factor, m_unit),
 			[factor](float value) { return value * factor; },
 			[factor](float value) { return value / factor; });
 	}

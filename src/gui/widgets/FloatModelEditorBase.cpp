@@ -517,7 +517,9 @@ auto FloatModelEditorBase::floatingTextType() const -> FloatingTextType
 
 void FloatModelEditorBase::enterValue()
 {
-	InlineValueEditor::showEditor(this, model());
+	if (!model()) { return; }
+	InlineValueEditor::showEditorWithHint(this, model(),
+		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue(), m_unit));
 }
 
 

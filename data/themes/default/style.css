@@ -125,7 +125,7 @@ QToolTip {
 	color: #d1d8e4;
 }
 
-lmms--gui--TextFloat, lmms--gui--SimpleTextFloat {
+lmms--gui--TextFloat, lmms--gui--SimpleTextFloat, QLabel#inlineValueEditorHint {
 	background: #040506;
 	color: #d1d8e4;
 }

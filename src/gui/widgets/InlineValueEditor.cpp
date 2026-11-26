@@ -29,6 +29,7 @@
 
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLabel>
 
 #include "AutomatableModel.h"
 #include "LocaleHelper.h"
@@ -70,6 +71,24 @@ InlineValueEditor::InlineValueEditor(QWidget* parent) :
 void InlineValueEditor::showEditor(QWidget* control, AutomatableModel* model,
 	const ValueTransform& toDisplay, const ValueTransform& fromDisplay, int decimals)
 {
+	showEditorWithHint(control, model, {}, toDisplay, fromDisplay, decimals);
+}
+
+
+QString InlineValueEditor::rangeHint(float minimum, float maximum, const QString& unit)
+{
+	const auto number = [](float value) {
+		return std::isinf(value) ? (value < 0 ? QStringLiteral("−∞") : QStringLiteral("∞"))
+			: QString::number(value, 'g', 7);
+	};
+	const auto range = tr("Range: %1 to %2").arg(number(minimum), number(maximum));
+	return unit.trimmed().isEmpty() ? range : range + QLatin1Char(' ') + unit.trimmed();
+}
+
+
+void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* model, const QString& hint,
+	const ValueTransform& toDisplay, const ValueTransform& fromDisplay, int decimals)
+{
 	if (!control || !model) { return; }
 
 	// Only one editor at a time per window, otherwise a double click on a
@@ -108,6 +127,34 @@ void InlineValueEditor::showEditor(QWidget* control, AutomatableModel* model,
 	editor->show();
 	editor->raise();
 	editor->setFocus(Qt::MouseFocusReason);
+
+	if (!hint.trimmed().isEmpty())
+	{
+		editor->setAccessibleDescription(hint.trimmed());
+		auto* label = new QLabel(hint.trimmed(), window);
+		label->setObjectName("inlineValueEditorHint");
+		label->setAttribute(Qt::WA_TransparentForMouseEvents);
+		auto palette = label->palette();
+		palette.setColor(QPalette::Window, editor->palette().color(QPalette::Base));
+		palette.setColor(QPalette::WindowText, editor->palette().color(QPalette::Text));
+		label->setPalette(palette);
+		label->setAutoFillBackground(true);
+		label->setMargin(4);
+		label->setFixedWidth(std::min(label->fontMetrics().horizontalAdvance(label->text()) + 12,
+			std::max(1, window->width() - 2 * HorizontalMargin)));
+		label->setWordWrap(true);
+		label->adjustSize();
+		const int hintX = std::clamp(x, HorizontalMargin,
+			std::max(HorizontalMargin, window->width() - label->width() - HorizontalMargin));
+		int hintY = y - label->height();
+		if (hintY < HorizontalMargin) { hintY = y + height; }
+		hintY = std::clamp(hintY, HorizontalMargin,
+			std::max(HorizontalMargin, window->height() - label->height() - HorizontalMargin));
+		label->move(hintX, hintY);
+		QObject::connect(editor, &QObject::destroyed, label, &QObject::deleteLater);
+		label->show();
+		label->raise();
+	}
 }
 
 
