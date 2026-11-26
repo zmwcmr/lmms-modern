@@ -37,6 +37,7 @@ namespace lmms
 {
 
 class Vst3Host;
+class Vst3RemoteHostClient;
 class InstrumentTrack;
 
 class Vst3Instrument : public Instrument
@@ -69,6 +70,7 @@ private:
 	void closePlugin();
 
 	std::unique_ptr<Vst3Host> m_host;
+	std::unique_ptr<Vst3RemoteHostClient> m_remoteHost;
 	QMutex m_mutex;
 	QString m_file;
 	QString m_classId;

@@ -22,6 +22,11 @@
  *
  */
 
+#if defined(__linux__)
+#	include <csignal>
+#	include <sys/prctl.h>
+#endif
+
 #include <QApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -82,6 +87,12 @@ void sendError(QLocalSocket& socket, const QString& error)
 int main(int argc, char* argv[])
 {
 	QApplication application(argc, argv);
+#if defined(__linux__)
+	prctl(PR_SET_PDEATHSIG, SIGKILL);
+#endif
+#if defined(Q_OS_LINUX)
+	prctl(PR_SET_PDEATHSIG, SIGKILL);
+#endif
 	const auto arguments = application.arguments();
 	if (arguments.size() < 5)
 	{

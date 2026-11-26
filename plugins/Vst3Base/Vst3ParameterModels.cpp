@@ -73,6 +73,12 @@ void Vst3ParameterModels::initialize(Model* parent, Vst3Host* host)
 	}
 }
 
+void Vst3ParameterModels::setQueueCallback(
+	std::function<void(uint32_t, double, int)> callback)
+{
+	m_queueCallback = std::move(callback);
+}
+
 void Vst3ParameterModels::clear()
 {
 	for (auto* model : m_models)
@@ -107,7 +113,14 @@ void Vst3ParameterModels::queueChanges(int frames)
 					const float value = buffer->value(frame);
 					if (value != last)
 					{
-						m_host->queueParameter(parameterId, value, frame);
+						if (m_queueCallback)
+						{
+							m_queueCallback(parameterId, value, frame);
+						}
+						else
+						{
+							m_host->queueParameter(parameterId, value, frame);
+						}
 						last = value;
 					}
 				}
@@ -119,7 +132,14 @@ void Vst3ParameterModels::queueChanges(int frames)
 		const float value = model->value();
 		if (value != m_lastValues[index])
 		{
-			m_host->queueParameter(parameterId, value, 0);
+			if (m_queueCallback)
+			{
+				m_queueCallback(parameterId, value, 0);
+			}
+			else
+			{
+				m_host->queueParameter(parameterId, value, 0);
+			}
 			m_lastValues[index] = value;
 		}
 	}

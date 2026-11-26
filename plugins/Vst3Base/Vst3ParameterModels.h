@@ -25,6 +25,7 @@
 #ifndef LMMS_VST3_PARAMETER_MODELS_H
 #define LMMS_VST3_PARAMETER_MODELS_H
 
+#include <functional>
 #include <vector>
 
 #include <QString>
@@ -50,6 +51,7 @@ class VST3BASE_EXPORT Vst3ParameterModels
 public:
 	void initialize(Model* parent, Vst3Host* host);
 	void clear();
+	void setQueueCallback(std::function<void(uint32_t, double, int)> callback);
 
 	//! Queue model changes for the next process() call.
 	void queueChanges(int frames);
@@ -69,6 +71,7 @@ private:
 	static QString settingName(uint32_t id);
 
 	Vst3Host* m_host = nullptr;
+	std::function<void(uint32_t, double, int)> m_queueCallback;
 	std::vector<Vst3Host::Parameter> m_parameters;
 	std::vector<FloatModel*> m_models;
 	std::vector<float> m_lastValues;

@@ -33,6 +33,7 @@
 #include "Engine.h"
 #include "Song.h"
 #include "Vst3Host.h"
+#include "Vst3RemoteHostClient.h"
 #include "Vst3SubPluginFeatures.h"
 
 #include "embed.h"
@@ -74,7 +75,13 @@ Vst3Effect::Vst3Effect(Model* parent, const Descriptor::SubPluginFeatures::Key* 
 	}
 }
 
-Vst3Effect::~Vst3Effect() = default;
+Vst3Effect::~Vst3Effect()
+{
+	if (m_host != nullptr)
+	{
+		m_host->setParameterChangeCallback({});
+	}
+}
 
 bool Vst3Effect::openPlugin()
 {
@@ -103,6 +110,34 @@ bool Vst3Effect::openPlugin()
 	}
 	m_controls.initializeParameters();
 
+	if (qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") == 1)
+	{
+		m_remoteHost = std::make_unique<Vst3RemoteHostClient>();
+		QString remoteError;
+		if (m_remoteHost->start(file, classId, sampleRate, blockSize,
+				m_host->componentState(), m_host->controllerState(), &remoteError))
+		{
+			m_controls.setQueueCallback([this](uint32_t id, double value, int offset) {
+				if (m_remoteHost != nullptr)
+				{
+					m_remoteHost->queueParameter(id, value, offset);
+				}
+			});
+			m_host->setParameterChangeCallback([this](uint32_t id, double value) {
+				if (m_remoteHost != nullptr)
+				{
+					m_remoteHost->queueParameter(id, value, 0);
+				}
+			});
+		}
+		else
+		{
+			m_remoteHost.reset();
+			qWarning("VST3 remote DSP host failed: %s",
+				remoteError.toUtf8().constData());
+		}
+	}
+
 	QStringList parameterNames;
 	for (const auto& parameter : m_host->parameters())
 	{
@@ -113,6 +148,41 @@ bool Vst3Effect::openPlugin()
 	}
 	m_controls.setPluginInfo(m_host->name(), m_host->vendor(), parameterNames);
 	return true;
+}
+
+bool Vst3Effect::setProgram(int index)
+{
+	QMutexLocker locker(&m_mutex);
+	bool result = m_host != nullptr && m_host->setProgram(index);
+	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
+	{
+		m_remoteHost->setProgram(index);
+	}
+	return result;
+}
+
+bool Vst3Effect::setUnit(int unitId)
+{
+	QMutexLocker locker(&m_mutex);
+	bool result = m_host != nullptr && m_host->selectUnit(unitId);
+	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
+	{
+		m_remoteHost->setUnit(unitId);
+	}
+	return result;
+}
+
+void Vst3Effect::setParameterValue(uint32_t id, double value)
+{
+	QMutexLocker locker(&m_mutex);
+	if (m_host != nullptr)
+	{
+		m_host->setParameterNormalised(id, value);
+	}
+	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
+	{
+		m_remoteHost->queueParameter(id, value, 0);
+	}
 }
 
 Effect::ProcessStatus Vst3Effect::processImpl(SampleFrame* buf, const f_cnt_t frames)
@@ -142,10 +212,23 @@ Effect::ProcessStatus Vst3Effect::processImpl(SampleFrame* buf, const f_cnt_t fr
 	}
 
 	m_controls.queueParameterChanges(frameCount);
-	m_host->setTempo(Engine::getSong() != nullptr ? Engine::getSong()->getTempo() : 120.0);
-	m_host->setPlaying(Engine::getSong() != nullptr && Engine::getSong()->isPlaying());
-	m_host->process(m_inputLeft.data(), m_inputRight.data(),
-		m_outputLeft.data(), m_outputRight.data(), frameCount);
+	const double tempo = Engine::getSong() != nullptr
+		? Engine::getSong()->getTempo() : 120.0;
+	const bool playing = Engine::getSong() != nullptr && Engine::getSong()->isPlaying();
+	if (m_remoteHost != nullptr && m_remoteHost->isRunning())
+	{
+		m_remoteHost->setTempo(tempo);
+		m_remoteHost->setPlaying(playing);
+		m_remoteHost->process(m_inputLeft.data(), m_inputRight.data(),
+			m_outputLeft.data(), m_outputRight.data(), frameCount);
+	}
+	else
+	{
+		m_host->setTempo(tempo);
+		m_host->setPlaying(playing);
+		m_host->process(m_inputLeft.data(), m_inputRight.data(),
+			m_outputLeft.data(), m_outputRight.data(), frameCount);
+	}
 
 	const float wet = wetLevel();
 	const float dry = dryLevel();

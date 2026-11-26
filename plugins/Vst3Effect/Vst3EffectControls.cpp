@@ -94,8 +94,7 @@ bool Vst3EffectControls::setProgram(int index)
 	{
 		return false;
 	}
-	QMutexLocker locker(&m_effect->hostMutex());
-	return m_effect->host()->setProgram(index);
+	return m_effect->setProgram(index);
 }
 
 bool Vst3EffectControls::setUnit(int unitId)
@@ -104,18 +103,21 @@ bool Vst3EffectControls::setUnit(int unitId)
 	{
 		return false;
 	}
-	QMutexLocker locker(&m_effect->hostMutex());
-	return m_effect->host()->selectUnit(unitId);
+	return m_effect->setUnit(unitId);
 }
 
 void Vst3EffectControls::setParameterValue(uint32_t id, double value)
 {
-	if (m_effect == nullptr || m_effect->host() == nullptr)
+	if (m_effect != nullptr)
 	{
-		return;
+		m_effect->setParameterValue(id, value);
 	}
-	QMutexLocker locker(&m_effect->hostMutex());
-	m_effect->host()->setParameterNormalised(id, value);
+}
+
+void Vst3EffectControls::setQueueCallback(
+	std::function<void(uint32_t, double, int)> callback)
+{
+	m_parameterModels.setQueueCallback(std::move(callback));
 }
 
 } // namespace lmms

@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.1 out-of-process editor host implemented for xcb. DSP still runs
-in-process; P3 state, program and unit basics work.
+Status: P5.2 shared-memory DSP host implemented as an opt-in path. The default
+still runs DSP in-process; P5.1 editor isolation is xcb-only.
 
 ## 1. Goal
 
@@ -159,12 +159,31 @@ Next: P5 (out-of-process DSP/UI host) and the remaining P3 state work.
 Verified with Surge XT and Dexed editors: the editor host starts, attaches,
 reports the expected size and exits cleanly without orphan processes.
 
+### Implemented: P5.2 out-of-process DSP (opt-in)
+
+- `lmms-vst3-host` loads the plugin in a child process and processes audio in
+  a separate thread.
+- `Vst3SharedAudio` carries stereo input/output, MIDI and parameter events in
+  a shared-memory block; POSIX semaphores synchronize each block.
+- `Vst3RemoteHostClient` creates the segment, starts the host, exchanges
+  state/parameters/programs/units over a local socket and applies audio with a
+  two-second timeout so a dead host yields silence instead of hanging LMMS.
+- The DSP host uses `PR_SET_PDEATHSIG` on Linux to avoid surviving a crashed
+  LMMS process.
+- `vst3-remote-host-test` verifies the shared-memory path without LMMS.
+- Set `LMMS_VST3_REMOTE_DSP=1` to use the DSP host from the instrument/effect
+  wrappers. The default remains in-process.
+
+Verified with Surge XT, Dexed, OB-Xf and sfizz through the standalone test and
+with Surge/Dexed LMMS renders using `LMMS_VST3_REMOTE_DSP=1`.
+
 Still open:
 
-- Wayland remote editor (needs an X11 parent window outside Qt),
-- parameter updates from LMMS automation to the remote editor,
-- DSP process isolation and audio/IPC shared memory (P5.2),
-- crash recovery/restart UX.
+- the wrappers currently keep a second, idle plugin instance in LMMS for
+  state/editor/parameter metadata; removing that is the next P5 step,
+- state snapshot round-trip from the DSP host,
+- Wayland remote editor,
+- crash restart/watchdog UX.
 
 ## 2. What Ardour and Carla teach us
 
@@ -492,8 +511,10 @@ Deliverables:
 - [x] IPC transport for editor state, parameters and resizing,
 - [x] window-ID handoff and X11 embedding,
 - [~] crash detection and clean child shutdown,
-- [ ] `lmms-vst3-host` for DSP and shared-memory audio/MIDI IPC,
-- [ ] watchdog/timeout behavior for the DSP host.
+- [x] `lmms-vst3-host` for DSP and shared-memory audio/MIDI IPC (opt-in),
+- [~] watchdog/timeout behavior for the DSP host (2s timeout, no restart yet),
+- [ ] remove the duplicate idle plugin instance in LMMS,
+- [ ] state snapshot round-trip from the DSP host.
 
 Estimate: 3-5 weeks.
 

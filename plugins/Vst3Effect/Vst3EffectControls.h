@@ -67,6 +67,7 @@ public:
 	bool setProgram(int index);
 	bool setUnit(int unitId);
 	void setParameterValue(uint32_t id, double value);
+	void setQueueCallback(std::function<void(uint32_t, double, int)> callback);
 
 private:
 	Vst3Effect* m_effect;

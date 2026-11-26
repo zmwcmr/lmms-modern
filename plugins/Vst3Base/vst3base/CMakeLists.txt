@@ -10,6 +10,8 @@ BUILD_PLUGIN(vst3base
 	../Vst3X11Editor.cpp ../Vst3X11Editor.h
 	../Vst3RemoteEditorClient.cpp ../Vst3RemoteEditorClient.h
 	../Vst3RemoteEditorWidget.cpp ../Vst3RemoteEditorWidget.h
+	../Vst3RemoteHostClient.cpp ../Vst3RemoteHostClient.h
+	../Vst3SharedAudio.h
 	../Vst3Protocol.h
 	../Vst3SubPluginFeatures.cpp ../Vst3SubPluginFeatures.h
 	EXPORT_BASE_NAME vst3base
