@@ -22,8 +22,8 @@
 | T0-4 | 焦点可见性（`:focus` 样式） | 1 h | 低 | — |
 | T0-5 | 补 icon-only 控件的 accessibleName | 2 h | 无 | — |
 | T0-6 | 修复 Project Notes 的字符串快捷键绑定（macOS） | 1 h | 无 | — |
-| T1-1 | 颜色收口到 `palette()`（36 处，分批） | 1–2 d | 低 | — |
-| T1-2 | 旋钮/推子双击归位 + 修饰键提示 | 1 d | 中（行为变化） | 评审 |
+| T1-1 | 硬编码颜色主题化（分批） | 1–2 d | 低 | — |
+| T1-2 | 数值就地编辑 + 手势说明 | 1 d | 中（行为变化） | 评审 |
 | T1-3 | 滚轮语义对齐 | 0.5 d | 中（手感变化） | 评审 |
 | T1-4 | 状态栏 | 1 d | 低 | — |
 | T1-5 | 撤销步数可配置 | 0.5 d | 低 | — |
@@ -40,7 +40,11 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 
 ---
 
-## 实施记录（T0 第一批，已合入本分支）
+## 实施记录（截至 `6fa1ce7b8`）
+
+下表的“已实现”表示代码已提交到当前分支，不代表所有平台和交互验收均已完成。
+T0 六项与 T1-3、T1-5～T1-8、T1-10、T1-11 已实现；T1-1、T1-2 和 T1-9 部分完成，
+T1-4 已实现但隐藏，T2-2 和 T2-3 尚待设计评审。
 
 | ID | 状态 | 验证方式 |
 | --- | --- | --- |
@@ -51,6 +55,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T0-5 | ✅ 已实现 | 仅编译验证；需在真实桌面用 Orca/accerciser 复核 |
 | T0-6 | ✅ 已实现 | 仅编译验证；Linux 绑定与改前相同（`QKeySequence::Undo` = Ctrl+Z） |
 | T1-1 | 🚧 进行中 | `TrackView` 已改（截图逐像素对比 = 0 差异，主题覆盖测试通过） |
+| T1-2 | 🚧 验证中 | Xephyr 已抽查旋钮、推子和工具栏滑块的提交、取消、失焦，以及音量旋钮的边界和负幅值；真实桌面及其他场景仍需复核 |
 | T1-10 | ✅ 已实现 | 仅编译验证；tooltip 需在交互式桌面悬停复核 |
 | T1-4 | ⏸️ 已实现但隐藏 | 状态栏 + 悬停提示可用，当前 `hide()` 掉，等提示内容完善后再启用 |
 | T1-3 | ✅ 已实现 | Alt+滚轮实测 0.05 dB（普通滚轮 1 dB） |
@@ -60,6 +65,15 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-8 | ✅ 已实现 | de_DE 1600 宽全部完整；1024 宽溢出菜单可用 |
 | T1-9 | 🚧 进行中 | 第一批 4 个：`black_key`×3 + `combobox_bg` |
 | T1-11 | ✅ 已实现 | QMessageBox / QInputDialog 图标已统一（`t1-11-dialog-icons.png`） |
+
+**后续回归重点**：在真实桌面复核焦点描边、长轨道名 tooltip、数值编辑的取消/失焦，
+并用 Orca 或 accerciser 抽查可访问名称；补充不同缩放比例、语言和 macOS 的验证。
+这些是待验证项，以上历史截图和测试结果不等同于本次重新运行。
+
+当前构建目录的 12 个测试注册在 `build-ui/tests`，可用
+`ctest --test-dir build-ui/tests --output-on-failure` 运行；从 `build-ui` 根目录执行
+`ctest -N` 会显示 0 个测试。2026-11-26 使用 `QT_QPA_PLATFORM=offscreen` 运行，12/12 通过；
+这些测试不能替代真实桌面的交互和视觉验收。
 
 ### 实施中发现并修正的两个问题
 
@@ -71,10 +85,9 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 已完成 `TrackView`：新增 `Q_PROPERTY(QColor trackBackground)`，默认值等于原来的硬编码值，`style.css` 里用
 `qproperty-trackBackground: #202428;` 暴露给主题。
 
-**发现：`FloatModelEditorBase::paintEvent` 是死代码。** 三个子类 `Knob`、`Fader`、`BarModelEditor`、`Draggable`
-都各自覆盖了 `paintEvent`，且该类从不被直接实例化，所以审计报告里列出的
-`FloatModelEditorBase.cpp:305` 的 `QColor{3, 94, 97}` 根本不会被绘制。已撤回针对它的改动，
-改为一个独立的清理项：**删除该死方法**（不要为它加主题属性）。
+**发现：`FloatModelEditorBase::paintEvent` 在仓库内没有已知调用路径。** 子类 `Knob`、`Fader`、`BarModelEditor`、`Draggable`
+各自覆盖了 `paintEvent`，该类在仓库内也没有直接实例化。已撤回对其颜色的改动；
+由于该类已导出，外部插件可能继承它，删除方法之前需要评估兼容性。
 
 **待定：`ProjectNotes`。** 它的背景（`#404040`）可以照 `TrackView` 的办法处理，但正文颜色（`#e0e0e0`）
 是写进文档字符格式的，改了主题也不会影响已有内容。需要先决定"笔记正文是否应跟随主题文字色"，
@@ -238,35 +251,36 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
 
 ## T1：小 PR（1–3 天）
 
-### T1-1 颜色收口到 `palette()`
+### T1-1 硬编码颜色主题化（进行中）
 
 **现象**：`src/gui` 有 36 处硬编码 `QColor`，其中 `TrackView.cpp:63` 让亮色主题不可能实现。
 
 **前提（已具备）**：`LmmsPalette` 已由 QSS 驱动并全局生效（`GuiApplication.cpp:113-120`），绘制代码可直接 `palette().color(...)` 或读 `LmmsStyle::s_palette`。
 
 **分批建议**
-1. `src/gui/tracks/TrackView.cpp:63`：轨道底色改为 `palette().color(QPalette::Base)`（或新增 `qproperty-trackBackground` 由 QSS 控制）。
-2. `src/gui/ProjectNotes.cpp:58,92`：改用 `palette()`。
-3. `src/gui/widgets/FloatModelEditorBase.cpp:305`：旋钮激活色改用 `LmmsStyle::s_palette->highlight()` 或新增 qproperty。
+1. 已完成：`TrackView` 轨道底色通过 `qproperty-trackBackground` 由 QSS 控制。
+2. 待决定：`ProjectNotes` 的正文颜色是否跟随主题，再评估背景和正文的处理方式。
+3. 仓库内子类均覆盖 `FloatModelEditorBase::paintEvent`，不应为该实现新增主题属性；该类已导出，删除方法前需评估外部插件继承和 ABI 兼容性。
 4. 其余 `Graph.cpp`、`Fader.cpp` 等逐个评估（有的颜色是语义色，如峰值红/黄，应保留但改为常量表）。
 
 **验收**
 - `grep -rn 'QColor\s*[{(]\s*[0-9]' src/gui | wc -l` 显著下降（目标 ≤ 10，且剩余均有注释说明为什么不是主题色）；
-- 在 `default` 与 `classic` 两套主题下，轨道底色、笔记窗口、旋钮激活态都跟随主题变化（截图）。
+- 在 `default` 与 `classic` 两套主题下，截图验证已纳入范围的颜色随主题变化；笔记正文的预期需先确定，旋钮激活态需先确认实际绘制位置。
 
 **不做**：不在这一步做亮色主题；只保证"主题能控制这些颜色"。`plugins/` 下另有 113 处硬编码颜色，列为后续独立任务（`ui/theme-colors-plugins`），不并入本项。
 
 ---
 
-### T1-2 双击归位 + 修饰键提示
+### T1-2 数值就地编辑 + 手势说明（已实现）
 
-**现象**：双击 = 弹模态输入框（`FloatModelEditorBase.cpp:500`、`Fader.cpp:128`）；归位只能右键（`AutomatableModelView.cpp:62`）；修饰键无任何说明。
+**基线现象**：双击弹出模态输入框；中键或右键菜单可归位，但中键手势不易发现；修饰键缺少说明。
 
 **结论（已实现）**
 - **不做**双击归位。中键已经能归位（`AutomatableModelView.cpp:173`），双击留给精确输入。
-- **双击的模态框已改为就地编辑**：新增 `InlineValueEditor`，覆盖
+- **部分双击模态框已改为就地编辑**：新增 `InlineValueEditor`，覆盖
   `FloatModelEditorBase::enterValue()`、`Fader::adjustByDialog()`、`AutomatableSlider::enterValue()`。
   Enter 提交、Esc 取消、失焦提交；推子仍以 dB 显示，滑块按整数显示。
+- `VolumeKnob::enterValue()` 也已改为就地编辑，保留 dBFS 换算、原幅值符号和输入范围。
 - **不做静态 tooltip**：`FloatModelEditorBase` 的悬浮提示是实时数值（`floatingTextType()`），
   设成静态文案会把数值读数顶掉。手势说明放进文档 `doc/ui-ux-gestures.md`，不进控件。
 
@@ -275,13 +289,21 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
   Enter → 旋钮转到 0（`t1-2-knob-committed.png`）。
 - 推子：双击 → 出现 `0.0`（dB）；输入 12 + Enter → 推子到 +12 dB（`t1-2-fader-inline.png`）。
 - Esc 取消路径：代码路径为 `cancel()`，不做数值提交。
+- 2026-11-26 Xephyr：轨道声像旋钮双击出现就地输入，输入 5 并按 Enter 后再次打开显示 5.0；轨道音量旋钮仍显示模态框。本次取消/失焦检查未完成。
+- 后续修改后重新构建：轨道音量旋钮双击显示就地输入，输入 -6 并按 Enter 后再次打开显示 -6.0；Esc 检查时隔离会话中断，取消、失焦、边界和负幅值尚待复核。
+- 继续在 Xephyr 中抽查轨道音量旋钮：输入 3 后按 Esc，再打开仍为 -6.0 dBFS；输入 -12 后点击别处，再打开显示 -12.0；输入 -99 / 99 分别限制为 -96.0 / 6.0；中键后恢复 0.0。应用在 Esc 后仍运行。负幅值模型及其他控件的回归仍待验证。
+- 轨道声像旋钮：输入 5 并提交后，输入 8 再按 Esc，重新打开仍显示 5.0。此前负幅值自动化测试尝试因图形应用初始化依赖未能运行；后续改用以下交互测试。
+- 2026-11-26 在隔离的 Xephyr 会话中，以临时工程加载 Flanger，读取保存的工程值验证反馈旋钮：初始 -0.5 显示 -6.0206 dBFS；输入 -12 并提交得到 -0.25118861；输入 -3 后 Esc 仍为 -0.25118861；输入 -6 后失焦得到 -0.50118721；输入 99 和 -99 分别限制为 -1 和 0。
+- 同一会话中，混音器主推子输入 -6 dB 后保存为 0.50118721；输入 -12 后 Esc 保持原值，再输入 -12 并失焦后保存为 0.25118861。工具栏主音高滑块确认 Enter 提交、Esc 取消和点击可聚焦控件后的失焦提交；双击滑块轨道可能先按原有 QSlider 行为改变一格，因此取消测试从滑块手柄上双击开始。
+- 本次重新构建成功，`QT_QPA_PLATFORM=offscreen ctest --test-dir build-ui/tests --output-on-failure` 为 12/12 通过。上述交互测试仅覆盖列出的控件和场景，不替代真实桌面与其他平台验证。
 
-**风险**：行为变化。缓解：先在本分支试两周；`Ctrl+双击` 保留原行为，等于没有功能损失。
+**风险**：行为变化，需在本分支继续试用。双击处理不区分 Ctrl 修饰键；支持就地编辑的控件上，
+`Ctrl+双击` 也进入就地编辑，并不会恢复原模态框。
 
 **验收**
-- 双击任意旋钮/推子 → 回到初始化值，并有数值浮层；
-- `Ctrl+双击` → 仍能输入精确值；
-- tooltip 在 Linux 与 macOS 上分别显示 `Ctrl` / `⌘`。
+- 双击旋钮、推子或工具栏滑块 → 出现就地输入框；Enter 提交，Esc 取消，失焦提交；
+- 旋钮和推子中键归位；推子按 dB、滑块按整数输入；
+- 手势说明以 `doc/ui-ux-gestures.md` 为准；状态栏提示目前隐藏，不能作为当前可见功能验收。
 
 ---
 
@@ -588,7 +610,7 @@ EOF
 
 ---
 
-## 建议的 PR 顺序
+## 原建议的 PR 顺序（历史规划）
 
 1. `ui/tokens-and-contrast` —— T0-1 ~ T0-4（纯样式与文案，零风险）
 2. `ui/accessibility-labels` —— T0-5 + T0-6

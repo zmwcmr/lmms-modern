@@ -24,12 +24,12 @@
 
 #include "Knob.h"
 
-#include <QInputDialog>
 #include <QPainter>
 
 #include "DeprecationHelper.h"
 #include "embed.h"
 #include "FontHelper.h"
+#include "InlineValueEditor.h"
 #include "lmms_math.h"
 
 #include <algorithm>
@@ -585,41 +585,21 @@ void VolumeKnob::enterValue()
 {
 	assert(m_zeroDbfsPoint > 0);
 
-	// Calculate the current value in dBFS
 	const auto roundedValue = model()->getRoundedValue();
-	const auto initalValue = std::abs(roundedValue) / m_zeroDbfsPoint;
-	const auto initialDbValue = initalValue > 0. ? ampToDbfs(initalValue) : -96;
-
-	// Calculate the upper bound in dBFS
 	const auto magnitude = roundedValue >= 0 ? model()->maxValue() : std::abs(model()->minValue());
 	const auto upperBound = ampToDbfs(magnitude / m_zeroDbfsPoint);
-
-	constexpr auto lowerBound = -96.0;
-
-	bool ok = false;
-	float newVal = QInputDialog::getDouble(
-		this,
-		tr("Set value"),
-		tr("Please enter a new value between %1 dBFS and %2 dBFS:")
-			.arg(lowerBound).arg(upperBound),
-		initialDbValue,
-		lowerBound,
-		upperBound,
-		model()->getDigitCount(),
-		&ok
-	);
-
-	if (!ok) { return; }
-
-	// Convert from dBFS back to amplitude
-	newVal = newVal <= lowerBound
-		? 0.0f
-		: dbfsToAmp(newVal) * m_zeroDbfsPoint;
-
-	// Support both positive and negative amplitudes
-	newVal = std::copysign(newVal, roundedValue);
-
-	model()->setValue(newVal);
+	const auto zeroDbfsPoint = m_zeroDbfsPoint;
+	constexpr float lowerBound = -96.f;
+	InlineValueEditor::showEditor(this, model(),
+		[zeroDbfsPoint](float value) {
+			const auto ratio = std::abs(value) / zeroDbfsPoint;
+			return ratio > 0.f ? ampToDbfs(ratio) : lowerBound;
+		},
+		[zeroDbfsPoint, roundedValue, upperBound, lowerBound](float db) {
+			const auto boundedDb = std::clamp(db, lowerBound, static_cast<float>(upperBound));
+			const auto amplitude = boundedDb <= lowerBound ? 0.f : dbfsToAmp(boundedDb) * zeroDbfsPoint;
+			return std::copysign(amplitude, roundedValue);
+		}, model()->getDigitCount());
 }
 
 void convertPixmapToGrayScale(QPixmap& pixMap)
