@@ -289,7 +289,9 @@ The UI is always a top-level X11 window:
 - Control flow: the UI `write_function` writes into the child's port values and
   bumps the child-to-host `ControlSlot` version. The child applies the value to
   the plugin at the next block boundary, so UI edits are block-rate like any
-  other control change.
+  other control change. In the other direction the child pushes changed control
+  values to the UI (`suil_instance_port_event`) on every idle tick; DPF/OpenGL
+  UIs such as ZynAddSubFX stay blank until they receive their initial values.
 - Plugin-to-UI control changes are pushed to the child's UI inside `run()`'s
   post-processing, as `Lv2Proc` does today.
 
@@ -417,9 +419,9 @@ Manual matrix additions:
      owned by the child, `ui:parent`/instance-access/data-access/scale/resize/
      idle/WM-close are wired, and the child keeps the Zyn asset root as its
      working directory during UI creation and idle. DrumGizmo opens and renders
-     at 750x740. Open issue: DPF/OpenGL UIs (ZynAddSubFX) open a window of the
-     right size but render black when hosted by the child under Xephyr; the same
-     UI renders in-process. This needs investigating before the default flips.
+     at 750x740, ZynAddSubFX (DPF/OpenGL) renders at 1181x659 once the child
+     pushes the control values to the UI. The remaining work for the default
+     flip is state/presets and packaging.
 5. **State, presets, failure UX.** State bundles over the filesystem, preset
    loading, reload path, crash notification, in-process fallback and the
    `pluginUiIsUnstable()` demotion. Acceptance: full test matrix and ASan run.

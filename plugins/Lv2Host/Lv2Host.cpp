@@ -466,6 +466,8 @@ private:
 	int m_pendingUiHeight = 0;
 	//! Asset root the UI resolves relative paths against (Zyn Fusion)
 	std::string m_uiDataRoot;
+	//! Last control values pushed to the UI
+	std::vector<float> m_lastUiControl;
 #endif
 #endif
 };
@@ -801,6 +803,7 @@ void Lv2HostProcess::destroyUi()
 		}
 		suil_instance_free(m_uiInstance);
 		m_uiInstance = nullptr;
+		m_lastUiControl.clear();
 	}
 	if (m_uiHost != nullptr)
 	{
@@ -859,18 +862,35 @@ void Lv2HostProcess::processUiEvents()
 void Lv2HostProcess::idleUi()
 {
 	processUiEvents();
-#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL) && defined(LMMS_HAVE_LV2)
 	if (m_uiInstance == nullptr || !m_uiVisible)
 	{
 		return;
 	}
+	const CurrentDirGuard cwdGuard(m_uiDataRoot);
+
+	// Keep the UI in sync with the values the DSP currently uses.
+	for (std::size_t i = 0; i < m_controlValues.size(); ++i)
+	{
+		const float value = m_controlValues[i];
+		if (i >= m_lastUiControl.size() || m_lastUiControl[i] != value)
+		{
+			suil_instance_port_event(m_uiInstance, static_cast<uint32_t>(i),
+				sizeof(float), 0, &value);
+			if (i >= m_lastUiControl.size())
+			{
+				m_lastUiControl.resize(i + 1);
+			}
+			m_lastUiControl[i] = value;
+		}
+	}
+
 	const auto* idle = static_cast<const LV2UI_Idle_Interface*>(
 		suil_instance_extension_data(m_uiInstance, LV2_UI__idleInterface));
 	if (idle != nullptr && idle->idle != nullptr)
 	{
 		// Zyn Fusion loads QML and helper libraries lazily from its asset
 		// root, so the idle calls need the same working directory.
-		const CurrentDirGuard cwdGuard(m_uiDataRoot);
 		idle->idle(suil_instance_get_handle(m_uiInstance));
 	}
 #endif
@@ -1089,6 +1109,7 @@ bool Lv2HostProcess::showUi(float scale)
 
 	// Zyn Fusion resolves qml/ and libzest.so relative to the working dir.
 	m_uiDataRoot = findUiDataRoot(bundlePath != nullptr ? bundlePath : "");
+	m_lastUiControl.clear();
 	const CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 	m_uiInstance = suil_instance_new(m_uiHost, this, LV2_UI__X11UI,

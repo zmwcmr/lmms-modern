@@ -350,9 +350,10 @@ Tasks:
   of a fake gain plugin, and MIDI events are forwarded to and from the first
   atom input/output pair. With `LMMS_LV2_REMOTE=1` the UI also moves into the
   child (window, parent XID, instance/data access, scale, resize, idle, WM
-  close). DrumGizmo renders in the child; ZynAddSubFX (DPF/OpenGL) is black
-  there, which is an open issue. State, presets and the default flip are still
-  missing; only the first two audio ports are routed.
+  close). DrumGizmo renders at 750x740 and ZynAddSubFX (DPF/OpenGL) at
+  1181x659; DPF UIs need the child to push the control values on every idle
+  tick, otherwise they stay blank. State, presets and the default flip are
+  still missing; only the first two audio ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.
