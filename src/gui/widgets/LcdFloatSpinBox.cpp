@@ -29,7 +29,6 @@
 #include <cmath>
 
 #include <QHBoxLayout>
-#include <QInputDialog>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
@@ -42,6 +41,7 @@
 #include "embed.h"
 #include "GuiApplication.h"
 #include "FontHelper.h"
+#include "InlineValueEditor.h"
 #include "KeyboardShortcuts.h"
 #include "MainWindow.h"
 #include "lmms_math.h"
@@ -205,29 +205,10 @@ void LcdFloatSpinBox::wheelEvent(QWheelEvent *event)
 
 void LcdFloatSpinBox::mouseDoubleClickEvent(QMouseEvent *)
 {
-	enterValue();
-}
-
-
-void LcdFloatSpinBox::enterValue()
-{
-	bool ok;
-	float newVal;
-
-	newVal = QInputDialog::getDouble(
-			this, tr("Set value"),
-			tr("Please enter a new value between %1 and %2:").
-				arg(model()->minValue()).
-				arg(model()->maxValue()),
-			model()->value(),
-			model()->minValue(),
-			model()->maxValue(),
-			m_fractionDisplay.numDigits(), &ok);
-
-	if (ok)
-	{
-		model()->setValue(newVal);
-	}
+	mouseReleaseEvent(nullptr);
+	InlineValueEditor::showEditorWithHint(this, model(),
+		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue()),
+		{}, {}, m_fractionDisplay.numDigits());
 }
 
 
