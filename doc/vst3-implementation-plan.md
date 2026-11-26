@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.6 adds editor-host restart. P6 documentation and platform guards
-are in progress.
+Status: P5.7 adds IRunLoop and timer support for editors. P6 documentation and
+platform guards are in progress.
 
 ## 1. Goal
 
@@ -247,6 +247,18 @@ editor host.
 
 Verified by killing `lmms-vst3-editor-host` while the editor is open; a new
 editor host appears and the window remains usable.
+
+### P5.7: IRunLoop and timer support
+
+- `EditorFrame` now exposes `IRunLoop` through `query_interface`.
+- Registered file descriptors are watched with `QSocketNotifier`; plugins get
+  `on_fd_is_set` callbacks.
+- Registered timers are implemented with `QTimer`; plugins get `on_timer`
+  callbacks.
+- Handlers are removed cleanly when the editor frame is destroyed.
+
+This unblocks plugins whose editor relies on the host run loop instead of
+handling its own event source.
 
 Still open:
 
@@ -588,7 +600,8 @@ Deliverables:
 - [x] make the remote path the default on xcb and Wayland,
 - [x] Wayland remote editor via a floating XWayland window,
 - [x] DSP watchdog and automatic restart,
-- [x] editor-host watchdog and restart.
+- [x] editor-host watchdog and restart,
+- [x] IRunLoop and timer support for editor hosts.
 
 Estimate: 3-5 weeks.
 

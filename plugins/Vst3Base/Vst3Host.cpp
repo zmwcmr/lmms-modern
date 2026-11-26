@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -45,6 +46,9 @@
 #include "travesty/host.h"
 #include "travesty/message.h"
 #include "travesty/unit.h"
+#include <QSocketNotifier>
+#include <QTimer>
+
 #include "travesty/view.h"
 
 namespace
@@ -230,9 +234,150 @@ private:
 	}
 };
 
+struct RunLoop : v3_run_loop_cpp
+{
+	RunLoop()
+	{
+		query_interface = queryInterface;
+		ref = refStatic;
+		unref = unrefStatic;
+		loop.register_event_handler = registerEventHandler;
+		loop.unregister_event_handler = unregisterEventHandler;
+		loop.register_timer = registerTimer;
+		loop.unregister_timer = unregisterTimer;
+	}
+
+	~RunLoop()
+	{
+		for (auto& [_, notifier] : m_eventNotifiers)
+		{
+			delete notifier;
+		}
+		for (auto& [_, timer] : m_timers)
+		{
+			timer->stop();
+			delete timer;
+		}
+	}
+
+private:
+	static RunLoop* runLoop(void* self)
+	{
+		return *static_cast<RunLoop**>(self);
+	}
+
+	static v3_result V3_API queryInterface(void* self, const v3_tuid iid, void** iface)
+	{
+		if (v3_tuid_match(iid, v3_funknown_iid)
+			|| v3_tuid_match(iid, v3_run_loop_iid))
+		{
+			*iface = self;
+			return V3_OK;
+		}
+		*iface = nullptr;
+		return V3_NO_INTERFACE;
+	}
+
+	static uint32_t V3_API refStatic(void*) { return 1; }
+	static uint32_t V3_API unrefStatic(void*) { return 0; }
+
+	static v3_result V3_API registerEventHandler(
+		void* self, v3_event_handler** handler, int fd)
+	{
+		if (handler == nullptr || fd < 0)
+		{
+			return V3_INVALID_ARG;
+		}
+		auto* const loop = runLoop(self);
+		loop->removeEventHandler(handler);
+		auto* notifier = new QSocketNotifier(fd, QSocketNotifier::Read);
+		QObject::connect(notifier, &QSocketNotifier::activated, notifier,
+			[handler, fd] {
+				v3_cpp_obj(handler)->on_fd_is_set(handler, fd);
+			});
+		loop->m_eventHandlers[handler] = notifier;
+		loop->m_eventNotifiers[fd] = notifier;
+		return V3_OK;
+	}
+
+	static v3_result V3_API unregisterEventHandler(
+		void* self, v3_event_handler** handler)
+	{
+		runLoop(self)->removeEventHandler(handler);
+		return V3_OK;
+	}
+
+	static v3_result V3_API registerTimer(
+		void* self, v3_timer_handler** handler, uint64_t milliseconds)
+	{
+		if (handler == nullptr)
+		{
+			return V3_INVALID_ARG;
+		}
+		auto* const loop = runLoop(self);
+		loop->removeTimer(handler);
+		auto* timer = new QTimer();
+		timer->setInterval(static_cast<int>(std::max<uint64_t>(1, milliseconds)));
+		QObject::connect(timer, &QTimer::timeout, timer, [handler] {
+			v3_cpp_obj(handler)->on_timer(handler);
+		});
+		timer->start();
+		loop->m_timers[handler] = timer;
+		return V3_OK;
+	}
+
+	static v3_result V3_API unregisterTimer(
+		void* self, v3_timer_handler** handler)
+	{
+		runLoop(self)->removeTimer(handler);
+		return V3_OK;
+	}
+
+	void removeEventHandler(v3_event_handler** handler)
+	{
+		const auto it = m_eventHandlers.find(handler);
+		if (it == m_eventHandlers.end())
+		{
+			return;
+		}
+		auto* notifier = it->second;
+		for (auto fdIt = m_eventNotifiers.begin(); fdIt != m_eventNotifiers.end();)
+		{
+			if (fdIt->second == notifier)
+			{
+				fdIt = m_eventNotifiers.erase(fdIt);
+			}
+			else
+			{
+				++fdIt;
+			}
+		}
+		delete notifier;
+		m_eventHandlers.erase(it);
+	}
+
+	void removeTimer(v3_timer_handler** handler)
+	{
+		const auto it = m_timers.find(handler);
+		if (it == m_timers.end())
+		{
+			return;
+		}
+		it->second->stop();
+		delete it->second;
+		m_timers.erase(it);
+	}
+
+	std::map<v3_event_handler**, QSocketNotifier*> m_eventHandlers;
+	std::map<int, QSocketNotifier*> m_eventNotifiers;
+	std::map<v3_timer_handler**, QTimer*> m_timers;
+};
+
 struct EditorFrame : v3_plugin_frame_cpp
 {
 	std::function<void(int, int)> resizeView;
+	RunLoop runLoop;
+	RunLoop* runLoopPointer = &runLoop;
 
 	EditorFrame()
 	{
@@ -261,10 +406,16 @@ private:
 
 	static v3_result V3_API queryInterface(void* self, const v3_tuid iid, void** iface)
 	{
+		auto* const frame = *static_cast<EditorFrame**>(self);
 		if (v3_tuid_match(iid, v3_funknown_iid)
 			|| v3_tuid_match(iid, v3_plugin_frame_iid))
 		{
 			*iface = self;
+			return V3_OK;
+		}
+		if (v3_tuid_match(iid, v3_run_loop_iid))
+		{
+			*iface = &frame->runLoopPointer;
 			return V3_OK;
 		}
 		*iface = nullptr;
