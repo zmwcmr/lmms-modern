@@ -225,10 +225,11 @@ rejected gracefully (“project is empty”) in well under a second.
 - 30 tiny cases with real instruments/effects: 30 pass (one silence caused by
   a mutated missing clip length; harness now treats silence as a warning for
   mutated projects).
-- 120 malformed XML cases: 0 crashes, 0 sanitizer reports.
-- 100 numeric edge-case projects (NaN/Inf/overflow attributes): 0 crashes,
+- 120 malformed XML cases under ASan, 500 under release: 0 crashes,
+  0 sanitizer reports.
+- 300 numeric edge-case projects (NaN/Inf/overflow attributes): 0 crashes,
   0 hangs (after the meter/tempo fixes).
-- 100 corrupted sample files: 0 crashes.
+- 300 corrupted sample files (and 100 under ASan): 0 crashes.
 - Real-plugin probe (Dexed, Zyn, Surge LV2/VST3, OB-Xf, sfizz, Pianoteq):
   all load and render, ASan-clean.
 - 50 load/save cycles with Dexed state: ASan-clean.

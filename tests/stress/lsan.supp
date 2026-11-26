@@ -10,3 +10,10 @@ leak:libdbus-1
 leak:libwayland-client
 leak:libQt5WaylandClient
 leak:libffi
+leak:libsndfile
+leak:libvorbis
+leak:libvorbisfile
+leak:libogg
+leak:libFLAC
+leak:libmpg123
+leak:libopus
