@@ -25,6 +25,8 @@
 
 #include "NotePlayHandle.h"
 
+#include <vector>
+
 #include "AudioEngine.h"
 #include "DetuningHelper.h"
 #include "InstrumentSoundShaping.h"
@@ -608,12 +610,21 @@ QReadWriteLock NotePlayHandleManager::s_mutex;
 std::atomic_int NotePlayHandleManager::s_availableIndex;
 int NotePlayHandleManager::s_size;
 
+namespace
+{
+// All note-play-handle storage blocks. They are handed out through
+// s_available and may contain live objects, so they can only be released
+// together when the audio engine is shut down.
+std::vector<void*> s_nphBlocks;
+}
+
 
 void NotePlayHandleManager::init()
 {
 	s_available = new NotePlayHandle*[INITIAL_NPH_CACHE];
 
 	auto n = static_cast<NotePlayHandle *>(std::malloc(sizeof(NotePlayHandle) * INITIAL_NPH_CACHE));
+	s_nphBlocks.push_back(n);
 
 	for( int i=0; i < INITIAL_NPH_CACHE; ++i )
 	{
@@ -661,6 +672,7 @@ void NotePlayHandleManager::extend( int c )
 	s_available = tmp;
 
 	auto n = static_cast<NotePlayHandle *>(std::malloc(sizeof(NotePlayHandle) * c));
+	s_nphBlocks.push_back(n);
 
 	for( int i=0; i < c; ++i )
 	{
@@ -672,6 +684,15 @@ void NotePlayHandleManager::extend( int c )
 void NotePlayHandleManager::free()
 {
 	delete[] s_available;
+	s_available = nullptr;
+
+	for( void* block : s_nphBlocks )
+	{
+		std::free( block );
+	}
+	s_nphBlocks.clear();
+	s_availableIndex = -1;
+	s_size = 0;
 }
 
 

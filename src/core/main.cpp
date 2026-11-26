@@ -794,6 +794,7 @@ int main( int argc, char * * argv )
 #endif
 
 	bool destroyEngine = false;
+	RenderManager* renderManager = nullptr;
 
 	// if we have an output file for rendering, just render the song
 	// without starting the GUI
@@ -822,13 +823,13 @@ int main( int argc, char * * argv )
 		}
 
 		// create renderer
-		auto r = new RenderManager(os, eff, renderOut);
-		QCoreApplication::instance()->connect( r,
+		renderManager = new RenderManager(os, eff, renderOut);
+		QCoreApplication::instance()->connect( renderManager,
 				SIGNAL(finished()), SLOT(quit()));
 
 		// timer for progress-updates
-		auto t = new QTimer(r);
-		r->connect( t, SIGNAL(timeout()),
+		auto t = new QTimer(renderManager);
+		renderManager->connect( t, SIGNAL(timeout()),
 				SLOT(updateConsoleProgress()));
 		t->start( 200 );
 
@@ -840,11 +841,11 @@ int main( int argc, char * * argv )
 		// start now!
 		if ( renderTracks )
 		{
-			r->renderTracks();
+			renderManager->renderTracks();
 		}
 		else
 		{
-			r->renderProject();
+			renderManager->renderProject();
 		}
 	}
 	else // otherwise, start the GUI
@@ -1038,6 +1039,11 @@ int main( int argc, char * * argv )
 	}
 
 	const int ret = app->exec();
+
+	// Destroy the renderer before the application object and the engine:
+	// restoring the original audio device emits sampleRateChanged and some
+	// plugin slots need a live QCoreApplication while doing so.
+	delete renderManager;
 	delete app;
 
 	if( destroyEngine )

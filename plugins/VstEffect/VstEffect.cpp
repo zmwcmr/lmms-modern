@@ -106,8 +106,14 @@ Effect::ProcessStatus VstEffect::processImpl(SampleFrame* buf, const f_cnt_t fra
 
 f_cnt_t VstEffect::latency() const
 {
-	QMutexLocker lock( &m_pluginMutex );
-	return m_plugin != nullptr ? m_plugin->latency() : 0;
+	// Do not block if the plugin is currently being opened on the GUI thread.
+	if( !m_pluginMutex.tryLock() )
+	{
+		return 0;
+	}
+	const f_cnt_t value = m_plugin != nullptr ? m_plugin->latency() : 0;
+	m_pluginMutex.unlock();
+	return value;
 }
 
 
@@ -124,19 +130,24 @@ bool VstEffect::openPlugin(const QString& plugin)
 				PLUGIN_NAME::getIconPixmap( "logo", 24, 24 ), 0 );
 	}
 
-	QMutexLocker ml( &m_pluginMutex ); Q_UNUSED( ml );
-	m_plugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
-	if( m_plugin->failed() )
+	// Construct the plugin without holding m_pluginMutex: plugin startup
+	// runs the Qt event loop and other handlers may take the mutex.
+	auto newPlugin = QSharedPointer<VstPlugin>(new VstPlugin(plugin));
+	if( newPlugin->failed() )
 	{
-		m_plugin.clear();
 		delete tf;
 		collectErrorForUI(VstPlugin::tr("The VST plugin %1 could not be loaded.").arg(plugin));
 		return false;
 	}
 
+	{
+		QMutexLocker ml( &m_pluginMutex );
+		m_plugin = newPlugin;
+	}
+
 	delete tf;
 
-	m_vstControls.connectToPlugin(m_plugin.data());
+	m_vstControls.connectToPlugin(newPlugin.data());
 
 	m_key.attributes["file"] = plugin;
 	return true;

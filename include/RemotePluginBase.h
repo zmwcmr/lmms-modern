@@ -207,9 +207,14 @@ public:
 		const int len = readInt();
 		if (len > 0)
 		{
+			constexpr int maxStringSize = 64 * 1024 * 1024;
+			if (len > maxStringSize)
+			{
+				invalidate();
+				return ret;
+			}
 			ret.resize(static_cast<std::size_t>(len));
 			read(ret.data(), len);
-			ret[len] = '\0';
 		}
 		return ret;
 	}
@@ -453,8 +458,12 @@ public:
 #endif
 	}
 
+	//! Wait for a message, optionally processing events. A positive
+	//! timeout invalidates the transport instead of blocking forever when a
+	//! plugin host stops responding.
 	message waitForMessage( const message & _m,
-						bool _busy_waiting = false );
+						bool _busy_waiting = false,
+						int timeoutMs = 30000 );
 
 	inline message fetchAndProcessNextMessage()
 	{
@@ -482,9 +491,18 @@ public:
 		const int len = readInt();
 		if (len > 0)
 		{
+			// A plugin host controls this length. Refuse absurd sizes so a
+			// broken or malicious host cannot exhaust memory in the host
+			// process.
+			constexpr int maxStringSize = 64 * 1024 * 1024;
+			if (len > maxStringSize)
+			{
+				invalidate();
+				return ret;
+			}
 			ret.resize(static_cast<std::size_t>(len));
 			read(ret.data(), len);
-			ret[len] = '\0';
+			// std::string already has a null terminator at data()[size()].
 		}
 		return ret;
 	}

@@ -44,9 +44,10 @@ namespace lmms::base64
 	inline void decode( const QString & _b64, T * * _data, int * _size )
 	{
 		QByteArray data = QByteArray::fromBase64( _b64.toUtf8() );
-		*_size = data.size();
-		*_data = new T[*_size / sizeof(T)];
-		memcpy( *_data, data.constData(), *_size );
+		const int count = data.size() / static_cast<int>( sizeof( T ) );
+		*_size = count * static_cast<int>( sizeof( T ) );
+		*_data = new T[count];
+		memcpy( *_data, data.constData(), static_cast<std::size_t>( *_size ) );
 	}
 
 	// for compatibility-code only

@@ -403,7 +403,7 @@ bool RemotePlugin::process( const SampleFrame* _in_buf, SampleFrame* _out_buf )
 		return false;
 	}
 
-	waitForMessage( IdProcessingDone );
+	waitForMessage( IdProcessingDone, false, 5000 );
 	unlock();
 
 	const ch_cnt_t outputs = std::min<ch_cnt_t>(m_outputCount,

@@ -16,3 +16,8 @@ Brewfile.lock.json
 compile_commands.json
 .vscode/
 .vs/
+/tests/stress/artifacts/
+/tests/stress/failures/
+/tests/stress/plugins/inventory.local.json
+/tests/stress/plugins/fixtures/
+__pycache__/

@@ -22,14 +22,19 @@
  *
  */
 
+#include <limits>
+
 #include <QDomDocument>
 #include <QtTest>
 
+#include "AutomatableModel.h"
 #include "ControllerConnection.h"
+#include "DataFile.h"
 #include "Engine.h"
 #include "Mixer.h"
 #include "Note.h"
 #include "SampleBuffer.h"
+#include "TimePos.h"
 
 class ValidationTest : public QObject
 {
@@ -44,6 +49,39 @@ private slots:
 	void cleanupTestCase()
 	{
 		lmms::Engine::destroy();
+	}
+
+	void deeplyNestedProjectIsRejected()
+	{
+		QByteArray xml("<?xml version=\"1.0\"?>"
+			"<lmms-project version=\"1.0\" type=\"song\"><head/><song>"
+			"<trackcontainer type=\"song\">");
+		for (int i = 0; i < 5000; ++i) { xml += "<x>"; }
+		for (int i = 0; i < 5000; ++i) { xml += "</x>"; }
+		xml += "</trackcontainer></song></lmms-project>";
+
+		lmms::DataFile file(xml);
+		QVERIFY(file.head().isNull());
+		QVERIFY(file.documentElement().isNull());
+	}
+
+	void nonFiniteModelValuesFallBackToDefault()
+	{
+		lmms::FloatModel model(0.5f, 0.0f, 1.0f, 0.01f);
+		model.setValue(std::numeric_limits<float>::quiet_NaN());
+		QCOMPARE(model.value(), 0.5f);
+		model.setValue(std::numeric_limits<float>::infinity());
+		QCOMPARE(model.value(), 0.5f);
+		model.setValue(-std::numeric_limits<float>::infinity());
+		QCOMPARE(model.value(), 0.5f);
+	}
+
+	void zeroMeterStillYieldsPositiveTicksPerBar()
+	{
+		const lmms::TimeSig sig(0, 0);
+		QVERIFY(lmms::TimePos::ticksPerBar(sig) > 0);
+		lmms::TimePos pos(0);
+		QVERIFY(pos.ticksPerBeat(sig) > 0);
 	}
 
 	void noteKeyIsClampedInConstructor()

@@ -551,19 +551,22 @@ void WatsynInstrument::loadSettings( const QDomElement & _this )
 	b2_rtune.loadSettings( _this, "b2_rtune" );
 
 	// load graphs
-	int size = 0;
-	char * dst = 0;
-
-	base64::decode( _this.attribute( "a1_wave"), &dst, &size );
-	a1_graph.setSamples( (float*) dst );
-	base64::decode( _this.attribute( "a2_wave"), &dst, &size );
-	a2_graph.setSamples( (float*) dst );
-	base64::decode( _this.attribute( "b1_wave"), &dst, &size );
-	b1_graph.setSamples( (float*) dst );
-	base64::decode( _this.attribute( "b2_wave"), &dst, &size );
-	b2_graph.setSamples( (float*) dst );
-
-	delete[] dst;
+	const auto loadGraph = [](const QString& encoded, graphModel& graph)
+	{
+		int size = 0;
+		char* dst = nullptr;
+		base64::decode( encoded, &dst, &size );
+		if( dst != nullptr &&
+				size >= graph.length() * static_cast<int>( sizeof( float ) ) )
+		{
+			graph.setSamples( reinterpret_cast<float*>( dst ) );
+		}
+		delete[] dst;
+	};
+	loadGraph( _this.attribute( "a1_wave" ), a1_graph );
+	loadGraph( _this.attribute( "a2_wave" ), a2_graph );
+	loadGraph( _this.attribute( "b1_wave" ), b1_graph );
+	loadGraph( _this.attribute( "b2_wave" ), b2_graph );
 
 	m_abmix.loadSettings( _this, "abmix" );
 

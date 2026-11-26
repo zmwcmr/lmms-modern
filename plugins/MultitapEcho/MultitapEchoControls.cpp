@@ -84,16 +84,21 @@ void MultitapEchoControls::loadSettings( const QDomElement & elem )
 	m_swapInputs.loadSettings( elem, "swapinputs" );
 	m_stages.loadSettings( elem, "stages" );
 	
-	int size = 0;
-	char * dst = 0;
-	
-	base64::decode( elem.attribute( "ampsteps"), &dst, &size );
-	m_ampGraph.setSamples( (float*) dst );
+	const auto loadGraph = [](const QString& encoded, graphModel& graph)
+	{
+		int size = 0;
+		char* dst = nullptr;
+		base64::decode( encoded, &dst, &size );
+		if( dst != nullptr &&
+				size >= graph.length() * static_cast<int>( sizeof( float ) ) )
+		{
+			graph.setSamples( reinterpret_cast<float*>( dst ) );
+		}
+		delete[] dst;
+	};
 
-	base64::decode( elem.attribute( "lpsteps"), &dst, &size );
-	m_lpGraph.setSamples( (float*) dst );
-	
-	delete[] dst;
+	loadGraph( elem.attribute( "ampsteps" ), m_ampGraph );
+	loadGraph( elem.attribute( "lpsteps" ), m_lpGraph );
 }
 
 

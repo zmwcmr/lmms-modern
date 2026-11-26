@@ -25,7 +25,9 @@
 #include "ConfigManager.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QDir>
+#include <QFileInfo>
 #include <QDomElement>
 #include <QMessageBox>
 #include <QStandardPaths>
@@ -104,19 +106,19 @@ ConfigManager::~ConfigManager()
 void ConfigManager::upgrade_1_1_90()
 {
 	// Remove trailing " (bad latency!)" string which was once saved with PulseAudio
-	if(value("mixer", "audiodev").startsWith("PulseAudio ("))
+	if(value("mixer", "audiodev", QString()).startsWith("PulseAudio ("))
 	{
 		setValue("mixer", "audiodev", "PulseAudio");
 	}
 
 	// MidiAlsaRaw used to store the device info as "Device" instead of "device"
-	if (value("MidiAlsaRaw", "device").isNull())
+	if (value("MidiAlsaRaw", "device", QString()).isNull())
 	{
 		// copy "device" = "Device" and then delete the old "Device" (further down)
-		QString oldDevice = value("MidiAlsaRaw", "Device");
+		QString oldDevice = value("MidiAlsaRaw", "Device", QString());
 		setValue("MidiAlsaRaw", "device", oldDevice);
 	}
-	if (!value("MidiAlsaRaw", "device").isNull())
+	if (!value("MidiAlsaRaw", "device", QString()).isNull())
 	{
 		// delete the old "Device" in the case that we just copied it to "device"
 		//   or if the user somehow set both the "Device" and "device" fields
@@ -127,9 +129,9 @@ void ConfigManager::upgrade_1_1_90()
 void ConfigManager::upgrade_1_1_91()
 {
 	// rename displaydbv to displaydbfs
-	if (!value("app", "displaydbv").isNull())
+	if (!value("app", "displaydbv", QString()).isNull())
 	{
-		setValue("app", "displaydbfs", value("app", "displaydbv"));
+		setValue("app", "displaydbfs", value("app", "displaydbv", QString()));
 		deleteValue("app", "displaydbv");
 	}
 }
@@ -144,9 +146,10 @@ void ConfigManager::upgrade_1_2_2()
 
 	for (auto attr : attrs)
 	{
-		if (!value("mixer", attr).isNull())
+		const QString legacyValue = value("mixer", attr, QString());
+		if (!legacyValue.isNull())
 		{
-			setValue("audioengine", attr, value("mixer", attr));
+			setValue("audioengine", attr, legacyValue);
 			deleteValue("mixer", attr);
 		}
 	}
@@ -441,6 +444,14 @@ void ConfigManager::loadConfigFile(const QString & configFile)
 		m_lmmsRcFile = configFile;
 	}
 
+	QFileInfo cfgInfo(m_lmmsRcFile);
+	if (cfgInfo.exists() && !cfgInfo.isFile())
+	{
+		qWarning() << "Configuration path is not a regular file:"
+			<< m_lmmsRcFile;
+		return;
+	}
+
 	QFile cfg_file(m_lmmsRcFile);
 	QDomDocument dom_tree;
 
@@ -635,6 +646,14 @@ void ConfigManager::loadConfigFile(const QString & configFile)
 
 void ConfigManager::saveConfigFile()
 {
+	const QFileInfo cfgInfo(m_lmmsRcFile);
+	if (cfgInfo.exists() && !cfgInfo.isFile())
+	{
+		qWarning() << "Refusing to write configuration to a non-regular file:"
+			<< m_lmmsRcFile;
+		return;
+	}
+
 	setValue("paths", "theme", m_themeDir);
 	setValue("paths", "workingdir", m_workingDir);
 	setValue("paths", "vstdir", m_vstDir);

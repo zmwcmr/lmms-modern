@@ -8,6 +8,8 @@ set(LMMS_TESTS
 	src/core/DelayLineTest.cpp
 	src/core/AudioBufferTest.cpp
 	src/core/AutomatableModelTest.cpp
+	src/core/Base64Test.cpp
+	src/core/ConfigUpgradeTest.cpp
 	src/core/MathTest.cpp
 	src/core/ParameterCurveTest.cpp
 	src/core/ProjectVersionTest.cpp
@@ -83,6 +85,15 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_features(${LMMS_TEST_NAME} PRIVATE cxx_std_20)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
+
+# Load/save/load helper used by the local stress harness. Not registered as
+# a ctest because it needs a project file and two output paths.
+add_executable(LmmsRoundTrip stress/roundtrip.cpp)
+target_include_directories(LmmsRoundTrip PRIVATE
+	$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>)
+target_static_libraries(LmmsRoundTrip PRIVATE lmmsobjs)
+target_link_libraries(LmmsRoundTrip PRIVATE ${QT_LIBRARIES})
+target_compile_features(LmmsRoundTrip PRIVATE cxx_std_20)
 
 if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	set(FAKE_VST3_BUNDLE "${CMAKE_BINARY_DIR}/plugins/fake-vst3.vst3")

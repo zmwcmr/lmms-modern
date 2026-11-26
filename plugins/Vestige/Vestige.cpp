@@ -458,13 +458,18 @@ QString VestigeInstrument::nodeName( void ) const
 
 void VestigeInstrument::loadFile( const QString & _file )
 {
-	m_pluginMutex.lock();
+	QString previousName;
+	{
+		QMutexLocker lock( &m_pluginMutex );
+		if( m_plugin != nullptr )
+		{
+			previousName = m_plugin->name();
+		}
+	}
 	const bool set_ch_name = ( m_plugin != nullptr &&
-			instrumentTrack()->name() == m_plugin->name() ) ||
+			instrumentTrack()->name() == previousName ) ||
 			instrumentTrack()->name() == InstrumentTrack::tr( "Default preset" ) ||
 			instrumentTrack()->name() == displayName();
-
-	m_pluginMutex.unlock();
 
 	// Do not reload a plugin which is already loaded from the same file.
 	// This also avoids tearing down a freshly created editor during project
@@ -489,11 +494,14 @@ void VestigeInstrument::loadFile( const QString & _file )
 				PLUGIN_NAME::getIconPixmap( "logo", 24, 24 ), 0 );
 	}
 
-	m_pluginMutex.lock();
-	m_plugin = new VstInstrumentPlugin( m_pluginDLL );
-	if( !m_plugin->failed() )
+	// Construct the plugin without holding m_pluginMutex. Plugin
+	// initialization runs the Qt event loop, and event handlers such as
+	// the periodic latency timer take this mutex. Holding it here can
+	// deadlock the GUI thread while a slow plugin is starting.
+	auto* plugin = new VstInstrumentPlugin( m_pluginDLL );
+	if( !plugin->failed() )
 	{
-		connect(m_plugin, &VstPlugin::midiOutEvent, this,
+		connect(plugin, &VstPlugin::midiOutEvent, this,
 			[this](int /*deltaFrames*/, const QByteArray& data)
 			{
 				if (data.isEmpty()) { return; }
@@ -513,19 +521,24 @@ void VestigeInstrument::loadFile( const QString & _file )
 						nullptr, MidiEvent::Source::Internal);
 				}
 			}, Qt::DirectConnection);
-		connect(m_plugin, &VstPlugin::parameterAutomated, this,
+		connect(plugin, &VstPlugin::parameterAutomated, this,
 			&VestigeInstrument::handleParameterAutomated,
 			Qt::QueuedConnection);
-		connect(m_plugin, &VstPlugin::parameterGestureBegin, this,
+		connect(plugin, &VstPlugin::parameterGestureBegin, this,
 			&VestigeInstrument::handleParameterGestureBegin,
 			Qt::QueuedConnection);
-		connect(m_plugin, &VstPlugin::parameterGestureEnd, this,
+		connect(plugin, &VstPlugin::parameterGestureEnd, this,
 			&VestigeInstrument::handleParameterGestureEnd,
 			Qt::QueuedConnection);
 	}
-	if( m_plugin->failed() )
+
 	{
-		m_pluginMutex.unlock();
+		QMutexLocker lock( &m_pluginMutex );
+		m_plugin = plugin;
+	}
+
+	if( plugin->failed() )
+	{
 		closePlugin();
 		delete tf;
 		collectErrorForUI( VstPlugin::tr( "The VST plugin %1 could not be loaded." ).arg( m_pluginDLL ) );
@@ -535,16 +548,14 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 	if ( !(instrumentTrack() != nullptr && instrumentTrack()->isPreviewMode()))
 	{
-		m_plugin->createUI(nullptr);
-		m_plugin->showUI();
+		plugin->createUI(nullptr);
+		plugin->showUI();
 	}
 
 	if( set_ch_name )
 	{
-		instrumentTrack()->setName( m_plugin->name() );
+		instrumentTrack()->setName( plugin->name() );
 	}
-
-	m_pluginMutex.unlock();
 
 	emit dataChanged();
 
@@ -600,8 +611,16 @@ void VestigeInstrument::drainMidiOutQueue()
 
 f_cnt_t VestigeInstrument::latency() const
 {
-	QMutexLocker lock( &m_pluginMutex );
-	return m_plugin != nullptr ? m_plugin->latency() : 0;
+	// This is polled from a GUI timer while the plugin may be starting up.
+	// Waiting for m_pluginMutex here can deadlock the GUI thread when plugin
+	// initialization is processing events while holding the mutex.
+	if( !m_pluginMutex.tryLock() )
+	{
+		return 0;
+	}
+	const f_cnt_t value = m_plugin != nullptr ? m_plugin->latency() : 0;
+	m_pluginMutex.unlock();
+	return value;
 }
 
 

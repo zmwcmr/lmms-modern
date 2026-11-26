@@ -24,9 +24,16 @@
 
 #include "RemotePluginBase.h"
 
+#include <chrono>
+
 #ifndef BUILD_REMOTE_PLUGIN_CLIENT
 #include <QCoreApplication>
+#include <QDebug>
 #include <QThread>
+#endif
+
+#if !defined(SYNC_WITH_SHM_FIFO) && !defined(_WIN32)
+#include <poll.h>
 #endif
 
 
@@ -105,12 +112,19 @@ int RemotePluginBase::sendMessage(const message & _m)
 
 RemotePluginBase::message RemotePluginBase::receiveMessage()
 {
+	constexpr int maxMessageParts = 1024 * 1024;
 #ifdef SYNC_WITH_SHM_FIFO
 	m_in->waitForMessage();
 	m_in->lock();
 	message m;
 	m.id = m_in->readInt();
 	const int s = m_in->readInt();
+	if (s < 0 || s > maxMessageParts)
+	{
+		m_in->unlock();
+		invalidate();
+		return message();
+	}
 	for (int i = 0; i < s; ++i)
 	{
 		m.data.push_back(m_in->readString());
@@ -121,6 +135,12 @@ RemotePluginBase::message RemotePluginBase::receiveMessage()
 	message m;
 	m.id = readInt();
 	const int s = readInt();
+	if (s < 0 || s > maxMessageParts)
+	{
+		pthread_mutex_unlock(&m_receiveMutex);
+		invalidate();
+		return message();
+	}
 	for (int i = 0; i < s; ++i)
 	{
 		m.data.push_back(readString());
@@ -135,8 +155,12 @@ RemotePluginBase::message RemotePluginBase::receiveMessage()
 
 RemotePluginBase::message RemotePluginBase::waitForMessage(
 							const message & _wm,
-							bool _busy_waiting)
+							bool _busy_waiting,
+							int timeoutMs)
 {
+	const auto deadline = timeoutMs > 0
+		? std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs)
+		: std::chrono::steady_clock::time_point::max();
 #ifndef BUILD_REMOTE_PLUGIN_CLIENT
 	if (_busy_waiting)
 	{
@@ -168,6 +192,13 @@ RemotePluginBase::message RemotePluginBase::waitForMessage(
 	while (!isInvalid())
 	{
 #ifndef BUILD_REMOTE_PLUGIN_CLIENT
+		if (timeoutMs > 0 && std::chrono::steady_clock::now() >= deadline)
+		{
+			qWarning() << "Timed out waiting for remote plugin message"
+				<< _wm.id;
+			invalidate();
+			return message();
+		}
 		if (_busy_waiting && !messagesLeft())
 		{
 			// FIXME: Can hang sometimes (due to too many messages?)
@@ -175,6 +206,39 @@ RemotePluginBase::message RemotePluginBase::waitForMessage(
 				QEventLoop::ExcludeUserInputEvents, 50);
 			continue;
 		}
+#endif
+#ifndef BUILD_REMOTE_PLUGIN_CLIENT
+#	if !defined(SYNC_WITH_SHM_FIFO) && !defined(_WIN32)
+		if (timeoutMs > 0 && !messagesLeft())
+		{
+			const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+				deadline - std::chrono::steady_clock::now()).count();
+			if (remaining <= 0)
+			{
+				qWarning() << "Timed out waiting for remote plugin message"
+					<< _wm.id;
+				invalidate();
+				return message();
+			}
+			struct pollfd pollin;
+			pollin.fd = m_socket;
+			pollin.events = POLLIN;
+			pollin.revents = 0;
+			const int pollResult = ::poll(&pollin, 1, static_cast<int>(remaining));
+			if (pollResult == 0)
+			{
+				qWarning() << "Timed out waiting for remote plugin message"
+					<< _wm.id;
+				invalidate();
+				return message();
+			}
+			if (pollResult < 0)
+			{
+				// Interrupted by a signal; retry within the deadline.
+				continue;
+			}
+		}
+#	endif
 #endif
 		message m = receiveMessage();
 		processMessage(m);

@@ -1,0 +1,12 @@
+# LeakSanitizer suppressions for third-party libraries and static globals
+# that outlive the LMMS objects using them.
+leak:liblilv
+leak:libSDL2
+leak:libglib-2.0
+leak:libgobject-2.0
+leak:libgdk-3
+leak:libfontconfig
+leak:libdbus-1
+leak:libwayland-client
+leak:libQt5WaylandClient
+leak:libffi
