@@ -26,6 +26,7 @@
 #include "DrumSynth.h"
 
 #include <QFile>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -209,7 +210,11 @@ std::size_t DrumSynth::GetPrivateProfileString(const char* sec,
 	const char* key, const char* def, char* buffer, std::size_t size,
 	QString file)
 {
-	const auto maxlen = std::max(std::size_t{1}, size) - 1; // TODO C++26: Use std::sub_sat(size, 1)
+	// buffer is intended to be null-terminated. size of 0 can't fit
+	// anything, size of 1 can only fit the null terminator. Neither
+	// should ever happen
+	assert(size > 1);
+	std::size_t len = 0;
 	stringstream is;
 	bool inSection = false;
 	std::array<char, 200> line = {};
@@ -220,11 +225,6 @@ std::size_t DrumSynth::GetPrivateProfileString(const char* sec,
 	f.open(QIODevice::ReadOnly);
 	QByteArray dat = f.readAll().constData();
 	is.str(string(dat.constData(), dat.size()));
-
-	// If buffer[0] isn't overwritten after reading file, default value
-	// `def` will be used.
-	std::memset(buffer, '\0', size);
-
 	while (is.good())
 	{
 		if (!inSection)
@@ -240,32 +240,42 @@ std::size_t DrumSynth::GetPrivateProfileString(const char* sec,
 		{
 			is.getline(line.data(), line.size());
 			if (line[0] == '[') { break; }
-
 			char* k = std::strtok(line.data(), " \t=");
 			char* b = std::strtok(nullptr, "\n\r\0");
 			if (k && !strcasecmp(k, key))
 			{
 				if (b)
 				{
-					// Trim trailing whitespace without writing past the
-					// local line buffer.
+					// Trim trailing whitespace without stepping before the string start
 					std::size_t bLen = std::strlen(b);
 					while (bLen > 0 && (b[bLen - 1] == ' ' || b[bLen - 1] == '\t'))
 					{
 						--bLen;
 					}
 					b[bLen] = '\0';
-					std::strncpy(buffer, b, maxlen);
+					len = std::min(bLen, size - 1);
+					std::memcpy(buffer, b, len);
+					buffer[len] = '\0';
+				}
+				else
+				{
+					len = 0;
+					buffer[0] = '\0';
 				}
 				break;
 			}
 		}
 	}
-
-	// Use default value `def` if value is missing
-	if (!buffer[0]) { std::strncpy(buffer, def, maxlen); }
-	// Since nothing ever copies past `maxlen`, buffer must be null-terminated
-	const auto len = std::strlen(buffer);
+	// Use default value if missing
+	if (!len)
+	{
+		len = std::strlen(def);
+		// Passing in a default value larger than the output buffer is
+		// a logic error at the callsite and should never happen
+		assert(len < size);
+		std::memcpy(buffer, def, len);
+		buffer[len] = '\0';
+	}
 	return len;
 }
 

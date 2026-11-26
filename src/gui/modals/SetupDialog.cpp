@@ -35,6 +35,8 @@
 #include <QScrollArea>
 #include <QSpinBox>
 
+#include <algorithm>
+
 #include "AudioEngine.h"
 #include "embed.h"
 #include "Engine.h"
@@ -608,7 +610,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 
 	auto setSampleRate = [this, sampleRateLabel](int sampleRate)
 	{	
-		const auto it = std::find(SUPPORTED_SAMPLERATES.begin(), SUPPORTED_SAMPLERATES.end(), sampleRate);
+		const auto it = std::ranges::find(SUPPORTED_SAMPLERATES, sampleRate);
 		const auto index = it == SUPPORTED_SAMPLERATES.end() ? 0 : std::distance(SUPPORTED_SAMPLERATES.begin(), it);
 
 		m_sampleRate = SUPPORTED_SAMPLERATES[index];
