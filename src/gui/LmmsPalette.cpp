@@ -25,6 +25,7 @@
 
 #include <QApplication>
 #include <QStyle>
+#include <QVariant>
 #include "LmmsPalette.h"
 
 
@@ -69,6 +70,26 @@ LmmsPalette::LmmsPalette( QWidget * parent, QStyle * stylearg ) :
 	ACCESSMET( brightText, setBrightText )
 	ACCESSMET( highlight, setHighlight )
 	ACCESSMET( highlightedText, setHighlightedText )
+
+// The style reads these application properties when drawing. Keeping them
+// outside LmmsPalette's instance layout preserves its exported class layout.
+#define STYLECOLOR(read, write, key, fallback) \
+	QColor LmmsPalette::read() const \
+	{ \
+		const auto color = qApp->property(key).value<QColor>(); \
+		return color.isValid() ? color : fallback; \
+	} \
+	void LmmsPalette::write(const QColor& color) \
+	{ \
+		qApp->setProperty(key, color); \
+	}
+
+STYLECOLOR(activeTitleText, setActiveTitleText, "_lmms_activeTitleText", QColor(255, 255, 255))
+STYLECOLOR(inactiveTitleText, setInactiveTitleText, "_lmms_inactiveTitleText", QColor(192, 192, 192))
+STYLECOLOR(titleText, setTitleText, "_lmms_titleText", QColor(64, 64, 64))
+STYLECOLOR(mdiButton, setMdiButton, "_lmms_mdiButton", QColor(223, 228, 236))
+STYLECOLOR(frameInner, setFrameInner, "_lmms_frameInner", QColor(0, 0, 0))
+#undef STYLECOLOR
 
 
 QPalette LmmsPalette::palette() const

@@ -32,8 +32,10 @@
 #include <QPainterPath>  // IWYU pragma: keep
 #include <QStyleFactory>
 #include <QStyleOption>
+#include <QVariant>
 
 #include "embed.h"
+#include "LmmsPalette.h"
 #include "LmmsStyle.h"
 #include "TextFloat.h"
 
@@ -43,6 +45,24 @@ namespace lmms::gui
 
 
 QPalette * LmmsStyle::s_palette = nullptr;
+
+namespace
+{
+QColor styleColor(const char* key, const QColor& fallback)
+{
+	const auto color = qApp->property(key).value<QColor>();
+	return color.isValid() ? color : fallback;
+}
+
+void resetStyleColors()
+{
+	for (const auto* key : {"_lmms_activeTitleText", "_lmms_inactiveTitleText", "_lmms_titleText",
+		"_lmms_mdiButton", "_lmms_frameInner"})
+	{
+		qApp->setProperty(key, QVariant{});
+	}
+}
+}
 
 QLinearGradient getGradient( const QColor & _col, const QRectF & _rect )
 {
@@ -147,7 +167,12 @@ LmmsStyle::LmmsStyle() :
 			if (auto file = QFile{path}; file.exists())
 			{
 				file.open(QIODevice::ReadOnly);
+				resetStyleColors();
 				qApp->setStyleSheet(file.readAll());
+				// The hidden palette used during startup is not automatically
+				// repolished on stylesheet reload. Read the new style properties
+				// from a freshly polished palette before widgets repaint.
+				LmmsPalette refreshedPalette(nullptr, this);
 				TextFloat::displayMessage(
 					tr("Theme updated"),
 					tr("LMMS theme file %1 has been reloaded.").arg(file.fileName()),
@@ -196,10 +221,10 @@ void LmmsStyle::drawComplexControl( ComplexControl control,
 			so.palette = standardPalette();
 			so.palette.setColor( QPalette::HighlightedText,
 				( titleBar->titleBarState & State_Active ) ?
-					QColor( 255, 255, 255 ) :
-						QColor( 192, 192, 192 ) );
+					styleColor("_lmms_activeTitleText", QColor(255, 255, 255)) :
+						styleColor("_lmms_inactiveTitleText", QColor(192, 192, 192)) );
 			so.palette.setColor( QPalette::Text,
-							QColor( 64, 64, 64 ) );
+							styleColor("_lmms_titleText", QColor(64, 64, 64)) );
 			QProxyStyle::drawComplexControl( control, &so,
 							painter, widget );
 			return;
@@ -208,7 +233,7 @@ void LmmsStyle::drawComplexControl( ComplexControl control,
 	else if (control == CC_MdiControls)
 	{
 		QStyleOptionComplex so(*option);
-		so.palette.setColor(QPalette::Button, QColor(223, 228, 236));
+		so.palette.setColor(QPalette::Button, styleColor("_lmms_mdiButton", QColor(223, 228, 236)));
 		QProxyStyle::drawComplexControl(control, &so, painter, widget);
 		return;
 	}
@@ -234,7 +259,7 @@ void LmmsStyle::drawPrimitive( PrimitiveElement element,
 	{
 		const QRect rect = option->rect;
 
-		QColor black = QColor( 0, 0, 0 );
+		QColor black = styleColor("_lmms_frameInner", QColor(0, 0, 0));
 		QColor shadow = option->palette.shadow().color();
 		QColor highlight = option->palette.highlight().color();
 

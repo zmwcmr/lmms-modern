@@ -73,10 +73,17 @@ public:
 	Q_PROPERTY(bool levelsDisplayedInDBFS MEMBER m_levelsDisplayedInDBFS)
 	Q_PROPERTY(bool renderUnityLine READ getRenderUnityLine WRITE setRenderUnityLine)
 	Q_PROPERTY(QColor unityMarker MEMBER m_unityMarker)
+	Q_PROPERTY(QColor zeroTickColor READ zeroTickColor WRITE setZeroTickColor)
+	Q_PROPERTY(QColor tickColor READ tickColor WRITE setTickColor)
 
 	Fader(FloatModel* model, const QString& name, QWidget* parent, bool modelIsLinear = true);
 	Fader(FloatModel* model, const QString& name, QWidget* parent, const QPixmap& knob, bool modelIsLinear = true);
 	~Fader() override = default;
+
+	QColor zeroTickColor() const;
+	void setZeroTickColor(const QColor& color);
+	QColor tickColor() const;
+	void setTickColor(const QColor& color);
 
 	void setPeak_L(float fPeak);
 	float getPeak_L() {	return m_fPeakValue_L;	}

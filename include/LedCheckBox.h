@@ -36,7 +36,13 @@ namespace lmms::gui
 class LMMS_EXPORT LedCheckBox : public AutomatableButton
 {
 	Q_OBJECT
+	Q_PROPERTY(QColor legacyTextColor READ legacyTextColor WRITE setLegacyTextColor)
+	Q_PROPERTY(QColor legacyTextShadowColor READ legacyTextShadowColor WRITE setLegacyTextShadowColor)
 public:
+	QColor legacyTextColor() const;
+	void setLegacyTextColor(const QColor& color);
+	QColor legacyTextShadowColor() const;
+	void setLegacyTextShadowColor(const QColor& color);
 	enum class LedColor
 	{
 		Yellow,

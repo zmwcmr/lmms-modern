@@ -30,6 +30,7 @@
 #include <QPainter>
 #include <QStyleOptionFrame>
 #include <QScreen>
+#include <QVariant>
 
 #include <algorithm>
 
@@ -246,15 +247,39 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 			tx += pm.width() + 3;
 		}
 		const int y = ( height()+p.fontMetrics().height() ) /2;
-		p.setPen( QColor( 64, 64, 64 ) );
+		p.setPen(textShadowColor());
 		p.drawText( tx+1, y-3, model()->currentText() );
-		p.setPen( QColor( 224, 224, 224 ) );
+		p.setPen(textColor());
 		p.drawText( tx, y-4, model()->currentText() );
 	}
 }
 
 
 
+
+QColor ComboBox::textColor() const
+{
+	const auto color = property("_lmms_comboTextColor").value<QColor>();
+	return color.isValid() ? color : QColor(224, 224, 224);
+}
+
+void ComboBox::setTextColor(const QColor& color)
+{
+	setProperty("_lmms_comboTextColor", color);
+	update();
+}
+
+QColor ComboBox::textShadowColor() const
+{
+	const auto color = property("_lmms_comboTextShadowColor").value<QColor>();
+	return color.isValid() ? color : QColor(64, 64, 64);
+}
+
+void ComboBox::setTextShadowColor(const QColor& color)
+{
+	setProperty("_lmms_comboTextShadowColor", color);
+	update();
+}
 
 void ComboBox::wheelEvent( QWheelEvent* event )
 {

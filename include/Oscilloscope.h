@@ -49,6 +49,7 @@ public:
 	Q_PROPERTY( QColor rightChannelColor READ rightChannelColor WRITE setRightChannelColor )
 	Q_PROPERTY( QColor otherChannelsColor READ otherChannelsColor WRITE setOtherChannelsColor )
 	Q_PROPERTY( QColor clippingColor READ clippingColor WRITE setClippingColor )
+	Q_PROPERTY( QColor hintTextColor MEMBER m_hintTextColor )
 
 	Oscilloscope( QWidget * _parent );
 	~Oscilloscope() override;
@@ -90,6 +91,7 @@ private:
 	QColor m_rightChannelColor;
 	QColor m_otherChannelsColor;
 	QColor m_clippingColor;
+	QColor m_hintTextColor {192, 192, 192};
 } ;
 
 

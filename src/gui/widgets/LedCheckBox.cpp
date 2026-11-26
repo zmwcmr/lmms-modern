@@ -26,6 +26,7 @@
 
 #include <QFontMetrics>
 #include <QPainter>
+#include <QVariant>
 #include <array>
 
 #include "DeprecationHelper.h"
@@ -111,6 +112,30 @@ void LedCheckBox::onTextUpdated()
 	setFixedSize(width, height);
 }
 
+QColor LedCheckBox::legacyTextColor() const
+{
+	const auto color = property("_lmms_ledTextColor").value<QColor>();
+	return color.isValid() ? color : QColor(255, 255, 255);
+}
+
+void LedCheckBox::setLegacyTextColor(const QColor& color)
+{
+	setProperty("_lmms_ledTextColor", color);
+	update();
+}
+
+QColor LedCheckBox::legacyTextShadowColor() const
+{
+	const auto color = property("_lmms_ledTextShadowColor").value<QColor>();
+	return color.isValid() ? color : QColor(64, 64, 64);
+}
+
+void LedCheckBox::setLegacyTextShadowColor(const QColor& color)
+{
+	setProperty("_lmms_ledTextShadowColor", color);
+	update();
+}
+
 void LedCheckBox::paintLegacy(QPaintEvent * pe)
 {
 	QPainter p( this );
@@ -118,9 +143,9 @@ void LedCheckBox::paintLegacy(QPaintEvent * pe)
 
 	p.drawPixmap(0, 0, model()->value() ? m_ledOnPixmap : m_ledOffPixmap);
 
-	p.setPen( QColor( 64, 64, 64 ) );
+	p.setPen(legacyTextShadowColor());
 	p.drawText(m_ledOffPixmap.width() + 4, 11, text());
-	p.setPen( QColor( 255, 255, 255 ) );
+	p.setPen(legacyTextColor());
 	p.drawText(m_ledOffPixmap.width() + 3, 10, text());
 }
 

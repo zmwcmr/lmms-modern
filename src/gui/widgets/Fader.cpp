@@ -53,6 +53,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
+#include <QVariant>
 
 #include "lmms_math.h"
 #include "CaptionMenu.h"
@@ -754,12 +755,37 @@ void Fader::paintLevels(QPaintEvent* ev, QPainter& painter, bool linear)
 	painter.restore();
 }
 
+QColor Fader::zeroTickColor() const
+{
+	const auto color = property("_lmms_faderZeroTickColor").value<QColor>();
+	return color.isValid() ? color : QColor(255, 255, 255, 216);
+}
+
+void Fader::setZeroTickColor(const QColor& color)
+{
+	// Keep theme overrides outside the exported class layout.
+	setProperty("_lmms_faderZeroTickColor", color);
+	update();
+}
+
+QColor Fader::tickColor() const
+{
+	const auto color = property("_lmms_faderTickColor").value<QColor>();
+	return color.isValid() ? color : QColor(255, 255, 255, 128);
+}
+
+void Fader::setTickColor(const QColor& color)
+{
+	setProperty("_lmms_faderTickColor", color);
+	update();
+}
+
 void Fader::paintFaderTicks(QPainter& painter)
 {
 	painter.save();
 
-	const QPen zeroPen(QColor(255, 255, 255, 216), 2.5);
-	const QPen nonZeroPen(QColor(255, 255, 255, 128), 1.);
+	const QPen zeroPen(zeroTickColor(), 2.5);
+	const QPen nonZeroPen(tickColor(), 1.);
 
 	// We use the maximum dB value of the model to calculate the nearest multiple
 	// of the step size that we use to paint the ticks so that we know the start point.
