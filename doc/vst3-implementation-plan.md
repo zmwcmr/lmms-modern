@@ -1,8 +1,9 @@
 # VST3 support implementation plan
 
 Status: P6 is complete for this pass, including fake-plugin tests, automation
-round-trip coverage, unified editor availability and a documented in-process
-fallback. Cross-platform packaging remains deferred by request.
+and project state round-trip coverage, unified editor availability and a
+documented in-process fallback. Cross-platform packaging remains deferred by
+request.
 
 ## 1. Goal
 
@@ -308,8 +309,9 @@ Retained intentionally:
 Deferred by request:
 
 - CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
-- AppImage/Windows/macOS packaging verification,
-- broader fake-module coverage (multi-bus, editor).
+- CMake install rules, AppImage/Windows/macOS packaging verification,
+- release notes,
+- broader fake-module coverage (multi-bus, editor, crash class).
 
 There is no fixed four-item quota; earlier "Still open" lists were kept for
 historical phase notes and have been consolidated here.
@@ -607,16 +609,16 @@ dialogs only show plugin information.
 
 Estimate: 2-3 weeks.
 
-### P3: Parameters, automation and state — partially implemented
+### P3: Parameters, automation and state — implemented
 
 Deliverables:
 
 - [x] parameter models and automation (per-block and sample-offset queue),
 - [x] component state save/load (verified with sfizz, Surge XT and Dexed),
-- [~] controller-only state streams,
+- [x] controller-only state streams,
 - [x] program lists and program selection (Dexed: 32 programs),
 - [x] unit lists, unit names and unit selection,
-- [ ] project round-trip tests.
+- [x] project round-trip tests (`Vst3ProjectTest`).
 
 Estimate: 2-3 weeks.
 
@@ -627,21 +629,21 @@ Deliverables:
 - [x] `IPlugView` attach on xcb,
 - [x] XWayland floating window fallback on Wayland,
 - [x] resize/show/hide/close handling,
-- [~] editor lifecycle (done) and crash recovery (P5),
+- [x] editor lifecycle and crash recovery (P5),
 - [x] DPI/content-scale handling where supported.
 
 Estimate: 2-3 weeks.
 
-### P5: Out-of-process DSP/UI host — editor part implemented
+### P5: Out-of-process DSP/UI host — implemented
 
 Deliverables:
 
-- [~] `lmms-vst3-editor-host` for editor isolation (xcb),
+- [x] `lmms-vst3-editor-host` for editor isolation (xcb),
 - [x] IPC transport for editor state, parameters and resizing,
 - [x] window-ID handoff and X11 embedding,
-- [~] crash detection and clean child shutdown,
+- [x] crash detection and clean child shutdown,
 - [x] `lmms-vst3-host` for DSP and shared-memory audio/MIDI IPC (opt-in),
-- [~] watchdog/timeout behavior for the DSP host (2s timeout, no restart yet),
+- [x] watchdog/timeout behavior for the DSP host (2s timeout, restart on failure),
 - [x] remove the duplicate idle plugin instance in remote mode,
 - [x] state snapshot round-trip from the DSP host,
 - [x] make the remote path the default on xcb and Wayland,
@@ -650,22 +652,36 @@ Deliverables:
 - [x] editor-host watchdog and restart,
 - [x] IRunLoop and timer support for editor hosts,
 - [x] fake VST3 module and automated tests,
-- [x] automation parameter save/load round-trip test.
+- [x] automation parameter save/load round-trip test,
+- [x] project-level component/controller state round-trip test.
 
 Estimate: 3-5 weeks.
 
-### P6: Packaging, documentation and CI — in progress
+### P6: Packaging, documentation and CI — partly deferred
 
 Deliverables:
 
-- `WANT_VST3` build option and CMake install rules,
-- AppImage/Windows/macOS packaging,
-- user documentation and limitation list,
-- CI build with VST3 on/off,
-- fake VST3 test module for automated tests,
-- release notes.
+- [x] `WANT_VST3` build option,
+- [~] CMake install rules (packaging is deferred),
+- [ ] AppImage/Windows/macOS packaging (deferred),
+- [x] user documentation and limitation list,
+- [ ] CI build with VST3 on/off (deferred),
+- [x] fake VST3 test module for automated tests,
+- [ ] release notes (deferred).
 
 Estimate: 2-3 weeks.
+
+### P6.4: Project state round-trip test
+
+- `Vst3ProjectTest` creates a VST3 instrument through the normal project
+  plugin path using the fake VST3 module.
+- It replaces the component/controller state with a known gain, verifies the
+  track serialization preserves it, then saves and reloads a complete `.mmp`
+  and checks the restored state again.
+- The test exposes only `libvst3instrument.so` and `libvst3base.so` to the
+  plugin loader, so it does not depend on installed third-party plugins.
+- The fake module now returns a fresh factory object per `GetPluginFactory`
+  call, which keeps repeated load/unload cycles valid.
 
 ### Overall
 
