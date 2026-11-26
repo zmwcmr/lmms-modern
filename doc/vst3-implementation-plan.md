@@ -104,17 +104,8 @@ chain also renders audio.
   parameters; the remaining parameters are still available to automation.
 - Automated/controlled model values are saved in the project.
 
-State handling is currently best-effort: sfizz returns a component state
-stream, while Surge XT and Dexed reject the host stream with
-`V3_INVALID_ARG`/`V3_NOT_IMPLEMENTED` and therefore need a follow-up
-investigation (likely activation order or a stricter stream implementation).
-
-Still open:
-
-- state round-trip for every tested plugin,
-- program/unit selection,
-- automation editor round-trip tests,
-- native editor embedding (P4).
+State, program and unit handling were completed in P5.3/P5.8. The only
+remaining P3 item is an automated automation-editor round-trip test.
 
 ### Implemented: P4 native editor
 
@@ -134,13 +125,9 @@ Still open:
 Verified with Surge XT, Dexed and OB-Xf editors on xcb, and with the XWayland
 floating fallback from the current Wayland session.
 
-Still open for P4/P5:
-
-- crash isolation for editor and DSP (P5),
-- more complete keyboard/scroll event forwarding for embedded views,
-- editor support for plugins that require an `IRunLoop` or timers.
-
-Next: P5 (out-of-process DSP/UI host) and the remaining P3 state work.
+Crash isolation, DSP/editor watchdogs, Wayland editing and `IRunLoop`
+support were completed in P5.1-P5.7. More complete keyboard/scroll forwarding
+for embedded views remains a small follow-up.
 
 ### Implemented: P5.1 out-of-process editor (xcb)
 
@@ -283,11 +270,21 @@ handling its own event source.
 
 Verified: all four tests pass without any installed third-party VST3 plugin.
 
-Still open:
+## Open work
 
-- a CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
+Active:
+
+- automated automation-editor round-trip test,
+- optional final cleanup of the in-process fallback.
+
+Deferred by request:
+
+- CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
 - AppImage/Windows/macOS packaging verification,
-- final cleanup of the in-process fallback.
+- broader fake-module coverage (multi-bus, editor).
+
+There is no fixed four-item quota; earlier "Still open" lists were kept for
+historical phase notes and have been consolidated here.
 
 ## 2. What Ardour and Carla teach us
 
