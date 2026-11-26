@@ -15,3 +15,9 @@ include_directories("${CMAKE_BINARY_DIR}/src")
 FOREACH(PLUGIN ${PLUGIN_LIST})
 	ADD_SUBDIRECTORY(${PLUGIN})
 ENDFOREACH()
+
+# The isolated LV2 host is an executable, not a plugin module, so it is not
+# part of PLUGIN_LIST.
+IF(LMMS_HAVE_LV2)
+	ADD_SUBDIRECTORY(Lv2Host)
+ENDIF()

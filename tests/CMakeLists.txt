@@ -23,6 +23,7 @@ set(LMMS_TESTS
 if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2HostClientTest.cpp)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -54,3 +55,9 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_features(${LMMS_TEST_NAME} PRIVATE cxx_std_20)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
+
+if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host)
+	add_dependencies(Lv2HostClientTest lmms-lv2-host)
+	target_compile_definitions(Lv2HostClientTest PRIVATE
+		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>")
+endif()

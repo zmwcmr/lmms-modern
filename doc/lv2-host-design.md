@@ -1,7 +1,9 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document. The plugin instance and its UI run in one host child
-and the UI always uses a separate X11 window. No host process code exists yet.
+Status: design document. The transport scaffold is implemented (child process,
+control channel, shared audio segment, block handshake and a crashing-child
+test); LV2 instantiation and the UI are still to come. The UI always uses a
+separate X11 window. No host process code exists yet.
 
 ## Goal
 
@@ -101,24 +103,30 @@ LMMS process                                  lmms-lv2-host child
 |  - port models            |   control FIFO  |  - lilv instance          |
 |  - automation routing     |<--------------->|  - ports / worker         |
 |  - state model            |                 |  - suil UI                |
-| Lv2ProcClient             |   shared memory |  - LV2 features           |
+| Lv2HostClient             |   shared memory |  - LV2 features           |
 |  - QProcess watcher       |<--------------->|  - atom / MIDI I/O        |
 |  - audio copy             |                 |  - state save / restore   |
 +---------------------------+                 +---------------------------+
 ```
 
 `Lv2Proc` keeps the model-facing API so `Lv2Effect`, `Lv2Instrument` and the
-views do not change conceptually. Internally it uses a new `Lv2ProcClient`
+views do not change conceptually. Internally it uses a new `Lv2HostClient`
 that implements `RemotePlugin`-style process management and the protocol.
 
 ## Transport
 
 ### Control channel
 
-Reuse `RemotePluginBase` and its `shmFifo` pair, exactly like VST2: two shared
-memory FIFOs, one in each direction, passed to the child as command-line
-arguments. Message IDs start at `RemoteMessageIDs::IdUserBase` plus a new LV2
-range, so the generic IDs stay compatible.
+Reuse `RemotePluginBase`, exactly like VST2. The transport it selects depends
+on the platform: an `AF_UNIX` socket when SysV IPC and POSIX semaphores are
+available, otherwise the `shmFifo` pair. The child connects to the socket path
+or attaches to the two FIFO keys given on its command line. Message IDs start at
+`RemoteMessageIDs::IdUserBase` plus a new LV2 range, so the generic IDs stay
+compatible.
+
+The scaffold uses `IdBufferSizeInformation`, `IdSampleRateInformation`,
+`IdChangeSharedMemoryKey`, `IdStartProcessing`, `IdProcessingDone` and `IdQuit`,
+plus `IdReady` and `IdFailed` from `Lv2HostProtocol.h`.
 
 ### Shared audio and event memory
 
@@ -126,6 +134,11 @@ The host allocates one shared segment per plugin and sends its key with
 `IdChangeSharedMemoryKey`. All offsets are byte offsets from the segment start;
 pointers are never stored in the segment because the two processes may map it
 at different addresses.
+
+The scaffold already uses a fixed stereo segment from `Lv2HostProtocol.h`
+(`lv2host::AudioSegment`): two planar input planes followed by two planar
+output planes. The full layout below replaces it when the DSP step moves the
+ports into the child.
 
 ```text
 struct Lv2HostSegment
@@ -290,8 +303,9 @@ audio thread, and apply state between runs.
 
 ## Lifecycle and failure handling
 
-- Start: `Lv2ProcClient::start()` launches the child with the two FIFO keys and
-  waits for `IdLv2Ready` with a timeout (default 10 s for instantiate).
+- Start: `Lv2HostClient::start()` launches the child with its transport
+  arguments (socket path or FIFO keys) and waits for `IdLv2Ready` with a
+  timeout (default 10 s for instantiate).
 - Orphan prevention: the child calls
   `prctl(PR_SET_PDEATHSIG, SIGTERM)` and checks `getppid() == 1` right after
   start, same as `RemoteVstPlugin`.
@@ -356,9 +370,12 @@ Manual matrix additions:
 
 ## Staged implementation
 
-1. **Scaffold.** `lmms-lv2-host` executable, `Lv2ProcClient` with FIFO setup,
-   process start/watcher, shared segment allocation and a no-op block loop.
+1. **Scaffold.** `lmms-lv2-host` executable, `Lv2HostClient` with transport
+   setup, process start, shared segment allocation and a no-op block loop.
    Acceptance: a fake "plugin" echoes audio and survives a kill.
+   - status: done. `Lv2HostClient` starts the child, the child echoes the
+     stereo block, `Lv2HostClientTest` covers the echo and a `kill -9` of the
+     child; the child exits on `IdQuit` and when its parent disappears.
 2. **DSP.** Move instantiation, ports, control slots, audio planes, latency and
    worker handling into the child. Keep UI disabled. Acceptance: audio parity
    and PDC.
@@ -401,10 +418,12 @@ quickly.
 ## Files
 
 ```text
-new: plugins/Lv2Host/Lv2Host.cpp          (child main)
-new: plugins/Lv2Host/CMakeLists.txt
-new: src/core/lv2/Lv2HostClient.h/.cpp    (process + shared segment)
-new: src/core/lv2/Lv2HostProtocol.h       (message IDs, segment layout)
+plugins/Lv2Host/Lv2Host.cpp               (child main, scaffold: echo block)
+plugins/Lv2Host/CMakeLists.txt
+include/Lv2HostClient.h                   (process + shared segment, host side)
+src/core/lv2/Lv2HostClient.cpp
+include/Lv2HostProtocol.h                 (message IDs, segment layout)
+tests/src/core/Lv2HostClientTest.cpp      (echo + crash test)
 include/Lv2Proc.h
 src/core/lv2/Lv2Proc.cpp
 src/core/lv2/Lv2Ports.cpp

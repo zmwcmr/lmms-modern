@@ -330,7 +330,7 @@ Tasks:
 
 - [ ] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
       options, worker and state features, run ports and atom events.
-- [ ] Implement `Lv2ProcClient` on the VST2 remote transport: control FIFO,
+- [ ] Implement `Lv2HostClient` on the VST2 remote transport: control channel,
       shared audio/MIDI/control segment, block handshake, `QProcess` watcher.
 - [ ] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
       watchdog, crash notification, reload.
@@ -342,6 +342,10 @@ Tasks:
       separate window because embedding is gone.
 - [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
 - [ ] Add fake test plugins that crash in UI and in DSP.
+- Current status: the transport scaffold landed. `lmms-lv2-host` starts,
+  connects over the `RemotePluginBase` transport, attaches the stereo planar
+  audio segment and echoes a block; `Lv2HostClientTest` covers the echo and
+  `kill -9` of the child. The child still has no LV2 instance and no UI.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.
