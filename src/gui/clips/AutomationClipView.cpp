@@ -372,7 +372,8 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 	if( m_clip->isRecording() )
 	{
 		static auto s_clipRec = embed::getIconPixmap("clip_rec");
-		p.drawPixmap(1, rect().bottom() - s_clipRec.height(), s_clipRec);
+		// SVG pixmaps are oversampled for HiDPI, so use the logical size.
+		p.drawPixmap(1, rect().bottom() - embed::logicalSize(s_clipRec).height(), s_clipRec);
 	}
 
 	// clip name

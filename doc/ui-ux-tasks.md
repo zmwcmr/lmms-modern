@@ -42,6 +42,8 @@ T1 各项尽量独立提交；T2 需要先讨论。
 - `data/themes/default/main_slider.png`：改为 `main_slider.svg`，同样使用 2× 内禀尺寸（52×20）。
 - `data/themes/default/sbarrow_*`（8 个）：改为 5×5 SVG，QSS 从 `background-image`
   改为 `image:`，使 Qt 按设备像素比栅格化；100% 下与原 PNG 一致，200% 下清晰。
+- `data/themes/default/clip_rec.png`：potrace 转成路径 SVG；`AutomationClipView`
+  改用 `embed::logicalSize()` 取高度，避免 SVG 的 HiDPI 过采样影响绘制位置。
 
 **未转换（原因）**
 - `cursor_select_left/right`：灰度光标掩码，需在真实桌面验证 `QCursor` 的透明与热点。
