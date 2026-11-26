@@ -24,6 +24,18 @@ if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2HostClientTest.cpp)
+
+	add_library(FakeLv2Gain MODULE plugins/fake-lv2-gain/gain.c)
+	target_include_directories(FakeLv2Gain PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Gain PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "gain"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2"
+	)
+	configure_file(plugins/fake-lv2-gain/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-gain/gain.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/gain.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -56,8 +68,13 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
 
-if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host)
-	add_dependencies(Lv2HostClientTest lmms-lv2-host)
+if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
+	add_dependencies(Lv2HostClientTest lmms-lv2-host FakeLv2Gain)
 	target_compile_definitions(Lv2HostClientTest PRIVATE
-		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>")
+		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
+		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>")
+	target_include_directories(Lv2HostClientTest PRIVATE
+		${Lilv_INCLUDE_DIRS}
+		${LV2_INCLUDE_DIRS})
+	target_link_libraries(Lv2HostClientTest PRIVATE Lilv::lilv)
 endif()

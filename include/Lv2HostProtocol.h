@@ -40,10 +40,16 @@ namespace lmms::lv2host
  */
 enum MessageId : int
 {
-	//! child -> host: the audio segment is attached and the instance is ready
+	//! child -> host: the instance is ready and the audio segment is attached
 	IdReady = IdUserBase,
 	//! child -> host: instantiation or segment attach failed (followed by text)
 	IdFailed,
+	//! child -> host: port metadata. index, symbol, name, kind, input, def, min, max
+	IdPortInfo,
+	//! host -> child: control value. index, value
+	IdControlValue,
+	//! child -> host: plugin latency in frames (only sent on change)
+	IdLatency,
 };
 
 /*! Layout of the stereo planar audio segment.

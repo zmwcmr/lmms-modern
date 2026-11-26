@@ -88,6 +88,8 @@ bool Lv2HostClient::start(const QString& hostExecutable, const QString& pluginUr
 	stop();
 	m_error.clear();
 	m_failed = true;
+	m_ports.clear();
+	m_latency = 0;
 
 	if (sampleRate == 0 || framesPerBlock == 0 || timeoutMs <= 0)
 	{
@@ -340,11 +342,50 @@ bool Lv2HostClient::processBlock(const float* const* in, float* const* out, f_cn
 
 bool Lv2HostClient::processMessage(const message& m)
 {
-	if (m.id == IdDebugMessage)
+	switch (m.id)
 	{
-		qWarning() << "LV2 host:" << m.getQString(0);
+		case IdDebugMessage:
+			qWarning() << "LV2 host:" << m.getQString(0);
+			break;
+
+		case lv2host::IdPortInfo:
+		{
+			Lv2HostPort port;
+			port.index = m.getInt(0);
+			port.symbol = m.getQString(1);
+			port.name = m.getQString(2);
+			port.kind = m.getQString(3);
+			port.isInput = m.getInt(4) != 0;
+			port.defaultValue = m.getFloat(5);
+			port.minValue = m.getFloat(6);
+			port.maxValue = m.getFloat(7);
+			m_ports.push_back(port);
+			break;
+		}
+
+		case lv2host::IdLatency:
+			m_latency = m.getInt(0);
+			break;
+
+		default:
+			break;
 	}
 	return false;
+}
+
+
+
+
+bool Lv2HostClient::setControlValue(int portIndex, float value)
+{
+	if (m_failed || portIndex < 0)
+	{
+		return false;
+	}
+	sendMessage(message(lv2host::IdControlValue)
+		.addInt(portIndex)
+		.addFloat(value));
+	return true;
 }
 
 

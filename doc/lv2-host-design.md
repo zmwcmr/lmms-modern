@@ -1,9 +1,9 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document. The transport scaffold is implemented (child process,
-control channel, shared audio segment, block handshake and a crashing-child
-test); LV2 instantiation and the UI are still to come. The UI always uses a
-separate X11 window. No host process code exists yet.
+Status: design document. The transport and the DSP step are implemented: the
+child instantiates the plugin with lilv, reports its ports, applies control
+values and runs the audio. Atom events, state and the UI are still to come. The
+UI always uses a separate X11 window.
 
 ## Goal
 
@@ -137,8 +137,12 @@ at different addresses.
 
 The scaffold already uses a fixed stereo segment from `Lv2HostProtocol.h`
 (`lv2host::AudioSegment`): two planar input planes followed by two planar
-output planes. The full layout below replaces it when the DSP step moves the
-ports into the child.
+output planes. The first two audio ports are mapped to those planes; extra
+audio ports get private scratch buffers, so plugins that require more ports
+still run but their extra channels are not routed (same policy as the
+in-process path). Atom ports get an empty sequence buffer until `IdAtomEvent`
+is implemented. The full layout below replaces the fixed segment when control
+slots and MIDI rings move into it.
 
 ```text
 struct Lv2HostSegment
@@ -178,12 +182,17 @@ blocks, never during a run.
 
 The first version keeps the VST2 sequence:
 
-1. Host fills `audioIn`, MIDI ring and control slots.
+1. Host fills `audioIn` and sends pending `IdControlValue` messages.
 2. Host sends `IdStartProcessing`.
-3. Child copies MIDI into atom sequences, applies control versions, runs the
-   plugin, collects outputs, writes MIDI output records and control versions.
+3. Child applies the control values, runs the plugin and collects the audio
+   outputs (MIDI atom forwarding comes with `IdAtomEvent`).
 4. Child sends `IdProcessingDone`.
-5. Host copies `audioOut`, drains MIDI output and applies control changes.
+5. Host copies `audioOut` and reads the reported latency/control values.
+
+Control changes travel as messages in this step. Moving them into versioned
+slots inside the segment is a performance optimization that only matters once
+the child publishes many continuously moving output controls; the message path
+is block-rate either way.
 
 This costs one inter-process round trip per block per plugin, which VST2
 already pays. If profiling shows it matters, the next step is a double-buffered
@@ -191,26 +200,26 @@ segment plus a semaphore so the host never waits for the whole block.
 
 ## Protocol
 
-New IDs, all below the LV2 host base:
+The transport reuses the generic IDs from `RemotePluginBase.h`
+(`IdBufferSizeInformation`, `IdSampleRateInformation`,
+`IdChangeSharedMemoryKey`, `IdStartProcessing`, `IdProcessingDone`, `IdQuit`,
+`IdDebugMessage`). The LV2-specific IDs live in `Lv2HostProtocol.h`:
 
-| ID | Direction | Payload |
-| --- | --- | --- |
-| `IdLv2Instantiate` | host to child | URI, sample rate, block size |
-| `IdLv2PortInfo` | child to host | port index, type, direction, flags, default/min/max |
-| `IdLv2InstantiateFailed` | child to host | issue list (missing feature, failed instantiate) |
-| `IdLv2Ready` | child to host | instance is running |
-| `IdLv2Latency` | child to host | latency in frames (only on change) |
-| `IdLv2ShowUI` | host to child | scale factor |
-| `IdLv2HideUI` | host to child | none |
-| `IdLv2DestroyUI` | host to child | none |
-| `IdLv2UiGeometry` | child to host | x, y, width, height |
-| `IdLv2UiClosed` | child to host | reason (WM close, UI destroyed) |
-| `IdLv2SaveState` | host to child | state directory path |
-| `IdLv2StateSaved` | child to host | manifest of written files |
-| `IdLv2RestoreState` | host to child | state directory path |
-| `IdLv2StateChanged` | child to host | plugin marked state dirty |
-| `IdLv2Reload` | host to child | new sample rate / block size |
-| `IdLv2Quit` | host to child | none |
+| ID | Direction | Payload | Status |
+| --- | --- | --- | --- |
+| `IdReady` | child to host | none | implemented |
+| `IdFailed` | child to host | reason text | implemented |
+| `IdPortInfo` | child to host | index, symbol, name, kind, input, default/min/max | implemented |
+| `IdControlValue` | host to child | port index, value | implemented |
+| `IdLatency` | child to host | latency in frames (only on change) | implemented |
+| `IdAtomEvent` | both | port index, size, protocol, bytes | planned |
+| `IdShowUI` / `IdHideUI` / `IdDestroyUI` | host to child | scale factor / none | planned |
+| `IdUiGeometry` / `IdUiClosed` | child to host | x, y, width, height / reason | planned |
+| `IdSaveState` / `IdStateSaved` / `IdRestoreState` | both | directory path, file manifest | planned |
+| `IdReload` | host to child | new sample rate / block size | planned |
+
+The plugin URI and the transport arguments are passed on the command line;
+there is no instantiate message yet.
 
 Port metadata is sent once, right after instantiation, and is enough for the
 host to create the same `AutomatableModel` objects and labels the in-process
@@ -379,6 +388,13 @@ Manual matrix additions:
 2. **DSP.** Move instantiation, ports, control slots, audio planes, latency and
    worker handling into the child. Keep UI disabled. Acceptance: audio parity
    and PDC.
+   - status: done for stereo plugins. The child instantiates with lilv and
+     provides map/unmap, options, bounded block length, log and worker
+     features. It reports port metadata, applies `IdControlValue`, runs the
+     plugin and reports the designated latency port. `Lv2HostClientTest`
+     compares the child output with an in-process instance of the fake gain
+     plugin, including a control change. Only the first two audio ports are
+     routed; extra ports get scratch buffers.
 3. **MIDI.** Move MIDI atom input/output and forwarding. Acceptance: fake MIDI
    plugin drives another track.
 4. **UI.** suil in the child, top-level window, scale factor, close/destroy.

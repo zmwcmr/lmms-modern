@@ -342,10 +342,13 @@ Tasks:
       separate window because embedding is gone.
 - [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
 - [ ] Add fake test plugins that crash in UI and in DSP.
-- Current status: the transport scaffold landed. `lmms-lv2-host` starts,
-  connects over the `RemotePluginBase` transport, attaches the stereo planar
-  audio segment and echoes a block; `Lv2HostClientTest` covers the echo and
-  `kill -9` of the child. The child still has no LV2 instance and no UI.
+- Current status: the transport and the DSP step landed. `lmms-lv2-host`
+  starts, connects over the `RemotePluginBase` transport, instantiates the
+  plugin with lilv, reports ports, applies control values and processes audio
+  through the shared stereo segment. `Lv2HostClientTest` covers the echo,
+  `kill -9` of the child, and bit-level comparison with an in-process instance
+  of a fake gain plugin. Atom events (MIDI), state, presets and the UI are
+  still missing, and only the first two audio ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.

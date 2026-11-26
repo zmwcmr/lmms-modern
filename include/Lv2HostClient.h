@@ -28,6 +28,9 @@
 #include <QObject>
 #include <QProcess>
 #include <QString>
+#include <QStringList>
+
+#include <vector>
 
 #include "LmmsTypes.h"
 #include "Lv2HostProtocol.h"
@@ -37,6 +40,20 @@
 
 namespace lmms
 {
+
+//! Port metadata reported by the child.
+struct Lv2HostPort
+{
+	int index = 0;
+	QString symbol;
+	QString name;
+	//! "audio", "control", "atom", "midi" or "other"
+	QString kind;
+	bool isInput = true;
+	float defaultValue = 0.0f;
+	float minValue = 0.0f;
+	float maxValue = 0.0f;
+};
 
 /*! Host-side handle for one `lmms-lv2-host` child process.
  *
@@ -79,6 +96,15 @@ public:
 	sample_rate_t sampleRate() const { return m_sampleRate; }
 	f_cnt_t framesPerBlock() const { return m_framesPerBlock; }
 
+	//! Ports reported by the child, in plugin order.
+	const std::vector<Lv2HostPort>& ports() const { return m_ports; }
+
+	//! Send a control-port value to the child. Applied at the next block.
+	bool setControlValue(int portIndex, float value);
+
+	//! Latency reported by the child in frames, 0 when unknown.
+	int latency() const { return m_latency; }
+
 	//! Process ID of the child, 0 when not running (used by tests).
 	qint64 processId() const { return m_process.processId(); }
 
@@ -104,6 +130,8 @@ private:
 
 	QProcess m_process;
 	SharedMemory<float[]> m_audio;
+	std::vector<Lv2HostPort> m_ports;
+	int m_latency = 0;
 	sample_rate_t m_sampleRate = 0;
 	f_cnt_t m_framesPerBlock = 0;
 	bool m_failed = true;
