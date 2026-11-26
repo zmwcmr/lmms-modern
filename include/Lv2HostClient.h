@@ -111,6 +111,15 @@ public:
 	//! Latency reported by the child in frames, 0 when unknown.
 	int latency() const { return m_latency; }
 
+	//! Ask the child to create and show its own X11 UI window.
+	bool showUi(float scale = 1.0f);
+	void hideUi();
+	void destroyUi();
+	bool isUiOpen() const { return m_uiOpen; }
+
+	//! Process pending messages without waiting for an audio block.
+	void poll();
+
 	//! Process ID of the child, 0 when not running (used by tests).
 	qint64 processId() const { return m_process.processId(); }
 
@@ -127,6 +136,8 @@ public:
 signals:
 	//! Emitted when the child died unexpectedly.
 	void crashed();
+	//! Emitted when the child's UI window was closed or could not be created.
+	void uiClosed();
 
 private:
 	bool waitForReply(int messageId, int timeoutMs);
@@ -144,6 +155,7 @@ private:
 	f_cnt_t m_framesPerBlock = 0;
 	bool m_failed = true;
 	bool m_stopping = false;
+	bool m_uiOpen = false;
 	QString m_error;
 #ifndef SYNC_WITH_SHM_FIFO
 	int m_serverSocket = -1;

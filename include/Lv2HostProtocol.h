@@ -58,6 +58,14 @@ enum MessageId : int
 	IdMidiEvents,
 	//! child -> host: binary list of MIDI events produced by the last block
 	IdMidiOut,
+	//! host -> child: create and show the UI with the given scale factor
+	IdShowUI,
+	//! host -> child: unmap the UI window
+	IdHideUI,
+	//! host -> child: destroy the UI and its window
+	IdDestroyUI,
+	//! child -> host: the UI was closed (reason text) or could not be created
+	IdUiClosed,
 };
 
 //! One MIDI event with a block-relative frame offset.

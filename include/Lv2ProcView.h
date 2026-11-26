@@ -100,6 +100,7 @@ private:
 	//! Whether a supported native UI exists for this plugin
 	bool hasPluginUi() const;
 	void createUi();
+	void createRemoteUi();
 	void destroyUi();
 	void setUiVisible(bool visible);
 	void updateUi();

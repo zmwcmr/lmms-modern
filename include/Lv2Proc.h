@@ -59,6 +59,7 @@ namespace lmms
 {
 
 class AutomatableModel;
+class Lv2HostClient;
 class MidiEvent;
 class PluginIssue;
 class SampleFrame;
@@ -218,6 +219,11 @@ public:
 	bool hasNoteInput() const;
 	//! Processing latency reported by the plugin, in samples
 	f_cnt_t latency() const { return m_latency.load(std::memory_order_relaxed); }
+
+	//! Whether this processor runs in an isolated host child process
+	bool isRemote() const { return m_remote != nullptr; }
+	//! Child process handle in remote mode, nullptr otherwise
+	Lv2HostClient* remoteClient() const { return m_remote.get(); }
 	const LilvPlugin* getPlugin() const { return m_plugin; }
 	bool hasGui() const { return m_hasGUI; }
 
@@ -312,6 +318,15 @@ private:
 	//! Output control port carrying the plugin latency, if any
 	Lv2Ports::Control* m_latencyPort = nullptr;
 	std::atomic<f_cnt_t> m_latency{0};
+
+	//! Isolated host process (LMMS_LV2_REMOTE=1), null in-process
+	std::unique_ptr<Lv2HostClient> m_remote;
+	//! Last control values sent to the child; NaN forces the first send
+	std::vector<float> m_lastRemoteControl;
+
+	void startRemote();
+	void runRemote(f_cnt_t frames);
+	void copyModelsToRemote();
 
 	//! Plugin -> UI event queue (atom events, etc.)
 	std::mutex m_uiEventMutex;

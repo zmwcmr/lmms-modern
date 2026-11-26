@@ -24,6 +24,9 @@
 
 #include "Lv2Proc.h"
 
+#include "Lv2HostClient.h"
+#include <limits>
+
 #ifdef LMMS_HAVE_LV2
 
 #include <algorithm>
@@ -65,6 +68,19 @@
 
 namespace lmms
 {
+
+namespace
+{
+bool lv2RemoteMode()
+{
+	if (qEnvironmentVariableIsSet("LMMS_LV2_INPROCESS"))
+	{
+		return false;
+	}
+	const QByteArray value = qgetenv("LMMS_LV2_REMOTE");
+	return !value.isEmpty() && value != "0";
+}
+} // namespace
 
 
 
@@ -539,6 +555,12 @@ void Lv2Proc::copyModelsFromCore()
 		}
 	}
 
+	if (m_remote)
+	{
+		copyModelsToRemote();
+		return;
+	}
+
 	// send pending MIDI events to atom port
 	if(m_midiIn)
 	{
@@ -805,6 +827,12 @@ bool Lv2Proc::sendToUi(uint32_t portIndex, uint32_t type, uint32_t size,
 void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
 {
 	ModelGroup::saveSettings(doc, that);
+	if (m_remote)
+	{
+		qWarning() << "Remote LV2 plugin state is not saved yet;"
+			<< "only the control values are stored.";
+		return;
+	}
 	saveState(doc, that);
 }
 
@@ -814,6 +842,15 @@ void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
 void Lv2Proc::loadSettings(const QDomElement& that)
 {
 	ModelGroup::loadSettings(that);
+	if (m_remote)
+	{
+		if (!that.firstChildElement("lv2state").isNull())
+		{
+			qWarning() << "Remote LV2 plugin state is not restored yet;"
+				<< "the saved state bundle is kept but ignored.";
+		}
+		return;
+	}
 	loadState(that);
 }
 
@@ -1081,6 +1118,12 @@ void Lv2Proc::run(f_cnt_t frames)
 	// State save/restore must not run concurrently with the plugin instance
 	std::lock_guard<std::mutex> lock(m_stateMutex);
 
+	if (m_remote)
+	{
+		runRemote(frames);
+		return;
+	}
+
 	if (m_worker)
 	{
 		// Process any worker replies
@@ -1235,6 +1278,12 @@ AutomatableModel *Lv2Proc::modelAtPort(const QString &uri)
 
 void Lv2Proc::initPlugin()
 {
+	if (lv2RemoteMode())
+	{
+		startRemote();
+		return;
+	}
+
 	m_features.initCommon();
 	initPluginSpecificFeatures();
 	m_features.createFeatureVectors();
@@ -1287,11 +1336,117 @@ void Lv2Proc::initPlugin()
 
 
 
+void Lv2Proc::startRemote()
+{
+	m_remote = std::make_unique<Lv2HostClient>();
+	const QString uri = QString::fromUtf8(pluginUri());
+	const auto sampleRate = Engine::audioEngine()->outputSampleRate();
+	const f_cnt_t frames = Engine::audioEngine()->framesPerPeriod();
+	if (!m_remote->start(QString(), uri, sampleRate, frames))
+	{
+		qCritical() << "Could not start the isolated LV2 host for" << uri
+			<< ":" << m_remote->errorString();
+		m_remote.reset();
+		throw std::runtime_error("Failed to create remote Lv2 processor");
+	}
+	if (m_remote->ports().size() != m_ports.size())
+	{
+		qWarning() << "Isolated LV2 host reported"
+			<< static_cast<int>(m_remote->ports().size())
+			<< "ports, LMMS built" << static_cast<int>(m_ports.size());
+	}
+	m_lastRemoteControl.assign(m_ports.size(),
+		std::numeric_limits<float>::quiet_NaN());
+}
+
+
+
+
+void Lv2Proc::runRemote(f_cnt_t frames)
+{
+	const float* input[2] = { nullptr, nullptr };
+	float* output[2] = { nullptr, nullptr };
+	if (inPorts().m_left) { input[0] = inPorts().m_left->data(); }
+	if (inPorts().m_right) { input[1] = inPorts().m_right->data(); }
+	if (outPorts().m_left) { output[0] = outPorts().m_left->data(); }
+	if (outPorts().m_right) { output[1] = outPorts().m_right->data(); }
+
+	m_remote->processBlock(input, output, frames);
+	m_latency.store(m_remote->latency(), std::memory_order_relaxed);
+
+	m_midiOutEvents.clear();
+	for (const auto& event : m_remote->midiOutput())
+	{
+		if (event.data.empty() || event.data.size() > 3)
+		{
+			continue;
+		}
+		MidiOutEvent outEvent;
+		outEvent.offset = event.frame;
+		outEvent.size = static_cast<uint8_t>(event.data.size());
+		std::memcpy(outEvent.data.data(), event.data.data(), event.data.size());
+		m_midiOutEvents.push_back(outEvent);
+	}
+}
+
+
+
+
+void Lv2Proc::copyModelsToRemote()
+{
+	std::vector<lv2host::MidiEventData> events;
+	if (m_midiIn)
+	{
+		while (m_midiInputReader.read_space() > 0)
+		{
+			const MidiInputEvent ev = m_midiInputReader.read(1)[0];
+			const uint32_t stamp =
+				ev.time.frames(Engine::framesPerTick()) + ev.offset;
+			std::array<uint8_t, 4> buffer{};
+			const std::size_t size = writeToByteSeq(ev.ev, buffer.data(), buffer.size());
+			if (size > 0)
+			{
+				events.push_back(lv2host::MidiEventData{
+					stamp,
+					std::vector<uint8_t>(buffer.data(), buffer.data() + size)});
+			}
+		}
+	}
+	m_remote->setMidiEvents(std::move(events));
+
+	for (std::size_t i = 0; i < m_ports.size(); ++i)
+	{
+		auto* control = dcast<Lv2Ports::Control>(m_ports[i].get());
+		if (control == nullptr || control->m_flow != Lv2Ports::Flow::Input)
+		{
+			continue;
+		}
+		const float value = control->m_val;
+		if (std::isnan(m_lastRemoteControl[i]) || m_lastRemoteControl[i] != value)
+		{
+			m_remote->setControlValue(static_cast<int>(i), value);
+			m_lastRemoteControl[i] = value;
+		}
+	}
+}
+
+
+
+
 void Lv2Proc::shutdownPlugin()
 {
-	lilv_instance_deactivate(m_instance);
-	lilv_instance_free(m_instance);
-	m_instance = nullptr;
+	if (m_remote)
+	{
+		m_remote->stop();
+		m_remote.reset();
+	}
+
+	if (m_instance)
+	{
+		lilv_instance_deactivate(m_instance);
+		lilv_instance_free(m_instance);
+		m_instance = nullptr;
+	}
 
 	m_features.clear();
 	m_options.clear();

@@ -33,6 +33,7 @@
 #include <csignal>
 #include <cstdarg>
 #include <cstdio>
+#include <climits>
 #include <cstring>
 #include <exception>
 #include <string>
@@ -41,6 +42,7 @@
 #include <chrono>
 #include <cmath>
 #include <deque>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -58,6 +60,8 @@
 #include <lv2/atom/atom.h>
 #include <lv2/buf-size/buf-size.h>
 #include <lv2/core/lv2.h>
+#include <lv2/data-access/data-access.h>
+#include <lv2/instance-access/instance-access.h>
 #include <lv2/log/log.h>
 #include <lv2/midi/midi.h>
 #include <lv2/options/options.h>
@@ -71,7 +75,15 @@
 #include <unistd.h>
 #endif
 
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <lv2/ui/ui.h>
+#include <suil/suil.h>
+#endif
+
 #ifndef SYNC_WITH_SHM_FIFO
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -123,6 +135,80 @@ private:
 #endif // LMMS_BUILD_LINUX
 
 #ifdef LMMS_HAVE_LV2
+
+namespace
+{
+LilvInstance* g_extDataInstance = nullptr;
+}
+
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+/*! Asset root some UIs (Zyn Fusion) resolve relative to the working dir. */
+std::string findUiDataRoot(const std::string& bundleDir)
+{
+	if (bundleDir.empty())
+	{
+		return std::string();
+	}
+	std::error_code error;
+	auto directory = std::filesystem::canonical(bundleDir, error);
+	if (error)
+	{
+		directory = bundleDir;
+	}
+	for (int depth = 0; depth < 4; ++depth)
+	{
+		if (std::filesystem::exists(directory / "qml" / "MainWindow.qml"))
+		{
+			return directory.string();
+		}
+		if (!directory.has_parent_path())
+		{
+			break;
+		}
+		directory = directory.parent_path();
+	}
+	return std::string();
+}
+
+/*! Restores the working directory when the UI creation scope ends. */
+class CurrentDirGuard
+{
+public:
+	explicit CurrentDirGuard(const std::string& directory)
+	{
+		char buffer[PATH_MAX] = {};
+		if (::getcwd(buffer, sizeof(buffer)) != nullptr)
+		{
+			m_previous = buffer;
+		}
+		if (!directory.empty())
+		{
+			::chdir(directory.c_str());
+		}
+	}
+
+	~CurrentDirGuard()
+	{
+		if (!m_previous.empty())
+		{
+			::chdir(m_previous.c_str());
+		}
+	}
+
+	CurrentDirGuard(const CurrentDirGuard&) = delete;
+	CurrentDirGuard& operator=(const CurrentDirGuard&) = delete;
+
+private:
+	std::string m_previous;
+};
+#endif
+
+const void* extDataAccess(const char* uri)
+{
+	return g_extDataInstance != nullptr
+		? lilv_instance_get_extension_data(g_extDataInstance, uri)
+		: nullptr;
+}
 
 int logPrintf(LV2_Log_Handle, LV2_URID, const char* fmt, ...)
 {
@@ -310,6 +396,17 @@ private:
 	void sendMidiOutput();
 	void sendFailed(const std::string& reason);
 
+	bool showUi(float scale);
+	void hideUi();
+	void destroyUi();
+	void idleUi();
+	void processUiEvents();
+	bool waitForMessage(int timeoutMs);
+	static void writeToUiPort(void* handle, uint32_t port, uint32_t size,
+		uint32_t protocol, const void* buffer);
+	static uint32_t portIndexBySymbol(void* handle, const char* symbol);
+	static void touchUiPort(void* handle, uint32_t port, bool grabbed);
+
 	SharedMemory<float[]> m_audio;
 	f_cnt_t m_frames = 0;
 	sample_rate_t m_sampleRate = 0;
@@ -345,6 +442,31 @@ private:
 	int m_latencyPort = -1;
 	float m_latencyValue = 0.0f;
 	int m_reportedLatency = -1;
+	bool m_uiVisible = false;
+
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	SuilHost* m_uiHost = nullptr;
+	SuilInstance* m_uiInstance = nullptr;
+	Display* m_uiDisplay = nullptr;
+	unsigned long m_uiWindow = 0;
+	unsigned long m_uiWmDelete = 0;
+	LV2_Feature m_uiParentFeature{};
+	LV2_Feature m_uiInstanceFeature{};
+	LV2_Feature m_uiDataFeature{};
+	LV2_Feature m_uiResizeFeature{};
+	LV2_Feature m_uiOptionsFeature{};
+	LV2_Feature m_uiLogFeature{};
+	LV2UI_Resize m_uiResize{};
+	LV2_Extension_Data_Feature m_uiExtData{};
+	LV2_Options_Option m_uiOptions[3]{};
+	float m_uiScale = 1.0f;
+	float m_uiSampleRate = 0.0f;
+	//! Size requested by the UI while suil_instance_new() is running
+	int m_pendingUiWidth = 0;
+	int m_pendingUiHeight = 0;
+	//! Asset root the UI resolves relative paths against (Zyn Fusion)
+	std::string m_uiDataRoot;
+#endif
 #endif
 };
 
@@ -353,6 +475,7 @@ private:
 
 Lv2HostProcess::~Lv2HostProcess()
 {
+	destroyUi();
 #ifdef LMMS_HAVE_LV2
 	if (m_instance != nullptr)
 	{
@@ -376,14 +499,41 @@ int Lv2HostProcess::run()
 {
 	for (;;)
 	{
+		if (!waitForMessage(30))
+		{
+			idleUi();
+			continue;
+		}
+
 		const auto m = receiveMessage();
 		if (m.id == IdQuit || m.id == IdUndefined)
 		{
 			break;
 		}
 		processMessage(m);
+		idleUi();
 	}
 	return 0;
+}
+
+
+
+
+bool Lv2HostProcess::waitForMessage(int timeoutMs)
+{
+#ifdef SYNC_WITH_SHM_FIFO
+	// The shared memory transport has no non-blocking check; block on the
+	// next message and pump the UI between blocks.
+	(void)timeoutMs;
+	return true;
+#else
+	if (m_socket == -1)
+	{
+		return false;
+	}
+	struct pollfd pollin = { m_socket, POLLIN, 0 };
+	return ::poll(&pollin, 1, timeoutMs) > 0;
+#endif
 }
 
 
@@ -436,6 +586,18 @@ bool Lv2HostProcess::processMessage(const message& m)
 
 		case lv2host::IdMidiEvents:
 			m_pendingMidi = lv2host::decodeMidiEvents(m.getString(0));
+			return true;
+
+		case lv2host::IdShowUI:
+			showUi(m.getFloat(0));
+			return true;
+
+		case lv2host::IdHideUI:
+			hideUi();
+			return true;
+
+		case lv2host::IdDestroyUI:
+			destroyUi();
 			return true;
 
 		case IdStartProcessing:
@@ -606,6 +768,394 @@ void Lv2HostProcess::sendFailed(const std::string& reason)
 {
 	std::fprintf(stderr, "lv2 host: %s\n", reason.c_str());
 	sendMessage(message(lv2host::IdFailed).addString(reason));
+}
+
+
+
+
+void Lv2HostProcess::hideUi()
+{
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	if (m_uiWindow != 0 && m_uiDisplay != nullptr)
+	{
+		XUnmapWindow(m_uiDisplay, m_uiWindow);
+		XFlush(m_uiDisplay);
+	}
+#endif
+	m_uiVisible = false;
+}
+
+
+
+
+void Lv2HostProcess::destroyUi()
+{
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	if (m_uiInstance != nullptr)
+	{
+		const auto* show = static_cast<const LV2UI_Show_Interface*>(
+			suil_instance_extension_data(m_uiInstance, LV2_UI__showInterface));
+		if (show != nullptr && show->hide != nullptr)
+		{
+			show->hide(suil_instance_get_handle(m_uiInstance));
+		}
+		suil_instance_free(m_uiInstance);
+		m_uiInstance = nullptr;
+	}
+	if (m_uiHost != nullptr)
+	{
+		suil_host_free(m_uiHost);
+		m_uiHost = nullptr;
+	}
+	if (m_uiWindow != 0 && m_uiDisplay != nullptr)
+	{
+		XDestroyWindow(m_uiDisplay, m_uiWindow);
+		m_uiWindow = 0;
+	}
+	if (m_uiDisplay != nullptr)
+	{
+		XCloseDisplay(m_uiDisplay);
+		m_uiDisplay = nullptr;
+	}
+	g_extDataInstance = nullptr;
+#endif
+	m_uiVisible = false;
+}
+
+
+
+
+void Lv2HostProcess::processUiEvents()
+{
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	if (m_uiDisplay == nullptr || m_uiWindow == 0)
+	{
+		return;
+	}
+	while (XPending(m_uiDisplay) > 0)
+	{
+		XEvent event;
+		XNextEvent(m_uiDisplay, &event);
+		if (event.type == ClientMessage
+			&& event.xclient.window == m_uiWindow
+			&& static_cast<Atom>(event.xclient.data.l[0]) == m_uiWmDelete)
+		{
+			destroyUi();
+			sendMessage(message(lv2host::IdUiClosed).addString("closed by user"));
+			return;
+		}
+		if (event.type == DestroyNotify
+			&& event.xdestroywindow.window == m_uiWindow)
+		{
+			m_uiWindow = 0;
+		}
+	}
+#endif
+}
+
+
+
+
+void Lv2HostProcess::idleUi()
+{
+	processUiEvents();
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	if (m_uiInstance == nullptr || !m_uiVisible)
+	{
+		return;
+	}
+	const auto* idle = static_cast<const LV2UI_Idle_Interface*>(
+		suil_instance_extension_data(m_uiInstance, LV2_UI__idleInterface));
+	if (idle != nullptr && idle->idle != nullptr)
+	{
+		// Zyn Fusion loads QML and helper libraries lazily from its asset
+		// root, so the idle calls need the same working directory.
+		const CurrentDirGuard cwdGuard(m_uiDataRoot);
+		idle->idle(suil_instance_get_handle(m_uiInstance));
+	}
+#endif
+}
+
+
+
+
+void Lv2HostProcess::writeToUiPort(void* handle, uint32_t port, uint32_t size,
+	uint32_t protocol, const void* buffer)
+{
+	auto* self = static_cast<Lv2HostProcess*>(handle);
+	if (buffer == nullptr || protocol != 0 || size != sizeof(float))
+	{
+		return;
+	}
+#ifdef LMMS_HAVE_LV2
+	if (port < self->m_controlValues.size())
+	{
+		self->m_controlValues[port] = *static_cast<const float*>(buffer);
+	}
+#endif
+}
+
+
+
+
+uint32_t Lv2HostProcess::portIndexBySymbol(void* handle, const char* symbol)
+{
+#ifdef LMMS_HAVE_LV2
+	auto* self = static_cast<Lv2HostProcess*>(handle);
+	if (self->m_plugin == nullptr || symbol == nullptr)
+	{
+		return LV2UI_INVALID_PORT_INDEX;
+	}
+	const uint32_t portCount = lilv_plugin_get_num_ports(self->m_plugin);
+	for (uint32_t i = 0; i < portCount; ++i)
+	{
+		const LilvPort* port = lilv_plugin_get_port_by_index(self->m_plugin, i);
+		const LilvNode* node = lilv_port_get_symbol(self->m_plugin, port);
+		if (node != nullptr && std::strcmp(lilv_node_as_string(node), symbol) == 0)
+		{
+			return i;
+		}
+	}
+#endif
+	(void)handle;
+	(void)symbol;
+	return LV2UI_INVALID_PORT_INDEX;
+}
+
+
+
+
+void Lv2HostProcess::touchUiPort(void* handle, uint32_t port, bool grabbed)
+{
+	(void)handle;
+	(void)port;
+	(void)grabbed;
+}
+
+
+
+
+bool Lv2HostProcess::showUi(float scale)
+{
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+#ifdef LMMS_HAVE_LV2
+	if (m_instance == nullptr || m_plugin == nullptr)
+	{
+		sendMessage(message(lv2host::IdUiClosed).addString("no plugin instance"));
+		return false;
+	}
+	if (m_uiInstance != nullptr)
+	{
+		if (!m_uiVisible && m_uiWindow != 0 && m_uiDisplay != nullptr)
+		{
+			XMapWindow(m_uiDisplay, m_uiWindow);
+			XFlush(m_uiDisplay);
+			m_uiVisible = true;
+		}
+		return true;
+	}
+
+	if (m_uiDisplay == nullptr)
+	{
+		m_uiDisplay = XOpenDisplay(nullptr);
+		if (m_uiDisplay == nullptr)
+		{
+			sendMessage(message(lv2host::IdUiClosed).addString("no X11 display"));
+			return false;
+		}
+	}
+
+	std::string title = "LV2 UI";
+	{
+		LilvNode* name = lilv_plugin_get_name(m_plugin);
+		if (name != nullptr)
+		{
+			title = lilv_node_as_string(name);
+			lilv_node_free(name);
+		}
+	}
+
+	const int screen = DefaultScreen(m_uiDisplay);
+	m_uiWindow = XCreateSimpleWindow(m_uiDisplay, RootWindow(m_uiDisplay, screen),
+		100, 100, 900, 700, 1,
+		BlackPixel(m_uiDisplay, screen), WhitePixel(m_uiDisplay, screen));
+	if (m_uiWindow == 0)
+	{
+		sendMessage(message(lv2host::IdUiClosed).addString("could not create a window"));
+		return false;
+	}
+	XStoreName(m_uiDisplay, m_uiWindow, title.c_str());
+	m_uiWmDelete = XInternAtom(m_uiDisplay, "WM_DELETE_WINDOW", False);
+	XSetWMProtocols(m_uiDisplay, m_uiWindow, &m_uiWmDelete, 1);
+	XSelectInput(m_uiDisplay, m_uiWindow, StructureNotifyMask);
+	XMapWindow(m_uiDisplay, m_uiWindow);
+	XFlush(m_uiDisplay);
+
+	m_uiHost = suil_host_new(writeToUiPort, portIndexBySymbol, nullptr, nullptr);
+	if (m_uiHost == nullptr)
+	{
+		destroyUi();
+		sendMessage(message(lv2host::IdUiClosed).addString("could not create the UI host"));
+		return false;
+	}
+	suil_host_set_touch_func(m_uiHost, touchUiPort);
+
+	LilvNode* x11Type = lilv_new_uri(m_world, LV2_UI__X11UI);
+	const LilvUI* selected = nullptr;
+	const LilvNode* uiType = nullptr;
+	LilvUIs* uis = lilv_plugin_get_uis(m_plugin);
+	LILV_FOREACH(uis, it, uis)
+	{
+		const LilvUI* candidate = lilv_uis_get(uis, it);
+		const LilvNode* candidateType = nullptr;
+		if (lilv_ui_is_supported(candidate, suil_ui_supported, x11Type, &candidateType))
+		{
+			selected = candidate;
+			uiType = candidateType;
+			break;
+		}
+	}
+	lilv_node_free(x11Type);
+	if (selected == nullptr)
+	{
+		destroyUi();
+		sendMessage(message(lv2host::IdUiClosed).addString("no X11 UI available"));
+		return false;
+	}
+
+	m_uiExtData.data_access = extDataAccess;
+	g_extDataInstance = m_instance;
+	m_uiParentFeature = LV2_Feature{
+		LV2_UI__parent,
+		reinterpret_cast<void*>(static_cast<uintptr_t>(m_uiWindow))
+	};
+	m_uiInstanceFeature = LV2_Feature{
+		LV2_INSTANCE_ACCESS_URI,
+		const_cast<void*>(lilv_instance_get_handle(m_instance))
+	};
+	m_uiDataFeature = LV2_Feature{LV2_DATA_ACCESS_URI, &m_uiExtData};
+	m_uiResize.handle = this;
+	m_uiResize.ui_resize = [](LV2UI_Handle handle, int width, int height) -> int {
+		auto* self = static_cast<Lv2HostProcess*>(handle);
+		if (width <= 0 || height <= 0)
+		{
+			return 1;
+		}
+		self->m_pendingUiWidth = width;
+		self->m_pendingUiHeight = height;
+		if (self->m_uiDisplay != nullptr && self->m_uiWindow != 0)
+		{
+			XResizeWindow(self->m_uiDisplay, self->m_uiWindow,
+				static_cast<unsigned>(width), static_cast<unsigned>(height));
+			XFlush(self->m_uiDisplay);
+		}
+		return 0;
+	};
+	m_uiResizeFeature = LV2_Feature{LV2_UI__resize, &m_uiResize};
+
+	const LV2_URID floatType = m_urids.map(LV2_ATOM__Float);
+	m_uiScale = scale > 0.0f ? scale : 1.0f;
+	m_uiSampleRate = static_cast<float>(m_sampleRate);
+	m_uiOptions[0] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		m_urids.map(LV2_UI__scaleFactor),
+		sizeof(float), floatType, &m_uiScale
+	};
+	m_uiOptions[1] = LV2_Options_Option{
+		LV2_OPTIONS_INSTANCE, 0,
+		m_urids.map(LV2_PARAMETERS__sampleRate),
+		sizeof(float), floatType, &m_uiSampleRate
+	};
+	m_uiOptions[2] = LV2_Options_Option{LV2_OPTIONS_INSTANCE, 0, 0, 0, 0, nullptr};
+	m_uiOptionsFeature = LV2_Feature{LV2_OPTIONS__options, m_uiOptions};
+	m_uiLogFeature = LV2_Feature{LV2_LOG__log, &m_log};
+
+	const LV2_Feature* features[] = {
+		&m_uiParentFeature,
+		&m_uiInstanceFeature,
+		&m_uiDataFeature,
+		&m_uiResizeFeature,
+		&m_uiOptionsFeature,
+		&m_uiLogFeature,
+		&m_mapFeature,
+		&m_unmapFeature,
+		nullptr
+	};
+
+	char* bundlePath = lilv_file_uri_parse(
+		lilv_node_as_uri(lilv_ui_get_bundle_uri(selected)), nullptr);
+	char* binaryPath = lilv_file_uri_parse(
+		lilv_node_as_uri(lilv_ui_get_binary_uri(selected)), nullptr);
+
+	// Zyn Fusion resolves qml/ and libzest.so relative to the working dir.
+	m_uiDataRoot = findUiDataRoot(bundlePath != nullptr ? bundlePath : "");
+	const CurrentDirGuard cwdGuard(m_uiDataRoot);
+
+	m_uiInstance = suil_instance_new(m_uiHost, this, LV2_UI__X11UI,
+		m_pluginUri.c_str(),
+		lilv_node_as_uri(lilv_ui_get_uri(selected)),
+		uiType != nullptr ? lilv_node_as_uri(uiType) : LV2_UI__X11UI,
+		bundlePath, binaryPath, features);
+	lilv_free(bundlePath);
+	lilv_free(binaryPath);
+
+	if (m_uiInstance == nullptr)
+	{
+		destroyUi();
+		sendMessage(message(lv2host::IdUiClosed).addString("could not instantiate the UI"));
+		return false;
+	}
+
+	// Some UIs (DrumGizmo) request their natural size from inside
+	// suil_instance_new(), before the widget has that size. Prefer that
+	// request and fall back to the widget size.
+	const auto widget = reinterpret_cast<uintptr_t>(suil_instance_get_widget(m_uiInstance));
+	int uiWidth = m_pendingUiWidth;
+	int uiHeight = m_pendingUiHeight;
+	XWindowAttributes attributes{};
+	if ((uiWidth <= 1 || uiHeight <= 1)
+		&& widget != 0
+		&& XGetWindowAttributes(m_uiDisplay, static_cast<Window>(widget), &attributes)
+		&& attributes.width > 1 && attributes.height > 1)
+	{
+		uiWidth = attributes.width;
+		uiHeight = attributes.height;
+	}
+	if (uiWidth > 1 && uiHeight > 1)
+	{
+		XResizeWindow(m_uiDisplay, m_uiWindow,
+			static_cast<unsigned>(uiWidth), static_cast<unsigned>(uiHeight));
+		if (widget != 0)
+		{
+			// Make the plugin widget match its window; some UIs only repaint
+			// at the size they asked for.
+			XResizeWindow(m_uiDisplay, static_cast<Window>(widget),
+				static_cast<unsigned>(uiWidth), static_cast<unsigned>(uiHeight));
+		}
+		XFlush(m_uiDisplay);
+	}
+
+	const auto* show = static_cast<const LV2UI_Show_Interface*>(
+		suil_instance_extension_data(m_uiInstance, LV2_UI__showInterface));
+	if (show != nullptr && show->show != nullptr)
+	{
+		show->show(suil_instance_get_handle(m_uiInstance));
+	}
+
+	std::fprintf(stderr, "lv2 host: UI created (window=%lu widget=%p size=%dx%d)\n",
+		m_uiWindow, reinterpret_cast<void*>(widget), uiWidth, uiHeight);
+	m_uiVisible = true;
+	return true;
+#else
+	(void)scale;
+	sendMessage(message(lv2host::IdUiClosed).addString("LV2 UI support missing"));
+	return false;
+#endif // LMMS_HAVE_LV2
+#else
+	(void)scale;
+	sendMessage(message(lv2host::IdUiClosed).addString("LV2 UI is only supported on X11"));
+	return false;
+#endif
 }
 
 
@@ -936,6 +1486,12 @@ int connectToHost(const char* path)
 
 int main(int argc, char** argv)
 {
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
+	// Many LV2 UIs render from a second thread; Xlib must be thread safe
+	// before the first display connection is opened.
+	XInitThreads();
+#endif
+
 #ifdef LMMS_BUILD_LINUX
 	// If LMMS is killed with SIGKILL, the kernel terminates this process as
 	// well instead of leaving an orphan behind.

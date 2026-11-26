@@ -93,6 +93,7 @@ bool Lv2HostClient::start(const QString& hostExecutable, const QString& pluginUr
 	m_pendingMidi.clear();
 	m_midiOutput.clear();
 	m_latency = 0;
+	m_uiOpen = false;
 
 	if (sampleRate == 0 || framesPerBlock == 0 || timeoutMs <= 0)
 	{
@@ -280,6 +281,7 @@ void Lv2HostClient::stop()
 
 	m_stopping = false;
 	m_failed = true;
+	m_uiOpen = false;
 	clearAudioSegment();
 }
 
@@ -387,6 +389,12 @@ bool Lv2HostClient::processMessage(const message& m)
 			break;
 		}
 
+		case lv2host::IdUiClosed:
+			m_uiOpen = false;
+			qWarning() << "LV2 UI closed:" << m.getQString(0);
+			emit uiClosed();
+			break;
+
 		default:
 			break;
 	}
@@ -414,6 +422,64 @@ bool Lv2HostClient::setControlValue(int portIndex, float value)
 void Lv2HostClient::setMidiEvents(std::vector<lv2host::MidiEventData> events)
 {
 	m_pendingMidi = std::move(events);
+}
+
+
+
+
+bool Lv2HostClient::showUi(float scale)
+{
+	if (m_failed)
+	{
+		qWarning() << "Lv2HostClient::showUi ignored, host failed:" << m_error;
+		return false;
+	}
+	sendMessage(message(lv2host::IdShowUI).addFloat(scale));
+	m_uiOpen = true;
+	return true;
+}
+
+
+
+
+void Lv2HostClient::hideUi()
+{
+	if (!m_failed)
+	{
+		sendMessage(message(lv2host::IdHideUI));
+	}
+	m_uiOpen = false;
+}
+
+
+
+
+void Lv2HostClient::destroyUi()
+{
+	if (!m_failed)
+	{
+		sendMessage(message(lv2host::IdDestroyUI));
+	}
+	m_uiOpen = false;
+}
+
+
+
+
+void Lv2HostClient::poll()
+{
+	if (m_failed)
+	{
+		return;
+	}
+	while (!isInvalid() && messagesLeft())
+	{
+		const auto m = fetchAndProcessNextMessage();
+		if (m.id == IdUndefined)
+		{
+			break;
+		}
+	}
 }
 
 

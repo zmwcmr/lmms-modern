@@ -1,10 +1,11 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document. The transport, the DSP step and MIDI/atom forwarding
-are implemented: the child instantiates the plugin with lilv, reports its
-ports, applies control values, runs the audio and forwards MIDI events in both
-directions. State, presets and the UI are still to come. The UI always uses a
-separate X11 window.
+Status: design document. The transport, the DSP step, MIDI/atom forwarding and
+the child-hosted UI are implemented behind `LMMS_LV2_REMOTE=1`: the child
+instantiates the plugin, reports its ports, applies control values, runs the
+audio, forwards MIDI events and owns the UI window. State and presets are still
+missing. The in-process path remains the default. The UI always uses a separate
+X11 window.
 
 ## Goal
 
@@ -220,8 +221,9 @@ The transport reuses the generic IDs from `RemotePluginBase.h`
 | `IdMidiEvents` | host to child | encoded MIDI event list (frame, size, bytes) | implemented |
 | `IdMidiOut` | child to host | encoded MIDI event list | implemented |
 | `IdAtomEvent` | both | port index, size, protocol, bytes | planned |
-| `IdShowUI` / `IdHideUI` / `IdDestroyUI` | host to child | scale factor / none | planned |
-| `IdUiGeometry` / `IdUiClosed` | child to host | x, y, width, height / reason | planned |
+| `IdShowUI` / `IdHideUI` / `IdDestroyUI` | host to child | scale factor / none | implemented |
+| `IdUiClosed` | child to host | reason text | implemented |
+| `IdUiGeometry` | child to host | x, y, width, height | planned |
 | `IdSaveState` / `IdStateSaved` / `IdRestoreState` | both | directory path, file manifest | planned |
 | `IdReload` | host to child | new sample rate / block size | planned |
 
@@ -276,9 +278,9 @@ of this milestone.
 
 The UI is always a top-level X11 window:
 
-- The child owns the window. It reports geometry and the host moves/hides it
-  through messages; `WM_DELETE_WINDOW` is handled in the child and reported as
-  `IdLv2UiClosed`.
+- The child owns the window. `IdShowUI` creates the suil instance with the
+  window as `ui:parent`; `IdHideUI` unmaps it and `IdDestroyUI` frees it.
+  `WM_DELETE_WINDOW` is handled in the child and reported as `IdUiClosed`.
 - Embedding in an MDI subwindow is out of scope: the in-process embedded mode
   was removed, and the host only needs a window to show and hide.
 - Wayland: the child opens an XWayland window; `DISPLAY` is forwarded.
@@ -411,6 +413,13 @@ Manual matrix additions:
 4. **UI.** suil in the child, top-level window, scale factor, close/destroy.
    Acceptance: every audited plugin opens, Surge XT resizes and closes, and a UI
    crash does not kill LMMS.
+   - status: partial. `LMMS_LV2_REMOTE=1` starts the child UI, the window is
+     owned by the child, `ui:parent`/instance-access/data-access/scale/resize/
+     idle/WM-close are wired, and the child keeps the Zyn asset root as its
+     working directory during UI creation and idle. DrumGizmo opens and renders
+     at 750x740. Open issue: DPF/OpenGL UIs (ZynAddSubFX) open a window of the
+     right size but render black when hosted by the child under Xephyr; the same
+     UI renders in-process. This needs investigating before the default flips.
 5. **State, presets, failure UX.** State bundles over the filesystem, preset
    loading, reload path, crash notification, in-process fallback and the
    `pluginUiIsUnstable()` demotion. Acceptance: full test matrix and ASan run.

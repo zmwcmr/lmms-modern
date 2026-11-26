@@ -348,8 +348,11 @@ Tasks:
   through the shared stereo segment. `Lv2HostClientTest` covers the echo,
   `kill -9` of the child, and bit-level comparison with an in-process instance
   of a fake gain plugin, and MIDI events are forwarded to and from the first
-  atom input/output pair. State, presets and the UI are still missing; only the
-  first two audio ports are routed.
+  atom input/output pair. With `LMMS_LV2_REMOTE=1` the UI also moves into the
+  child (window, parent XID, instance/data access, scale, resize, idle, WM
+  close). DrumGizmo renders in the child; ZynAddSubFX (DPF/OpenGL) is black
+  there, which is an open issue. State, presets and the default flip are still
+  missing; only the first two audio ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.
