@@ -578,7 +578,7 @@ private:
 	static v3_result V3_API read(
 		void* self, void* buffer, int32_t numBytes, int32_t* bytesRead)
 	{
-		if (buffer == nullptr || numBytes < 0 || bytesRead == nullptr)
+		if (buffer == nullptr || numBytes < 0)
 		{
 			return V3_INVALID_ARG;
 		}
@@ -591,14 +591,17 @@ private:
 			std::memcpy(buffer, memory->data.data() + memory->position, count);
 			memory->position += count;
 		}
-		*bytesRead = static_cast<int32_t>(count);
+		if (bytesRead != nullptr)
+		{
+			*bytesRead = static_cast<int32_t>(count);
+		}
 		return V3_OK;
 	}
 
 	static v3_result V3_API write(
 		void* self, void* buffer, int32_t numBytes, int32_t* bytesWritten)
 	{
-		if (buffer == nullptr || numBytes < 0 || bytesWritten == nullptr)
+		if (buffer == nullptr || numBytes < 0)
 		{
 			return V3_INVALID_ARG;
 		}
@@ -610,7 +613,10 @@ private:
 		}
 		std::memcpy(memory->data.data() + memory->position, buffer, count);
 		memory->position += count;
-		*bytesWritten = numBytes;
+		if (bytesWritten != nullptr)
+		{
+			*bytesWritten = numBytes;
+		}
 		return V3_OK;
 	}
 
@@ -1267,14 +1273,9 @@ bool Vst3Host::Impl::setupProcessing()
 	{
 		return false;
 	}
-	if (v3_cpp_obj(component)->set_active(component, true) != V3_OK)
-	{
-		return false;
-	}
-	if (v3_cpp_obj(processor)->set_processing(processor, true) != V3_OK)
-	{
-		return false;
-	}
+	// Some plugins return kResultFalse here even though they are usable.
+	v3_cpp_obj(component)->set_active(component, true);
+	v3_cpp_obj(processor)->set_processing(processor, true);
 	active = true;
 	return true;
 }
