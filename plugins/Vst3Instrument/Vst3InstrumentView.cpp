@@ -136,14 +136,18 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 			editorButton->setToolTip(
 				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
 		}
-		connect(editorButton, &QPushButton::clicked, this, [this, host] {
+		connect(editorButton, &QPushButton::clicked, this,
+			[this, host, vst3Instrument] {
 			if (m_editorWindow != nullptr)
 			{
 				m_editorWindow->raiseEditor();
 				m_editorWindow->activateEditor();
 				return;
 			}
-			m_editorWindow = Vst3EditorWindow::open(host, this, host->name());
+			m_editorWindow = Vst3EditorWindow::open(host, this, host->name(),
+				[vst3Instrument](uint32_t id, double value) {
+					vst3Instrument->setParameterValue(id, value);
+				});
 		});
 		layout->addWidget(editorButton);
 	}

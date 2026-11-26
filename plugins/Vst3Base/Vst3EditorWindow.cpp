@@ -28,17 +28,35 @@
 #include <QVBoxLayout>
 
 #include "Vst3EditorWidget.h"
+#include "Vst3RemoteEditorWidget.h"
 #include "Vst3X11Editor.h"
 
 namespace lmms
 {
 
 Vst3EditorWindow::Vst3EditorWindow(
-	Vst3Host* host, const QString& title, QWidget* parent) :
+	Vst3Host* host, const QString& title,
+	std::function<void(uint32_t, double)> parameterHandler, QWidget* parent) :
 	QDialog(parent)
 {
 	setAttribute(Qt::WA_DeleteOnClose, true);
 	setWindowTitle(title);
+
+	auto* layout = new QVBoxLayout(this);
+	layout->setContentsMargins(0, 0, 0, 0);
+
+	if (Vst3RemoteEditorWidget::isSupported())
+	{
+		auto* remoteEditor = new Vst3RemoteEditorWidget(
+			host, std::move(parameterHandler), this);
+		if (remoteEditor->isRunning())
+		{
+			layout->addWidget(remoteEditor);
+			resize(remoteEditor->sizeHint());
+			return;
+		}
+		delete remoteEditor;
+	}
 
 	if (!Vst3EditorWidget::isSupported() && Vst3X11Editor::isAvailable())
 	{
@@ -54,17 +72,17 @@ Vst3EditorWindow::Vst3EditorWindow(
 		m_x11Editor = nullptr;
 	}
 
-	auto* layout = new QVBoxLayout(this);
-	layout->setContentsMargins(0, 0, 0, 0);
 	m_editor = new Vst3EditorWidget(host, this);
 	layout->addWidget(m_editor);
 	resize(m_editor->sizeHint());
 }
 
 Vst3EditorWindow* Vst3EditorWindow::open(
-	Vst3Host* host, QWidget* parent, const QString& title)
+	Vst3Host* host, QWidget* parent, const QString& title,
+	std::function<void(uint32_t, double)> parameterHandler)
 {
-	auto* window = new Vst3EditorWindow(host, title, parent);
+	auto* window = new Vst3EditorWindow(
+		host, title, std::move(parameterHandler), parent);
 	if (!window->isX11Forwarded())
 	{
 		window->show();

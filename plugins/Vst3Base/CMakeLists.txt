@@ -6,4 +6,5 @@ INCLUDE(BuildPlugin)
 
 ADD_SUBDIRECTORY(vst3base)
 ADD_SUBDIRECTORY(scanner)
+ADD_SUBDIRECTORY(editor-host)
 ADD_SUBDIRECTORY(tests)

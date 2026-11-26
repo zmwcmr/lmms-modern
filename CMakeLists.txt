@@ -276,7 +276,7 @@ else()
 	set(STATUS_QT6 "Disabled")
 endif()
 
-find_package(Qt${QT_VERSION_MAJOR} ${LMMS_QT_MIN_VERSION} COMPONENTS Core Gui Widgets Xml Svg REQUIRED)
+find_package(Qt${QT_VERSION_MAJOR} ${LMMS_QT_MIN_VERSION} COMPONENTS Core Gui Widgets Xml Svg Network REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS LinguistTools QUIET)
 
 message(STATUS "Using Qt version: ${Qt${QT_VERSION_MAJOR}_VERSION}")
@@ -695,7 +695,7 @@ endif()
 
 IF(WANT_VST3)
 	SET(LMMS_HAVE_VST3 TRUE)
-	SET(STATUS_VST3 "OK (scanner, host, parameters, native editor, P4)")
+	SET(STATUS_VST3 "OK (P5.1: out-of-process editor, DSP in-process)")
 ELSE()
 	SET(STATUS_VST3 "Not built, as requested")
 ENDIF()

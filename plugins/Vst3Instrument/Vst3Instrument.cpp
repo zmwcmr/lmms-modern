@@ -257,6 +257,15 @@ bool Vst3Instrument::setUnit(int unitId)
 	return m_host != nullptr && m_host->selectUnit(unitId);
 }
 
+void Vst3Instrument::setParameterValue(uint32_t id, double value)
+{
+	QMutexLocker locker(&m_mutex);
+	if (m_host != nullptr)
+	{
+		m_host->setParameterNormalised(id, value);
+	}
+}
+
 void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 {
 	parent.setAttribute(QStringLiteral("file"), m_file);

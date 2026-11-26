@@ -31,6 +31,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include "Vst3Module.h"
@@ -709,10 +710,14 @@ struct Vst3Host::Impl
 	bool terminateController = false;
 	bool active = false;
 
+	std::recursive_mutex hostMutex;
+
 	bool isInstrument = false;
 	QString pluginName;
 	QString pluginVendor;
 	QString pluginVersion;
+	QString classId;
+	std::function<void(uint32_t, double)> parameterChangeCallback;
 
 	double sampleRate = 44100.0;
 	int maxBlockSize = 512;
@@ -787,6 +792,15 @@ struct Vst3Host::Impl
 namespace
 {
 
+QString fromPath(const std::filesystem::path& path)
+{
+#ifdef Q_OS_WIN
+	return QString::fromStdWString(path.wstring());
+#else
+	return QString::fromStdString(path.string());
+#endif
+}
+
 std::filesystem::path toPath(const QString& path)
 {
 #ifdef Q_OS_WIN
@@ -821,6 +835,7 @@ bool Vst3Host::Impl::load(const QString& bundlePath,
 		return false;
 	}
 
+	Impl::classId = classId;
 	QString loadError;
 	if (!module.load(toPath(bundlePath), &loadError))
 	{
@@ -912,6 +927,10 @@ bool Vst3Host::Impl::load(const QString& bundlePath,
 	componentHandler.beginEdit = [](uint32_t) {};
 	componentHandler.performEdit = [this](uint32_t id, double value) {
 		parameterValues[id] = value;
+		if (parameterChangeCallback)
+		{
+			parameterChangeCallback(id, value);
+		}
 	};
 	componentHandler.endEdit = [](uint32_t) {};
 	componentHandler.restartComponent = [](int32_t) {};
@@ -1044,6 +1063,7 @@ void Vst3Host::Impl::unload()
 	pluginName.clear();
 	pluginVendor.clear();
 	pluginVersion.clear();
+	classId.clear();
 	projectTime = 0;
 	allocatedFrames = 0;
 }
@@ -1569,6 +1589,22 @@ QString Vst3Host::version() const
 	return m_impl->pluginVersion;
 }
 
+QString Vst3Host::bundlePath() const
+{
+	return fromPath(m_impl->module.bundlePath());
+}
+
+QString Vst3Host::classId() const
+{
+	return m_impl->classId;
+}
+
+void Vst3Host::setParameterChangeCallback(
+	std::function<void(uint32_t, double)> callback)
+{
+	m_impl->parameterChangeCallback = std::move(callback);
+}
+
 const std::vector<Vst3Host::Parameter>& Vst3Host::parameters() const
 {
 	return m_impl->parameters;
@@ -1576,6 +1612,7 @@ const std::vector<Vst3Host::Parameter>& Vst3Host::parameters() const
 
 bool Vst3Host::setParameterNormalised(uint32_t id, double value)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->controller == nullptr)
 	{
 		return false;
@@ -1654,6 +1691,7 @@ int Vst3Host::currentUnit() const
 
 bool Vst3Host::selectUnit(int unitId)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->unitInformation == nullptr)
 	{
 		return false;
@@ -1669,6 +1707,7 @@ bool Vst3Host::selectUnit(int unitId)
 
 void Vst3Host::queueParameter(uint32_t id, double value, int sampleOffset)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->parameterValues.find(id) == m_impl->parameterValues.end())
 	{
 		return;
@@ -1704,6 +1743,7 @@ void Vst3Host::process(const float* leftIn,
 	float* rightOut,
 	int frames)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (frames <= 0)
 	{
 		return;
@@ -2048,6 +2088,7 @@ void Vst3Host::setEditorResizeCallback(std::function<void(int, int)> callback)
 
 QByteArray Vst3Host::componentState() const
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->component == nullptr)
 	{
 		return {};
@@ -2065,6 +2106,7 @@ QByteArray Vst3Host::componentState() const
 
 QByteArray Vst3Host::controllerState() const
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->controller == nullptr)
 	{
 		return {};
@@ -2083,6 +2125,7 @@ QByteArray Vst3Host::controllerState() const
 bool Vst3Host::setState(
 	const QByteArray& componentState, const QByteArray& controllerState)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
 	if (m_impl->component == nullptr)
 	{
 		return false;

@@ -109,6 +109,11 @@ public:
 	QString name() const;
 	QString vendor() const;
 	QString version() const;
+	QString bundlePath() const;
+	QString classId() const;
+
+	//! Called when the plugin itself changes a parameter (e.g. from its UI).
+	void setParameterChangeCallback(std::function<void(uint32_t, double)> callback);
 
 	const std::vector<Parameter>& parameters() const;
 	bool setParameterNormalised(uint32_t id, double value);

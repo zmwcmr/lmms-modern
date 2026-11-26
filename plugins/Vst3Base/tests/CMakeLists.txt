@@ -24,6 +24,8 @@ ADD_EXECUTABLE(vst3-editor-test
 	../Vst3EditorWidget.cpp
 	../Vst3EditorWindow.cpp
 	../Vst3X11Editor.cpp
+	../Vst3RemoteEditorClient.cpp
+	../Vst3RemoteEditorWidget.cpp
 )
 
 TARGET_INCLUDE_DIRECTORIES(vst3-editor-test
@@ -33,7 +35,7 @@ TARGET_INCLUDE_DIRECTORIES(vst3-editor-test
 		"${CMAKE_CURRENT_BINARY_DIR}/../vst3base"
 )
 
-TARGET_LINK_LIBRARIES(vst3-editor-test Qt${QT_VERSION_MAJOR}::Widgets)
+TARGET_LINK_LIBRARIES(vst3-editor-test Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
 IF(LMMS_BUILD_LINUX)
 	TARGET_LINK_LIBRARIES(vst3-editor-test X11)
 ENDIF()

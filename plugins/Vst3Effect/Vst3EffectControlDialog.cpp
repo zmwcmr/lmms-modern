@@ -144,7 +144,10 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 				return;
 			}
 			m_editorWindow = Vst3EditorWindow::open(
-				controls->host(), this, controls->pluginName());
+				controls->host(), this, controls->pluginName(),
+				[controls](uint32_t id, double value) {
+					controls->setParameterValue(id, value);
+				});
 		});
 		layout->addWidget(editorButton);
 	}

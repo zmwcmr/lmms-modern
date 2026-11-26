@@ -66,6 +66,7 @@ public:
 	Vst3Host* host() const;
 	bool setProgram(int index);
 	bool setUnit(int unitId);
+	void setParameterValue(uint32_t id, double value);
 
 private:
 	Vst3Effect* m_effect;

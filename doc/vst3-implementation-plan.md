@@ -1,8 +1,7 @@
 # VST3 support implementation plan
 
-Status: P4 native editor implemented for X11 (xcb) and XWayland floating
-windows. P3 state, program and unit basics work; automated round-trip tests
-remain.
+Status: P5.1 out-of-process editor host implemented for xcb. DSP still runs
+in-process; P3 state, program and unit basics work.
 
 ## 1. Goal
 
@@ -142,6 +141,30 @@ Still open for P4/P5:
 - editor support for plugins that require an `IRunLoop` or timers.
 
 Next: P5 (out-of-process DSP/UI host) and the remaining P3 state work.
+
+### Implemented: P5.1 out-of-process editor (xcb)
+
+- `lmms-vst3-editor-host` loads the plugin in a child process, restores the
+  component state sent by LMMS, attaches the editor to an X11 parent window
+  and runs a Qt event loop.
+- `Vst3RemoteEditorClient` starts the child, exchanges newline-delimited JSON
+  over `QLocalSocket`, forwards initial state, resize requests and plugin
+  parameter edits, and reports child crashes.
+- The in-process `Vst3Host` still owns DSP. Parameter edits from the editor
+  are applied to it through the plugin wrapper mutex.
+- `LMMS_VST3_EDITOR_LOCAL=1` forces the old in-process editor path.
+- On Wayland the P4 XWayland floating fallback is still used; the remote
+  editor is currently xcb-only.
+
+Verified with Surge XT and Dexed editors: the editor host starts, attaches,
+reports the expected size and exits cleanly without orphan processes.
+
+Still open:
+
+- Wayland remote editor (needs an X11 parent window outside Qt),
+- parameter updates from LMMS automation to the remote editor,
+- DSP process isolation and audio/IPC shared memory (P5.2),
+- crash recovery/restart UX.
 
 ## 2. What Ardour and Carla teach us
 
@@ -461,15 +484,16 @@ Deliverables:
 
 Estimate: 2-3 weeks.
 
-### P5: Out-of-process DSP/UI host
+### P5: Out-of-process DSP/UI host — editor part implemented
 
 Deliverables:
 
-- `lmms-vst3-host`,
-- IPC transport for audio/parameters/MIDI/state,
-- window-ID handoff and embedding,
-- crash recovery and orphan cleanup,
-- watchdog/timeout behavior.
+- [~] `lmms-vst3-editor-host` for editor isolation (xcb),
+- [x] IPC transport for editor state, parameters and resizing,
+- [x] window-ID handoff and X11 embedding,
+- [~] crash detection and clean child shutdown,
+- [ ] `lmms-vst3-host` for DSP and shared-memory audio/MIDI IPC,
+- [ ] watchdog/timeout behavior for the DSP host.
 
 Estimate: 3-5 weeks.
 

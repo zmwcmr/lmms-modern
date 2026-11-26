@@ -62,6 +62,7 @@ public:
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	bool setProgram(int index);
 	bool setUnit(int unitId);
+	void setParameterValue(uint32_t id, double value);
 
 private:
 	bool openPlugin(const QString& file, const QString& classId);
