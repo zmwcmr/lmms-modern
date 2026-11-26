@@ -40,6 +40,7 @@ class QLocalServer;
 class QLocalSocket;
 class QProcess;
 class QSharedMemory;
+class QTimer;
 
 namespace lmms
 {
@@ -128,9 +129,15 @@ public:
 
 	static QString hostExecutable();
 
+	qint64 hostProcessId() const;
+	std::function<void()> hostCrashed;
+	std::function<void()> hostRestarted;
+
 private:
 	void sendMessage(const QJsonObject& message);
 	bool requestState();
+	void onWatchdog();
+	void startWatchdog();
 
 	QSharedMemory* m_shared = nullptr;
 	vst3::SharedAudio* m_audio = nullptr;
@@ -139,9 +146,13 @@ private:
 	QProcess* m_process = nullptr;
 	void* m_request = nullptr;
 	void* m_done = nullptr;
+	QTimer* m_watchdog = nullptr;
+	std::mutex m_transportMutex;
 	QString m_key;
 	QString m_requestName;
 	QString m_doneName;
+	double m_sampleRate = 44100.0;
+	int m_blockSize = 512;
 	QByteArray m_readBuffer;
 	std::vector<Parameter> m_parameters;
 	std::map<uint32_t, double> m_parameterValues;
@@ -158,6 +169,9 @@ private:
 	bool m_isInstrument = false;
 	bool m_hasEditor = false;
 	std::atomic<bool> m_running{false};
+	bool m_started = false;
+	bool m_stopping = false;
+	bool m_autoRestart = true;
 	mutable QByteArray m_stateComponent;
 	mutable QByteArray m_stateController;
 	mutable bool m_stateValid = false;

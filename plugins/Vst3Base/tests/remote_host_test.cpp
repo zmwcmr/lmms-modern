@@ -27,7 +27,11 @@
 #include <cstdio>
 #include <vector>
 
+#include <signal.h>
+#include <unistd.h>
+
 #include <QCoreApplication>
+#include <QThread>
 #include <QTextStream>
 
 #include "Vst3RemoteHostClient.h"
@@ -54,6 +58,13 @@ int main(int argc, char* argv[])
 
 	const auto componentState = client.componentState();
 	const auto controllerState = client.controllerState();
+	client.hostCrashed = [] {
+		QTextStream(stdout) << "host-crashed\n";
+	};
+	client.hostRestarted = [] {
+		QTextStream(stdout) << "host-restarted\n";
+	};
+	const bool crashTest = arguments.contains(QStringLiteral("--crash"));
 	QTextStream(stdout) << "parameters=" << client.parameters().size()
 		<< " latency=" << client.latencySamples()
 		<< " state=" << componentState.size() << '/' << controllerState.size()
@@ -104,6 +115,39 @@ int main(int argc, char* argv[])
 				+ outputRight[frame] * outputRight[frame];
 			sampleCount += 2;
 		}
+	}
+
+	if (crashTest)
+	{
+		const auto pid = client.hostProcessId();
+		QTextStream(stdout) << "killing-host=" << pid << '\n';
+		if (pid > 0)
+		{
+			::kill(static_cast<pid_t>(pid), SIGKILL);
+		}
+		float recoveredPeak = 0.0f;
+		for (int i = 0; i < 80; ++i)
+		{
+			QCoreApplication::processEvents();
+			QThread::msleep(100);
+			lmms::Vst3Host::MidiEvent event;
+			if (i % 20 == 0)
+			{
+				event.type = lmms::Vst3Host::MidiType::NoteOn;
+				event.data1 = 64;
+				event.value = 0.8f;
+				client.queueMidi(event);
+			}
+			client.process(nullptr, nullptr, outputLeft.data(), outputRight.data(),
+				blockSize);
+			for (int frame = 0; frame < blockSize; ++frame)
+			{
+				recoveredPeak = std::max(recoveredPeak,
+					std::abs(outputLeft[frame]));
+			}
+		}
+		QTextStream(stdout) << "recovered-peak=" << recoveredPeak
+			<< " running=" << client.isRunning() << '\n';
 	}
 
 	client.stop();

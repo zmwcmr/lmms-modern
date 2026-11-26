@@ -40,6 +40,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QProcess>
+#include <QTimer>
 #include <QSharedMemory>
 
 #include <fcntl.h>
@@ -51,7 +52,13 @@
 namespace lmms
 {
 
-Vst3RemoteHostClient::Vst3RemoteHostClient() = default;
+Vst3RemoteHostClient::Vst3RemoteHostClient()
+{
+	m_watchdog = new QTimer(this);
+	m_watchdog->setInterval(2000);
+	connect(m_watchdog, &QTimer::timeout, this,
+		&Vst3RemoteHostClient::onWatchdog);
+}
 
 Vst3RemoteHostClient::~Vst3RemoteHostClient()
 {
@@ -68,8 +75,16 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 {
 	stop();
 
+	m_stopping = false;
 	m_bundlePath = bundlePath;
 	m_classId = classId;
+	m_sampleRate = sampleRate;
+	m_blockSize = maxBlockSize;
+	m_stateComponent = componentState;
+	m_stateController = controllerState;
+	m_stateValid = !componentState.isEmpty() || !controllerState.isEmpty();
+	m_autoRestart = qEnvironmentVariableIsEmpty("LMMS_VST3_REMOTE_RESTART")
+		|| qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_RESTART") != 0;
 	const auto host = hostExecutable();
 	if (host.isEmpty())
 	{
@@ -127,6 +142,13 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 	}
 
 	m_process = new QProcess(this);
+	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+		this, [this](int, QProcess::ExitStatus) {
+			if (!m_stopping)
+			{
+				m_running = false;
+			}
+		});
 	m_process->setProgram(host);
 	m_process->setArguments({
 		m_key,
@@ -262,11 +284,22 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 	m_stateValid = false;
 
 	m_running = true;
+	m_started = true;
+	if (m_autoRestart && m_watchdog != nullptr)
+	{
+		m_watchdog->start();
+	}
 	return true;
 }
 
 void Vst3RemoteHostClient::stop()
 {
+	std::lock_guard<std::mutex> transportLock(m_transportMutex);
+	m_stopping = true;
+	if (m_watchdog != nullptr)
+	{
+		m_watchdog->stop();
+	}
 	m_running = false;
 	if (m_audio != nullptr)
 	{
@@ -340,6 +373,8 @@ void Vst3RemoteHostClient::stop()
 	m_version.clear();
 	m_isInstrument = false;
 	m_hasEditor = false;
+	m_started = false;
+	m_stopping = false;
 }
 
 bool Vst3RemoteHostClient::isRunning() const
@@ -521,6 +556,7 @@ void Vst3RemoteHostClient::process(const float* leftIn,
 	{
 		std::memset(rightOut, 0, sizeof(float) * static_cast<size_t>(frames));
 	}
+	std::lock_guard<std::mutex> transportLock(m_transportMutex);
 	if (!m_running || m_audio == nullptr || m_request == nullptr || m_done == nullptr)
 	{
 		return;
@@ -594,6 +630,41 @@ void Vst3RemoteHostClient::process(const float* leftIn,
 	}
 }
 
+qint64 Vst3RemoteHostClient::hostProcessId() const
+{
+	return m_process != nullptr ? static_cast<qint64>(m_process->processId()) : 0;
+}
+
+void Vst3RemoteHostClient::onWatchdog()
+{
+	if (m_stopping || !m_started || m_running)
+	{
+		return;
+	}
+	if (hostCrashed)
+	{
+		hostCrashed();
+	}
+	const auto bundle = m_bundlePath;
+	const auto classId = m_classId;
+	const auto component = m_stateComponent;
+	const auto controller = m_stateController;
+	QString error;
+	if (start(bundle, classId, m_sampleRate, m_blockSize,
+			component, controller, &error))
+	{
+		if (hostRestarted)
+		{
+			hostRestarted();
+		}
+	}
+	else
+	{
+		m_started = true;
+		qWarning("VST3 DSP host restart failed: %s", error.toUtf8().constData());
+	}
+}
+
 QString Vst3RemoteHostClient::hostExecutable()
 {
 	const auto name = QStringLiteral("lmms-vst3-host");
@@ -620,6 +691,7 @@ QString Vst3RemoteHostClient::hostExecutable()
 
 bool Vst3RemoteHostClient::requestState()
 {
+	std::lock_guard<std::mutex> transportLock(m_transportMutex);
 	if (m_stateValid)
 	{
 		return true;

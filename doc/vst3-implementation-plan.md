@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.4 remote DSP and editor are the default on both xcb and Wayland,
-using a floating XWayland editor window on Wayland.
+Status: P5.5 remote DSP has watchdog restart, and the remote DSP/editor remain
+the default on xcb and Wayland.
 
 ## 1. Goal
 
@@ -209,9 +209,24 @@ the remote DSP and remote editor paths.
 Verified from the current Wayland session: the remote editor host stays alive
 for the editor lifetime, and normal LMMS renders use the remote DSP path.
 
+### Implemented: P5.5 DSP watchdog and restart
+
+- `Vst3RemoteHostClient` runs a two-second watchdog timer.
+- A crashed DSP host is reported through `hostCrashed`, then restarted with
+  the cached bundle, class, sample rate, block size and last state.
+- `hostRestarted` reports recovery.
+- The audio thread times out after two seconds and returns silence while the
+  GUI thread restarts the host; it never blocks indefinitely.
+- `LMMS_VST3_REMOTE_RESTART=0` disables automatic restarts.
+- `vst3-remote-host-test --crash` kills the host mid-render and verifies that
+  audio resumes after the restart.
+
+Editor crashes still close the editor window; reopening it starts a fresh
+editor host.
+
 Still open:
 
-- crash restart/watchdog UX,
+- editor-host auto-restart,
 - state snapshot caching for very large plugin states,
 - removing the in-process fallback entirely.
 
@@ -546,7 +561,8 @@ Deliverables:
 - [x] remove the duplicate idle plugin instance in remote mode,
 - [x] state snapshot round-trip from the DSP host,
 - [x] make the remote path the default on xcb and Wayland,
-- [x] Wayland remote editor via a floating XWayland window.
+- [x] Wayland remote editor via a floating XWayland window,
+- [x] DSP watchdog and automatic restart.
 
 Estimate: 3-5 weeks.
 
