@@ -94,6 +94,15 @@ QString withShortcutHint(const QString& text, int key, bool forMenu)
 				   : text + QStringLiteral(" (%1)").arg(sequence);
 }
 
+//! Turns a menu label into a plain status-bar sentence.
+QString statusTipFor(const QString& text)
+{
+	QString tip = text;
+	tip.remove(QLatin1Char('&'));
+	if (tip.endsWith(QLatin1String("..."))) { tip.chop(3); }
+	return tip;
+}
+
 } // namespace
 
 
@@ -221,12 +230,10 @@ MainWindow::MainWindow() :
 	vbox->addWidget( w );
 	setCentralWidget( main_widget );
 
-	// status bar, used for hints while hovering controls and short messages
-	// such as the result of saving the project.
-	// TODO: hidden until the gesture hints are finished (see doc/ui-ux-tasks.md,
-	// T1-4). Remove the hide() call to bring the bar back.
-	statusBar()->setSizeGripEnabled( false );
-	statusBar()->hide();
+	// Status bar, used for hints while hovering controls and short messages
+	// such as the result of saving or loading a project. Menu actions use
+	// their status tips; buttons fall back to their tooltips.
+	statusBar()->setSizeGripEnabled(false);
 
 	m_updateTimer.start( 1000 / 60, this );  // 60 fps
 
@@ -295,10 +302,12 @@ void MainWindow::finalize()
 		const QKeySequence& shortcut, auto(MainWindow::* slot)()) -> QAction*
 	{
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 3, 0))
-		return menu->addAction(embed::getIconPixmap(icon), text, shortcut, this, slot);
+		auto* action = menu->addAction(embed::getIconPixmap(icon), text, shortcut, this, slot);
 #else
-		return menu->addAction(embed::getIconPixmap(icon), text, this, slot, shortcut);
+		auto* action = menu->addAction(embed::getIconPixmap(icon), text, this, slot, shortcut);
 #endif
+		action->setStatusTip(statusTipFor(text));
+		return action;
 	};
 
 	// project-popup-menu
@@ -325,13 +334,15 @@ void MainWindow::finalize()
 	addAction(project_menu, "project_save", tr("Save as New &Version"),
 		keySequence(Qt::CTRL, Qt::ALT, Qt::Key_S), &MainWindow::saveProjectAsNewVersion);
 
-	project_menu->addAction(embed::getIconPixmap("project_save"), tr("Save as default template"),
-		this, &MainWindow::saveProjectAsDefaultTemplate);
+	auto* saveTemplateAction = project_menu->addAction(embed::getIconPixmap("project_save"),
+		tr("Save as default template"), this, &MainWindow::saveProjectAsDefaultTemplate);
+	saveTemplateAction->setStatusTip(tr("Save the current project as the default template"));
 
 	project_menu->addSeparator();
 
-	project_menu->addAction(embed::getIconPixmap("project_import"), tr("Import..."),
-		this, &MainWindow::onImportProject);
+	auto* importAction = project_menu->addAction(embed::getIconPixmap("project_import"),
+		tr("Import..."), this, &MainWindow::onImportProject);
+	importAction->setStatusTip(tr("Import a MIDI or Hydrogen project"));
 
 	addAction(project_menu, "project_export", tr("E&xport..."),
 		keySequence(Qt::CTRL, Qt::Key_E), &MainWindow::onExportProject);
@@ -344,8 +355,10 @@ void MainWindow::finalize()
 
 	project_menu->addSeparator();
 
-	project_menu->addAction(embed::getIconPixmap("exit"), tr("&Quit"),
-		qApp, SLOT(closeAllWindows()))->setShortcut(keySequence(Qt::CTRL, Qt::Key_Q));
+	auto* quitAction = project_menu->addAction(embed::getIconPixmap("exit"), tr("&Quit"),
+		qApp, SLOT(closeAllWindows()));
+	quitAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_Q));
+	quitAction->setStatusTip(tr("Quit LMMS"));
 
 	auto edit_menu = new QMenu(this);
 	menuBar()->addMenu( edit_menu )->setText( tr( "&Edit" ) );
@@ -360,10 +373,12 @@ void MainWindow::finalize()
 	m_redoAction->setShortcutContext(Qt::ApplicationShortcut);
 
 	edit_menu->addSeparator();
-	edit_menu->addAction(embed::getIconPixmap("microtuner"), tr("Scales and keymaps"),
-		this, SLOT(toggleMicrotunerWin()));
-	edit_menu->addAction(embed::getIconPixmap("setup_general"), tr("Settings"),
-		this, SLOT(showSettingsDialog()));
+	auto* scalesAction = edit_menu->addAction(embed::getIconPixmap("microtuner"),
+		tr("Scales and keymaps"), this, SLOT(toggleMicrotunerWin()));
+	scalesAction->setStatusTip(tr("Open the scales and keymaps editor"));
+	auto* settingsAction = edit_menu->addAction(embed::getIconPixmap("setup_general"),
+		tr("Settings"), this, SLOT(showSettingsDialog()));
+	settingsAction->setStatusTip(tr("Open the LMMS settings"));
 
 	connect(edit_menu, SIGNAL(aboutToShow()), this, SLOT(updateUndoRedoButtons()));
 
@@ -395,22 +410,25 @@ void MainWindow::finalize()
 	auto help_menu = new QMenu(this);
 	menuBar()->addMenu( help_menu )->setText( tr( "&Help" ) );
 	// May use offline help
+	QAction* helpAction = nullptr;
 	if( true )
 	{
-		help_menu->addAction( embed::getIconPixmap( "help" ),
+		helpAction = help_menu->addAction( embed::getIconPixmap( "help" ),
 						tr( "Online Help" ),
 						this, SLOT(browseHelp()));
 	}
 	else
 	{
-		help_menu->addAction( embed::getIconPixmap( "help" ),
+		helpAction = help_menu->addAction( embed::getIconPixmap( "help" ),
 							tr( "Help" ),
 							this, SLOT(help()));
 	}
+	helpAction->setStatusTip(tr("Open the LMMS documentation"));
 
 	help_menu->addSeparator();
-	help_menu->addAction( embed::getIconPixmap( "icon_small" ), tr( "About" ),
-				  this, SLOT(aboutLMMS()));
+	auto* aboutAction = help_menu->addAction( embed::getIconPixmap( "icon_small" ),
+		tr( "About" ), this, SLOT(aboutLMMS()));
+	aboutAction->setStatusTip(tr("About LMMS"));
 
 	// create tool-buttons
 	auto project_new = new ToolButton(
@@ -797,14 +815,26 @@ void MainWindow::openProject()
 		if( ofd.exec () == QDialog::Accepted &&
 						!ofd.selectedFiles().isEmpty() )
 		{
-			Song *song = Engine::getSong();
-
-			song->stop();
-			setCursor( Qt::WaitCursor );
-			song->loadProject( ofd.selectedFiles()[0] );
-			setCursor( Qt::ArrowCursor );
+			loadProjectFile(ofd.selectedFiles()[0]);
 		}
 	}
+}
+
+
+
+
+void MainWindow::loadProjectFile(const QString& filename)
+{
+	Song* song = Engine::getSong();
+
+	song->stop();
+	statusBar()->showMessage(tr("Loading %1...").arg(QFileInfo(filename).fileName()));
+	// Loading blocks the event loop, so paint the message before starting.
+	statusBar()->repaint();
+	setCursor(Qt::WaitCursor);
+	song->loadProject(filename);
+	setCursor(Qt::ArrowCursor);
+	statusBar()->showMessage(tr("Loaded: %1").arg(filename), 4000);
 }
 
 
@@ -1086,42 +1116,50 @@ void MainWindow::updateViewMenu()
 	// TODO: get current visibility for these and indicate in menu?
 	// Not that it's straight visible <-> invisible, more like
 	// not on top -> top <-> invisible
-	m_viewMenu->addAction(embed::getIconPixmap( "songeditor" ),
+	auto* songEditorAction = m_viewMenu->addAction(embed::getIconPixmap( "songeditor" ),
 			      withShortcutHint(tr("Song Editor"), 1, true),
 			      this, SLOT(toggleSongEditorWin())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap("pattern_track"),
+	songEditorAction->setStatusTip(tr("Show or hide the Song Editor"));
+	auto* patternEditorAction = m_viewMenu->addAction(embed::getIconPixmap("pattern_track"),
 					withShortcutHint(tr("Pattern Editor"), 2, true),
 					this, SLOT(togglePatternEditorWin())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap( "piano" ),
+	patternEditorAction->setStatusTip(tr("Show or hide the Pattern Editor"));
+	auto* pianoRollAction = m_viewMenu->addAction(embed::getIconPixmap( "piano" ),
 			      withShortcutHint(tr("Piano Roll"), 3, true),
 			      this, SLOT(togglePianoRollWin())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap( "automation" ),
+	pianoRollAction->setStatusTip(tr("Show or hide the Piano Roll"));
+	auto* automationEditorAction = m_viewMenu->addAction(embed::getIconPixmap( "automation" ),
 			      withShortcutHint(tr("Automation Editor"), 4, true),
 			      this,
 			      SLOT(toggleAutomationEditorWin())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap( "mixer" ),
+	automationEditorAction->setStatusTip(tr("Show or hide the Automation Editor"));
+	auto* mixerAction = m_viewMenu->addAction(embed::getIconPixmap( "mixer" ),
 			      withShortcutHint(tr("Mixer"), 5, true),
 			      this, SLOT(toggleMixerWin())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap( "controller" ),
+	mixerAction->setStatusTip(tr("Show or hide the Mixer"));
+	auto* controllerRackAction = m_viewMenu->addAction(embed::getIconPixmap( "controller" ),
 			      withShortcutHint(tr("Controller Rack"), 6, true),
 			      this, SLOT(toggleControllerRack())
 		);
-	m_viewMenu->addAction(embed::getIconPixmap( "project_notes" ),
+	controllerRackAction->setStatusTip(tr("Show or hide the controller rack"));
+	auto* projectNotesAction = m_viewMenu->addAction(embed::getIconPixmap( "project_notes" ),
 			      withShortcutHint(tr("Project Notes"), 7, true),
 			      this, SLOT(toggleProjectNotesWin())
 		);
+	projectNotesAction->setStatusTip(tr("Show or hide the project notes"));
 
 	m_viewMenu->addSeparator();
-	
-	m_viewMenu->addAction(embed::getIconPixmap( "fullscreen" ),
+
+	auto* fullscreenAction = m_viewMenu->addAction(embed::getIconPixmap( "fullscreen" ),
 				tr( "Fullscreen" ) + "\tF11",
 				this, SLOT(toggleFullscreen())
 		);
+	fullscreenAction->setStatusTip(tr("Toggle fullscreen mode"));
 
 	m_viewMenu->addSeparator();
 
@@ -1136,6 +1174,8 @@ void MainWindow::updateViewMenu()
 		QKeySequence{Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_D}
 	);
 
+	detachAllAction->setStatusTip(tr("Detach all editor windows from the main window"));
+	attachAllAction->setStatusTip(tr("Attach all editor windows to the main window"));
 	detachAllAction->setShortcutContext(Qt::ApplicationShortcut);
 	attachAllAction->setShortcutContext(Qt::ApplicationShortcut);
 
@@ -1148,6 +1188,7 @@ void MainWindow::updateViewMenu()
 	qa->setData("smoothscroll");
 	qa->setCheckable( true );
 	qa->setChecked( ConfigManager::inst()->value( "ui", "smoothscroll" ).toInt() );
+	qa->setStatusTip(tr("Toggle smooth scrolling in the editors"));
 	m_viewMenu->addAction(qa);
 
 	// Not yet.
@@ -1162,6 +1203,7 @@ void MainWindow::updateViewMenu()
 	qa->setData("printnotelabels");
 	qa->setCheckable( true );
 	qa->setChecked( ConfigManager::inst()->value( "ui", "printnotelabels" ).toInt() );
+	qa->setStatusTip(tr("Show note names on the piano roll notes"));
 	m_viewMenu->addAction(qa);
 
 }
@@ -1495,7 +1537,10 @@ void MainWindow::onExportProjectMidi()
 		QString export_filename = efd.selectedFiles()[0];
 		if (!export_filename.endsWith(suffix)) export_filename += suffix;
 
+		statusBar()->showMessage(tr("Exporting MIDI..."));
+		statusBar()->repaint();
 		Engine::getSong()->exportProjectMidi(PathUtil::stringToPath(export_filename));
+		statusBar()->showMessage(tr("Exported: %1").arg(export_filename), 4000);
 	}
 }
 
@@ -1581,7 +1626,16 @@ void MainWindow::exportProject(bool multiExport)
 		ExportProjectDialog epd(exportFileName,
 			multiExport ? ExportProjectDialog::Mode::ExportTracks : ExportProjectDialog::Mode::ExportProject,
 			getGUI()->mainWindow());
-		epd.exec();
+		statusBar()->showMessage(tr("Exporting..."));
+		statusBar()->repaint();
+		if (epd.exec() == QDialog::Accepted)
+		{
+			statusBar()->showMessage(tr("Export finished"), 4000);
+		}
+		else
+		{
+			statusBar()->clearMessage();
+		}
 	}
 }
 
@@ -1589,6 +1643,7 @@ void MainWindow::handleSaveResult(QString const & filename, bool songSavedSucces
 {
 	if (songSavedSuccessfully)
 	{
+		statusBar()->showMessage(tr("Saved: %1").arg(filename), 4000);
 		TextFloat::displayMessage( tr( "Project saved" ), tr( "The project %1 is now saved.").arg( filename ),
 				embed::getIconPixmap( "project_save", 24, 24 ), 2000 );
 		ConfigManager::inst()->addRecentlyOpenedProject(filename);
@@ -1596,6 +1651,7 @@ void MainWindow::handleSaveResult(QString const & filename, bool songSavedSucces
 	}
 	else
 	{
+		statusBar()->showMessage(tr("Not saved: %1").arg(filename), 4000);
 		TextFloat::displayMessage( tr( "Project NOT saved." ), tr( "The project %1 was not saved!" ).arg(filename),
 				embed::getIconPixmap( "error" ), 4000 );
 	}
@@ -1615,11 +1671,6 @@ bool MainWindow::guiSaveProjectAs( const QString & filename )
 	Song * song = Engine::getSong();
 	bool const songSaveResult = song->guiSaveProjectAs(filename);
 	handleSaveResult(filename, songSaveResult);
-
-	if (songSaveResult)
-	{
-		statusBar()->showMessage(tr("Saved: %1").arg(filename), 4000);
-	}
 
 	return songSaveResult;
 }

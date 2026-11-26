@@ -154,6 +154,8 @@ public slots:
 	void emptySlot();
 	void createNewProject();
 	void openProject();
+	//! Loads \a filename and reports progress in the status bar.
+	void loadProjectFile(const QString& filename);
 	bool saveProject();
 	bool saveProjectAs();
 	bool saveProjectAsNewVersion();

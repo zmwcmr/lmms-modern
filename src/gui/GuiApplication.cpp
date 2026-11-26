@@ -103,6 +103,49 @@ protected:
 };
 
 
+//! Shows a button's tooltip in the main status bar when the button has no
+//! explicit status tip. This gives the many icon buttons in the main and
+//! editor toolbars a hint without editing every construction site.
+class ButtonStatusTipFallback : public QObject
+{
+public:
+	explicit ButtonStatusTipFallback(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override
+	{
+		const auto type = event->type();
+		if (type != QEvent::Enter && type != QEvent::Leave)
+		{
+			return QObject::eventFilter(watched, event);
+		}
+
+		auto* button = qobject_cast<QAbstractButton*>(watched);
+		if (button == nullptr || !button->statusTip().isEmpty() || button->toolTip().isEmpty())
+		{
+			return QObject::eventFilter(watched, event);
+		}
+
+		auto* gui = GuiApplication::instance();
+		auto* mainWindow = gui != nullptr ? gui->mainWindow() : nullptr;
+		if (mainWindow == nullptr || !mainWindow->isAncestorOf(button))
+		{
+			return QObject::eventFilter(watched, event);
+		}
+
+		if (type == QEvent::Enter)
+		{
+			mainWindow->showStatusHint(button->toolTip());
+		}
+		else
+		{
+			mainWindow->clearStatusHint(button->toolTip());
+		}
+		return QObject::eventFilter(watched, event);
+	}
+};
+
+
 //! Qt's standard message boxes and input dialogs take their icons from the
 //! platform icon theme, which is usually a different visual style than LMMS'
 //! flat artwork. Replace the dialog icon and the standard button icons with
@@ -293,6 +336,9 @@ GuiApplication::GuiApplication()
 	displayInitProgress(tr("Preparing UI"));
 
 	m_mainWindow = new MainWindow;
+	// Status tips on menu actions are handled by Qt; buttons only have
+	// tooltips, so fall back to those while the status bar is visible.
+	qApp->installEventFilter(new ButtonStatusTipFallback(this));
 	connect(m_mainWindow, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 	connect(m_mainWindow, SIGNAL(initProgress(const QString&)), 
 		this, SLOT(displayInitProgress(const QString&)));
