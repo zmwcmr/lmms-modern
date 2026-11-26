@@ -596,7 +596,7 @@ lmms--gui--AutomatableSlider::groove:vertical {
 
 lmms--gui--AutomatableSlider::handle:vertical {
 	background: none;
-	border-image: url("resources:main_slider.png");
+	border-image: url("resources:main_slider.svg");
 	width: 26px;
 	height: 10px;
 	border-radius: 2px;
