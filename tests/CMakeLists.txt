@@ -73,3 +73,31 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 		COMMAND $<TARGET_FILE:vst3-remote-host-test> "${FAKE_VST3_BUNDLE}"
 			"${FAKE_VST3_INSTRUMENT_ID}")
 endif()
+
+if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
+	add_executable(Vst3AutomationTest
+		src/core/Vst3AutomationTest.cpp
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3ParameterModels.cpp"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3Host.cpp"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3Module.cpp"
+	)
+	target_include_directories(Vst3AutomationTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/travesty"
+		"${CMAKE_BINARY_DIR}/plugins/Vst3Base/vst3base"
+	)
+	target_static_libraries(Vst3AutomationTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst3AutomationTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+	)
+	target_compile_features(Vst3AutomationTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst3AutomationTest PRIVATE
+		LMMS_TESTING
+		VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+		VST3_FAKE_CLASS="${FAKE_VST3_INSTRUMENT_ID}"
+	)
+	add_dependencies(Vst3AutomationTest fake-vst3)
+	add_test(NAME Vst3AutomationTest COMMAND Vst3AutomationTest)
+endif()

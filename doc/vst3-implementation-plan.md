@@ -1,7 +1,8 @@
 # VST3 support implementation plan
 
-Status: P6 now has a fake VST3 module and automated scanner/host/remote tests.
-Cross-platform packaging remains out of scope for this pass.
+Status: P6 is complete for this pass, including fake-plugin tests, automation
+round-trip coverage and a documented in-process fallback. Cross-platform
+packaging remains deferred by request.
 
 ## 1. Goal
 
@@ -272,10 +273,12 @@ Verified: all four tests pass without any installed third-party VST3 plugin.
 
 ## Open work
 
-Active:
+Active for this pass: none.
 
-- automated automation-editor round-trip test,
-- optional final cleanup of the in-process fallback.
+Retained intentionally:
+
+- the in-process host fallback when the remote helper is missing or fails;
+  the wrappers log when they use it.
 
 Deferred by request:
 
@@ -621,7 +624,8 @@ Deliverables:
 - [x] DSP watchdog and automatic restart,
 - [x] editor-host watchdog and restart,
 - [x] IRunLoop and timer support for editor hosts,
-- [x] fake VST3 module and automated tests.
+- [x] fake VST3 module and automated tests,
+- [x] automation parameter save/load round-trip test.
 
 Estimate: 3-5 weeks.
 

@@ -116,6 +116,10 @@ bool Vst3Effect::openPlugin()
 	}
 	if (m_host == nullptr)
 	{
+		if (remoteRequested)
+		{
+			qWarning("VST3 remote DSP unavailable, using the in-process fallback");
+		}
 		auto local = std::make_unique<Vst3Host>();
 		QString error;
 		if (!local->load(file, classId, sampleRate, blockSize, &error))
