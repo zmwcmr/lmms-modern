@@ -33,6 +33,7 @@
 #include <QFontDatabase>
 #include <QLineEdit>
 #include <QMdiArea>
+#include <QPalette>
 #include <QTextEdit>
 #include <QToolBar>
 #include <QDomCDATASection>
@@ -53,10 +54,9 @@ ProjectNotes::ProjectNotes()
 	: QMainWindow{getGUI()->mainWindow()->workspace()}
 {
 	m_edit = new QTextEdit( this );
-	m_edit->setAutoFillBackground( true );
-	QPalette pal;
-	pal.setColor( m_edit->backgroundRole(), QColor( 64, 64, 64 ) );
-	m_edit->setPalette( pal );
+	// The background and default text colour come from the theme's style
+	// sheet (see "ProjectNotes QTextEdit" in data/themes/*/style.css).
+	// Do not set a palette here: that would override the theme.
 	m_edit->show();
 
 	clear();
@@ -88,8 +88,11 @@ ProjectNotes::ProjectNotes()
 void ProjectNotes::clear()
 {
 	m_edit->setHtml( tr( "Enter project notes here" ) );
+	// Do not write an explicit text colour into the document here: the
+	// theme's text colour should apply to the placeholder and to newly
+	// typed text. Notes loaded from a project keep the character
+	// formatting they were saved with.
 	m_edit->selectAll();
-	m_edit->setTextColor( QColor( 224, 224, 224 ) );
 	QTextCursor cursor = m_edit->textCursor();
 	cursor.clearSelection();
 	m_edit->setTextCursor( cursor );
@@ -339,8 +342,13 @@ void ProjectNotes::formatChanged( const QTextCharFormat & _f )
 	m_actionTextItalic->setChecked( font.italic() );
 	m_actionTextUnderline->setChecked( font.underline() );
 
+	// Default character formats have no explicit foreground; use the
+	// theme's text colour for the toolbar swatch in that case.
+	const auto foreground = _f.foreground().style() == Qt::NoBrush
+		? m_edit->palette().color( QPalette::Text )
+		: _f.foreground().color();
 	QPixmap pix( 16, 16 );
-	pix.fill( _f.foreground().color() );
+	pix.fill( foreground );
 	m_actionTextColor->setIcon( pix );
 
 	Engine::getSong()->setModified();

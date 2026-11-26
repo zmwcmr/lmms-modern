@@ -112,6 +112,11 @@ QTextEdit, QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focu
 	selection-background-color: #0f5c2c;
 }
 
+/* Project notes use the theme's text colour but keep their own background. */
+lmms--gui--ProjectNotes QTextEdit {
+	background-color: #404040;
+}
+
 /* Keyboard focus indication.
    These rules only draw an outline; they never change border widths or
    padding, so focus cannot shift the layout. An outline is used instead of

@@ -80,6 +80,11 @@ QTextEdit, QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focu
 	selection-background-color: #202020;
 }
 
+/* Project notes use the theme's text colour but keep their own background. */
+lmms--gui--ProjectNotes QTextEdit {
+	background-color: #404040;
+}
+
 QToolTip {
 	border-radius: 4px;
 	background: qlineargradient(spread:reflect, x1:0.5, y1:0.5, x2:0.5, y2:0,

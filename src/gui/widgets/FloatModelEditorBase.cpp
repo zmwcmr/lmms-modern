@@ -318,6 +318,11 @@ void FloatModelEditorBase::mouseDoubleClickEvent(QMouseEvent *)
 
 void FloatModelEditorBase::paintEvent(QPaintEvent *)
 {
+	// Dead code in-tree: Knob, Fader, BarModelEditor and Draggable all
+	// override paintEvent, and this class is never instantiated directly.
+	// The hardcoded colour is kept only for binary compatibility with
+	// out-of-tree subclasses; do not add theme properties here. Remove the
+	// method at the next ABI-breaking release.
 	QPainter p(this);
 
 	const auto foreground = QColor{3, 94, 97};
