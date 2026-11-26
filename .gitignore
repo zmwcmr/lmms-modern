@@ -1,4 +1,6 @@
 /build/
+/build-*/
+/build-ui/
 /target/
 .*.sw?
 .DS_Store
