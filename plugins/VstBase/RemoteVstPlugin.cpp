@@ -945,6 +945,27 @@ void RemoteVstPlugin::initEditor()
 
 	pluginDispatch(effEditOpen, 0, (intptr_t) m_display, (void*) m_window);
 
+	// Some plugins only report their real editor size after the editor has
+	// been opened. Re-read the rectangle so the window is not stuck at the
+	// pre-open default.
+	ERect* openedRect = nullptr;
+	pluginDispatch(effEditGetRect, 0, 0, &openedRect);
+	if (openedRect)
+	{
+		const int width = openedRect->right - openedRect->left;
+		const int height = openedRect->bottom - openedRect->top;
+		if (width > 0 && height > 0
+			&& (width != m_windowWidth || height != m_windowHeight))
+		{
+			m_windowWidth = width;
+			m_windowHeight = height;
+			XResizeWindow(m_display, m_window,
+				static_cast<unsigned int>(width),
+				static_cast<unsigned int>(height));
+			XFlush(m_display);
+		}
+	}
+
 	XSelectInput(m_display, m_window, SubstructureNotifyMask | ButtonPressMask | ButtonReleaseMask
 			| ButtonMotionMask | ExposureMask | KeyPressMask);
 	

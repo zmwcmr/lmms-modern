@@ -28,7 +28,10 @@ Environment overrides:
 - `LMMS_ENABLE_UNSTABLE_LV2_UI=1` re-enables UIs for plugins on the known
   unstable list (currently empty).
 - `LMMS_LV2_UI_SCALE=1.5` overrides the scale factor passed to plugin UIs.
-  By default the widget's device pixel ratio is used.
+  By default the widget's device pixel ratio is used for embedded UIs, while
+  floating X11 UIs use 1.0 so they match the pixel size that VST2 editors
+  report. The floating window is also clamped to the screen; resizable UIs
+  receive the clamped size and re-layout their contents.
 
 ## Implemented
 

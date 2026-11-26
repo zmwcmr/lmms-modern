@@ -53,6 +53,13 @@ UI**:
 Hiding an embedded editor does not destroy the plugin editor; reopening it is
 cheap and avoids reinitialising plugin GUIs which are not restart-safe.
 
+VST2 editors report a fixed pixel size through `effEditGetRect`; the host has
+no standard way to scale their content. LMMS re-reads the rectangle after
+`effEditOpen` because some plugins only report their real size then, and the
+remote X11 window remains user-resizable. On fractional Wayland desktops the
+plugin's fixed pixel size can look smaller than native HiDPI applications;
+that is a plugin limitation, not a host size calculation error.
+
 ## State and presets
 
 When a project is saved, LMMS asks the plugin for its opaque chunk

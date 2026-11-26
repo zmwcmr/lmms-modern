@@ -530,7 +530,14 @@ void Lv2ProcView::createUi()
 
 	QWidget* const scaleWidget = m_uiHostWidget
 		? static_cast<QWidget*>(m_uiHostWidget) : m_pluginWidget;
-	qreal scale = scaleWidget ? scaleWidget->devicePixelRatioF() : 1.0;
+	// The floating UI is a raw X11 window managed outside Qt's Wayland
+	// surfaces. Qt's device pixel ratio is rounded up (often to 2.0) for
+	// fractional desktops, which would make the plugin render at double size
+	// and push its lower part below the screen. Use 1.0 so the plugin's
+	// natural pixel size matches VST2 editors; the environment override can
+	// still request a different scale.
+	qreal scale = m_uiHostWidget
+		? (scaleWidget ? scaleWidget->devicePixelRatioF() : 1.0) : 1.0;
 	if (const QByteArray override = qgetenv("LMMS_LV2_UI_SCALE");
 		!override.isEmpty())
 	{
@@ -700,16 +707,28 @@ void Lv2ProcView::resizeUiToPlugin()
 			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
 			&& attr.width > 0 && attr.height > 0)
 		{
-			XResizeWindow(dpy, m_x11Window, attr.width, attr.height);
-			m_lastUiWidth = attr.width;
-			m_lastUiHeight = attr.height;
+			// Keep the outer window on screen even if the plugin asks for a
+			// larger size. Resizable UIs are told to use the clamped size.
+			const int screen = DefaultScreen(dpy);
+			const int maxWidth = std::max(DisplayWidth(dpy, screen) - 80, 320);
+			const int maxHeight = std::max(DisplayHeight(dpy, screen) - 120, 240);
+			const int windowWidth = std::min(attr.width, maxWidth);
+			const int windowHeight = std::min(attr.height, maxHeight);
+			XResizeWindow(dpy, m_x11Window, windowWidth, windowHeight);
+			if (m_uiResizable
+				&& (windowWidth != attr.width || windowHeight != attr.height))
+			{
+				resizePluginChild(windowWidth, windowHeight);
+			}
+			m_lastUiWidth = windowWidth;
+			m_lastUiHeight = windowHeight;
 
 			if (!m_uiResizable)
 			{
 				XSizeHints hints{};
 				hints.flags = PMinSize | PMaxSize;
-				hints.min_width = hints.max_width = attr.width;
-				hints.min_height = hints.max_height = attr.height;
+				hints.min_width = hints.max_width = windowWidth;
+				hints.min_height = hints.max_height = windowHeight;
 				XSetNormalHints(dpy, m_x11Window, &hints);
 			}
 			XFlush(dpy);
