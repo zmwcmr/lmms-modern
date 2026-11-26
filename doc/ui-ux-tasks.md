@@ -40,11 +40,11 @@ T1 各项尽量独立提交；T2 需要先讨论。
 - `data/themes/default/horizontal_slider.png`：改为 `horizontal_slider.svg`，
   QSS `border-image` 已验证；SVG 使用 2× 内禀尺寸（20×52），在 200% 下保持清晰。
 - `data/themes/default/main_slider.png`：改为 `main_slider.svg`，同样使用 2× 内禀尺寸（52×20）。
+- `data/themes/default/sbarrow_*`（8 个）：改为 5×5 SVG，QSS 从 `background-image`
+  改为 `image:`，使 Qt 按设备像素比栅格化；100% 下与原 PNG 一致，200% 下清晰。
 
 **未转换（原因）**
 - `cursor_select_left/right`：灰度光标掩码，需在真实桌面验证 `QCursor` 的透明与热点。
-- `sbarrow_*`（8 个）：QSS 用 `background-image` 绘制 5×5 箭头；SVG 在该路径下
-  不能稳定按 DPR 栅格化，暂保留 PNG。若要转换，需先把 QSS 改为 `image:` 并重新验证。
 - `clip_rec` / `envelope_graph`：含像素字体，SVG `<text>` 依赖系统字体，需先转成路径。
 - `effect_plugin`：214×57 圆角渐变 + 半透明边框，比第一批复杂，后续单独处理。
 - **必须保留**：`apply_css.png`、`apply-selected_css.png`（QSS 菜单指示图标，见 `74bac7745`）；`closed_branch.png`、`open_branch.png` 仅被 `QTreeView::branch` 的 `border-image` 引用。

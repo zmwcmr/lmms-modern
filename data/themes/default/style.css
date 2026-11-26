@@ -407,16 +407,16 @@ QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
 	margin-left: 3px;
 }
 
-QScrollBar::left-arrow:horizontal { background-image: url("resources:sbarrow_left.png");}
-QScrollBar::right-arrow:horizontal { background-image: url("resources:sbarrow_right.png");}
-QScrollBar::up-arrow:vertical { background-image: url("resources:sbarrow_up.png");}
-QScrollBar::down-arrow:vertical { background-image: url("resources:sbarrow_down.png");}
-QScrollBar::left-arrow:horizontal:disabled { background-image: url("resources:sbarrow_left_d.png");}
-QScrollBar::right-arrow:horizontal:disabled { background-image: url("resources:sbarrow_right_d.png");}
-QScrollBar::up-arrow:vertical:disabled { background-image: url("resources:sbarrow_up_d.png");}
-QScrollBar::down-arrow:vertical:disabled { background-image: url("resources:sbarrow_down_d.png");}
-lmms--gui--EffectRackView QScrollBar::up-arrow:vertical:disabled { background-image: url("resources:sbarrow_up.png");}
-lmms--gui--EffectRackView QScrollBar::down-arrow:vertical:disabled { background-image: url("resources:sbarrow_down.png");}
+QScrollBar::left-arrow:horizontal { image: url("resources:sbarrow_left.svg");}
+QScrollBar::right-arrow:horizontal { image: url("resources:sbarrow_right.svg");}
+QScrollBar::up-arrow:vertical { image: url("resources:sbarrow_up.svg");}
+QScrollBar::down-arrow:vertical { image: url("resources:sbarrow_down.svg");}
+QScrollBar::left-arrow:horizontal:disabled { image: url("resources:sbarrow_left_d.svg");}
+QScrollBar::right-arrow:horizontal:disabled { image: url("resources:sbarrow_right_d.svg");}
+QScrollBar::up-arrow:vertical:disabled { image: url("resources:sbarrow_up_d.svg");}
+QScrollBar::down-arrow:vertical:disabled { image: url("resources:sbarrow_down_d.svg");}
+lmms--gui--EffectRackView QScrollBar::up-arrow:vertical:disabled { image: url("resources:sbarrow_up.svg");}
+lmms--gui--EffectRackView QScrollBar::down-arrow:vertical:disabled { image: url("resources:sbarrow_down.svg");}
 
 /* background for song editor and pattern editor */
 
