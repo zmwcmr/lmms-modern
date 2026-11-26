@@ -97,9 +97,13 @@ Tasks:
   - build `RemoteVstPlugin32`,
   - test with one 32-bit VST2 plugin under Wine,
   - document the supported Wine/32-bit combinations.
-- [ ] VST2 UI scale investigation:
+- [x] VST2 UI scale investigation:
   - measure `effEditGetRect` and device pixel ratio,
   - decide between host-side scaling and plugin-native scaling.
+  - current status: measured Pianoteq 8 STAGE at 864x888 and ZynAddSubFX at
+    1181x659 for both VST2 and LV2 at `ui:scaleFactor` 1.0. Native Linux VST2
+    editors always open separately; the `qt`/`xembed` setting only applies to
+    Wine-hosted editors. The size audit is recorded in `doc/lv2-plugin-ui.md`.
 
 Files:
 

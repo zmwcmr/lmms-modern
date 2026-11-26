@@ -55,6 +55,37 @@ Surge XT was previously on the unstable list. After the feature lifetime and
 resize fixes it passes ASan and repeated open/close tests, so its native UI is
 enabled again.
 
+## UI size audit
+
+The native X11 UIs of the installed plugins were measured on a 1920x1080
+screen with `ui:scaleFactor` 1.0. The sizes below are the plugin widget sizes;
+window decorations are additional.
+
+| Plugin | LV2 floating | LV2 embedded | VST2 |
+| --- | --- | --- | --- |
+| DrumGizmo | 750x740 (resizable) | 750x740 | - |
+| OB-Xf | 1150x576 | 1150x576 | - |
+| Pianoteq 8 STAGE | 864x888 | 864x888 | 864x888 |
+| sfizz | 775x515 | 775x515 | - |
+| Surge XT | 1141x711 | 1141x711 | - (VST3 only) |
+| Surge XT Effects | 600x490 | - | - (VST3 only) |
+| ZynAddSubFX | 1181x659 | 1181x659 | 1181x659 |
+
+- LV2 and VST2 sizes match for the plugins that provide both interfaces.
+- The effect UIs are opened from the mixer channel's **Effects chain** panel:
+  enable the effect, click **Controls**, then **Show GUI**.
+- Native Linux VST2 editors always open as separate windows; the native host
+  ignores the `qt`/`xembed` embedding request (see `vst-plugin-hosting.md`).
+- DrumGizmo requests its natural size from inside `suil_instance_new()`. The
+  host now keeps that request and applies it after the instance exists; before
+  this, the UI stayed at the 1x1 size of its initial X11 window.
+- Embedded subwindows reserve space for the title bar, so the bottom of the
+  plugin UI is not hidden below it. A subwindow that the cascade would push
+  off-screen is moved back into the workspace.
+- The MDI workspace scroll bars are enabled on demand. A plugin UI larger than
+  the workspace can therefore be panned even when the plugin itself cannot
+  resize, instead of leaving part of it unreachable.
+
 ## Known limitations
 
 - Plugins with more than two audio inputs or outputs are loaded, but LMMS

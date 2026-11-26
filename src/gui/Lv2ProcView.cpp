@@ -39,6 +39,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -662,6 +663,18 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
+	// DrumGizmo and other UIs request their natural size from inside
+	// suil_instance_new(), before m_uiInstance existed. Apply that request now;
+	// otherwise the UI stays at the 1x1 size of its initial X11 window.
+	if (m_pendingUiWidth > 0 && m_pendingUiHeight > 0)
+	{
+		const int width = m_pendingUiWidth;
+		const int height = m_pendingUiHeight;
+		m_pendingUiWidth = 0;
+		m_pendingUiHeight = 0;
+		applyUiResize(width, height);
+	}
+
 	m_uiShow = static_cast<const LV2UI_Show_Interface*>(
 		suil_instance_extension_data(m_uiInstance, LV2_UI__showInterface));
 	if (m_uiShow && m_uiShow->show)
@@ -703,6 +716,8 @@ void Lv2ProcView::destroyUi()
 	}
 	m_uiShow = nullptr;
 	m_uiResizable = true;
+	m_pendingUiWidth = 0;
+	m_pendingUiHeight = 0;
 	m_lastUiWidth = 0;
 	m_lastUiHeight = 0;
 
@@ -771,16 +786,27 @@ void Lv2ProcView::resizeUiToPlugin()
 			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
 			&& attr.width > 0 && attr.height > 0)
 		{
+			int widgetWidth = attr.width;
+			int widgetHeight = attr.height;
+			// Some UIs are still 1x1 until the host applies the size they
+			// requested from inside suil_instance_new().
+			if ((widgetWidth <= 1 || widgetHeight <= 1)
+				&& m_lastUiWidth > 1 && m_lastUiHeight > 1)
+			{
+				widgetWidth = m_lastUiWidth;
+				widgetHeight = m_lastUiHeight;
+				resizePluginChild(widgetWidth, widgetHeight);
+			}
 			// Keep the outer window on screen even if the plugin asks for a
 			// larger size. Resizable UIs are told to use the clamped size.
 			const int screen = DefaultScreen(dpy);
 			const int maxWidth = std::max(DisplayWidth(dpy, screen) - 80, 320);
 			const int maxHeight = std::max(DisplayHeight(dpy, screen) - 120, 240);
-			const int windowWidth = std::min(attr.width, maxWidth);
-			const int windowHeight = std::min(attr.height, maxHeight);
+			const int windowWidth = std::min(widgetWidth, maxWidth);
+			const int windowHeight = std::min(widgetHeight, maxHeight);
 			XResizeWindow(dpy, m_x11Window, windowWidth, windowHeight);
 			if (m_uiResizable
-				&& (windowWidth != attr.width || windowHeight != attr.height))
+				&& (windowWidth != widgetWidth || windowHeight != widgetHeight))
 			{
 				resizePluginChild(windowWidth, windowHeight);
 			}
@@ -815,11 +841,20 @@ void Lv2ProcView::resizeUiToPlugin()
 			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
 			&& attr.width > 0 && attr.height > 0)
 		{
+			int widgetWidth = attr.width;
+			int widgetHeight = attr.height;
+			if ((widgetWidth <= 1 || widgetHeight <= 1)
+				&& m_lastUiWidth > 1 && m_lastUiHeight > 1)
+			{
+				widgetWidth = m_lastUiWidth;
+				widgetHeight = m_lastUiHeight;
+				resizePluginChild(widgetWidth, widgetHeight);
+			}
 			const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-			const int width = std::max(static_cast<int>(std::lround(attr.width / dpr)), 320);
-			const int height = std::max(static_cast<int>(std::lround(attr.height / dpr)), 240);
-			m_lastUiWidth = attr.width;
-			m_lastUiHeight = attr.height;
+			const int width = std::max(static_cast<int>(std::lround(widgetWidth / dpr)), 320);
+			const int height = std::max(static_cast<int>(std::lround(widgetHeight / dpr)), 240);
+			m_lastUiWidth = widgetWidth;
+			m_lastUiHeight = widgetHeight;
 			if (m_uiResizable)
 			{
 				m_uiHostWidget->setMinimumSize(width, height);
@@ -829,15 +864,68 @@ void Lv2ProcView::resizeUiToPlugin()
 			{
 				m_uiHostWidget->setFixedSize(width, height);
 			}
-			if (m_uiWindow)
-			{
-				m_uiWindow->resize(width, height);
-			}
+			resizeUiWindow(width, height);
+			clampUiWindowToWorkspace();
 		}
 		XCloseDisplay(dpy);
 	}
 #endif // LMMS_BUILD_LINUX
 #endif // LMMS_HAVE_SUIL
+}
+
+
+
+
+void Lv2ProcView::resizeUiWindow(int width, int height)
+{
+	if (!m_uiWindow)
+	{
+		return;
+	}
+
+	// QMdiSubWindow::resize() sets the whole subwindow, including its title
+	// bar and frame. Add that decoration so the child gets the full plugin
+	// size instead of losing its bottom part below the title bar.
+	if (auto* subWindow = qobject_cast<SubWindow*>(m_uiWindow);
+		subWindow && !subWindow->isDetached())
+	{
+		const int frame = subWindow->frameWidth();
+		width += 2 * frame;
+		height += subWindow->titleBarHeight() + frame;
+	}
+
+	m_uiWindow->resize(width, height);
+}
+
+
+
+
+void Lv2ProcView::clampUiWindowToWorkspace()
+{
+	if (!m_uiWindow)
+	{
+		return;
+	}
+
+	if (auto* subWindow = qobject_cast<SubWindow*>(m_uiWindow);
+		subWindow && subWindow->isDetached())
+	{
+		return;
+	}
+
+	QMdiArea* area = m_uiWindow->mdiArea();
+	if (!area)
+	{
+		return;
+	}
+
+	const QRect viewport = area->viewport()->rect();
+	QPoint position = m_uiWindow->pos();
+	position.setX(std::clamp(position.x(), 0,
+		std::max(0, viewport.width() - m_uiWindow->width())));
+	position.setY(std::clamp(position.y(), 0,
+		std::max(0, viewport.height() - m_uiWindow->height())));
+	m_uiWindow->move(position);
 }
 
 
@@ -850,9 +938,12 @@ int Lv2ProcView::resizeUiRequest(int width, int height)
 		return 1;
 	}
 
-	// Some UIs request a size from inside suil_instance_new().
+	// Some UIs request a size from inside suil_instance_new(). Remember it and
+	// apply it once the instance exists; the initial X11 window is only 1x1.
 	if (!m_uiInstance)
 	{
+		m_pendingUiWidth = width;
+		m_pendingUiHeight = height;
 		return 0;
 	}
 
@@ -912,10 +1003,8 @@ void Lv2ProcView::applyUiResize(int width, int height)
 		{
 			m_uiHostWidget->setFixedSize(width, height);
 		}
-		if (m_uiWindow)
-		{
-			m_uiWindow->resize(width, height);
-		}
+		resizeUiWindow(width, height);
+		clampUiWindowToWorkspace();
 	}
 }
 

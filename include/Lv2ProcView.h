@@ -105,6 +105,8 @@ private:
 	void setUiVisible(bool visible);
 	void updateUi();
 	void resizeUiToPlugin();
+	void resizeUiWindow(int width, int height);
+	void clampUiWindowToWorkspace();
 	int resizeUiRequest(int width, int height);
 	void applyUiResize(int width, int height);
 	void updateToggleButton();
@@ -143,6 +145,9 @@ private:
 	float m_uiSampleRate = 0.0f;
 	bool m_uiVisible = false;
 	bool m_uiResizable = true;
+	//! Size requested by the UI while suil_instance_new() was running
+	int m_pendingUiWidth = 0;
+	int m_pendingUiHeight = 0;
 	int m_lastUiWidth = 0;
 	int m_lastUiHeight = 0;
 #endif
