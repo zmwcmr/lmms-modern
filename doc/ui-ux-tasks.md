@@ -32,6 +32,7 @@
 | T1-8 | 钢琴卷帘/自动化工具栏弹性宽度 | 1 d | 低 | — |
 | T1-9 | 剩余 PNG → SVG（除 QSS 必需项） | 按图标计 | 低 | — |
 | T1-10 | 轨道名被省略时补 tooltip | 0.2 d | 低 | — |
+| T1-11 | 标准对话框/输入框图标主题化 | 0.5 d | 低 | — |
 | T2-2 | 控件右键菜单加"在自动化编辑器中显示" | 2–3 d | 中（新建 clip 逻辑） | 评审 |
 | T2-3 | 快捷键映射表（不含 UI） | 2–3 d | 中 | 评审 |
 
@@ -58,6 +59,7 @@ T0 全部可在一天内完成；T1 每项独立 PR；T2 需要先讨论。
 | T1-7 | ✅ 已实现 | 10 pt → 13/11/16 px；100%/150% 截图无重叠 |
 | T1-8 | ✅ 已实现 | de_DE 1600 宽全部完整；1024 宽溢出菜单可用 |
 | T1-9 | 🚧 进行中 | 第一批 4 个：`black_key`×3 + `combobox_bg` |
+| T1-11 | ✅ 已实现 | QMessageBox / QInputDialog 图标已统一（`t1-11-dialog-icons.png`） |
 
 ### 实施中发现并修正的两个问题
 
@@ -474,6 +476,25 @@ setToolTip(elidedName == name ? QString() : name);
 （`maxTextWidth < 1` 的早退分支保留即可，或合并进同一逻辑。）
 
 **验收**：把一条轨道改名为超长中文名并拖窄轨道头 → 悬停显示完整名称；名字未被省略时无 tooltip。
+
+---
+
+### T1-11 标准对话框/输入框图标主题化（已实现）
+
+**现象**：`QMessageBox` / `QInputDialog` 的图标来自系统图标主题（蓝色菱形问号、红圈 Cancel、Oxygen 风格 Save/OK），与 LMMS 的扁平白色图标不一致。
+
+**实现**
+- `GuiApplication` 新增 `StandardDialogIconSync` 事件过滤器，监听 `QEvent::Show`：
+  - `QMessageBox`：按 `icon()` 把 Question → `help.svg`、Warning/Critical → `error.svg`、Information → 新增的 `info.svg`，以 48×48 光栅化；
+  - 标准按钮映射：Ok/Yes → `apply`，Save → `project_save`，Discard → `discard`，Cancel/Close/No/Abort → `cancel`/`close`，Reset/Retry → `reload`，Help → `help`；按钮图标统一为 14×14，避免顶到按钮上下边缘；
+  - `QInputDialog`：通过 `QDialogButtonBox` 设置 Ok → `apply`、Cancel → `cancel`。
+- 新增 `data/themes/default/info.svg`（白色圆形 "i"，与 `help.svg` / `error.svg` 同一套线条）。
+- 工作目录提示原本在样式表加载前弹出，现在移到 `LmmsStyle` 应用之后，因此该对话框也使用深色主题。
+- **不做**：不逐个修改 57 处 `QMessageBox` 调用点；不改系统原生文件对话框。
+
+**验收**
+- 构建通过，12 个测试可执行文件通过。
+- 关键截图 `t1-11-dialog-icons.png`：左侧 `QMessageBox`（工作目录询问）为扁平问号 + 扁平 No/Yes，右侧 `QInputDialog`（Set value）为扁平 Cancel/OK。
 
 ---
 
