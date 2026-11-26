@@ -118,7 +118,7 @@ remaining P3 item is an automated automation-editor round-trip test.
 - On Wayland, `Vst3X11Editor` opens a plain X11 top-level window through
   XWayland and attaches the plugin view there. This is the floating-window
   fallback; native Wayland embedding is intentionally not attempted.
-- Effect and instrument UIs have an "Open editor" button. The editor window
+- Effect and instrument UIs have a "Show GUI" button. The editor window
   closes the plugin view and X11 window on destruction.
 - `vst3-editor-test` opens an editor for a given bundle/class and exits after
   three seconds.
@@ -259,10 +259,13 @@ handling its own event source.
 
 - `<Vst3EditorWindow::isSupported>` considers the remote xcb editor, the
   embedded xcb editor and the floating X11/XWayland editor.
-- Instrument and effect views enable **Open editor** based on that unified
-  check instead of requiring the whole Qt application to run on xcb.
+- Instrument and effect views have a checkable **Show GUI** toggle near the
+  top, enabled based on that unified check instead of requiring the whole Qt
+  application to run on xcb. Closing the editor resets the toggle.
 - The X11 editor window is flushed/synchronized after mapping so the window
   manager sees it and the editor host can attach to an existing window.
+- The editor host is started with `QT_QPA_PLATFORM=xcb`, matching its X11
+  parent window.
 - Verified by opening the Surge XT editor from a Wayland LMMS session; the
   native GUI is displayed in an XWayland window.
 

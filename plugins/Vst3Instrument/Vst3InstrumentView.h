@@ -29,6 +29,8 @@
 
 #include "InstrumentView.h"
 
+class QPushButton;
+
 namespace lmms
 {
 
@@ -49,6 +51,7 @@ private:
 	void modelChanged() override;
 
 	QPointer<Vst3EditorWindow> m_editorWindow;
+	QPushButton* m_guiButton = nullptr;
 };
 
 } // namespace gui

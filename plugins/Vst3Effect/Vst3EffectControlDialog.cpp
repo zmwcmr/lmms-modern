@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -55,6 +56,54 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 	if (!controls->pluginVendor().isEmpty())
 	{
 		layout->addWidget(new QLabel(tr("Vendor: %1").arg(controls->pluginVendor()), this));
+	}
+
+	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
+	{
+		m_guiButton = new QPushButton(tr("Show GUI"), this);
+		m_guiButton->setCheckable(true);
+		const bool editorSupported = Vst3EditorWindow::isSupported(host);
+		m_guiButton->setEnabled(editorSupported);
+		if (!editorSupported)
+		{
+			m_guiButton->setToolTip(
+				tr("The VST3 editor requires X11 or an XWayland display."));
+		}
+		connect(m_guiButton, &QPushButton::toggled, this,
+			[this, controls](bool show) {
+			if (!show)
+			{
+				if (m_editorWindow != nullptr)
+				{
+					m_editorWindow->close();
+				}
+				return;
+			}
+			if (m_editorWindow != nullptr)
+			{
+				m_editorWindow->raiseEditor();
+				m_editorWindow->activateEditor();
+				return;
+			}
+			auto* window = Vst3EditorWindow::open(
+				controls->host(), this, controls->pluginName(),
+				[controls](uint32_t id, double value) {
+					controls->setParameterValue(id, value);
+				});
+			m_editorWindow = window;
+			connect(window, &QObject::destroyed, this, [this] {
+				if (m_guiButton != nullptr)
+				{
+					QSignalBlocker blocker(m_guiButton);
+					m_guiButton->setChecked(false);
+				}
+			});
+		});
+		layout->addWidget(m_guiButton);
+	}
+	else
+	{
+		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
 	}
 
 	const auto& models = controls->parameterModels();
@@ -124,36 +173,6 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 				controls->setUnit(unitBox->itemData(index).toInt());
 			});
 		layout->addWidget(unitBox);
-	}
-
-	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
-	{
-		auto* editorButton = new QPushButton(tr("Open editor"), this);
-		const bool editorSupported = Vst3EditorWindow::isSupported(host);
-		editorButton->setEnabled(editorSupported);
-		if (!editorSupported)
-		{
-			editorButton->setToolTip(
-				tr("The VST3 editor requires X11 or an XWayland display."));
-		}
-		connect(editorButton, &QPushButton::clicked, this, [this, controls] {
-			if (m_editorWindow != nullptr)
-			{
-				m_editorWindow->raiseEditor();
-				m_editorWindow->activateEditor();
-				return;
-			}
-			m_editorWindow = Vst3EditorWindow::open(
-				controls->host(), this, controls->pluginName(),
-				[controls](uint32_t id, double value) {
-					controls->setParameterValue(id, value);
-				});
-		});
-		layout->addWidget(editorButton);
-	}
-	else
-	{
-		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
 	}
 
 	layout->setSizeConstraint(QLayout::SetFixedSize);
