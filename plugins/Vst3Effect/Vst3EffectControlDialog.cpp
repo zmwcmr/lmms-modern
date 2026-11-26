@@ -26,6 +26,7 @@
 
 #include <QGridLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -34,6 +35,9 @@
 #include "AutomatableModel.h"
 #include "Knob.h"
 #include "Vst3EffectControls.h"
+#include "Vst3EditorWidget.h"
+#include "Vst3EditorWindow.h"
+#include "Vst3Host.h"
 
 namespace lmms::gui
 {
@@ -91,8 +95,32 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		layout->addWidget(scrollArea);
 	}
 
-	layout->addWidget(new QLabel(
-		tr("The native editor follows in a later phase."), this));
+	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
+	{
+		auto* editorButton = new QPushButton(tr("Open editor"), this);
+		editorButton->setEnabled(Vst3EditorWidget::isSupported());
+		if (!Vst3EditorWidget::isSupported())
+		{
+			editorButton->setToolTip(
+				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
+		}
+		connect(editorButton, &QPushButton::clicked, this, [this, controls] {
+			if (m_editorWindow != nullptr)
+			{
+				m_editorWindow->raiseEditor();
+				m_editorWindow->activateEditor();
+				return;
+			}
+			m_editorWindow = Vst3EditorWindow::open(
+				controls->host(), this, controls->pluginName());
+		});
+		layout->addWidget(editorButton);
+	}
+	else
+	{
+		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
+	}
+
 	layout->setSizeConstraint(QLayout::SetFixedSize);
 }
 

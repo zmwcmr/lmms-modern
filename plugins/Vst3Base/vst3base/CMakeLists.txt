@@ -5,6 +5,9 @@ BUILD_PLUGIN(vst3base
 	../Vst3List.cpp ../Vst3List.h
 	../Vst3Host.cpp ../Vst3Host.h
 	../Vst3ParameterModels.cpp ../Vst3ParameterModels.h
+	../Vst3EditorWidget.cpp ../Vst3EditorWidget.h
+	../Vst3EditorWindow.cpp ../Vst3EditorWindow.h
+	../Vst3X11Editor.cpp ../Vst3X11Editor.h
 	../Vst3Protocol.h
 	../Vst3SubPluginFeatures.cpp ../Vst3SubPluginFeatures.h
 	EXPORT_BASE_NAME vst3base
@@ -18,6 +21,10 @@ TARGET_INCLUDE_DIRECTORIES(vst3base
 
 FIND_PACKAGE(Qt${QT_VERSION_MAJOR} COMPONENTS Core REQUIRED)
 TARGET_LINK_LIBRARIES(vst3base Qt${QT_VERSION_MAJOR}::Core)
+
+IF(LMMS_BUILD_LINUX)
+	TARGET_LINK_LIBRARIES(vst3base X11)
+ENDIF()
 
 IF(APPLE)
 	FIND_LIBRARY(COREFOUNDATION_FRAMEWORK CoreFoundation)

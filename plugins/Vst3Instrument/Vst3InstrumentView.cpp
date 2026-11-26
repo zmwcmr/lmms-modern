@@ -26,6 +26,7 @@
 
 #include <QGridLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
 
@@ -34,6 +35,8 @@
 #include "AutomatableModel.h"
 #include "Instrument.h"
 #include "Knob.h"
+#include "Vst3EditorWidget.h"
+#include "Vst3EditorWindow.h"
 #include "Vst3Host.h"
 #include "Vst3Instrument.h"
 
@@ -92,9 +95,33 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 		layout->addWidget(scrollArea);
 	}
 
+	if (host->hasEditor())
+	{
+		auto* editorButton = new QPushButton(tr("Open editor"), this);
+		editorButton->setEnabled(Vst3EditorWidget::isSupported());
+		if (!Vst3EditorWidget::isSupported())
+		{
+			editorButton->setToolTip(
+				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
+		}
+		connect(editorButton, &QPushButton::clicked, this, [this, host] {
+			if (m_editorWindow != nullptr)
+			{
+				m_editorWindow->raiseEditor();
+				m_editorWindow->activateEditor();
+				return;
+			}
+			m_editorWindow = Vst3EditorWindow::open(host, this, host->name());
+		});
+		layout->addWidget(editorButton);
+	}
+	else
+	{
+		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
+	}
+
 	layout->addWidget(new QLabel(
-		tr("MIDI input is active. The native editor follows in a later phase."),
-		this));
+		tr("MIDI input is active."), this));
 	layout->setSizeConstraint(QLayout::SetFixedSize);
 }
 

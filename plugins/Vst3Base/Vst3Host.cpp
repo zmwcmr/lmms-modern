@@ -43,6 +43,7 @@
 #include "travesty/factory.h"
 #include "travesty/host.h"
 #include "travesty/message.h"
+#include "travesty/view.h"
 
 namespace
 {
@@ -225,6 +226,51 @@ private:
 		}
 		return V3_OK;
 	}
+};
+
+struct EditorFrame : v3_plugin_frame_cpp
+{
+	std::function<void(int, int)> resizeView;
+
+	EditorFrame()
+	{
+		query_interface = queryInterface;
+		ref = refStatic;
+		unref = unrefStatic;
+		frame.resize_view = resizeViewCallback;
+	}
+
+private:
+	static EditorFrame* editorFrame(void* self)
+	{
+		return *static_cast<EditorFrame**>(self);
+	}
+
+	static v3_result V3_API resizeViewCallback(
+		void* self, v3_plugin_view**, v3_view_rect* rect)
+	{
+		if (rect != nullptr && editorFrame(self)->resizeView)
+		{
+			editorFrame(self)->resizeView(rect->right - rect->left,
+				rect->bottom - rect->top);
+		}
+		return V3_OK;
+	}
+
+	static v3_result V3_API queryInterface(void* self, const v3_tuid iid, void** iface)
+	{
+		if (v3_tuid_match(iid, v3_funknown_iid)
+			|| v3_tuid_match(iid, v3_plugin_frame_iid))
+		{
+			*iface = self;
+			return V3_OK;
+		}
+		*iface = nullptr;
+		return V3_NO_INTERFACE;
+	}
+
+	static uint32_t V3_API refStatic(void*) { return 1; }
+	static uint32_t V3_API unrefStatic(void*) { return 0; }
 };
 
 struct EventList : v3_event_list_cpp
@@ -687,6 +733,11 @@ struct Vst3Host::Impl
 	EventList outputEvents;
 	ParamChanges inputParams;
 	ParamChanges outputParams;
+
+	EditorFrame editorFrame;
+	EditorFrame* editorFramePointer = nullptr;
+	v3_plugin_view** editorView = nullptr;
+	std::function<void(int, int)> editorResizeCallback;
 	std::vector<MidiEvent> pendingMidi;
 
 	struct QueuedParameter
@@ -848,6 +899,12 @@ bool Vst3Host::Impl::load(const QString& bundlePath,
 	};
 	componentHandler.endEdit = [](uint32_t) {};
 	componentHandler.restartComponent = [](int32_t) {};
+	editorFrame.resizeView = [this](int width, int height) {
+		if (editorResizeCallback)
+		{
+			editorResizeCallback(width, height);
+		}
+	};
 	handlerPointer = &componentHandler;
 	if (controller != nullptr)
 	{
@@ -871,6 +928,13 @@ bool Vst3Host::Impl::load(const QString& bundlePath,
 
 void Vst3Host::Impl::unload()
 {
+	if (editorView != nullptr)
+	{
+		v3_cpp_obj(editorView)->set_frame(editorView, nullptr);
+		v3_cpp_obj(editorView)->removed(editorView);
+		v3_cpp_obj_unref(editorView);
+		editorView = nullptr;
+	}
 	if (processor != nullptr && component != nullptr && active)
 	{
 		v3_cpp_obj(processor)->set_processing(processor, false);
@@ -1658,6 +1722,140 @@ int Vst3Host::latencySamples() const
 	}
 	return static_cast<int>(v3_cpp_obj(m_impl->processor)->get_latency_samples(
 		m_impl->processor));
+}
+
+bool Vst3Host::hasEditor() const
+{
+	return m_impl->controller != nullptr;
+}
+
+bool Vst3Host::openEditor(void* parentWindow, QString* error)
+{
+	if (m_impl->editorView != nullptr)
+	{
+		return true;
+	}
+	if (m_impl->controller == nullptr)
+	{
+		setError(error, QStringLiteral("Plugin has no edit controller"));
+		return false;
+	}
+
+	auto* const view = v3_cpp_obj(m_impl->controller)->create_view(
+		m_impl->controller, "editor");
+	if (view == nullptr)
+	{
+		setError(error, QStringLiteral("Plugin did not create an editor view"));
+		return false;
+	}
+	// V3_TRUE and V3_OK are both zero in Travesty.
+	if (v3_cpp_obj(view)->is_platform_type_supported(
+			view, V3_VIEW_PLATFORM_TYPE_X11) != V3_OK)
+	{
+		setError(error, QStringLiteral("Plugin does not support X11 embedding"));
+		v3_cpp_obj_unref(view);
+		return false;
+	}
+
+	m_impl->editorFramePointer = &m_impl->editorFrame;
+	v3_cpp_obj(view)->set_frame(view,
+		reinterpret_cast<v3_plugin_frame**>(&m_impl->editorFramePointer));
+	if (v3_cpp_obj(view)->attached(
+			view, parentWindow, V3_VIEW_PLATFORM_TYPE_X11) != V3_OK)
+	{
+		setError(error, QStringLiteral("Plugin failed to attach its editor"));
+		v3_cpp_obj(view)->set_frame(view, nullptr);
+		v3_cpp_obj_unref(view);
+		return false;
+	}
+
+	m_impl->editorView = view;
+	return true;
+}
+
+void Vst3Host::closeEditor()
+{
+	if (m_impl->editorView == nullptr)
+	{
+		return;
+	}
+	v3_cpp_obj(m_impl->editorView)->set_frame(m_impl->editorView, nullptr);
+	v3_cpp_obj(m_impl->editorView)->removed(m_impl->editorView);
+	v3_cpp_obj_unref(m_impl->editorView);
+	m_impl->editorView = nullptr;
+}
+
+bool Vst3Host::isEditorOpen() const
+{
+	return m_impl->editorView != nullptr;
+}
+
+bool Vst3Host::editorSize(int& width, int& height) const
+{
+	if (m_impl->editorView == nullptr)
+	{
+		return false;
+	}
+	v3_view_rect rect = {};
+	if (v3_cpp_obj(m_impl->editorView)->get_size(
+			m_impl->editorView, &rect) != V3_OK)
+	{
+		return false;
+	}
+	width = std::max(1, rect.right - rect.left);
+	height = std::max(1, rect.bottom - rect.top);
+	return true;
+}
+
+bool Vst3Host::canResizeEditor() const
+{
+	if (m_impl->editorView == nullptr)
+	{
+		return false;
+	}
+	return v3_cpp_obj(m_impl->editorView)->can_resize(
+		m_impl->editorView) == V3_TRUE;
+}
+
+void Vst3Host::resizeEditor(int width, int height)
+{
+	if (m_impl->editorView == nullptr || width <= 0 || height <= 0)
+	{
+		return;
+	}
+	v3_view_rect rect = {0, 0, width, height};
+	v3_cpp_obj(m_impl->editorView)->on_size(m_impl->editorView, &rect);
+}
+
+void Vst3Host::setEditorContentScale(float scale)
+{
+	if (m_impl->editorView == nullptr || scale <= 0.0f)
+	{
+		return;
+	}
+	v3_plugin_view_content_scale** contentScale = nullptr;
+	if (v3_cpp_obj_query_interface(m_impl->editorView,
+			v3_plugin_view_content_scale_iid, &contentScale) == V3_OK
+		&& contentScale != nullptr)
+	{
+		v3_cpp_obj(contentScale)->set_content_scale_factor(contentScale, scale);
+		v3_cpp_obj_unref(contentScale);
+	}
+}
+
+void Vst3Host::focusEditor(bool focused)
+{
+	if (m_impl->editorView == nullptr)
+	{
+		return;
+	}
+	v3_cpp_obj(m_impl->editorView)->on_focus(
+		m_impl->editorView, focused ? V3_TRUE : V3_FALSE);
+}
+
+void Vst3Host::setEditorResizeCallback(std::function<void(int, int)> callback)
+{
+	m_impl->editorResizeCallback = std::move(callback);
 }
 
 QByteArray Vst3Host::componentState() const

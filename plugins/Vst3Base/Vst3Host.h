@@ -26,6 +26,7 @@
 #define LMMS_VST3_HOST_H
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -123,6 +124,19 @@ public:
 		int frames);
 
 	int latencySamples() const;
+
+	//! True if the plugin exposes an IPlugView editor.
+	bool hasEditor() const;
+	//! Create and attach the native editor to an X11 window id.
+	bool openEditor(void* parentWindow, QString* error = nullptr);
+	void closeEditor();
+	bool isEditorOpen() const;
+	bool editorSize(int& width, int& height) const;
+	bool canResizeEditor() const;
+	void resizeEditor(int width, int height);
+	void setEditorContentScale(float scale);
+	void focusEditor(bool focused);
+	void setEditorResizeCallback(std::function<void(int, int)> callback);
 
 	QByteArray componentState() const;
 	QByteArray controllerState() const;

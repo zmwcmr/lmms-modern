@@ -25,12 +25,15 @@
 #ifndef LMMS_GUI_VST3_EFFECT_CONTROL_DIALOG_H
 #define LMMS_GUI_VST3_EFFECT_CONTROL_DIALOG_H
 
+#include <QPointer>
+
 #include "EffectControlDialog.h"
 
 namespace lmms
 {
 
 class Vst3EffectControls;
+class Vst3EditorWindow;
 
 namespace gui
 {
@@ -41,6 +44,9 @@ class Vst3EffectControlDialog : public EffectControlDialog
 public:
 	explicit Vst3EffectControlDialog(Vst3EffectControls* controls);
 	~Vst3EffectControlDialog() override = default;
+
+private:
+	QPointer<Vst3EditorWindow> m_editorWindow;
 };
 
 } // namespace gui

@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P2 in-process host implemented. P3 parameter models are in place; state
-save/load is best-effort and needs hardening.
+Status: P4 native editor implemented for X11 (xcb) and XWayland floating
+windows. P3 state save/load is still best-effort.
 
 ## 1. Goal
 
@@ -116,7 +116,31 @@ Still open:
 - automation editor round-trip tests,
 - native editor embedding (P4).
 
-Next: finish P3 state/program handling, then P4 (native editor).
+### Implemented: P4 native editor
+
+- `Vst3Host` creates `IPlugView` through the edit controller, implements
+  `IPlugFrame::resize_view`, and forwards size, focus and content-scale
+  changes.
+- On xcb, `Vst3EditorWidget` creates a native Qt child window and attaches
+  the plugin view with `X11EmbedWindowID`.
+- On Wayland, `Vst3X11Editor` opens a plain X11 top-level window through
+  XWayland and attaches the plugin view there. This is the floating-window
+  fallback; native Wayland embedding is intentionally not attempted.
+- Effect and instrument UIs have an "Open editor" button. The editor window
+  closes the plugin view and X11 window on destruction.
+- `vst3-editor-test` opens an editor for a given bundle/class and exits after
+  three seconds.
+
+Verified with Surge XT, Dexed and OB-Xf editors on xcb, and with the XWayland
+floating fallback from the current Wayland session.
+
+Still open for P4/P5:
+
+- crash isolation for editor and DSP (P5),
+- more complete keyboard/scroll event forwarding for embedded views,
+- editor support for plugins that require an `IRunLoop` or timers.
+
+Next: P5 (out-of-process DSP/UI host) and the remaining P3 state work.
 
 ## 2. What Ardour and Carla teach us
 
@@ -423,14 +447,15 @@ Deliverables:
 
 Estimate: 2-3 weeks.
 
-### P4: Native editor
+### P4: Native editor — implemented
 
 Deliverables:
 
-- `IPlugView` attach on xcb and XWayland,
-- resize/show/hide/close handling,
-- editor lifecycle and crash recovery,
-- DPI/content-scale handling where supported.
+- [x] `IPlugView` attach on xcb,
+- [x] XWayland floating window fallback on Wayland,
+- [x] resize/show/hide/close handling,
+- [~] editor lifecycle (done) and crash recovery (P5),
+- [x] DPI/content-scale handling where supported.
 
 Estimate: 2-3 weeks.
 

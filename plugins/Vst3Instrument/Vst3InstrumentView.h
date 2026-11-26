@@ -25,12 +25,15 @@
 #ifndef LMMS_GUI_VST3_INSTRUMENT_VIEW_H
 #define LMMS_GUI_VST3_INSTRUMENT_VIEW_H
 
+#include <QPointer>
+
 #include "InstrumentView.h"
 
 namespace lmms
 {
 
 class Instrument;
+class Vst3EditorWindow;
 
 namespace gui
 {
@@ -44,6 +47,8 @@ public:
 
 private:
 	void modelChanged() override;
+
+	QPointer<Vst3EditorWindow> m_editorWindow;
 };
 
 } // namespace gui
