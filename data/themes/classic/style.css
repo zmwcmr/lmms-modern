@@ -811,6 +811,8 @@ lmms--gui--TrackContainerView QLabel
 
 /* common clip colors */
 lmms--gui--ClipView   {
+	/* The underlay is always opaque to avoid transparent repaint artifacts. */
+	qproperty-underlayColor: #000000;
 	qproperty-mutedColor: rgb( 128, 128, 128 );
 	qproperty-mutedBackgroundColor: rgb( 80, 80, 80 );
 	qproperty-selectedColor: rgb( 0, 125, 255 );
@@ -899,6 +901,8 @@ lmms--gui--EnvelopeGraph {
 
 /* LFO graph */
 lmms--gui--LfoGraph {
+	qproperty-infoTextColor: #c9c9e1;
+	qproperty-infoBackgroundColor: rgba(0, 0, 0, 192);
 	qproperty-noAmountColor: rgb(96, 91, 96);
 	qproperty-fullAmountColor: rgb(0, 255, 128);
 }

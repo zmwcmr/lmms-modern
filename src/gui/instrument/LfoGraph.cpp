@@ -177,10 +177,10 @@ void LfoGraph::drawInfoText(const EnvelopeAndLfoParameters& params)
 	// This gives the bounding rectangle if the text was rendered at the origin ...
 	const auto boundingRect = fontMetrics.boundingRect(infoText);
 	// ... so we translate it to the actual position where the text will be rendered.
-	p.fillRect(boundingRect.translated(textPosition), QColor{0, 0, 0, 192});
+	p.fillRect(boundingRect.translated(textPosition), m_infoBackgroundColor);
 
 	// Now draw the actual info text
-	p.setPen(QColor(201, 201, 225));
+	p.setPen(m_infoTextColor);
 	p.drawText(textPosition, infoText);
 }
 

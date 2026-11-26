@@ -588,8 +588,8 @@ void MidiClipView::paintEvent( QPaintEvent * )
 	lingrad.setColorAt( beatClip ? 0 : 1, c.darker( 300 ) );
 	lingrad.setColorAt( beatClip ? 1 : 0, c );
 
-	// paint a black rectangle under the clip to prevent glitches with transparent backgrounds
-	p.fillRect( rect(), QColor( 0, 0, 0 ) );
+	// An opaque underlay prevents glitches with transparent clip backgrounds.
+	p.fillRect(rect(), underlayColor());
 
 	if( gradient() )
 	{
