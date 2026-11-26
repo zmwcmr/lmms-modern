@@ -201,7 +201,11 @@ void Oscilloscope::paintEvent( QPaintEvent * )
 	else
 	{
 		p.setPen( QColor( 192, 192, 192 ) );
-		p.setFont(adjustedToPixelSize(p.font(), DEFAULT_FONT_SIZE));
+		// The oscilloscope background is fixed-size artwork, so the hint text
+		// keeps the design size.
+		QFont hintFont = p.font();
+		hintFont.setPixelSize(DEFAULT_FONT_SIZE);
+		p.setFont(hintFont);
 		p.drawText( 6, height()-5, tr( "Click to enable" ) );
 	}
 }

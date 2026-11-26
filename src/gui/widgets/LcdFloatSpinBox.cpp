@@ -98,8 +98,9 @@ void LcdFloatSpinBox::layoutSetup(const QString &style)
 	lcdLayout->setContentsMargins(0, 0, 0, 0);
 	lcdLayout->setSpacing(0);
 
-	// Add space for label
-	const int labelSpace = scaledFontSize(9);
+	// Add space for the label. The LCD artwork is fixed-size, so the caption
+	// keeps the design size instead of growing with the system font.
+	const int labelSpace = 9;
 	auto outerLayout = new QVBoxLayout();
 	outerLayout->addLayout(lcdLayout);
 	outerLayout->addSpacing(labelSpace);
@@ -251,7 +252,9 @@ void LcdFloatSpinBox::paintEvent(QPaintEvent*)
 	// Label
 	if (!m_label.isEmpty())
 	{
-		p.setFont(adjustedToPixelSize(p.font(), DEFAULT_FONT_SIZE));
+		QFont labelFont = p.font();
+		labelFont.setPixelSize(DEFAULT_FONT_SIZE);
+		p.setFont(labelFont);
 		p.setPen(m_wholeDisplay.textShadowColor());
 		p.drawText(width() / 2 - p.fontMetrics().boundingRect(m_label).width() / 2 + 1, height(), m_label);
 		p.setPen(m_wholeDisplay.textColor());

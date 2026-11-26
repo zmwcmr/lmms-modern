@@ -401,18 +401,19 @@ m_actionTextBold->setShortcut(keySequence(Qt::CTRL, Qt::Key_B));
    - `LfoGraph` 的 Hz 文本（`height() * 0.2`）；
    - `TabWidget`（标签栏固定 14/17 px，`ControllerConnectionDialog` 还把输入框绝对定位在它下方）。
    这些位置改为直接 `QFont::setPixelSize()` 并加注释说明原因。
-3. 为放大后的文字补足固定布局空间：
+3. **固定像素底图上的标签也不缩放**：`LcdWidget` / `LcdFloatSpinBox` 的 TEMPO/MIN/SEC/MSEC 等标签、`Oscilloscope` 的 "Click to enable" 保持 12 px。底图（LCD 数字、示波器面板）本身不随系统字体变大，标签单独放大会压过数字，看起来反而失衡。
+4. 为放大后的文字补足固定布局空间：
    - `Knob` legacy 标签区：`+10` → `+ scaledFontSize(SMALL_FONT_SIZE)`；
-   - `LcdWidget` / `LcdFloatSpinBox` 的标签区：`9` → `scaledFontSize(9)`，后者高度按 `cellHeight()` 重算，不再写死 32；
    - `EffectView` 的 "Controls" 按钮：按字体 metrics 计算宽高，保持原来的右下角锚点。
-4. `InstrumentTrackWindow` 与 `SampleTrackWindow` 删除 `labelStyleSheet = "font-size: 10px;"`，6 + 3 个标签改用 `setObjectName("trackSettingsLabel")`；两套主题的 `style.css` 增加同名规则统一控制。
-5. QSS 单位统一为 px：default 的 `8pt` → `11px`（原值约 10.7 px）；classic 的 `8pt` → `11px`，`7pt` → `10px`（T0-2 当时只处理了 default 主题）。现在两套主题的 `font-size` 全部是 px。
+5. `InstrumentTrackWindow` 与 `SampleTrackWindow` 删除 `labelStyleSheet = "font-size: 10px;"`，6 + 3 个标签改用 `setObjectName("trackSettingsLabel")`；两套主题的 `style.css` 增加同名规则统一控制。
+6. QSS 单位统一为 px：default 的 `8pt` → `11px`（原值约 10.7 px）；classic 的 `8pt` → `11px`，`7pt` → `10px`（T0-2 当时只处理了 default 主题）。现在两套主题的 `font-size` 全部是 px。
 
 **Qt QSS 限制（实测）**：`font-size: 1.2em` 和 `font-size: 120%` 都被 Qt 忽略，QSS 只接受 px/pt。所以 QSS 里的字号仍是固定 px，跟随系统字体的是 C++ 绘制的文字。要让 QSS 也动态缩放，需要运行时生成样式表，另立项。
 
 **实测**
 - 当前 Xvfb 会话是 10 pt → 因子 1.11：12/10/14 → **13/11/16 px**；11 pt → 1.22；12 pt → 1.33；13.5 pt 以上封顶 1.5。
-- 100%：主窗口、Piano Roll、乐器窗口、Settings 截图见 `doc/ui-ux-shots/t1-7-*.png`，无重叠或裁切；Settings 使用原生 Qt 控件，字号保持应用字体不变（符合预期）。
+- 100%：主窗口、Piano Roll、Settings 截图见 `doc/ui-ux-shots/t1-7-*.png`，无重叠或裁切；Settings 使用原生 Qt 控件，字号保持应用字体不变（符合预期）。
+- 固定底图上的标签保持 12 px（TEMPO/MIN/SEC/MSEC/TIME SIG、Click to enable），不会压过 LCD 数字；其余 C++ 文本按上面的因子放大。
 - 150%：`t1-7-hidpi-150.png`（2400×1500 屏幕，`QT_SCALE_FACTOR=1.5`），文字和布局同比放大，主窗口无重叠。
 - `grep -rn 'font-size' src/gui` = **0**；`grep -nE 'font-size:\s*[0-9]+pt' data/themes/*/style.css` = **0**。
 - 12 个测试可执行文件全部通过；完整构建（含插件）通过。
