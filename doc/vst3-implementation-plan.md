@@ -1,6 +1,7 @@
 # VST3 support implementation plan
 
-Status: P1 scanner/cache implemented; the UI rescan entry arrives with the P2 wrappers.
+Status: P2 in-process host implemented. Parameters/automation are next (P3);
+state save/load is present but needs hardening.
 
 ## 1. Goal
 
@@ -46,9 +47,8 @@ The first phase is in `plugins/Vst3Base/`:
   `~/.cache/lmms/vst3-list.json`, deduplicates identical bundles by SHA-256,
   and keeps failures in the cache so a crashing bundle is not retried on every
   launch.
-- `Vst3SubPluginFeatures` is ready to expose the scanned classes to the
-  instrument browser and the effect dialog. It is not attached to a plugin
-  descriptor yet because the `Vst3Instrument`/`Vst3Effect` wrappers are P2.
+- `Vst3SubPluginFeatures` exposes the scanned classes to the instrument
+  browser and the effect dialog, and provides the rescan hook.
 - `WANT_VST3` (default `ON`) builds the scanner and the shared `vst3base`
   library. There is no external dependency; the Travesty C headers are
   vendored under `plugins/Vst3Base/travesty/`.
@@ -65,7 +65,41 @@ The scanner was verified on Dexed, OB-Xf, sfizz (two classes), Surge XT and
 Surge XT Effects. A deliberately broken bundle is cached as an error and does
 not abort the scan.
 
-Next: P2 (in-process stereo host, instrument and effect wrappers).
+### Implemented: P2 in-process stereo host
+
+- `Vst3Host` in `plugins/Vst3Base/` owns the component, controller and
+  processor, implements the host application and component handler, and
+  processes a stereo main bus.
+- Audio buses are configured with stereo arrangements; additional buses are
+  activated so plugins such as Surge XT accept the configuration, but only the
+  first main output bus is routed back to LMMS.
+- MIDI note on/off, CC, pitch bend, channel pressure, poly pressure and program
+  change are converted to VST3 events.
+- `Vst3Instrument` is a MIDI-based LMMS instrument with an `InstrumentPlayHandle`
+  and project state blobs.
+- `Vst3Effect` is a normal LMMS effect with wet/dry mixing and project state
+  blobs.
+- `vst3-host-test` is a small command-line smoke test for the host itself.
+
+Verified with the host test:
+
+```text
+Dexed, OB-Xf, sfizz, sfizz-multi, Surge XT   instruments, audible output
+Surge XT Effects                             effect, passes/processes audio
+```
+
+Verified end-to-end with `lmms render` on a project containing a
+`vst3instrument` track. The same project with a `vst3effect` in its effect
+chain also renders audio.
+
+Still open for P3/P4:
+
+- per-parameter LMMS `FloatModel`s and automation,
+- a usable parameter UI (the current dialog only lists parameter names),
+- more reliable component/controller state for every plugin,
+- native editor embedding.
+
+Next: P3 (parameters, automation and state hardening).
 
 ## 2. What Ardour and Carla teach us
 
@@ -335,8 +369,7 @@ Deliverables:
 - [x] `Vst3Module` loader,
 - [x] `Vst3List` JSON cache,
 - [x] bundle/class enumeration,
-- [ ] rescan entry in both plugin selection UIs (needs the P2 plugin
-  descriptors; `Vst3SubPluginFeatures` already implements the rescan hook),
+- [x] rescan entry in both plugin selection UIs,
 - [x] timeout/crash handling.
 
 The scanner runs per bundle with a 60 second timeout. Scan failures are
@@ -345,15 +378,19 @@ invalidated when the scanner protocol version changes.
 
 Estimate: 2-3 weeks.
 
-### P2: Minimal in-process stereo host
+### P2: Minimal in-process stereo host — implemented
 
 Deliverables:
 
-- `Vst3Host` with component/controller setup,
-- stereo audio processing through `ProcessData`,
-- instrument and effect wrappers,
-- MIDI note on/off and basic CC,
-- one known VST3 instrument and one effect working.
+- [x] `Vst3Host` with component/controller setup,
+- [x] stereo audio processing through `ProcessData`,
+- [x] instrument and effect wrappers,
+- [x] MIDI note on/off and basic CC,
+- [x] one known VST3 instrument and one effect working.
+
+The wrappers are `Vst3Instrument` and `Vst3Effect`. Parameter models and a
+usable parameter UI are deliberately deferred to P3; the current control
+dialogs only show plugin information.
 
 Estimate: 2-3 weeks.
 

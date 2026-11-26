@@ -3,6 +3,7 @@ BUILD_PLUGIN(vst3base
 	../Vst3Module.cpp ../Vst3Module.h
 	../Vst3Scanner.cpp ../Vst3Scanner.h
 	../Vst3List.cpp ../Vst3List.h
+	../Vst3Host.cpp ../Vst3Host.h
 	../Vst3Protocol.h
 	../Vst3SubPluginFeatures.cpp ../Vst3SubPluginFeatures.h
 	EXPORT_BASE_NAME vst3base

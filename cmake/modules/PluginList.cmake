@@ -72,6 +72,8 @@ SET(LMMS_PLUGIN_LIST
 	TapTempo
 	VstBase
 	Vst3Base
+	Vst3Effect
+	Vst3Instrument
 	Vestige
 	VstEffect
 	Watsyn
