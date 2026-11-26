@@ -28,6 +28,7 @@
 #include "ProjectRenderer.h"
 #include "Song.h"
 #include "PerfLog.h"
+#include "Mixer.h"
 
 #include "AudioFileWave.h"
 #include "AudioFileOgg.h"
@@ -152,19 +153,32 @@ void ProjectRenderer::run()
 	PerfLogTimer perfLog("Project Render");
 
 	Engine::getSong()->startExport();
-	// Skip first empty buffer.
-	Engine::audioEngine()->renderNextPeriod();
 
 	m_progress = 0;
 
-	// Now start processing
+	// Start processing before the warm-up period so the file device is ready.
 	Engine::audioEngine()->startProcessing();
+
+	// The first period is a warm-up period: plugins initialize and may only
+	// publish their latency after processing a block. Discard it, then trim
+	// the reported total latency from the beginning of the actual song stream.
+	Engine::audioEngine()->renderNextPeriod();
+	f_cnt_t framesToSkip = Engine::mixer()->totalLatency();
 
 	// Continually track and emit progress percentage to listeners.
 	while (!Engine::getSong()->isExportDone() && !m_abort.load(std::memory_order_relaxed))
 	{
 		const auto buffer = Engine::audioEngine()->renderNextPeriod();
-		m_fileDev->writeBuffer(buffer.data(), buffer.size());
+		if (framesToSkip >= static_cast<f_cnt_t>(buffer.size()))
+		{
+			framesToSkip -= buffer.size();
+		}
+		else
+		{
+			m_fileDev->writeBuffer(buffer.data() + framesToSkip,
+				buffer.size() - framesToSkip);
+			framesToSkip = 0;
+		}
 
 		const int nprog = Engine::getSong()->getExportProgress();
 		const int oldProgress = m_progress.load(std::memory_order_relaxed);

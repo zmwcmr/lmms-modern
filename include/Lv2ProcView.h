@@ -45,6 +45,7 @@
 #endif
 
 class QPushButton;
+class QComboBox;
 class QMdiSubWindow;
 class QTimer;
 
@@ -82,6 +83,7 @@ protected:
 	QPushButton* m_reloadPluginButton = nullptr;
 	QPushButton* m_toggleUIButton = nullptr;
 	QPushButton* m_helpButton = nullptr;
+	QComboBox* m_presetCombo = nullptr;
 
 	void toggleUI();
 	void toggleHelp(bool visible);
@@ -135,6 +137,8 @@ private:
 	LV2_Options_Option m_uiOptions[3]{};
 	LV2UI_Resize m_resize{};
 	const LV2UI_Show_Interface* m_uiShow = nullptr;
+	//! Asset root some UIs (Zyn Fusion) resolve relative to the CWD
+	QString m_uiDataRoot;
 	float m_uiScale = 1.0f;
 	float m_uiSampleRate = 0.0f;
 	bool m_uiVisible = false;

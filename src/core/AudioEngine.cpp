@@ -50,6 +50,7 @@
 
 // platform-specific midi-interface-classes
 #include "MidiAlsaRaw.h"
+#include "MidiClient.h"
 #include "MidiAlsaSeq.h"
 #include "MidiJack.h"
 #include "MidiSndio.h"
@@ -208,6 +209,12 @@ void AudioEngine::renderStageNoteSetup()
 		clearInternal();
 	}
 
+	if( m_noteOffSignal.exchange(false, std::memory_order_relaxed)
+		&& m_midiClient != nullptr )
+	{
+		m_midiClient->noteOffAll();
+	}
+
 	// remove all play-handles that have to be deleted and delete
 	// them if they still exist...
 	// maybe this algorithm could be optimized...
@@ -305,6 +312,11 @@ void AudioEngine::renderStageMix()
 	Mixer *mixer = Engine::mixer();
 	mixer->masterMix(m_outputBufferWrite.get());
 
+	// Refresh the graph after the effects have run: plugins may have published
+	// a new latency during this block. This also makes totalLatency() current
+	// for export offset calculation and UI reporting.
+	mixer->updateLatencyCompensation();
+
 	MixHelpers::multiply(m_outputBufferWrite.get(), m_masterGain.load(std::memory_order_relaxed), m_framesPerPeriod);
 
 	emit nextAudioBuffer(m_outputBufferRead.get());
@@ -326,6 +338,11 @@ std::span<const SampleFrame> AudioEngine::renderNextPeriod()
 
 	renderStageNoteSetup();     // STAGE 0: clear old play handles and buffers, setup new play handles
 	renderStageInstruments();   // STAGE 1: run and render all play handles
+
+	// Rebuild the latency graph after the tracks have reported their current
+	// latency and before the bus delay lines are applied in stage 2.
+	Engine::mixer()->updateLatencyCompensation();
+
 	renderStageEffects();       // STAGE 2: process effects of all instrument- and sampletracks
 	renderStageMix();           // STAGE 3: do master mix in mixer
 
@@ -349,6 +366,14 @@ void AudioEngine::swapBuffers()
 void AudioEngine::clear()
 {
 	m_clearSignal.store(true, std::memory_order_relaxed);
+}
+
+
+
+
+void AudioEngine::requestNoteOffAll()
+{
+	m_noteOffSignal.store(true, std::memory_order_relaxed);
 }
 
 
@@ -388,7 +413,11 @@ void AudioEngine::clearNewPlayHandles()
 // all remaining notes etc. would be played until their end
 void AudioEngine::clearInternal()
 {
-	// TODO: m_midiClient->noteOffAll();
+	if( m_midiClient != nullptr )
+	{
+		m_midiClient->noteOffAll();
+	}
+
 	for (auto ph : m_playHandles)
 	{
 		if (ph->type() != PlayHandle::Type::InstrumentPlayHandle)

@@ -106,6 +106,9 @@ public:
 	{
 	}
 
+	//! Send All Notes Off to every port's external MIDI output
+	void noteOffAll();
+
 	// tries to open either MIDI-driver from config-file or (if it fails)
 	// any other working
 	static MidiClient * openMidiClient();

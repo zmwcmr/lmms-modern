@@ -26,6 +26,7 @@
 #define LMMS_MIXER_H
 
 #include "AudioBuffer.h"
+#include "DelayLine.h"
 #include "EffectChain.h"
 #include "JournallingObject.h"
 #include "Model.h"
@@ -74,6 +75,9 @@ public:
 	int index() const { return m_channelIndex; }
 	void setIndex(int index) { m_channelIndex = index; }
 
+	//! Sum of the effect-chain latencies on this channel, in samples
+	f_cnt_t latency() const { return m_fxChain.latency(); }
+
 	bool isMaster() { return m_channelIndex == 0; }
 
 	bool requiresProcessing() const override { return true; }
@@ -111,6 +115,12 @@ public:
 		return m_to->index();
 	}
 
+	//! Delay required to align this send with other paths into the receiver
+	void setDelayFrames(f_cnt_t delay) { m_delayLine.setDelayFrames(delay); }
+	f_cnt_t delayFrames() const { return m_delayLine.delayFrames(); }
+	AudioBuffer& delayedBuffer() { return m_delayedBuffer; }
+	DelayLine& delayLine() { return m_delayLine; }
+
 	FloatModel * amount()
 	{
 		return &m_amount;
@@ -132,6 +142,8 @@ public:
 		MixerChannel * m_from;
 		MixerChannel * m_to;
 		FloatModel m_amount;
+		AudioBuffer m_delayedBuffer;
+		DelayLine m_delayLine;
 };
 
 
@@ -207,6 +219,12 @@ public:
 	void activateSolo();
 	void deactivateSolo();
 
+	//! Align the track buses that feed the same mixer channel
+	void updateLatencyCompensation();
+
+	//! Total latency from the timeline to the final output, in samples
+	f_cnt_t totalLatency() const;
+
 	inline mix_ch_t numChannels() const
 	{
 		return m_mixerChannels.size();
@@ -217,6 +235,12 @@ public:
 private:
 	// the mixer channels in the mixer. index 0 is always master.
 	std::vector<MixerChannel*> m_mixerChannels;
+	//! Maximum input latency per channel, rebuilt between mixer rounds
+	std::vector<f_cnt_t> m_latencyByChannel;
+	//! Output latency per channel (input latency + channel FX chain)
+	std::vector<f_cnt_t> m_outputLatencyByChannel;
+	//! Whether the last graph update exceeded the delay-line capacity
+	bool m_latencySaturated = false;
 
 	// make sure we have at least num channels
 	void allocateChannelsTo(int num);

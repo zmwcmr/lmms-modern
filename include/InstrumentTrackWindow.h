@@ -25,6 +25,7 @@
 #ifndef LMMS_GUI_INSTRUMENT_TRACK_WINDOW_H
 #define LMMS_GUI_INSTRUMENT_TRACK_WINDOW_H
 
+#include <QPointer>
 #include <QWidget>
 
 #include "InstrumentTrack.h"
@@ -108,6 +109,7 @@ public slots:
 	void textChanged( const QString & _new_name );
 	void toggleVisibility( bool _on );
 	void updateName();
+	void clearInstrumentView();
 	void updateInstrumentView();
 
 
@@ -155,7 +157,7 @@ private:
 
 	// tab-widget with all children
 	TabWidget * m_tabWidget;
-	PluginView * m_instrumentView;
+	QPointer<PluginView> m_instrumentView;
 	InstrumentSoundShapingView * m_ssView;
 	InstrumentFunctionNoteStackingView* m_noteStackingView;
 	InstrumentFunctionArpeggioView* m_arpeggioView;

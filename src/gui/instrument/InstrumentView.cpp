@@ -34,6 +34,8 @@ namespace lmms::gui
 InstrumentView::InstrumentView( Instrument * _Instrument, QWidget * _parent ) :
 	PluginView( _Instrument, _parent )
 {
+	// The parent is the instrument tab widget; its parent is the window.
+	m_owningWindow = _parent ? _parent->parentWidget() : nullptr;
 	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	setModel( _Instrument );
 	setAttribute( Qt::WA_DeleteOnClose, true );
@@ -44,9 +46,10 @@ InstrumentView::InstrumentView( Instrument * _Instrument, QWidget * _parent ) :
 
 InstrumentView::~InstrumentView()
 {
-	if( instrumentTrackWindow() )
+	auto* window = qobject_cast<InstrumentTrackWindow*>(m_owningWindow.data());
+	if (window && window->m_instrumentView.data() == this)
 	{
-		instrumentTrackWindow()->m_instrumentView = nullptr;
+		window->m_instrumentView = nullptr;
 	}
 }
 

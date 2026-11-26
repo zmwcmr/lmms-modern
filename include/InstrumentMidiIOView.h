@@ -43,6 +43,7 @@ namespace gui
 class GroupBox;
 class LcdSpinBox;
 class LedCheckBox;
+class ComboBox;
 
 
 class InstrumentMidiIOView : public QWidget, public ModelView
@@ -52,6 +53,9 @@ public:
 	InstrumentMidiIOView( QWidget* parent );
 	~InstrumentMidiIOView() override = default;
 
+
+protected:
+	void showEvent(QShowEvent* event) override;
 
 private:
 	void modelChanged() override;
@@ -67,6 +71,7 @@ private:
 	LcdSpinBox * m_outputProgramSpinBox;
 	LcdSpinBox * m_fixedOutputNoteSpinBox;
 	QToolButton * m_wpBtn;
+	ComboBox * m_midiOutTargetCombo = nullptr;
 
 	LcdSpinBox* m_baseVelocitySpinBox;
 

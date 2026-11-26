@@ -35,6 +35,7 @@
 #include <QTemporaryFile>
 #include <QTimerEvent>
 
+#include <algorithm>
 #include <cstring>
 
 #if defined(LMMS_BUILD_LINUX) && (QT_VERSION < QT_VERSION_CHECK(6,0,0))
@@ -528,6 +529,36 @@ bool VstPlugin::processMessage( const message & _m )
 			m_isSynth = true;
 			break;
 
+		case IdVstLatency:
+			m_latency = std::max(0, _m.getInt(0));
+			break;
+
+		case IdVstMidiOut:
+		{
+			const int deltaFrames = _m.getInt(0);
+			const int size = std::clamp(_m.getInt(1), 0, 4);
+			QByteArray data;
+			data.reserve(size);
+			for (int i = 0; i < size; ++i)
+			{
+				data.append(static_cast<char>(_m.getInt(2 + i) & 0xFF));
+			}
+			emit midiOutEvent(deltaFrames, data);
+			break;
+		}
+
+		case IdVstParameterAutomated:
+			emit parameterAutomated(_m.getInt(0), _m.getFloat(1));
+			break;
+
+		case IdVstParameterGestureBegin:
+			emit parameterGestureBegin(_m.getInt(0));
+			break;
+
+		case IdVstParameterGestureEnd:
+			emit parameterGestureEnd(_m.getInt(0));
+			break;
+
 		case IdVstParameterDump:
 		{
 			m_parameterDump.clear();
@@ -697,6 +728,29 @@ void VstPlugin::setParam( int i, float f )
 	lock();
 	sendMessage( message( IdVstSetParameter ).addInt( i ).addFloat( f ) );
 	//waitForMessage( IdVstSetParameter, true );
+	unlock();
+}
+
+
+
+
+void VstPlugin::setParamEvents( int i, const std::vector<ParameterEvent> & events )
+{
+	if( events.empty() )
+	{
+		return;
+	}
+
+	lock();
+	message m( IdVstParameterEvents );
+	m.addInt( i );
+	m.addInt( static_cast<int>( events.size() ) );
+	for( const auto & event : events )
+	{
+		m.addInt( event.frame );
+		m.addFloat( event.value );
+	}
+	sendMessage( m );
 	unlock();
 }
 

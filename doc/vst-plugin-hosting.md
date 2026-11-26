@@ -46,12 +46,19 @@ UI**:
 | Method | Behaviour |
 | --- | --- |
 | Separate window (default) | The editor is a standalone window. On Wayland it still opens through XWayland. |
-| Embed in LMMS window (`qt`) | The editor window is embedded into the LMMS dialog. |
+| Embed in LMMS window (`qt`) | The editor window is embedded into the LMMS dialog. Available on `xcb` only; on Wayland LMMS falls back to the separate window. |
 | XEmbed (`xembed`) | X11 embedding, available with Qt 5 on `xcb` only. |
 | Disabled/headless | No editor; the generic parameter controls remain usable. |
 
 Hiding an embedded editor does not destroy the plugin editor; reopening it is
 cheap and avoids reinitialising plugin GUIs which are not restart-safe.
+
+VST2 editors report a fixed pixel size through `effEditGetRect`; the host has
+no standard way to scale their content. LMMS re-reads the rectangle after
+`effEditOpen` because some plugins only report their real size then, and the
+remote X11 window remains user-resizable. On fractional Wayland desktops the
+plugin's fixed pixel size can look smaller than native HiDPI applications;
+that is a plugin limitation, not a host size calculation error.
 
 ## State and presets
 
@@ -68,7 +75,9 @@ navigation. Presets are `.fxp`/`.fxb` files handled by the plugin.
 - VST3 is not supported.
 - 32-bit VSTs require the 32-bit remote host (and Wine on Linux).
 - Plugin editors are X11 windows. Native Wayland embedding is not possible, so
-  the default separate-window mode is used on Wayland.
+  the default separate-window mode is used on Wayland. A saved `qt` embedding
+  setting is ignored there instead of producing a black embedded widget.
+  XEmbed and `qt` embedding require the `xcb` platform.
 - A remote host crash loses the plugin's current unsaved state. The parameters
   stored in the project are restored the next time it is loaded.
 - Scanning starts every candidate plugin once. A large collection can make

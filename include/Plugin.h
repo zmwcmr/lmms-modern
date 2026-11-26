@@ -29,6 +29,7 @@
 #include <QMap>
 
 #include "JournallingObject.h"
+#include "LmmsTypes.h"
 #include "Model.h"
 
 
@@ -257,6 +258,9 @@ public:
 	);
 
 	~Plugin() override = default;
+
+	//! Processing latency in samples
+	virtual f_cnt_t latency() const { return 0; }
 
 	//! Return display-name out of sub plugin or descriptor
 	QString displayName() const override;

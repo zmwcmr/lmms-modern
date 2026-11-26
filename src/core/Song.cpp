@@ -133,6 +133,11 @@ Song::Song() :
 
 	// Inform VST plugins if the user moved the play head
 	connect(this, &Song::playbackPositionJumped, this, [this](){ m_vstSyncController.setPlaybackJumped(true); }, Qt::DirectConnection);
+
+	// Release notes on external MIDI outputs after a seek.
+	connect(this, &Song::playbackPositionJumped, this,
+		[](){ Engine::audioEngine()->requestNoteOffAll(); },
+		Qt::DirectConnection);
 }
 
 
@@ -332,6 +337,8 @@ void Song::processNextBuffer()
 		if (static_cast<f_cnt_t>(frameOffsetInTick) == 0)
 		{
 			// First frame of tick: process automation and play tracks
+			m_currentFrameOffsetInPeriod.store(
+				frameOffsetInPeriod, std::memory_order_relaxed);
 			processAutomations(trackList, getPlayPos(), framesToPlay);
 			processMetronome(frameOffsetInPeriod);
 
@@ -349,6 +356,8 @@ void Song::processNextBuffer()
 
 	// Reset the jumped state after processing this buffer, since presumably it has now been handled.
 	m_vstSyncController.setPlaybackJumped(false);
+
+	m_currentFrameOffsetInPeriod.store(0, std::memory_order_relaxed);
 }
 
 void Song::removeOldAutomatedValue(AutomatableModel* am)

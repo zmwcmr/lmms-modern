@@ -32,7 +32,10 @@
 #include <QByteArray>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -81,10 +84,62 @@
 namespace lmms::gui
 {
 
+namespace
+{
+// UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
+// ui:resize. Clamp them before they reach the plugin, which may assert.
+int clampUiDimension(int value, int maximum)
+{
+	return std::clamp(value, 1, std::max(maximum, 1));
+}
+
+// Temporarily switch the working directory for plugin calls that resolve
+// assets relative to the CWD (Zyn Fusion's qml/ and libzest.so).
+class CurrentDirGuard
+{
+public:
+	explicit CurrentDirGuard(const QString& dir)
+		: m_old(QDir::currentPath())
+	{
+		if (!dir.isEmpty() && dir != m_old)
+		{
+			m_changed = QDir::setCurrent(dir);
+		}
+	}
+	~CurrentDirGuard()
+	{
+		if (m_changed) { QDir::setCurrent(m_old); }
+	}
+private:
+	QString m_old;
+	bool m_changed = false;
+};
+}
+
 #if defined(LMMS_BUILD_LINUX)
 namespace
 {
 XErrorHandler g_previousXErrorHandler = nullptr;
+
+// Some plugin UIs (Zyn Fusion) look for qml/, font/ and schema/ relative to
+// the current directory. Walk up from the bundle until the asset root is
+// found; return an empty string for ordinary bundles.
+QString findUiDataRoot(const QString& bundleDir)
+{
+	// Bundle paths are often symlinks into an install tree; resolve them
+	// before walking up to the asset root.
+	const QString canonical = QFileInfo(bundleDir).canonicalFilePath();
+	QDir dir(canonical.isEmpty() ? bundleDir : canonical);
+	for (int depth = 0; depth < 4; ++depth)
+	{
+		if (QFile::exists(dir.filePath(QStringLiteral("qml/MainWindow.qml"))))
+		{
+			return dir.absolutePath();
+		}
+		if (!dir.cdUp()) { break; }
+	}
+	return {};
+}
 
 int lmmsXErrorHandler(Display* display, XErrorEvent* event)
 {
@@ -99,6 +154,8 @@ int lmmsXErrorHandler(Display* display, XErrorEvent* event)
 		? g_previousXErrorHandler(display, event)
 		: 0;
 }
+
+
 }
 #endif
 
@@ -125,6 +182,40 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 			meAsWidget);
 		m_reloadPluginButton->setObjectName("btn");
 		btnBox->addWidget(m_reloadPluginButton, 0);
+	}
+
+	if (proc && !proc->presets().empty())
+	{
+		auto* presetLabel = new QLabel(QObject::tr("Preset:"), meAsWidget);
+		m_presetCombo = new QComboBox(meAsWidget);
+		m_presetCombo->setSizeAdjustPolicy(
+			QComboBox::AdjustToMinimumContentsLengthWithIcon);
+		m_presetCombo->setMinimumContentsLength(24);
+		m_presetCombo->setSizePolicy(QSizePolicy::Expanding,
+			QSizePolicy::Fixed);
+		m_presetCombo->setToolTip(QObject::tr(
+			"Load a factory preset from the plugin bundle"));
+		m_presetCombo->addItem(QObject::tr("Choose preset..."));
+		for (const Lv2Proc::Preset& preset : proc->presets())
+		{
+			m_presetCombo->addItem(preset.label);
+		}
+		btnBox->addWidget(presetLabel);
+		btnBox->addWidget(m_presetCombo, 1);
+		QObject::connect(m_presetCombo,
+			QOverload<int>::of(&QComboBox::currentIndexChanged),
+			meAsWidget,
+			[this](int index)
+			{
+				if (index <= 0 || !m_proc)
+				{
+					return;
+				}
+				if (!m_proc->loadPreset(static_cast<std::size_t>(index - 1)))
+				{
+					qWarning() << "Could not load LV2 preset" << index;
+				}
+			});
 	}
 
 	if (hasPluginUi())
@@ -168,7 +259,8 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		break;
 	}
 
-	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton)
+	if (m_reloadPluginButton || m_toggleUIButton || m_helpButton
+		|| m_presetCombo)
 	{
 		auto* buttonBar = new QWidget(meAsWidget);
 		// ControlLayout sorts items by object name. This key sorts after the
@@ -494,7 +586,14 @@ void Lv2ProcView::createUi()
 
 	QWidget* const scaleWidget = m_uiHostWidget
 		? static_cast<QWidget*>(m_uiHostWidget) : m_pluginWidget;
-	qreal scale = scaleWidget ? scaleWidget->devicePixelRatioF() : 1.0;
+	// The floating UI is a raw X11 window managed outside Qt's Wayland
+	// surfaces. Qt's device pixel ratio is rounded up (often to 2.0) for
+	// fractional desktops, which would make the plugin render at double size
+	// and push its lower part below the screen. Use 1.0 so the plugin's
+	// natural pixel size matches VST2 editors; the environment override can
+	// still request a different scale.
+	qreal scale = m_uiHostWidget
+		? (scaleWidget ? scaleWidget->devicePixelRatioF() : 1.0) : 1.0;
 	if (const QByteArray override = qgetenv("LMMS_LV2_UI_SCALE");
 		!override.isEmpty())
 	{
@@ -536,6 +635,13 @@ void Lv2ProcView::createUi()
 		lilv_node_as_uri(lilv_ui_get_bundle_uri(ui)), nullptr));
 	AutoLilvPtr<char> binaryPath(lilv_file_uri_parse(
 		lilv_node_as_uri(lilv_ui_get_binary_uri(ui)), nullptr));
+
+	// Zyn Fusion loads qml/ and libzest.so relative to the working directory.
+	// Switch to its asset root while the UI is created and updated.
+	const QString dataRoot = findUiDataRoot(
+		QString::fromLocal8Bit(bundlePath.get()));
+	m_uiDataRoot = dataRoot;
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 	m_uiInstance = suil_instance_new(
 		m_uiHost,
@@ -584,6 +690,7 @@ void Lv2ProcView::createUi()
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
 	if (m_proc)
 	{
 		m_proc->setUiActive(false);
@@ -664,16 +771,28 @@ void Lv2ProcView::resizeUiToPlugin()
 			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
 			&& attr.width > 0 && attr.height > 0)
 		{
-			XResizeWindow(dpy, m_x11Window, attr.width, attr.height);
-			m_lastUiWidth = attr.width;
-			m_lastUiHeight = attr.height;
+			// Keep the outer window on screen even if the plugin asks for a
+			// larger size. Resizable UIs are told to use the clamped size.
+			const int screen = DefaultScreen(dpy);
+			const int maxWidth = std::max(DisplayWidth(dpy, screen) - 80, 320);
+			const int maxHeight = std::max(DisplayHeight(dpy, screen) - 120, 240);
+			const int windowWidth = std::min(attr.width, maxWidth);
+			const int windowHeight = std::min(attr.height, maxHeight);
+			XResizeWindow(dpy, m_x11Window, windowWidth, windowHeight);
+			if (m_uiResizable
+				&& (windowWidth != attr.width || windowHeight != attr.height))
+			{
+				resizePluginChild(windowWidth, windowHeight);
+			}
+			m_lastUiWidth = windowWidth;
+			m_lastUiHeight = windowHeight;
 
 			if (!m_uiResizable)
 			{
 				XSizeHints hints{};
 				hints.flags = PMinSize | PMaxSize;
-				hints.min_width = hints.max_width = attr.width;
-				hints.min_height = hints.max_height = attr.height;
+				hints.min_width = hints.max_width = windowWidth;
+				hints.min_height = hints.max_height = windowHeight;
 				XSetNormalHints(dpy, m_x11Window, &hints);
 			}
 			XFlush(dpy);
@@ -765,6 +884,9 @@ void Lv2ProcView::applyUiResize(int width, int height)
 	if (m_x11Window && m_x11Display)
 	{
 		Display* dpy = static_cast<Display*>(m_x11Display);
+		const int screen = DefaultScreen(dpy);
+		width = clampUiDimension(width, DisplayWidth(dpy, screen) - 80);
+		height = clampUiDimension(height, DisplayHeight(dpy, screen) - 120);
 		XResizeWindow(dpy, m_x11Window, static_cast<unsigned>(width),
 			static_cast<unsigned>(height));
 		m_lastUiWidth = width;
@@ -773,6 +895,9 @@ void Lv2ProcView::applyUiResize(int width, int height)
 		return;
 	}
 #endif
+
+	width = clampUiDimension(width, 16384);
+	height = clampUiDimension(height, 16384);
 
 	if (m_uiHostWidget)
 	{
@@ -860,6 +985,8 @@ void Lv2ProcView::resizePluginChild(int width, int height)
 	{
 		return;
 	}
+	width = clampUiDimension(width, 16384);
+	height = clampUiDimension(height, 16384);
 	bool ownDisplay = false;
 	Display* dpy = static_cast<Display*>(m_x11Display);
 	if (!dpy)
@@ -903,12 +1030,16 @@ void Lv2ProcView::updateUi()
 		return;
 	}
 
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
+
 #if defined(LMMS_BUILD_LINUX)
 	if (m_uiHostWidget && m_uiResizable)
 	{
 		const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-		const int width = static_cast<int>(std::lround(m_uiHostWidget->width() * dpr));
-		const int height = static_cast<int>(std::lround(m_uiHostWidget->height() * dpr));
+		const int width = clampUiDimension(
+			static_cast<int>(std::lround(m_uiHostWidget->width() * dpr)), 16384);
+		const int height = clampUiDimension(
+			static_cast<int>(std::lround(m_uiHostWidget->height() * dpr)), 16384);
 		if (width != m_lastUiWidth || height != m_lastUiHeight)
 		{
 			resizePluginChild(width, height);

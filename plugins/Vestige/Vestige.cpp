@@ -45,8 +45,10 @@
 #include "GuiApplication.h"
 #include "InstrumentPlayHandle.h"
 #include "InstrumentTrack.h"
+#include "MidiEvent.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
+#include "ParameterCurve.h"
 #include "PathUtil.h"
 #include "PixmapButton.h"
 #include "Song.h"
@@ -158,7 +160,8 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
 	m_subWindow( nullptr ),
 	m_scrollArea( nullptr ),
 	knobFModel( nullptr ),
-	p_subWindow( nullptr )
+	p_subWindow( nullptr ),
+	paramCount( 0 )
 {
 	// now we need a play-handle which cares for calling play()
 	auto iph = new InstrumentPlayHandle(this, _instrument_track);
@@ -227,6 +230,7 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 		const QMap<QString, QString> & dump = m_plugin->parameterDump();
 		paramCount = dump.size();
+		m_lastParameterPeriod.assign(paramCount, -1);
 		auto paramStr = std::array<char, 35>{};
 		knobFModel = new FloatModel *[ paramCount ];
 		QStringList s_dumpValues;
@@ -256,11 +260,123 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 void VestigeInstrument::setParameter( Model * action )
 {
-	int knobUNID = action->displayName().toInt();
-
-	if ( m_plugin != nullptr ) {
-		m_plugin->setParam( knobUNID, knobFModel[knobUNID]->value() );
+	if (m_updatingParametersFromPlugin)
+	{
+		return;
 	}
+
+	const int knobUNID = action->displayName().toInt();
+	if (knobUNID < 0 || knobUNID >= paramCount || knobFModel == nullptr)
+	{
+		return;
+	}
+
+	sendParameter(knobUNID, knobFModel[knobUNID]);
+}
+
+
+
+
+void VestigeInstrument::sendParameter( int index, FloatModel * model )
+{
+	if (m_plugin == nullptr || model == nullptr)
+	{
+		return;
+	}
+
+	// Automation clips update the model at tick boundaries. Send one event at
+	// the exact frame offset within the current block. valueBuffer() is not
+	// used here: for a scalar automation change it interpolates over the whole
+	// period instead of starting at the tick.
+	if (model->isAutomated())
+	{
+		const f_cnt_t frameOffset = Engine::getSong() != nullptr
+			? Engine::getSong()->currentFrameOffsetInPeriod() : 0;
+		m_plugin->setParamEvents(index, {
+			{static_cast<int>(frameOffset), model->value()}});
+		return;
+	}
+
+	// Controllers with sample-exact data provide a block-aligned curve.
+	if (model->controllerConnection())
+	{
+		const long period = AutomatableModel::periodCounter();
+		if (index >= 0
+			&& index < static_cast<int>(m_lastParameterPeriod.size()))
+		{
+			if (m_lastParameterPeriod[index] == period)
+			{
+				return;
+			}
+			m_lastParameterPeriod[index] = period;
+		}
+
+		ValueBuffer * values = model->valueBuffer();
+		if (values != nullptr && values->length() > 0)
+		{
+			const auto events = compressParameterCurve(
+				values->values(), values->length(),
+				model->minValue(), model->maxValue());
+			if (!events.empty())
+			{
+				m_plugin->setParamEvents(index, events);
+				return;
+			}
+		}
+	}
+
+	m_plugin->setParam(index, model->value());
+}
+
+
+
+
+void VestigeInstrument::handleParameterAutomated( int index, float value )
+{
+	if (m_updatingParametersFromPlugin || knobFModel == nullptr
+		|| index < 0 || index >= paramCount)
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_updatingParametersFromPlugin = true;
+	model->setValue(value, true);
+	m_updatingParametersFromPlugin = false;
+}
+
+
+
+
+void VestigeInstrument::handleParameterGestureBegin( int index )
+{
+	if (knobFModel == nullptr || index < 0 || index >= paramCount
+		|| m_parameterGestures.contains(index))
+	{
+		return;
+	}
+
+	FloatModel* model = knobFModel[index];
+	if (model == nullptr || model->isAutomatedOrControlled())
+	{
+		return;
+	}
+
+	m_parameterGestures.insert(index);
+	model->addJournalCheckPoint();
+}
+
+
+
+
+void VestigeInstrument::handleParameterGestureEnd( int index )
+{
+	m_parameterGestures.remove(index);
 }
 
 void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString value)
@@ -374,6 +490,38 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 	m_pluginMutex.lock();
 	m_plugin = new VstInstrumentPlugin( m_pluginDLL );
+	if( !m_plugin->failed() )
+	{
+		connect(m_plugin, &VstPlugin::midiOutEvent, this,
+			[this](int /*deltaFrames*/, const QByteArray& data)
+			{
+				if (data.isEmpty()) { return; }
+				const auto status = static_cast<quint8>(data[0]);
+				const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+				if (type == MidiSysEx) { return; }
+				const auto channel = static_cast<int8_t>(status & 0x0F);
+				const auto param1 = data.size() > 1
+					? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
+				const auto param2 = data.size() > 2
+					? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
+
+				std::lock_guard<std::mutex> lock(m_midiOutMutex);
+				if (m_midiOutQueue.size() < 4096)
+				{
+					m_midiOutQueue.emplace_back(type, channel, param1, param2,
+						nullptr, MidiEvent::Source::Internal);
+				}
+			}, Qt::DirectConnection);
+		connect(m_plugin, &VstPlugin::parameterAutomated, this,
+			&VestigeInstrument::handleParameterAutomated,
+			Qt::QueuedConnection);
+		connect(m_plugin, &VstPlugin::parameterGestureBegin, this,
+			&VestigeInstrument::handleParameterGestureBegin,
+			Qt::QueuedConnection);
+		connect(m_plugin, &VstPlugin::parameterGestureEnd, this,
+			&VestigeInstrument::handleParameterGestureEnd,
+			Qt::QueuedConnection);
+	}
 	if( m_plugin->failed() )
 	{
 		m_pluginMutex.unlock();
@@ -416,8 +564,43 @@ void VestigeInstrument::play( SampleFrame* _buf )
 	}
 
 	m_plugin->process( nullptr, _buf );
+	drainMidiOutQueue();
+
+	if (auto* track = instrumentTrack())
+	{
+		track->audioBusHandle()->setSourceLatency(m_plugin->latency());
+	}
 
 	m_pluginMutex.unlock();
+}
+
+
+
+
+void VestigeInstrument::drainMidiOutQueue()
+{
+	std::vector<MidiEvent> events;
+	{
+		std::lock_guard<std::mutex> lock(m_midiOutMutex);
+		events.swap(m_midiOutQueue);
+	}
+
+	if (auto* track = instrumentTrack())
+	{
+		for (const MidiEvent& event : events)
+		{
+			track->routeMidiOutEvent(event, TimePos());
+		}
+	}
+}
+
+
+
+
+f_cnt_t VestigeInstrument::latency() const
+{
+	QMutexLocker lock( &m_pluginMutex );
+	return m_plugin != nullptr ? m_plugin->latency() : 0;
 }
 
 
@@ -440,6 +623,11 @@ bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& 
 
 void VestigeInstrument::closePlugin( void )
 {
+	{
+		std::lock_guard<std::mutex> lock(m_midiOutMutex);
+		m_midiOutQueue.clear();
+	}
+
 	// disconnect all signals
 	if( knobFModel != nullptr )
 	{
@@ -454,6 +642,7 @@ void VestigeInstrument::closePlugin( void )
 		delete [] knobFModel;
 		knobFModel = nullptr;
 	}
+	m_lastParameterPeriod.clear();
 
 	if( m_scrollArea != nullptr )
 	{
@@ -966,6 +1155,9 @@ ManageVestigeInstrumentView::ManageVestigeInstrumentView( Instrument * _instrume
 		m_vi->knobFModel = new FloatModel *[ m_vi->paramCount ];
 		hasKnobModel = false;
 	}
+	if (!hasKnobModel) {
+		m_vi->m_lastParameterPeriod.assign(m_vi->paramCount, -1);
+	}
 
 	auto paramStr = std::array<char, 35>{};
 	QStringList s_dumpValues;
@@ -1084,12 +1276,17 @@ void ManageVestigeInstrumentView::displayAutomatedOnly( void )
 
 ManageVestigeInstrumentView::~ManageVestigeInstrumentView()
 {
+	// Delete the knobs first: their ModelView destructor still looks at the
+	// model, and the models are owned by the instrument.
 	if( m_vi->knobFModel != nullptr )
 	{
 		for( int i = 0; i < m_vi->paramCount; i++ )
 		{
-			delete m_vi->knobFModel[ i ];
 			delete m_vstKnobs[i];
+		}
+		for( int i = 0; i < m_vi->paramCount; i++ )
+		{
+			delete m_vi->knobFModel[ i ];
 		}
 	}
 
@@ -1117,10 +1314,17 @@ ManageVestigeInstrumentView::~ManageVestigeInstrumentView()
 
 void ManageVestigeInstrumentView::setParameter( Model * action )
 {
+	if (m_vi->m_updatingParametersFromPlugin)
+	{
+		return;
+	}
+
 	int knobUNID = action->displayName().toInt();
 
-	if ( m_vi->m_plugin != nullptr ) {
-		m_vi->m_plugin->setParam( knobUNID, m_vi->knobFModel[knobUNID]->value() );
+	if ( m_vi->m_plugin != nullptr && m_vi->knobFModel != nullptr
+		&& knobUNID >= 0 && knobUNID < m_vi->paramCount )
+	{
+		m_vi->sendParameter( knobUNID, m_vi->knobFModel[knobUNID] );
 	}
 }
 

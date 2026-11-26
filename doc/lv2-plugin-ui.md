@@ -28,7 +28,10 @@ Environment overrides:
 - `LMMS_ENABLE_UNSTABLE_LV2_UI=1` re-enables UIs for plugins on the known
   unstable list (currently empty).
 - `LMMS_LV2_UI_SCALE=1.5` overrides the scale factor passed to plugin UIs.
-  By default the widget's device pixel ratio is used.
+  By default the widget's device pixel ratio is used for embedded UIs, while
+  floating X11 UIs use 1.0 so they match the pixel size that VST2 editors
+  report. The floating window is also clamped to the screen; resizable UIs
+  receive the clamped size and re-layout their contents.
 
 ## Implemented
 
@@ -62,3 +65,31 @@ enabled again.
   real-time safe yet.
 - A UI crash runs in-process and can take LMMS down with it. Out-of-process
   UI hosting is future work.
+- LV2 control ports are block-rate: a parameter change takes effect at the
+  start of the next `run()` cycle, not at a sample offset inside the block.
+  Sample-accurate plugin parameters are VST2-only for now; core LV2 has no
+  standard parameter event with a sample position. MIDI atom events still keep
+  their block-relative frame offsets.
+- Plugins taken from Flatpak runtimes and symlinked into `~/.lv2` can load, but
+  their data files are not visible outside the sandbox. Surge, for example,
+  looks for `~/.local/share/surge` or `/usr/share/surge`; without that link
+  its UI reports a skin error and stays black. Link the runtime's `files/share`
+  directory into the path the plugin expects, or install a native build.
+
+## Flatpak plugin bundles
+
+Flatpak audio runtimes install their LV2 bundles under
+`~/.local/share/flatpak/runtime/org.freedesktop.LinuxAudio.Plugins.*/.../files/lv2`.
+Symlinking those bundles into `~/.lv2` is enough for scanning and audio, but
+the plugin's resource lookup still uses paths outside the runtime:
+
+```bash
+# Surge XT
+ln -s "$(readlink -f ~/.lv2/Surge.lv2)/../../share/surge" \
+      ~/.local/share/surge
+```
+
+The same pattern applies to other bundles that ship banks, skins or kits.
+Check the plugin's log output first; a missing resource usually produces an
+explicit path in the error message.
+

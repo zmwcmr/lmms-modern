@@ -31,11 +31,14 @@
 
 #include <lilv/lilv.h>
 #include <lv2/state/state.h>
+#include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <vector>
 
 #include <QTemporaryDir>
 
@@ -64,6 +67,7 @@ class SampleFrame;
 namespace Lv2Ports
 {
 	struct Audio;
+	struct Control;
 	struct PortBase;
 	struct AtomSeq;
 }
@@ -149,6 +153,35 @@ public:
 	void dumpPorts();
 
 	/*
+		factory presets
+	*/
+	struct Preset
+	{
+		QString label;
+		QString uri;
+	};
+
+	//! Presets from the plugin bundle that apply to this plugin
+	const std::vector<Preset>& presets() const { return m_presets; }
+	//! Restore a factory preset; must be called from the GUI thread
+	bool loadPreset(std::size_t index);
+
+	//! One MIDI message emitted on the plugin's MIDI output port
+	struct MidiOutEvent
+	{
+		uint32_t offset = 0;
+		std::array<uint8_t, 3> data{};
+		uint8_t size = 0;
+	};
+
+	//! MIDI events produced since the last clear; audio-thread only
+	const std::vector<MidiOutEvent>& midiOutEvents() const
+	{
+		return m_midiOutEvents;
+	}
+	void clearMidiOutEvents() { m_midiOutEvents.clear(); }
+
+	/*
 		utils for the run thread
 	*/
 
@@ -183,6 +216,8 @@ public:
 	AutomatableModel *modelAtPort(const QString &uri); // unused currently
 	std::size_t controlCount() const { return ModelGroup::size(); }
 	bool hasNoteInput() const;
+	//! Processing latency reported by the plugin, in samples
+	f_cnt_t latency() const { return m_latency.load(std::memory_order_relaxed); }
 	const LilvPlugin* getPlugin() const { return m_plugin; }
 	bool hasGui() const { return m_hasGUI; }
 
@@ -193,6 +228,7 @@ public:
 	const char* pluginUri() const { return lilv_node_as_uri(lilv_plugin_get_uri(m_plugin)); }
 	std::size_t getIdOfPort(const char* symbol) const;
 	std::size_t portNum() const { return m_ports.size(); }
+	Lv2Ports::PortBase* port(std::size_t idx) { return m_ports[idx].get(); }
 	const Lv2Ports::PortBase* port(std::size_t idx) const { return m_ports[idx].get(); }
 	//! Called by the UI when the user moves a control
 	void setControlFromUi(uint32_t portIndex, float value);
@@ -273,11 +309,23 @@ private:
 	//! Called by the view to detach its native UI before shutdown
 	std::function<void()> m_viewDetacher;
 
+	//! Output control port carrying the plugin latency, if any
+	Lv2Ports::Control* m_latencyPort = nullptr;
+	std::atomic<f_cnt_t> m_latency{0};
+
 	//! Plugin -> UI event queue (atom events, etc.)
 	std::mutex m_uiEventMutex;
 	std::deque<UiEvent> m_uiEvents;
 	std::atomic<bool> m_uiActive{false};
 	bool sendToUi(uint32_t portIndex, uint32_t type, uint32_t size, const void* body);
+
+	//! Factory presets exposed by the plugin bundle
+	std::vector<Preset> m_presets;
+	void scanPresets();
+
+	//! MIDI output collected in run(); consumed on the audio thread
+	std::vector<MidiOutEvent> m_midiOutEvents;
+	void collectMidiOutEvent(uint32_t offset, const uint8_t* data, uint32_t size);
 
 	void saveState(QDomDocument& doc, QDomElement& that);
 	void loadState(const QDomElement& that);

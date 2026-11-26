@@ -65,6 +65,9 @@ public:
 	void moveUp( Effect * _effect );
 	bool processAudioBuffer(AudioBuffer& buffer);
 
+	//! Sum of the processing latencies of all effects, in samples
+	f_cnt_t latency() const;
+
 	void clear();
 
 

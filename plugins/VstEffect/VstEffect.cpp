@@ -104,6 +104,15 @@ Effect::ProcessStatus VstEffect::processImpl(SampleFrame* buf, const f_cnt_t fra
 
 
 
+f_cnt_t VstEffect::latency() const
+{
+	QMutexLocker lock( &m_pluginMutex );
+	return m_plugin != nullptr ? m_plugin->latency() : 0;
+}
+
+
+
+
 bool VstEffect::openPlugin(const QString& plugin)
 {
 	gui::TextFloat* tf = nullptr;
@@ -126,6 +135,8 @@ bool VstEffect::openPlugin(const QString& plugin)
 	}
 
 	delete tf;
+
+	m_vstControls.connectToPlugin(m_plugin.data());
 
 	m_key.attributes["file"] = plugin;
 	return true;

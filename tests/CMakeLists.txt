@@ -5,9 +5,11 @@ set(CMAKE_AUTOMOC ON)
 
 set(LMMS_TESTS
 	src/core/ArrayVectorTest.cpp
+	src/core/DelayLineTest.cpp
 	src/core/AudioBufferTest.cpp
 	src/core/AutomatableModelTest.cpp
 	src/core/MathTest.cpp
+	src/core/ParameterCurveTest.cpp
 	src/core/ProjectVersionTest.cpp
 	src/core/RelativePathsTest.cpp
 	src/core/SongAutomationTest.cpp
@@ -17,6 +19,21 @@ set(LMMS_TESTS
 	src/tracks/InstrumentTrackTest.cpp
 	src/tracks/MidiClipTest.cpp
 )
+
+if(LMMS_HAVE_LV2)
+	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
+endif()
+
+if(LMMS_BUILD_LINUX AND WANT_VST)
+	add_library(FakeMidiVst SHARED plugins/fake-midi-vst.cpp)
+	target_include_directories(FakeMidiVst PRIVATE ${CMAKE_SOURCE_DIR}/include)
+	target_compile_features(FakeMidiVst PRIVATE cxx_std_17)
+	set_target_properties(FakeMidiVst PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "fake-midi-vst"
+	)
+endif()
 
 foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	# TODO CMake 3.20: Use cmake_path
