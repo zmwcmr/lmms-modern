@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.5 remote DSP has watchdog restart, and the remote DSP/editor remain
-the default on xcb and Wayland.
+Status: P5 complete; P6 documentation and cross-platform build guards are in
+progress.
 
 ## 1. Goal
 
@@ -224,11 +224,25 @@ for the editor lifetime, and normal LMMS renders use the remote DSP path.
 Editor crashes still close the editor window; reopening it starts a fresh
 editor host.
 
+### P6: Documentation and platform guards (in progress)
+
+- Added `doc/vst3-plugin-hosting.md` covering build options, scanning,
+  instruments/effects, editors, remote DSP, environment switches and
+  diagnostics.
+- Updated the VST2 hosting document to point at VST3 instead of claiming VST3
+  is unsupported.
+- The POSIX DSP host/client are now Linux-only; other platforms compile a stub
+  and use the in-process host. Only the shared scanner, local host and editor
+  client sources remain portable.
+- The remote host tests are Linux-only; CoreFoundation is linked for the macOS
+  scanner/host/editor targets.
+
 Still open:
 
-- editor-host auto-restart,
-- state snapshot caching for very large plugin states,
-- removing the in-process fallback entirely.
+- fake VST3 test module for automated scanner/host tests,
+- a CI matrix with `WANT_VST3=ON` and `WANT_VST3=OFF`,
+- AppImage/Windows/macOS packaging verification,
+- editor-host auto-restart and final cleanup of the in-process fallback.
 
 ## 2. What Ardour and Carla teach us
 
@@ -566,7 +580,7 @@ Deliverables:
 
 Estimate: 3-5 weeks.
 
-### P6: Packaging, documentation and CI
+### P6: Packaging, documentation and CI — in progress
 
 Deliverables:
 

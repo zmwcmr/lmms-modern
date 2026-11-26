@@ -1,7 +1,8 @@
 # VST2 plugin hosting
 
 LMMS hosts VST2 instruments and effects through the Vestige plugin family.
-VST3 is not supported.
+Native VST3 hosting is available through the separate VST3 plugins; see
+[`vst3-plugin-hosting.md`](vst3-plugin-hosting.md).
 
 ## Where plugins are found
 
@@ -72,7 +73,7 @@ navigation. Presets are `.fxp`/`.fxb` files handled by the plugin.
 
 ## Known limitations
 
-- VST3 is not supported.
+- VST3 has its own host path; see [`vst3-plugin-hosting.md`](vst3-plugin-hosting.md).
 - 32-bit VSTs require the 32-bit remote host (and Wine on Linux).
 - Plugin editors are X11 windows. Native Wayland embedding is not possible, so
   the default separate-window mode is used on Wayland. A saved `qt` embedding

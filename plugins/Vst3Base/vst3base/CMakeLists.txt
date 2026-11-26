@@ -1,3 +1,9 @@
+IF(LMMS_BUILD_LINUX)
+	SET(VST3_REMOTE_HOST_SRC ../Vst3RemoteHostClient.cpp)
+ELSE()
+	SET(VST3_REMOTE_HOST_SRC ../Vst3RemoteHostClientStub.cpp)
+ENDIF()
+
 BUILD_PLUGIN(vst3base
 	../vst3_base.cpp
 	../Vst3Module.cpp ../Vst3Module.h
@@ -10,7 +16,7 @@ BUILD_PLUGIN(vst3base
 	../Vst3X11Editor.cpp ../Vst3X11Editor.h
 	../Vst3RemoteEditorClient.cpp ../Vst3RemoteEditorClient.h
 	../Vst3RemoteEditorWidget.cpp ../Vst3RemoteEditorWidget.h
-	../Vst3RemoteHostClient.cpp ../Vst3RemoteHostClient.h
+	${VST3_REMOTE_HOST_SRC} ../Vst3RemoteHostClient.h
 	../Vst3SharedAudio.h
 	../Vst3Protocol.h
 	../Vst3SubPluginFeatures.cpp ../Vst3SubPluginFeatures.h

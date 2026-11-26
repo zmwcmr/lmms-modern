@@ -12,10 +12,22 @@ TARGET_INCLUDE_DIRECTORIES(vst3-host-test
 )
 
 TARGET_LINK_LIBRARIES(vst3-host-test Qt${QT_VERSION_MAJOR}::Core)
+IF(APPLE)
+	FIND_LIBRARY(COREFOUNDATION_FRAMEWORK CoreFoundation)
+	IF(COREFOUNDATION_FRAMEWORK)
+		TARGET_LINK_LIBRARIES(vst3-host-test "${COREFOUNDATION_FRAMEWORK}")
+	ENDIF()
+ENDIF()
 
 SET_TARGET_PROPERTIES(vst3-host-test PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
 )
+
+IF(LMMS_BUILD_LINUX)
+	SET(VST3_REMOTE_HOST_SRC ../Vst3RemoteHostClient.cpp)
+ELSE()
+	SET(VST3_REMOTE_HOST_SRC ../Vst3RemoteHostClientStub.cpp)
+ENDIF()
 
 ADD_EXECUTABLE(vst3-editor-test
 	editor_test.cpp
@@ -26,7 +38,7 @@ ADD_EXECUTABLE(vst3-editor-test
 	../Vst3X11Editor.cpp
 	../Vst3RemoteEditorClient.cpp
 	../Vst3RemoteEditorWidget.cpp
-	../Vst3RemoteHostClient.cpp
+	${VST3_REMOTE_HOST_SRC}
 )
 
 TARGET_INCLUDE_DIRECTORIES(vst3-editor-test
@@ -37,6 +49,12 @@ TARGET_INCLUDE_DIRECTORIES(vst3-editor-test
 )
 
 TARGET_LINK_LIBRARIES(vst3-editor-test Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network)
+IF(APPLE)
+	FIND_LIBRARY(COREFOUNDATION_FRAMEWORK CoreFoundation)
+	IF(COREFOUNDATION_FRAMEWORK)
+		TARGET_LINK_LIBRARIES(vst3-editor-test "${COREFOUNDATION_FRAMEWORK}")
+	ENDIF()
+ENDIF()
 IF(LMMS_BUILD_LINUX)
 	TARGET_LINK_LIBRARIES(vst3-editor-test X11)
 ENDIF()
@@ -45,6 +63,7 @@ SET_TARGET_PROPERTIES(vst3-editor-test PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
 )
 
+IF(LMMS_BUILD_LINUX)
 ADD_EXECUTABLE(vst3-remote-host-test
 	remote_host_test.cpp
 	../Vst3RemoteHostClient.cpp
@@ -69,3 +88,4 @@ ADD_DEPENDENCIES(vst3-remote-host-test lmms-vst3-host)
 SET_TARGET_PROPERTIES(vst3-remote-host-test PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins"
 )
+ENDIF()

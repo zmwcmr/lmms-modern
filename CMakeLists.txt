@@ -695,7 +695,7 @@ endif()
 
 IF(WANT_VST3)
 	SET(LMMS_HAVE_VST3 TRUE)
-	SET(STATUS_VST3 "OK (P5.5: remote DSP/editor + watchdog restart)")
+	SET(STATUS_VST3 "OK (P5 complete; P6 docs/guards in progress)")
 ELSE()
 	SET(STATUS_VST3 "Not built, as requested")
 ENDIF()
