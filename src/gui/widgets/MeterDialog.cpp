@@ -26,10 +26,10 @@
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPainter>
 #include <QVBoxLayout>
 
 #include "MeterDialog.h"
-#include "FontHelper.h"
 #include "MeterModel.h"
 #include "LcdSpinBox.h"
 
@@ -48,6 +48,7 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 
 	if (_simple)
 	{
+		setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 		auto layout = new QVBoxLayout(this);
 		layout->setContentsMargins(0, 0, 0, 0);
 		layout->setSpacing(0);
@@ -62,11 +63,9 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 		digits->addStretch();
 		layout->addLayout(digits);
 
-		auto caption = new QLabel(tr("TIME SIG"), this);
-		caption->setFont(adjustedToPixelSize(caption->font(), DEFAULT_FONT_SIZE));
-		caption->setAlignment(Qt::AlignCenter);
-		caption->setFixedHeight(9);
-		layout->addWidget(caption);
+		m_caption = tr("TIME SIG");
+		setMinimumWidth(QFontMetrics(m_numerator->labelFont()).horizontalAdvance(m_caption) + 1);
+		layout->addSpacing(LcdWidget::LabelHeight);
 		return;
 	}
 
@@ -109,6 +108,16 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 
 
 
+
+void MeterDialog::paintEvent(QPaintEvent* event)
+{
+	QWidget::paintEvent(event);
+	if (!m_caption.isEmpty())
+	{
+		QPainter painter(this);
+		m_numerator->drawLabel(painter, rect(), m_caption);
+	}
+}
 
 void MeterDialog::modelChanged()
 {

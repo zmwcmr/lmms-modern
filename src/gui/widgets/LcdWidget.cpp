@@ -211,19 +211,26 @@ void LcdWidget::paintEvent( QPaintEvent* )
 	{
 		// The LCD digits are fixed-size artwork, so the caption keeps the
 		// design size instead of growing with the system font.
-		QFont labelFont = p.font();
-		labelFont.setPixelSize(DEFAULT_FONT_SIZE);
-		p.setFont(labelFont);
-		p.setPen( textShadowColor() );
-		p.drawText(width() / 2 -
-				p.fontMetrics().horizontalAdvance(m_label) / 2 + 1,
-						height(), m_label);
-		p.setPen( textColor() );
-		p.drawText(width() / 2 -
-				p.fontMetrics().horizontalAdvance(m_label) / 2,
-						height() - 1, m_label);
+		drawLabel(p, rect(), m_label);
 	}
 
+}
+
+QFont LcdWidget::labelFont() const
+{
+	auto result = font();
+	result.setPixelSize(DEFAULT_FONT_SIZE);
+	return result;
+}
+
+void LcdWidget::drawLabel(QPainter& painter, const QRect& area, const QString& label) const
+{
+	painter.setFont(labelFont());
+	const int left = area.x() + (area.width() - painter.fontMetrics().horizontalAdvance(label)) / 2;
+	painter.setPen(textShadowColor());
+	painter.drawText(left + 1, area.bottom() + 1, label);
+	painter.setPen(textColor());
+	painter.drawText(left, area.bottom(), label);
 }
 
 
@@ -262,14 +269,12 @@ void LcdWidget::updateSize()
 	}
 	else
 	{
-		QFont labelFont = font();
-		labelFont.setPixelSize(DEFAULT_FONT_SIZE);
 		setFixedSize(
 			qMax<int>(
 				m_cellWidth * m_numDigits + marginX1 + marginX2,
-				QFontMetrics(labelFont).horizontalAdvance(m_label)
+				QFontMetrics(labelFont()).horizontalAdvance(m_label)
 			),
-			m_cellHeight + (2 * marginY) + 9
+			m_cellHeight + (2 * marginY) + LabelHeight
 		);
 	}
 
