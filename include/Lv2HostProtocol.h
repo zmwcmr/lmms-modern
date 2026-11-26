@@ -27,6 +27,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -66,6 +67,20 @@ enum MessageId : int
 	IdDestroyUI,
 	//! child -> host: the UI was closed (reason text) or could not be created
 	IdUiClosed,
+	//! host -> child: save the plugin state into the given directory
+	IdSaveState,
+	//! child -> host: state save result (1 = ok)
+	IdStateSaved,
+	//! host -> child: restore the plugin state from the given directory
+	IdRestoreState,
+	//! child -> host: state restore result (1 = ok)
+	IdStateRestored,
+	//! host -> child: restore a factory preset by URI
+	IdLoadPreset,
+	//! child -> host: preset load result (1 = ok)
+	IdPresetLoaded,
+	//! child -> host: all control-port values after a restore (binary blob)
+	IdControlValues,
 };
 
 //! One MIDI event with a block-relative frame offset.
@@ -96,6 +111,39 @@ inline std::string encodeMidiEvents(const std::vector<MidiEventData>& events)
 		blob.append(reinterpret_cast<const char*>(event.data.data()), event.data.size());
 	}
 	return blob;
+}
+
+/*! Encode all control-port values as `uint32 count` followed by floats. */
+inline std::string encodeControlValues(const std::vector<float>& values)
+{
+	std::string blob;
+	blob.reserve(sizeof(uint32_t) + values.size() * sizeof(float));
+	const auto count = static_cast<uint32_t>(values.size());
+	blob.append(reinterpret_cast<const char*>(&count), sizeof(count));
+	blob.append(reinterpret_cast<const char*>(values.data()),
+		values.size() * sizeof(float));
+	return blob;
+}
+
+//! Decode a blob produced by encodeControlValues().
+inline std::vector<float> decodeControlValues(const std::string& blob)
+{
+	std::vector<float> values;
+	uint32_t count = 0;
+	if (blob.size() < sizeof(count))
+	{
+		return values;
+	}
+	std::memcpy(&count, blob.data(), sizeof(count));
+	const std::size_t available = (blob.size() - sizeof(count)) / sizeof(float);
+	count = std::min<uint32_t>(count, static_cast<uint32_t>(available));
+	values.resize(count);
+	if (count > 0)
+	{
+		std::memcpy(values.data(), blob.data() + sizeof(count),
+			count * sizeof(float));
+	}
+	return values;
 }
 
 //! Decode a blob produced by encodeMidiEvents(); truncation stops decoding.

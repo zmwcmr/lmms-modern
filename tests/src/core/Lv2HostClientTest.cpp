@@ -27,14 +27,17 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QProcess>
+#include <QTemporaryDir>
 
 #include <lilv/lilv.h>
 
 #include <cmath>
+#include <memory>
 #include <vector>
 
 #include "Lv2HostClient.h"
 #include "Lv2HostProtocol.h"
+#include "Lv2UridMap.h"
 
 using namespace lmms;
 
@@ -57,6 +60,7 @@ struct Reference
 {
 	LilvWorld* world = nullptr;
 	LilvInstance* instance = nullptr;
+	std::unique_ptr<UridMap> m_urids;
 	float gain = 0.5f;
 
 	~Reference()
@@ -84,7 +88,11 @@ struct Reference
 		}
 		lilv_node_free(uri);
 		if (plugin == nullptr) { return false; }
-		instance = lilv_plugin_instantiate(plugin, 44100, nullptr);
+		m_urids = std::make_unique<UridMap>();
+		LV2_Feature mapFeature{ LV2_URID__map, m_urids->mapFeature() };
+		LV2_Feature unmapFeature{ LV2_URID__unmap, m_urids->unmapFeature() };
+		const LV2_Feature* features[] = { &mapFeature, &unmapFeature, nullptr };
+		instance = lilv_plugin_instantiate(plugin, 44100, features);
 		return instance != nullptr;
 	}
 };
@@ -100,6 +108,7 @@ private slots:
 	void survivesChildKill();
 	void matchesInProcessGain();
 	void forwardsMidiEvents();
+	void stateRoundTrip();
 };
 
 
@@ -285,6 +294,70 @@ void Lv2HostClientTest::forwardsMidiEvents()
 	QVERIFY(client.midiOutput().empty());
 
 	client.stop();
+}
+
+
+void Lv2HostClientTest::stateRoundTrip()
+{
+	qputenv("LV2_PATH",
+		QFileInfo(QString::fromUtf8(LMMS_FAKE_LV2_GAIN_BUNDLE))
+			.absolutePath().toUtf8());
+
+	QTemporaryDir stateDir;
+	QVERIFY(stateDir.isValid());
+
+	{
+		Lv2HostClient client;
+		QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+			QString::fromUtf8(GainUri), 44100, BlockSize, 15000),
+			qPrintable(client.errorString()));
+
+		int gainPort = -1;
+		for (const auto& port : client.ports())
+		{
+			if (port.symbol == QStringLiteral("gain")) { gainPort = port.index; }
+		}
+		QVERIFY(gainPort >= 0);
+		QVERIFY(client.setControlValue(gainPort, 0.25f));
+
+		std::vector<float> buffer(BlockSize, 0.0f);
+		const float* in[2] = { buffer.data(), buffer.data() };
+		float* out[2] = { buffer.data(), buffer.data() };
+		QVERIFY(client.processBlock(in, out, BlockSize));
+
+		QVERIFY2(client.saveState(stateDir.path()),
+			"could not save the plugin state in the child");
+	}
+
+	{
+		Lv2HostClient client;
+		QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+			QString::fromUtf8(GainUri), 44100, BlockSize, 15000),
+			qPrintable(client.errorString()));
+
+		QVERIFY2(client.restoreState(stateDir.path()),
+			"could not restore the plugin state in the child");
+
+		int gainPort = -1;
+		for (const auto& port : client.ports())
+		{
+			if (port.symbol == QStringLiteral("gain")) { gainPort = port.index; }
+		}
+		QVERIFY(gainPort >= 0);
+		QVERIFY(client.controlValues().size() > static_cast<std::size_t>(gainPort));
+		QCOMPARE(client.controlValues()[gainPort], 0.25f);
+
+		std::vector<float> in(BlockSize);
+		std::vector<float> out(BlockSize, 0.0f);
+		fillRamp(in, 1.0f);
+		const float* inPtr[2] = { in.data(), in.data() };
+		float* outPtr[2] = { out.data(), out.data() };
+		QVERIFY(client.processBlock(inPtr, outPtr, BlockSize));
+		for (f_cnt_t i = 0; i < BlockSize; ++i)
+		{
+			QVERIFY(std::abs(out[i] - in[i] * 0.25f) < 1e-6f);
+		}
+	}
 }
 
 

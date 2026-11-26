@@ -327,6 +327,9 @@ private:
 	void startRemote();
 	void runRemote(f_cnt_t frames);
 	void copyModelsToRemote();
+	void saveStateRemote(QDomDocument& doc, QDomElement& that);
+	void loadStateRemote(const QDomElement& that);
+	void applyRemoteControlValues();
 
 	//! Plugin -> UI event queue (atom events, etc.)
 	std::mutex m_uiEventMutex;

@@ -92,6 +92,8 @@ bool Lv2HostClient::start(const QString& hostExecutable, const QString& pluginUr
 	m_ports.clear();
 	m_pendingMidi.clear();
 	m_midiOutput.clear();
+	m_controlSnapshot.clear();
+	m_lastStateResult = -1;
 	m_latency = 0;
 	m_uiOpen = false;
 
@@ -395,6 +397,16 @@ bool Lv2HostClient::processMessage(const message& m)
 			emit uiClosed();
 			break;
 
+		case lv2host::IdStateSaved:
+		case lv2host::IdStateRestored:
+		case lv2host::IdPresetLoaded:
+			m_lastStateResult = m.getInt(0);
+			break;
+
+		case lv2host::IdControlValues:
+			m_controlSnapshot = lv2host::decodeControlValues(m.getString(0));
+			break;
+
 		default:
 			break;
 	}
@@ -461,6 +473,60 @@ void Lv2HostClient::destroyUi()
 		sendMessage(message(lv2host::IdDestroyUI));
 	}
 	m_uiOpen = false;
+}
+
+
+
+
+bool Lv2HostClient::saveState(const QString& directory, int timeoutMs)
+{
+	if (m_failed)
+	{
+		return false;
+	}
+	m_lastStateResult = -1;
+	sendMessage(message(lv2host::IdSaveState).addString(directory.toStdString()));
+	if (!waitForReply(lv2host::IdStateSaved, timeoutMs))
+	{
+		return false;
+	}
+	return m_lastStateResult == 1;
+}
+
+
+
+
+bool Lv2HostClient::restoreState(const QString& directory, int timeoutMs)
+{
+	if (m_failed)
+	{
+		return false;
+	}
+	m_lastStateResult = -1;
+	sendMessage(message(lv2host::IdRestoreState).addString(directory.toStdString()));
+	if (!waitForReply(lv2host::IdStateRestored, timeoutMs))
+	{
+		return false;
+	}
+	return m_lastStateResult == 1;
+}
+
+
+
+
+bool Lv2HostClient::loadPreset(const QString& presetUri, int timeoutMs)
+{
+	if (m_failed)
+	{
+		return false;
+	}
+	m_lastStateResult = -1;
+	sendMessage(message(lv2host::IdLoadPreset).addString(presetUri.toStdString()));
+	if (!waitForReply(lv2host::IdPresetLoaded, timeoutMs))
+	{
+		return false;
+	}
+	return m_lastStateResult == 1;
 }
 
 

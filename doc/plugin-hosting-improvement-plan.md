@@ -337,7 +337,7 @@ Tasks:
 - [ ] Create the suil UI in the child and show it as a top-level X11 window;
       forward geometry, visibility, close, `ui:scaleFactor` and idle. Wayland
       uses an XWayland window, as today.
-- [ ] Exchange state and factory presets over the filesystem.
+- [x] Exchange state and factory presets over the filesystem.
 - [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`; it also uses a
       separate window because embedding is gone.
 - [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
@@ -352,8 +352,10 @@ Tasks:
   child (window, parent XID, instance/data access, scale, resize, idle, WM
   close). DrumGizmo renders at 750x740 and ZynAddSubFX (DPF/OpenGL) at
   1181x659; DPF UIs need the child to push the control values on every idle
-  tick, otherwise they stay blank. State, presets and the default flip are
-  still missing; only the first two audio ports are routed.
+  tick, otherwise they stay blank. State and factory presets round-trip
+  through the child (base64 project format unchanged). The default flip,
+  reload UX and packaging check are still missing; only the first two audio
+  ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.

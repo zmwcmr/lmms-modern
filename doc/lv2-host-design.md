@@ -1,11 +1,12 @@
 # RemoteLv2 process isolation design (P6.4)
 
 Status: design document. The transport, the DSP step, MIDI/atom forwarding and
-the child-hosted UI are implemented behind `LMMS_LV2_REMOTE=1`: the child
-instantiates the plugin, reports its ports, applies control values, runs the
-audio, forwards MIDI events and owns the UI window. State and presets are still
-missing. The in-process path remains the default. The UI always uses a separate
-X11 window.
+the child-hosted UI and state/preset exchange are implemented behind
+`LMMS_LV2_REMOTE=1`: the child instantiates the plugin, reports its ports,
+applies control values, runs the audio, forwards MIDI events, owns the UI
+window and saves/restores LV2 state through the filesystem. The in-process
+path remains the default until the packaging check is done. The UI always uses
+a separate X11 window.
 
 ## Goal
 
@@ -224,7 +225,10 @@ The transport reuses the generic IDs from `RemotePluginBase.h`
 | `IdShowUI` / `IdHideUI` / `IdDestroyUI` | host to child | scale factor / none | implemented |
 | `IdUiClosed` | child to host | reason text | implemented |
 | `IdUiGeometry` | child to host | x, y, width, height | planned |
-| `IdSaveState` / `IdStateSaved` / `IdRestoreState` | both | directory path, file manifest | planned |
+| `IdSaveState` / `IdStateSaved` | host to child / child to host | directory path / result | implemented |
+| `IdRestoreState` / `IdStateRestored` | host to child / child to host | directory path / result | implemented |
+| `IdLoadPreset` / `IdPresetLoaded` | host to child / child to host | preset URI / result | implemented |
+| `IdControlValues` | child to host | all control values after a restore | implemented |
 | `IdReload` | host to child | new sample rate / block size | planned |
 
 The plugin URI and the transport arguments are passed on the command line;
@@ -425,6 +429,12 @@ Manual matrix additions:
 5. **State, presets, failure UX.** State bundles over the filesystem, preset
    loading, reload path, crash notification, in-process fallback and the
    `pluginUiIsUnstable()` demotion. Acceptance: full test matrix and ASan run.
+   - status: state and factory presets are done. The child implements the
+     state makePath/mapPath/freePath features and saves/restores with lilv in
+     the host-provided directory; the host keeps the base64 project format and
+     applies the returned control values to the models. `Lv2HostClientTest`
+     saves with one child and restores in a fresh one. Still missing: the
+     reload/crash UX, the default flip and the packaging check.
 
 Each step keeps the in-process path selectable so a regression can be bisected
 quickly.

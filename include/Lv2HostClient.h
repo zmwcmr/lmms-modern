@@ -120,6 +120,16 @@ public:
 	//! Process pending messages without waiting for an audio block.
 	void poll();
 
+	//! Save the plugin state into @a directory (files written by the child).
+	bool saveState(const QString& directory, int timeoutMs = 10000);
+	//! Restore the plugin state from @a directory.
+	bool restoreState(const QString& directory, int timeoutMs = 10000);
+	//! Restore a factory preset by URI.
+	bool loadPreset(const QString& presetUri, int timeoutMs = 10000);
+
+	//! Control values reported by the child after a state/preset restore.
+	const std::vector<float>& controlValues() const { return m_controlSnapshot; }
+
 	//! Process ID of the child, 0 when not running (used by tests).
 	qint64 processId() const { return m_process.processId(); }
 
@@ -150,6 +160,8 @@ private:
 	std::vector<Lv2HostPort> m_ports;
 	std::vector<lv2host::MidiEventData> m_pendingMidi;
 	std::vector<lv2host::MidiEventData> m_midiOutput;
+	std::vector<float> m_controlSnapshot;
+	int m_lastStateResult = -1;
 	int m_latency = 0;
 	sample_rate_t m_sampleRate = 0;
 	f_cnt_t m_framesPerBlock = 0;

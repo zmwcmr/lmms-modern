@@ -404,7 +404,26 @@ void Lv2Proc::scanPresets()
 
 bool Lv2Proc::loadPreset(std::size_t index)
 {
-	if (!m_instance || index >= m_presets.size())
+	if (index >= m_presets.size())
+	{
+		return false;
+	}
+
+	if (m_remote)
+	{
+		bool restored = false;
+		{
+			std::lock_guard<std::mutex> lock(m_stateMutex);
+			restored = m_remote->loadPreset(m_presets[index].uri);
+		}
+		if (restored)
+		{
+			applyRemoteControlValues();
+		}
+		return restored;
+	}
+
+	if (!m_instance)
 	{
 		return false;
 	}
@@ -827,12 +846,6 @@ bool Lv2Proc::sendToUi(uint32_t portIndex, uint32_t type, uint32_t size,
 void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
 {
 	ModelGroup::saveSettings(doc, that);
-	if (m_remote)
-	{
-		qWarning() << "Remote LV2 plugin state is not saved yet;"
-			<< "only the control values are stored.";
-		return;
-	}
 	saveState(doc, that);
 }
 
@@ -842,15 +855,6 @@ void Lv2Proc::saveSettings(QDomDocument& doc, QDomElement& that)
 void Lv2Proc::loadSettings(const QDomElement& that)
 {
 	ModelGroup::loadSettings(that);
-	if (m_remote)
-	{
-		if (!that.firstChildElement("lv2state").isNull())
-		{
-			qWarning() << "Remote LV2 plugin state is not restored yet;"
-				<< "the saved state bundle is kept but ignored.";
-		}
-		return;
-	}
 	loadState(that);
 }
 
@@ -873,8 +877,80 @@ char* duplicateCString(const QByteArray& str)
 
 
 
+/** Write the files stored in an lv2state element into @a directory.
+ *  Returns true when state.ttl was written, which is what lilv needs.
+ */
+bool writeStateFilesFromXml(const QDomElement& stateElem, const QString& directory)
+{
+	for (QDomElement fileElem = stateElem.firstChildElement("file");
+		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
+	{
+		const QString name = fileElem.attribute("name");
+		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
+		{
+			qWarning() << "Ignoring invalid LV2 state file name" << name;
+			continue;
+		}
+
+		const QString path = QDir(directory).filePath(name);
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		QFile file(path);
+		if (!file.open(QIODevice::WriteOnly))
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return false;
+		}
+		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return false;
+		}
+	}
+	return QFileInfo::exists(QDir(directory).filePath("state.ttl"));
+}
+
+/** Append all files from @a directory (except manifest.ttl) to @a stateElem. */
+void appendStateFilesToXml(QDomDocument& doc, QDomElement& stateElem,
+	const QString& directory)
+{
+	const QDir dir(directory);
+	QDirIterator it(directory, QDir::Files | QDir::NoDotAndDotDot,
+		QDirIterator::Subdirectories);
+	while (it.hasNext())
+	{
+		const QString path = it.next();
+		const QString rel = dir.relativeFilePath(path);
+		if (rel == "manifest.ttl")
+		{
+			continue;
+		}
+
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			qWarning() << "Could not read LV2 state file" << path;
+			continue;
+		}
+
+		QDomElement fileElem = doc.createElement("file");
+		fileElem.setAttribute("name", rel);
+		fileElem.appendChild(doc.createTextNode(
+			QString::fromLatin1(file.readAll().toBase64())));
+		stateElem.appendChild(fileElem);
+	}
+}
+
+
+
+
 void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 {
+	if (m_remote)
+	{
+		saveStateRemote(doc, that);
+		return;
+	}
+
 	if (!m_instance || !m_plugin || !m_stateDir)
 	{
 		return;
@@ -925,36 +1001,52 @@ void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 
 	QDomElement stateElem = doc.createElement("lv2state");
 	stateElem.setAttribute("version", 1);
+	appendStateFilesToXml(doc, stateElem, saveDir.path());
 
-	const QDir dir(saveDir.path());
-	QDirIterator it(saveDir.path(), QDir::Files | QDir::NoDotAndDotDot,
-		QDirIterator::Subdirectories);
-	bool anyFile = false;
-	while (it.hasNext())
+	if (stateElem.hasChildNodes())
 	{
-		const QString path = it.next();
-		const QString rel = dir.relativeFilePath(path);
-		if (rel == "manifest.ttl")
-		{
-			continue;
-		}
+		that.appendChild(stateElem);
+	}
+}
 
-		QFile file(path);
-		if (!file.open(QIODevice::ReadOnly))
-		{
-			qWarning() << "Could not read LV2 state file" << path;
-			continue;
-		}
 
-		QDomElement fileElem = doc.createElement("file");
-		fileElem.setAttribute("name", rel);
-		fileElem.appendChild(doc.createTextNode(
-			QString::fromLatin1(file.readAll().toBase64())));
-		stateElem.appendChild(fileElem);
-		anyFile = true;
+
+
+void Lv2Proc::saveStateRemote(QDomDocument& doc, QDomElement& that)
+{
+	if (!m_plugin || !m_remote)
+	{
+		return;
 	}
 
-	if (anyFile)
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	if (!lilv_plugin_has_extension_data(m_plugin, stateIface.get()))
+	{
+		return;
+	}
+
+	QTemporaryDir saveDir(QDir::tempPath() + "/lmms-lv2save-XXXXXX");
+	if (!saveDir.isValid())
+	{
+		qWarning() << "Could not create temporary LV2 save directory";
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		if (!m_remote->saveState(saveDir.path()))
+		{
+			qWarning() << "Could not save the remote LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+			return;
+		}
+	}
+
+	QDomElement stateElem = doc.createElement("lv2state");
+	stateElem.setAttribute("version", 1);
+	appendStateFilesToXml(doc, stateElem, saveDir.path());
+	if (stateElem.hasChildNodes())
 	{
 		that.appendChild(stateElem);
 	}
@@ -965,6 +1057,12 @@ void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 
 void Lv2Proc::loadState(const QDomElement& that)
 {
+	if (m_remote)
+	{
+		loadStateRemote(that);
+		return;
+	}
+
 	const QDomElement stateElem = that.firstChildElement("lv2state");
 	if (stateElem.isNull() || !m_instance || !m_plugin)
 	{
@@ -985,37 +1083,13 @@ void Lv2Proc::loadState(const QDomElement& that)
 		return;
 	}
 
-	for (QDomElement fileElem = stateElem.firstChildElement("file");
-		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
-	{
-		const QString name = fileElem.attribute("name");
-		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
-		{
-			qWarning() << "Ignoring invalid LV2 state file name" << name;
-			continue;
-		}
-
-		const QString path = QDir(stateDir->path()).filePath(name);
-		QDir().mkpath(QFileInfo(path).absolutePath());
-		QFile file(path);
-		if (!file.open(QIODevice::WriteOnly))
-		{
-			qWarning() << "Could not write LV2 state file" << path;
-			return;
-		}
-		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
-		{
-			qWarning() << "Could not write LV2 state file" << path;
-			return;
-		}
-	}
-
-	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
-	if (!QFileInfo::exists(statePath))
+	if (!writeStateFilesFromXml(stateElem, stateDir->path()))
 	{
 		qWarning() << "LV2 state has no state.ttl";
 		return;
 	}
+
+	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
 
 	Lv2Manager* mgr = Engine::getLv2Manager();
 	LilvState* state = lilv_state_new_from_file(
@@ -1041,6 +1115,75 @@ void Lv2Proc::loadState(const QDomElement& that)
 	lilv_state_free(state);
 
 	copyModelsFromCore();
+}
+
+
+
+
+void Lv2Proc::loadStateRemote(const QDomElement& that)
+{
+	const QDomElement stateElem = that.firstChildElement("lv2state");
+	if (stateElem.isNull() || !m_remote || !m_plugin)
+	{
+		return;
+	}
+
+	const int version = stateElem.attribute("version", "0").toInt();
+	if (version != 1)
+	{
+		qWarning() << "Unsupported LV2 state version" << version;
+		return;
+	}
+
+	auto stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+	if (!stateDir->isValid())
+	{
+		qWarning() << "Could not create temporary LV2 state directory";
+		return;
+	}
+	if (!writeStateFilesFromXml(stateElem, stateDir->path()))
+	{
+		qWarning() << "LV2 state has no state.ttl";
+		return;
+	}
+
+	bool restored = false;
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		restored = m_remote->restoreState(stateDir->path());
+	}
+	if (!restored)
+	{
+		qWarning() << "Could not restore the remote LV2 state for"
+			<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+		return;
+	}
+
+	m_stateDir = std::move(stateDir);
+	applyRemoteControlValues();
+}
+
+
+
+
+void Lv2Proc::applyRemoteControlValues()
+{
+	if (!m_remote)
+	{
+		return;
+	}
+	const auto& values = m_remote->controlValues();
+	for (std::size_t i = 0; i < values.size() && i < m_ports.size(); ++i)
+	{
+		auto* control = dcast<Lv2Ports::Control>(m_ports[i].get());
+		if (control != nullptr && control->m_flow == Lv2Ports::Flow::Input)
+		{
+			setControlFromUi(static_cast<uint32_t>(i), values[i]);
+		}
+	}
+	// Push the model values again on the next block.
+	m_lastRemoteControl.assign(m_ports.size(),
+		std::numeric_limits<float>::quiet_NaN());
 }
 
 

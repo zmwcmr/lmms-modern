@@ -65,6 +65,7 @@
 #include <lv2/log/log.h>
 #include <lv2/midi/midi.h>
 #include <lv2/options/options.h>
+#include <lv2/state/state.h>
 #include <lv2/parameters/parameters.h>
 #include <lv2/urid/urid.h>
 #include <lv2/worker/worker.h>
@@ -396,6 +397,15 @@ private:
 	void sendMidiOutput();
 	void sendFailed(const std::string& reason);
 
+	bool saveState(const std::string& directory);
+	bool restoreState(const std::string& directory);
+	bool loadPreset(const std::string& presetUri);
+	void sendControlValues();
+	std::string ensureStateDir();
+	static char* makePathCb(LV2_State_Make_Path_Handle handle, const char* path);
+	static char* mapPathCb(LV2_State_Map_Path_Handle handle, const char* path);
+	static void freePathCb(LV2_State_Free_Path_Handle handle, char* path);
+
 	bool showUi(float scale);
 	void hideUi();
 	void destroyUi();
@@ -443,6 +453,15 @@ private:
 	float m_latencyValue = 0.0f;
 	int m_reportedLatency = -1;
 	bool m_uiVisible = false;
+
+	// State features: files created/read by the plugin live here.
+	std::string m_stateDirPath;
+	LV2_Feature m_stateMakePathFeature{};
+	LV2_Feature m_stateMapPathFeature{};
+	LV2_Feature m_stateFreePathFeature{};
+	LV2_State_Make_Path m_stateMakePath{};
+	LV2_State_Map_Path m_stateMapPath{};
+	LV2_State_Free_Path m_stateFreePath{};
 
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	SuilHost* m_uiHost = nullptr;
@@ -589,6 +608,31 @@ bool Lv2HostProcess::processMessage(const message& m)
 		case lv2host::IdMidiEvents:
 			m_pendingMidi = lv2host::decodeMidiEvents(m.getString(0));
 			return true;
+
+		case lv2host::IdSaveState:
+		{
+			const bool ok = saveState(m.getString(0));
+			// Values first, so the host has them when the ack arrives.
+			sendControlValues();
+			sendMessage(message(lv2host::IdStateSaved).addInt(ok ? 1 : 0));
+			return true;
+		}
+
+		case lv2host::IdRestoreState:
+		{
+			const bool ok = restoreState(m.getString(0));
+			sendControlValues();
+			sendMessage(message(lv2host::IdStateRestored).addInt(ok ? 1 : 0));
+			return true;
+		}
+
+		case lv2host::IdLoadPreset:
+		{
+			const bool ok = loadPreset(m.getString(0));
+			sendControlValues();
+			sendMessage(message(lv2host::IdPresetLoaded).addInt(ok ? 1 : 0));
+			return true;
+		}
 
 		case lv2host::IdShowUI:
 			showUi(m.getFloat(0));
@@ -761,6 +805,185 @@ void Lv2HostProcess::sendMidiOutput()
 	sequence->atom.size = sizeof(LV2_Atom_Sequence_Body);
 	sequence->body.unit = 0;
 	sequence->body.pad = 0;
+}
+
+
+
+
+std::string Lv2HostProcess::ensureStateDir()
+{
+	if (m_stateDirPath.empty())
+	{
+		char templ[] = "/tmp/lmms-lv2host-state-XXXXXX";
+		if (char* dir = ::mkdtemp(templ))
+		{
+			m_stateDirPath = dir;
+		}
+	}
+	return m_stateDirPath;
+}
+
+
+
+
+char* Lv2HostProcess::makePathCb(LV2_State_Make_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2HostProcess*>(handle);
+	if (self == nullptr || path == nullptr || *path == '\0')
+	{
+		return nullptr;
+	}
+	const std::string root = self->ensureStateDir();
+	if (root.empty())
+	{
+		return nullptr;
+	}
+	const std::filesystem::path full = std::filesystem::path(root) / path;
+	std::error_code error;
+	std::filesystem::create_directories(full.parent_path(), error);
+	return ::strdup(full.string().c_str());
+}
+
+
+
+
+char* Lv2HostProcess::mapPathCb(LV2_State_Map_Path_Handle handle, const char* path)
+{
+	auto* self = static_cast<Lv2HostProcess*>(handle);
+	if (self == nullptr || path == nullptr || *path == '\0')
+	{
+		return nullptr;
+	}
+	const std::filesystem::path input(path);
+	if (input.is_absolute())
+	{
+		return ::strdup(path);
+	}
+	const std::string root = self->m_stateDirPath.empty()
+		? self->ensureStateDir() : self->m_stateDirPath;
+	if (root.empty())
+	{
+		return nullptr;
+	}
+	return ::strdup((std::filesystem::path(root) / input).string().c_str());
+}
+
+
+
+
+void Lv2HostProcess::freePathCb(LV2_State_Free_Path_Handle, char* path)
+{
+	std::free(path);
+}
+
+
+
+
+void Lv2HostProcess::sendControlValues()
+{
+	sendMessage(message(lv2host::IdControlValues).addString(
+		lv2host::encodeControlValues(m_controlValues)));
+}
+
+
+
+
+bool Lv2HostProcess::saveState(const std::string& directory)
+{
+#ifdef LMMS_HAVE_LV2
+	if (m_instance == nullptr || m_plugin == nullptr || directory.empty())
+	{
+		return false;
+	}
+	const std::string scratch = ensureStateDir();
+	LilvState* state = lilv_state_new_from_instance(m_plugin, m_instance,
+		m_urids.mapFeature(), scratch.c_str(), directory.c_str(),
+		directory.c_str(), directory.c_str(), nullptr, nullptr, 0, nullptr);
+	if (state == nullptr)
+	{
+		return false;
+	}
+	const int result = lilv_state_save(m_world, m_urids.mapFeature(),
+		m_urids.unmapFeature(), state, nullptr, directory.c_str(), "state.ttl");
+	lilv_state_free(state);
+	return result == 0;
+#else
+	(void)directory;
+	return false;
+#endif
+}
+
+
+
+
+bool Lv2HostProcess::restoreState(const std::string& directory)
+{
+#ifdef LMMS_HAVE_LV2
+	if (m_instance == nullptr || directory.empty())
+	{
+		return false;
+	}
+	const std::string path =
+		(std::filesystem::path(directory) / "state.ttl").string();
+	LilvState* state = lilv_state_new_from_file(m_world,
+		m_urids.mapFeature(), nullptr, path.c_str());
+	if (state == nullptr)
+	{
+		return false;
+	}
+
+	m_stateDirPath = directory;
+	const LV2_Feature* features[] = {
+		&m_stateMakePathFeature,
+		&m_stateMapPathFeature,
+		&m_stateFreePathFeature,
+		nullptr
+	};
+	lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
+	lilv_state_free(state);
+	return true;
+#else
+	(void)directory;
+	return false;
+#endif
+}
+
+
+
+
+bool Lv2HostProcess::loadPreset(const std::string& presetUri)
+{
+#ifdef LMMS_HAVE_LV2
+	if (m_instance == nullptr || presetUri.empty())
+	{
+		return false;
+	}
+	LilvNode* node = lilv_new_uri(m_world, presetUri.c_str());
+	if (node == nullptr)
+	{
+		return false;
+	}
+	lilv_world_load_resource(m_world, node);
+	LilvState* state = lilv_state_new_from_world(m_world,
+		m_urids.mapFeature(), node);
+	lilv_node_free(node);
+	if (state == nullptr)
+	{
+		return false;
+	}
+	const LV2_Feature* features[] = {
+		&m_stateMakePathFeature,
+		&m_stateMapPathFeature,
+		&m_stateFreePathFeature,
+		nullptr
+	};
+	lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
+	lilv_state_free(state);
+	return true;
+#else
+	(void)presetUri;
+	return false;
+#endif
 }
 
 
@@ -1251,6 +1474,18 @@ bool Lv2HostProcess::instantiate()
 	m_schedule = m_worker.scheduleFeature();
 	m_workerFeature = LV2_Feature{LV2_WORKER__schedule, m_schedule};
 
+	m_stateMakePath.handle = this;
+	m_stateMakePath.path = makePathCb;
+	m_stateMapPath.handle = this;
+	m_stateMapPath.abstract_path = nullptr;
+	m_stateMapPath.absolute_path = mapPathCb;
+	m_stateFreePath.handle = this;
+	m_stateFreePath.free_path = freePathCb;
+	m_stateMakePathFeature = LV2_Feature{LV2_STATE__makePath, &m_stateMakePath};
+	m_stateMapPathFeature = LV2_Feature{LV2_STATE__mapPath, &m_stateMapPath};
+	m_stateFreePathFeature = LV2_Feature{LV2_STATE__freePath, &m_stateFreePath};
+	ensureStateDir();
+
 	const LV2_Feature* features[] = {
 		&m_mapFeature,
 		&m_unmapFeature,
@@ -1258,6 +1493,9 @@ bool Lv2HostProcess::instantiate()
 		&m_boundedFeature,
 		&m_logFeature,
 		&m_workerFeature,
+		&m_stateMakePathFeature,
+		&m_stateMapPathFeature,
+		&m_stateFreePathFeature,
 		nullptr
 	};
 
