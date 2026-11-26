@@ -46,6 +46,9 @@ namespace lmms::gui
 Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 	EffectControlDialog(controls)
 {
+	setMinimumSize(QSize(480, 360));
+	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
 	auto* layout = new QVBoxLayout(this);
 
 	const auto name = controls->pluginName().isEmpty()
@@ -132,12 +135,13 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
 			knob->setModel(parameter);
 			knob->setHintText(info.name, info.unit);
-			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
+			constexpr int columns = 3;
+			grid->addWidget(knob, index / columns, index % columns, Qt::AlignHCenter);
 		}
 		if (models.count() > shown)
 		{
 			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
-				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+				.arg(shown), parameterWidget), (shown + 2) / 3, 0, 1, 3);
 		}
 		scrollArea->setWidget(parameterWidget);
 		scrollArea->setMinimumSize(420, 300);
@@ -175,7 +179,6 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		layout->addWidget(unitBox);
 	}
 
-	layout->setSizeConstraint(QLayout::SetFixedSize);
 }
 
 } // namespace lmms::gui

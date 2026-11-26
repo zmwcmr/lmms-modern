@@ -255,6 +255,17 @@ handling its own event source.
 - Saving a project therefore asks the DSP host for a fresh state instead of
   reusing a stale snapshot.
 
+### P6.3: Resizable parameter views
+
+- `Vst3InstrumentView` now derives from the resizable `InstrumentView` and
+  reports `isResizable()`, so LMMS enables resize and maximize on its sub
+  window.
+- Instrument parameters use a two-column grid with a 320 px minimum width;
+  effect parameters use three columns with a 480 px dialog minimum.
+- The effect dialog no longer forces `QLayout::SetFixedSize`.
+- This keeps parameter labels and the **Show GUI** button visible in narrow
+  windows while still allowing the user to enlarge the view.
+
 ### P6.2: Unified GUI availability on Wayland
 
 - `<Vst3EditorWindow::isSupported>` considers the remote xcb editor, the
