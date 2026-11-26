@@ -24,9 +24,15 @@
 
 #include "Vst3EffectControlDialog.h"
 
+#include <QGridLayout>
 #include <QLabel>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
+#include "AutomatableModel.h"
+#include "Knob.h"
 #include "Vst3EffectControls.h"
 
 namespace lmms::gui
@@ -47,31 +53,46 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		layout->addWidget(new QLabel(tr("Vendor: %1").arg(controls->pluginVendor()), this));
 	}
 
-	if (controls->parameterNames().isEmpty())
+	const auto& models = controls->parameterModels();
+	if (models.count() == 0)
 	{
 		layout->addWidget(new QLabel(tr("No automatable parameters reported."), this));
 	}
 	else
 	{
 		layout->addWidget(new QLabel(tr("Parameters: %1")
-			.arg(controls->parameterNames().size()), this));
+			.arg(models.count()), this));
 
-		QStringList visibleParameters;
-		for (const auto& parameter : controls->parameterNames())
+		auto* scrollArea = new QScrollArea(this);
+		scrollArea->setWidgetResizable(true);
+		auto* parameterWidget = new QWidget(scrollArea);
+		auto* grid = new QGridLayout(parameterWidget);
+		const int shown = std::min(models.count(), 64);
+		for (int index = 0; index < shown; ++index)
 		{
-			visibleParameters.push_back(parameter);
-			if (visibleParameters.size() >= 32)
+			auto* const parameter = models.model(index);
+			if (parameter == nullptr)
 			{
-				break;
+				continue;
 			}
+			const auto& info = models.parameter(index);
+			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
+			knob->setModel(parameter);
+			knob->setHintText(info.name, info.unit);
+			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
 		}
-		auto* parameterLabel = new QLabel(visibleParameters.join(QStringLiteral("\n")), this);
-		parameterLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-		layout->addWidget(parameterLabel);
+		if (models.count() > shown)
+		{
+			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
+				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+		}
+		scrollArea->setWidget(parameterWidget);
+		scrollArea->setMinimumSize(420, 300);
+		layout->addWidget(scrollArea);
 	}
 
 	layout->addWidget(new QLabel(
-		tr("Parameter automation and the native editor follow in later phases."), this));
+		tr("The native editor follows in a later phase."), this));
 	layout->setSizeConstraint(QLayout::SetFixedSize);
 }
 

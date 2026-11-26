@@ -98,8 +98,10 @@ bool Vst3Effect::openPlugin()
 	if (!m_host->load(file, classId, sampleRate, blockSize, &error))
 	{
 		m_host.reset();
+		m_controls.initializeParameters();
 		return false;
 	}
+	m_controls.initializeParameters();
 
 	QStringList parameterNames;
 	for (const auto& parameter : m_host->parameters())
@@ -139,6 +141,7 @@ Effect::ProcessStatus Vst3Effect::processImpl(SampleFrame* buf, const f_cnt_t fr
 		m_inputRight[frame] = buf[frame][1];
 	}
 
+	m_controls.queueParameterChanges(frameCount);
 	m_host->setTempo(Engine::getSong() != nullptr ? Engine::getSong()->getTempo() : 120.0);
 	m_host->setPlaying(Engine::getSong() != nullptr && Engine::getSong()->isPlaying());
 	m_host->process(m_inputLeft.data(), m_inputRight.data(),
@@ -208,6 +211,8 @@ void Vst3Effect::loadSettings(const QDomElement& parent)
 	{
 		m_host->setState(component, controller);
 	}
+	m_controls.refreshParameters();
+	m_controls.loadSettings(parent);
 }
 
 extern "C"

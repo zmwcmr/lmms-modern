@@ -106,6 +106,9 @@ public:
 	bool setParameterNormalised(uint32_t id, double value);
 	double parameterNormalised(uint32_t id) const;
 
+	//! Queue a parameter change for the next process() call.
+	void queueParameter(uint32_t id, double value, int sampleOffset);
+
 	void queueMidi(const MidiEvent& event);
 	void clearMidi();
 

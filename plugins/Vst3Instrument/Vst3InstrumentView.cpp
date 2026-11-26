@@ -24,10 +24,16 @@
 
 #include "Vst3InstrumentView.h"
 
+#include <QGridLayout>
 #include <QLabel>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
+#include "AutomatableModel.h"
 #include "Instrument.h"
+#include "Knob.h"
 #include "Vst3Host.h"
 #include "Vst3Instrument.h"
 
@@ -52,10 +58,42 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 	{
 		layout->addWidget(new QLabel(tr("Vendor: %1").arg(host->vendor()), this));
 	}
-	layout->addWidget(new QLabel(tr("Parameters: %1")
-		.arg(host->parameters().size()), this));
+	const auto& models = vst3Instrument->parameterModels();
+	layout->addWidget(new QLabel(tr("Automatable parameters: %1")
+		.arg(models.count()), this));
+
+	if (models.count() > 0)
+	{
+		auto* scrollArea = new QScrollArea(this);
+		scrollArea->setWidgetResizable(true);
+		auto* parameterWidget = new QWidget(scrollArea);
+		auto* grid = new QGridLayout(parameterWidget);
+		const int shown = std::min(models.count(), 48);
+		for (int index = 0; index < shown; ++index)
+		{
+			auto* const parameter = models.model(index);
+			if (parameter == nullptr)
+			{
+				continue;
+			}
+			const auto& info = models.parameter(index);
+			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
+			knob->setModel(parameter);
+			knob->setHintText(info.name, info.unit);
+			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
+		}
+		if (models.count() > shown)
+		{
+			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
+				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+		}
+		scrollArea->setWidget(parameterWidget);
+		scrollArea->setMinimumSize(420, 260);
+		layout->addWidget(scrollArea);
+	}
+
 	layout->addWidget(new QLabel(
-		tr("MIDI input is active. Parameter automation and the native editor follow later."),
+		tr("MIDI input is active. The native editor follows in a later phase."),
 		this));
 	layout->setSizeConstraint(QLayout::SetFixedSize);
 }

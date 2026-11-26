@@ -419,6 +419,28 @@ struct ParamChanges : v3_param_changes_cpp
 		exposedQueues.clear();
 	}
 
+	void addPoint(v3_param_id id, int32_t sampleOffset, double value)
+	{
+		ParamValueQueue* target = nullptr;
+		for (auto* queue : exposedQueues)
+		{
+			if (queue->id == id)
+			{
+				target = queue;
+				break;
+			}
+		}
+		if (target == nullptr)
+		{
+			auto queue = std::make_unique<ParamValueQueue>();
+			queue->id = id;
+			target = queue.get();
+			exposedQueues.push_back(target);
+			queues.push_back(std::move(queue));
+		}
+		target->points.emplace_back(sampleOffset, value);
+	}
+
 private:
 	static int32_t V3_API getParamCount(void* self)
 	{
@@ -667,6 +689,14 @@ struct Vst3Host::Impl
 	ParamChanges outputParams;
 	std::vector<MidiEvent> pendingMidi;
 
+	struct QueuedParameter
+	{
+		uint32_t id = 0;
+		double value = 0.0;
+		int sampleOffset = 0;
+	};
+	std::vector<QueuedParameter> queuedParameters;
+
 	~Impl() { unload(); }
 
 	bool load(const QString& bundlePath,
@@ -914,6 +944,7 @@ void Vst3Host::Impl::unload()
 	inputChannelData.clear();
 	outputChannelData.clear();
 	pendingMidi.clear();
+	queuedParameters.clear();
 	inputEvents.clear();
 	outputEvents.clear();
 	inputParams.clear();
@@ -1384,6 +1415,17 @@ double Vst3Host::parameterNormalised(uint32_t id) const
 	return it != m_impl->parameterValues.end() ? it->second : 0.0;
 }
 
+void Vst3Host::queueParameter(uint32_t id, double value, int sampleOffset)
+{
+	if (m_impl->parameterValues.find(id) == m_impl->parameterValues.end())
+	{
+		return;
+	}
+	value = std::clamp(value, 0.0, 1.0);
+	m_impl->parameterValues[id] = value;
+	m_impl->queuedParameters.push_back({id, value, sampleOffset});
+}
+
 void Vst3Host::queueMidi(const MidiEvent& event)
 {
 	m_impl->pendingMidi.push_back(event);
@@ -1432,6 +1474,16 @@ void Vst3Host::process(const float* leftIn,
 	m_impl->outputEvents.clear();
 	m_impl->inputParams.clear();
 	m_impl->outputParams.clear();
+
+	std::stable_sort(m_impl->queuedParameters.begin(), m_impl->queuedParameters.end(),
+		[](const auto& lhs, const auto& rhs) {
+			return lhs.sampleOffset < rhs.sampleOffset;
+		});
+	for (const auto& parameter : m_impl->queuedParameters)
+	{
+		m_impl->inputParams.addPoint(parameter.id,
+			std::clamp(parameter.sampleOffset, 0, frames - 1), parameter.value);
+	}
 
 	std::stable_sort(m_impl->pendingMidi.begin(), m_impl->pendingMidi.end(),
 		[](const auto& lhs, const auto& rhs) {
@@ -1595,6 +1647,7 @@ void Vst3Host::process(const float* leftIn,
 	m_impl->copyOutput(frames, leftOut, rightOut);
 	m_impl->projectTime += frames;
 	m_impl->pendingMidi.clear();
+	m_impl->queuedParameters.clear();
 }
 
 int Vst3Host::latencySamples() const

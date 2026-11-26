@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P2 in-process host implemented. Parameters/automation are next (P3);
-state save/load is present but needs hardening.
+Status: P2 in-process host implemented. P3 parameter models are in place; state
+save/load is best-effort and needs hardening.
 
 ## 1. Goal
 
@@ -92,14 +92,31 @@ Verified end-to-end with `lmms render` on a project containing a
 `vst3instrument` track. The same project with a `vst3effect` in its effect
 chain also renders audio.
 
-Still open for P3/P4:
+### Implemented: P3 parameter models and automation (basic)
 
-- per-parameter LMMS `FloatModel`s and automation,
-- a usable parameter UI (the current dialog only lists parameter names),
-- more reliable component/controller state for every plugin,
-- native editor embedding.
+- `Vst3ParameterModels` creates one LMMS `FloatModel` per automatable,
+  non-hidden VST3 parameter.
+- Effects and instruments expose the models to the automation system.
+- Automated models are sampled through `ValueBuffer` while processing and
+  converted into sample-offset parameter queues in `ProcessData`.
+- Manual knob changes are picked up at the next process block.
+- The effect dialog and instrument view show knobs for the first 64/48
+  parameters; the remaining parameters are still available to automation.
+- Automated/controlled model values are saved in the project.
 
-Next: P3 (parameters, automation and state hardening).
+State handling is currently best-effort: sfizz returns a component state
+stream, while Surge XT and Dexed reject the host stream with
+`V3_INVALID_ARG`/`V3_NOT_IMPLEMENTED` and therefore need a follow-up
+investigation (likely activation order or a stricter stream implementation).
+
+Still open:
+
+- state round-trip for every tested plugin,
+- program/unit selection,
+- automation editor round-trip tests,
+- native editor embedding (P4).
+
+Next: finish P3 state/program handling, then P4 (native editor).
 
 ## 2. What Ardour and Carla teach us
 
@@ -394,14 +411,15 @@ dialogs only show plugin information.
 
 Estimate: 2-3 weeks.
 
-### P3: Parameters, automation and state
+### P3: Parameters, automation and state — partially implemented
 
 Deliverables:
 
-- parameter models and automation,
-- component/controller state save/load,
-- program/unit basics,
-- project round-trip tests.
+- [x] parameter models and automation (per-block and sample-offset queue),
+- [~] component/controller state save/load (works with sfizz; Surge XT and
+  Dexed still reject the host stream),
+- [ ] program/unit basics,
+- [ ] project round-trip tests.
 
 Estimate: 2-3 weeks.
 

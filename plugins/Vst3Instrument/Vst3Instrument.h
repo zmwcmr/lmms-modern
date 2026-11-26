@@ -31,6 +31,7 @@
 #include <QMutex>
 
 #include "Instrument.h"
+#include "Vst3ParameterModels.h"
 
 namespace lmms
 {
@@ -58,6 +59,7 @@ public:
 
 	Vst3Host* host() const { return m_host.get(); }
 	QMutex& hostMutex() { return m_mutex; }
+	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 
 private:
 	bool openPlugin(const QString& file, const QString& classId);
@@ -67,6 +69,7 @@ private:
 	QMutex m_mutex;
 	QString m_file;
 	QString m_classId;
+	Vst3ParameterModels m_parameterModels;
 	std::vector<float> m_outputLeft;
 	std::vector<float> m_outputRight;
 };

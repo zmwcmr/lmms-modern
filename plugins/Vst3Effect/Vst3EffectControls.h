@@ -28,6 +28,7 @@
 #include <QStringList>
 
 #include "EffectControls.h"
+#include "Vst3ParameterModels.h"
 
 namespace lmms
 {
@@ -54,16 +55,21 @@ public:
 
 	void setPluginInfo(const QString& name, const QString& vendor,
 		const QStringList& parameterNames);
+	void initializeParameters();
+	void queueParameterChanges(int frames);
+	void refreshParameters();
 
 	const QString& pluginName() const { return m_pluginName; }
 	const QString& pluginVendor() const { return m_pluginVendor; }
 	const QStringList& parameterNames() const { return m_parameterNames; }
+	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 
 private:
 	Vst3Effect* m_effect;
 	QString m_pluginName;
 	QString m_pluginVendor;
 	QStringList m_parameterNames;
+	Vst3ParameterModels m_parameterModels;
 };
 
 } // namespace lmms

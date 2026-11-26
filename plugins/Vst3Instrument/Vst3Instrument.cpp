@@ -113,8 +113,10 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 	if (!m_host->load(file, classId, sampleRate, blockSize, &error))
 	{
 		m_host.reset();
+		m_parameterModels.initialize(this, nullptr);
 		return false;
 	}
+	m_parameterModels.initialize(this, m_host.get());
 
 	setDisplayName(m_host->name());
 	m_file = file;
@@ -166,6 +168,7 @@ void Vst3Instrument::play(SampleFrame* workingBuffer)
 		m_outputRight.resize(frames);
 	}
 
+	m_parameterModels.queueChanges(frames);
 	m_host->setTempo(Engine::getSong() != nullptr ? Engine::getSong()->getTempo() : 120.0);
 	m_host->setPlaying(Engine::getSong() != nullptr && Engine::getSong()->isPlaying());
 	m_host->process(nullptr, nullptr, m_outputLeft.data(), m_outputRight.data(), frames);
@@ -242,10 +245,11 @@ bool Vst3Instrument::handleMidiEvent(const MidiEvent& event,
 	return true;
 }
 
-void Vst3Instrument::saveSettings(QDomDocument&, QDomElement& parent)
+void Vst3Instrument::saveSettings(QDomDocument& doc, QDomElement& parent)
 {
 	parent.setAttribute(QStringLiteral("file"), m_file);
 	parent.setAttribute(QStringLiteral("class"), m_classId);
+	m_parameterModels.saveSettings(doc, parent);
 
 	if (m_host != nullptr)
 	{
@@ -287,6 +291,8 @@ void Vst3Instrument::loadSettings(const QDomElement& parent)
 	{
 		m_host->setState(component, controller);
 	}
+	m_parameterModels.refreshFromHost();
+	m_parameterModels.loadSettings(parent);
 }
 
 QString Vst3Instrument::nodeName() const

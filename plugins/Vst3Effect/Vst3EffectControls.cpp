@@ -37,12 +37,15 @@ Vst3EffectControls::Vst3EffectControls(Vst3Effect* effect) :
 {
 }
 
-void Vst3EffectControls::saveSettings(QDomDocument&, QDomElement&)
+void Vst3EffectControls::saveSettings(QDomDocument& doc, QDomElement& parent)
 {
+	m_parameterModels.saveSettings(doc, parent);
 }
 
-void Vst3EffectControls::loadSettings(const QDomElement&)
+void Vst3EffectControls::loadSettings(const QDomElement& parent)
 {
+	m_parameterModels.loadSettings(parent);
+	m_parameterModels.refreshFromHost();
 }
 
 gui::EffectControlDialog* Vst3EffectControls::createView()
@@ -52,7 +55,7 @@ gui::EffectControlDialog* Vst3EffectControls::createView()
 
 int Vst3EffectControls::controlCount()
 {
-	return m_parameterNames.size();
+	return m_parameterModels.count();
 }
 
 void Vst3EffectControls::setPluginInfo(const QString& name, const QString& vendor,
@@ -61,6 +64,21 @@ void Vst3EffectControls::setPluginInfo(const QString& name, const QString& vendo
 	m_pluginName = name;
 	m_pluginVendor = vendor;
 	m_parameterNames = parameterNames;
+}
+
+void Vst3EffectControls::initializeParameters()
+{
+	m_parameterModels.initialize(this, m_effect != nullptr ? m_effect->host() : nullptr);
+}
+
+void Vst3EffectControls::queueParameterChanges(int frames)
+{
+	m_parameterModels.queueChanges(frames);
+}
+
+void Vst3EffectControls::refreshParameters()
+{
+	m_parameterModels.refreshFromHost();
 }
 
 } // namespace lmms
