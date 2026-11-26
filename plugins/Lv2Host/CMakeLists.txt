@@ -44,3 +44,7 @@ ENDIF()
 # binary lands next to the plugin modules and is found through PLUGIN_DIR.
 
 INSTALL(TARGETS lmms-lv2-host RUNTIME DESTINATION "${PLUGIN_DIR}")
+
+# Deploy its runtime dependencies with the other plugin binaries (AppImage,
+# tar.gz). The binary lives in PLUGIN_DIR like RemoteVstPlugin.
+SET_PROPERTY(GLOBAL APPEND PROPERTY PLUGINS_BUILT "lmms-lv2-host")
