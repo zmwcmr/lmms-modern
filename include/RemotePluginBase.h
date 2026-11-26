@@ -557,6 +557,15 @@ protected:
 #endif
 	}
 
+	//! Clear the invalid state before reusing the transport for a new child.
+	//! FIFO transports get fresh objects through reset() instead.
+	inline void clearInvalid()
+	{
+#ifndef SYNC_WITH_SHM_FIFO
+		m_invalid = false;
+#endif
+	}
+
 
 #ifndef SYNC_WITH_SHM_FIFO
 	int m_socket;

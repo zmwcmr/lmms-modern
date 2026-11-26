@@ -39,8 +39,9 @@ Status: proposed roadmap, based on the current `feature/vst-improvements` state.
 
 1. LV2 UI and DSP run in the LMMS process; P6.4 RemoteLv2 moves both into a
    host child.
-2. Track-to-channel PDC is implemented, but send and master compensation is
-   still missing.
+2. PDC aligns track buses and mixer sends, and exports trim the master chain
+   latency from the start of the stream. The latency values are not yet shown
+   in the UI.
 3. VST2 and LV2 MIDI output are forwarded to the track MIDI port or one
    internal target track; longer routing chains are still missing.
 4. VST2 sample-accurate parameter automation is implemented for instruments and
@@ -329,18 +330,34 @@ Tasks:
 
 - [ ] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
       options, worker and state features, run ports and atom events.
-- [ ] Implement `Lv2ProcClient` on the VST2 remote transport: control FIFO,
+- [ ] Implement `Lv2HostClient` on the VST2 remote transport: control channel,
       shared audio/MIDI/control segment, block handshake, `QProcess` watcher.
 - [ ] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
       watchdog, crash notification, reload.
 - [ ] Create the suil UI in the child and show it as a top-level X11 window;
       forward geometry, visibility, close, `ui:scaleFactor` and idle. Wayland
       uses an XWayland window, as today.
-- [ ] Exchange state and factory presets over the filesystem.
+- [x] Exchange state and factory presets over the filesystem.
 - [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`; it also uses a
       separate window because embedding is gone.
 - [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
 - [ ] Add fake test plugins that crash in UI and in DSP.
+- Current status: the transport and the DSP step landed. `lmms-lv2-host`
+  starts, connects over the `RemotePluginBase` transport, instantiates the
+  plugin with lilv, reports ports, applies control values and processes audio
+  through the shared stereo segment. `Lv2HostClientTest` covers the echo,
+  `kill -9` of the child, and bit-level comparison with an in-process instance
+  of a fake gain plugin, and MIDI events are forwarded to and from the first
+  atom input/output pair. With `LMMS_LV2_REMOTE=1` the UI also moves into the
+  child (window, parent XID, instance/data access, scale, resize, idle, WM
+  close). DrumGizmo renders at 750x740 and ZynAddSubFX (DPF/OpenGL) at
+  1181x659; DPF UIs need the child to push the control values on every idle
+  tick, otherwise they stay blank. State and factory presets round-trip
+  through the child (base64 project format unchanged). The remote UI matrix
+  (DrumGizmo, ZynAddSubFX, OB-Xf, Pianoteq 8 STAGE, sfizz, Surge XT) matches
+  the in-process sizes and renders, and `Lv2HostClientTest` passes under
+  AddressSanitizer. Only the reload UX, the default flip and the packaging
+  check remain; only the first two audio ports are routed.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.

@@ -72,6 +72,7 @@
 #include "Lv2Manager.h"
 #include "Lv2Ports.h"
 #include "Lv2Proc.h"
+#include "Lv2HostClient.h"
 #include "MainWindow.h"
 #include "SubWindow.h"
 
@@ -454,6 +455,12 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
+	if (m_proc->isRemote())
+	{
+		createRemoteUi();
+		return;
+	}
+
 	LilvUIs* uis = m_proc->getUis();
 	AutoLilvNode hostType = uri(LV2_UI__X11UI);
 	const LilvUI* ui = nullptr;
@@ -692,9 +699,68 @@ void Lv2ProcView::createUi()
 
 
 
+void Lv2ProcView::createRemoteUi()
+{
+	auto* client = m_proc ? m_proc->remoteClient() : nullptr;
+	if (client == nullptr)
+	{
+		return;
+	}
+
+	// Same default as the in-process path: the child window uses the plugin's
+	// natural pixel size unless the user overrides it.
+	float scale = 1.0f;
+	if (const QByteArray override = qgetenv("LMMS_LV2_UI_SCALE");
+		!override.isEmpty())
+	{
+		bool ok = false;
+		const double value = override.toDouble(&ok);
+		if (ok && value > 0.0)
+		{
+			scale = static_cast<float>(value);
+		}
+	}
+
+	if (!client->showUi(scale))
+	{
+		qWarning() << "Could not show the remote LV2 UI";
+		return;
+	}
+
+	m_uiVisible = true;
+	if (!m_uiTimer)
+	{
+		m_uiTimer = new QTimer(m_pluginWidget);
+		QObject::connect(m_uiTimer, &QTimer::timeout, m_pluginWidget,
+			[this] { updateUi(); });
+		m_uiTimer->start(100);
+	}
+	updateToggleButton();
+}
+
+
+
+
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (auto* client = m_proc->remoteClient())
+		{
+			client->destroyUi();
+		}
+		if (m_uiTimer)
+		{
+			m_uiTimer->stop();
+			delete m_uiTimer;
+			m_uiTimer = nullptr;
+		}
+		m_uiVisible = false;
+		updateToggleButton();
+		return;
+	}
+
 	CurrentDirGuard cwdGuard(m_uiDataRoot);
 	if (m_proc)
 	{
@@ -978,6 +1044,20 @@ void Lv2ProcView::touchPort(uint32_t portIndex, bool grabbed)
 void Lv2ProcView::updateUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (auto* client = m_proc->remoteClient())
+		{
+			client->poll();
+			if (m_uiVisible && !client->isUiOpen())
+			{
+				m_uiVisible = false;
+			}
+		}
+		updateToggleButton();
+		return;
+	}
+
 	if (!m_uiInstance || !m_proc)
 	{
 		return;
@@ -1085,6 +1165,28 @@ void Lv2ProcView::toggleUI()
 void Lv2ProcView::setUiVisible(bool visible)
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (m_uiVisible == visible)
+		{
+			return;
+		}
+		if (auto* client = m_proc->remoteClient())
+		{
+			if (visible)
+			{
+				client->showUi(1.0f);
+			}
+			else
+			{
+				client->hideUi();
+			}
+		}
+		m_uiVisible = visible;
+		updateToggleButton();
+		return;
+	}
+
 	if (!m_uiInstance || m_uiVisible == visible)
 	{
 		return;

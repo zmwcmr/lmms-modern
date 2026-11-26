@@ -23,6 +23,31 @@ set(LMMS_TESTS
 if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2HostClientTest.cpp)
+
+	add_library(FakeLv2Gain MODULE plugins/fake-lv2-gain/gain.c)
+	target_include_directories(FakeLv2Gain PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Gain PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "gain"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2"
+	)
+	configure_file(plugins/fake-lv2-gain/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-gain/gain.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/gain.ttl" COPYONLY)
+
+	add_library(FakeLv2Midi MODULE plugins/fake-lv2-midi/midi.c)
+	target_include_directories(FakeLv2Midi PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Midi PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "midi"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2"
+	)
+	configure_file(plugins/fake-lv2-midi/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-midi/midi.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/midi.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -126,4 +151,19 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument
 	set_target_properties(Vst3ProjectTest PROPERTIES ENABLE_EXPORTS TRUE)
 	add_dependencies(Vst3ProjectTest fake-vst3 vst3instrument)
 	add_test(NAME Vst3ProjectTest COMMAND Vst3ProjectTest)
+endif()
+
+if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
+	add_dependencies(Lv2HostClientTest lmms-lv2-host FakeLv2Gain)
+	if(TARGET FakeLv2Midi)
+		add_dependencies(Lv2HostClientTest FakeLv2Midi)
+	endif()
+	target_compile_definitions(Lv2HostClientTest PRIVATE
+		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
+		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
+		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>")
+	target_include_directories(Lv2HostClientTest PRIVATE
+		${Lilv_INCLUDE_DIRS}
+		${LV2_INCLUDE_DIRS})
+	target_link_libraries(Lv2HostClientTest PRIVATE Lilv::lilv)
 endif()
