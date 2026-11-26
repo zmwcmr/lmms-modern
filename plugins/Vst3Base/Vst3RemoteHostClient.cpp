@@ -455,6 +455,7 @@ bool Vst3RemoteHostClient::setProgram(int index)
 	message.insert(QStringLiteral("index"), index);
 	sendMessage(message);
 	m_currentProgram = index;
+	m_stateValid = false;
 	return true;
 }
 
@@ -469,6 +470,7 @@ bool Vst3RemoteHostClient::selectUnit(int unitId)
 	message.insert(QStringLiteral("unit"), unitId);
 	sendMessage(message);
 	m_currentUnit = unitId;
+	m_stateValid = false;
 	return true;
 }
 
@@ -518,6 +520,7 @@ void Vst3RemoteHostClient::queueParameter(
 		m_pendingParameters.push_back({id, value, sampleOffset});
 	}
 	m_parameterValues[id] = value;
+	m_stateValid = false;
 }
 
 void Vst3RemoteHostClient::queueMidi(const Vst3Host::MidiEvent& event)

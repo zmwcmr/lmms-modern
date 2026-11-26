@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.7 adds IRunLoop and timer support for editors. P6 documentation and
-platform guards are in progress.
+Status: P5.8 invalidates remote state snapshots after parameters, programs,
+units or MIDI. P6 documentation and platform guards are in progress.
 
 ## 1. Goal
 
@@ -259,6 +259,13 @@ editor host appears and the window remains usable.
 
 This unblocks plugins whose editor relies on the host run loop instead of
 handling its own event source.
+
+### P5.8: State snapshot invalidation
+
+- The remote host client marks its cached component/controller state dirty
+  after parameter, program, unit or MIDI changes.
+- Saving a project therefore asks the DSP host for a fresh state instead of
+  reusing a stale snapshot.
 
 Still open:
 
