@@ -19,7 +19,7 @@ Disable it with `-DWANT_VST3=OFF`. The build installs:
 - `libvst3base.so` / `vst3base` – shared host code and the plugin browser
   feature,
 - `lmms-vst3-scanner` – crash-isolated metadata scanner,
-- `lmms-vst3-host` – out-of-process DSP host (POSIX platforms),
+- `lmms-vst3-host` – out-of-process DSP host (Linux),
 - `lmms-vst3-editor-host` – out-of-process editor host,
 - `vst3instrument` and `vst3effect` – the LMMS plugins.
 
@@ -133,8 +133,8 @@ watchdog brings audio back.
 - 32-bit VST3 on Linux is not supported.
 - Plugins that reject the host state stream may not restore all of their
   state; LMMS still stores the component/controller streams it receives.
-- Out-of-process DSP and editor helpers are currently built on POSIX
-  platforms. Windows and macOS use the in-process path when available.
+- The out-of-process DSP host is Linux-only. The editor host is X11-specific;
+  Windows and macOS use the in-process DSP path and have no native editor yet.
 
 ## File map
 
