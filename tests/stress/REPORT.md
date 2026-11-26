@@ -125,7 +125,8 @@ accepted as a sample path.
 **Fix:** `SampleDecoder::decode()` now requires a regular file
 (`QFileInfo::isFile()`) before opening anything, so FIFOs, character devices,
 directories and sockets are rejected immediately. The same guard is applied
-to the project file itself and to the configuration file on load/save.
+to the project file itself, the configuration file on load/save, and the
+audio export path on write.
 
 **Evidence:** the FIFO reproducer now completes in ~2 s with a warning; the
 `nonregular-sample-devzero.mmp` regression is replayed by

@@ -23,6 +23,7 @@
  *
  */
 
+#include <QFileInfo>
 #include <QMessageBox>
 
 #include "AudioFileDevice.h"
@@ -43,6 +44,14 @@ AudioFileDevice::AudioFileDevice( OutputSettings const & outputSettings,
 	using gui::ExportProjectDialog;
 
 	setSampleRate( outputSettings.getSampleRate() );
+
+	const QFileInfo outputInfo(_file);
+	if (outputInfo.exists() && !outputInfo.isFile())
+	{
+		fprintf(stderr, "Refusing to write audio to a non-regular file: %s\n",
+			_file.toUtf8().constData());
+		exit(EXIT_FAILURE);
+	}
 
 	if( m_outputFile.open( QFile::WriteOnly | QFile::Truncate ) == false )
 	{
