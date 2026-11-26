@@ -84,6 +84,38 @@
 namespace lmms::gui
 {
 
+namespace
+{
+// UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
+// ui:resize. Clamp them before they reach the plugin, which may assert.
+int clampUiDimension(int value, int maximum)
+{
+	return std::clamp(value, 1, std::max(maximum, 1));
+}
+
+// Temporarily switch the working directory for plugin calls that resolve
+// assets relative to the CWD (Zyn Fusion's qml/ and libzest.so).
+class CurrentDirGuard
+{
+public:
+	explicit CurrentDirGuard(const QString& dir)
+		: m_old(QDir::currentPath())
+	{
+		if (!dir.isEmpty() && dir != m_old)
+		{
+			m_changed = QDir::setCurrent(dir);
+		}
+	}
+	~CurrentDirGuard()
+	{
+		if (m_changed) { QDir::setCurrent(m_old); }
+	}
+private:
+	QString m_old;
+	bool m_changed = false;
+};
+}
+
 #if defined(LMMS_BUILD_LINUX)
 namespace
 {
@@ -123,12 +155,7 @@ int lmmsXErrorHandler(Display* display, XErrorEvent* event)
 		: 0;
 }
 
-// UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
-// ui:resize. Clamp them before they reach the plugin, which may assert.
-int clampUiDimension(int value, int maximum)
-{
-	return std::clamp(value, 1, std::max(maximum, 1));
-}
+
 }
 #endif
 
@@ -610,13 +637,11 @@ void Lv2ProcView::createUi()
 		lilv_node_as_uri(lilv_ui_get_binary_uri(ui)), nullptr));
 
 	// Zyn Fusion loads qml/ and libzest.so relative to the working directory.
-	// Switch to its asset root while the UI is being created, then restore the
-	// process-wide directory immediately.
-	const QString oldCwd = QDir::currentPath();
+	// Switch to its asset root while the UI is created and updated.
 	const QString dataRoot = findUiDataRoot(
 		QString::fromLocal8Bit(bundlePath.get()));
-	const bool cwdChanged = !dataRoot.isEmpty()
-		&& QDir::setCurrent(dataRoot);
+	m_uiDataRoot = dataRoot;
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 	m_uiInstance = suil_instance_new(
 		m_uiHost,
@@ -628,11 +653,6 @@ void Lv2ProcView::createUi()
 		bundlePath.get(),
 		binaryPath.get(),
 		features);
-
-	if (cwdChanged)
-	{
-		QDir::setCurrent(oldCwd);
-	}
 
 	if (!m_uiInstance)
 	{
@@ -670,6 +690,7 @@ void Lv2ProcView::createUi()
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
 	if (m_proc)
 	{
 		m_proc->setUiActive(false);
@@ -1008,6 +1029,8 @@ void Lv2ProcView::updateUi()
 	{
 		return;
 	}
+
+	CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 #if defined(LMMS_BUILD_LINUX)
 	if (m_uiHostWidget && m_uiResizable)

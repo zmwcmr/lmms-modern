@@ -137,6 +137,8 @@ private:
 	LV2_Options_Option m_uiOptions[3]{};
 	LV2UI_Resize m_resize{};
 	const LV2UI_Show_Interface* m_uiShow = nullptr;
+	//! Asset root some UIs (Zyn Fusion) resolve relative to the CWD
+	QString m_uiDataRoot;
 	float m_uiScale = 1.0f;
 	float m_uiSampleRate = 0.0f;
 	bool m_uiVisible = false;
