@@ -136,6 +136,15 @@ vst3-remote-host-test /usr/lib/vst3/Foo.vst3 <class-id>
 `vst3-remote-host-test --crash` kills the DSP host and checks that the
 watchdog brings audio back.
 
+The automated VST3 tests use the fake module and need no installed plugin:
+
+```sh
+ctest -R 'vst3-.*-fake|Vst3AutomationTest|Vst3ProjectTest'
+```
+
+`Vst3ProjectTest` saves an instrument with component/controller state to a
+real `.mmp` and verifies the state after reloading the project.
+
 ## Limitations
 
 - Native Wayland embedding is not implemented; editors are floating XWayland

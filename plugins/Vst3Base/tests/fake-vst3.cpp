@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "travesty/audio_processor.h"
 #include "travesty/bstream.h"
@@ -48,6 +49,8 @@ const uint8_t kEffectId[16] = {
 	0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
 	0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0x00, 0x02,
 };
+
+std::vector<v3_plugin_factory**> factoryHolders;
 
 bool matches(const v3_tuid a, const uint8_t* b)
 {
@@ -689,12 +692,22 @@ extern "C" __attribute__((visibility("default"))) bool ModuleEntry(void*)
 
 extern "C" __attribute__((visibility("default"))) bool ModuleExit()
 {
+	for (auto* holder : factoryHolders)
+	{
+		delete holder;
+	}
+	factoryHolders.clear();
 	return true;
 }
 
 extern "C" __attribute__((visibility("default"))) v3_plugin_factory** GetPluginFactory()
 {
-	static FakeFactory* factory = new FakeFactory();
-	static v3_plugin_factory* pointer = reinterpret_cast<v3_plugin_factory*>(factory);
-	return &pointer;
+	// VST3 expects each call to return a factory with one reference. Returning
+	// a shared singleton here breaks repeated load/unload cycles because the
+	// host releases the factory after unloading the module.
+	auto* factory = new FakeFactory();
+	auto** pointer = new v3_plugin_factory*(
+		reinterpret_cast<v3_plugin_factory*>(factory));
+	factoryHolders.push_back(pointer);
+	return pointer;
 }

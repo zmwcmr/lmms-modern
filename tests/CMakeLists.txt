@@ -101,3 +101,29 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	add_dependencies(Vst3AutomationTest fake-vst3)
 	add_test(NAME Vst3AutomationTest COMMAND Vst3AutomationTest)
 endif()
+
+if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument)
+	add_executable(Vst3ProjectTest
+		src/core/Vst3ProjectTest.cpp
+	)
+	target_include_directories(Vst3ProjectTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+	)
+	target_static_libraries(Vst3ProjectTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst3ProjectTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+	)
+	target_compile_features(Vst3ProjectTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst3ProjectTest PRIVATE
+		LMMS_TESTING
+		VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+		VST3_FAKE_CLASS="${FAKE_VST3_INSTRUMENT_ID}"
+		VST3_PLUGIN_DIR="${CMAKE_BINARY_DIR}/plugins"
+	)
+	# Plugins resolve LMMS core symbols from the loading executable, as they
+	# do when loaded by the lmms binary.
+	set_target_properties(Vst3ProjectTest PROPERTIES ENABLE_EXPORTS TRUE)
+	add_dependencies(Vst3ProjectTest fake-vst3 vst3instrument)
+	add_test(NAME Vst3ProjectTest COMMAND Vst3ProjectTest)
+endif()
