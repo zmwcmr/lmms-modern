@@ -27,7 +27,6 @@
 #include <algorithm>
 
 #include <QDomElement>
-#include <QGuiApplication>
 #include <QStringList>
 
 #include "AudioEngine.h"
@@ -98,8 +97,6 @@ bool Vst3Effect::openPlugin()
 	const bool remoteRequested = qEnvironmentVariableIsEmpty("LMMS_VST3_REMOTE_DSP")
 		|| qEnvironmentVariableIntValue("LMMS_VST3_REMOTE_DSP") != 0;
 	const bool remoteDsp = remoteRequested
-		&& QGuiApplication::platformName().startsWith(QStringLiteral("xcb"),
-			Qt::CaseInsensitive)
 		&& qEnvironmentVariableIsEmpty("LMMS_VST3_EDITOR_LOCAL")
 		&& !Vst3RemoteHostClient::hostExecutable().isEmpty();
 

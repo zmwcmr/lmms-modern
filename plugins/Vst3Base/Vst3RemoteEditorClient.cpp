@@ -32,6 +32,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QProcess>
+#include <QProcessEnvironment>
 
 #include "Vst3Host.h"
 
@@ -126,7 +127,6 @@ bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 	});
 
 	m_process = new QProcess(this);
-	m_process->setProcessChannelMode(QProcess::ForwardedErrorChannel);
 	connect(m_process, &QProcess::errorOccurred, this,
 		[this](QProcess::ProcessError) {
 			if (editorError)

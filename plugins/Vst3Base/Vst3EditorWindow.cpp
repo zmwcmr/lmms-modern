@@ -60,10 +60,19 @@ Vst3EditorWindow::Vst3EditorWindow(
 
 	if (!Vst3EditorWidget::isSupported() && Vst3X11Editor::isAvailable())
 	{
-		m_x11Editor = new Vst3X11Editor(host, title, [this] {
+		const auto closed = [this] {
 			QMetaObject::invokeMethod(this, [this] { deleteLater(); },
 				Qt::QueuedConnection);
-		}, this);
+		};
+		m_x11Editor = new Vst3X11Editor(host, title, closed, this, true);
+		if (m_x11Editor->isOpen())
+		{
+			return;
+		}
+		delete m_x11Editor;
+		m_x11Editor = nullptr;
+
+		m_x11Editor = new Vst3X11Editor(host, title, closed, this, false);
 		if (m_x11Editor->isOpen())
 		{
 			return;

@@ -38,6 +38,7 @@ namespace lmms
 {
 
 class Vst3HostBase;
+class Vst3RemoteEditorClient;
 
 /**
  * Creates a plain X11 top-level window through XWayland and attaches the
@@ -48,7 +49,8 @@ class VST3BASE_EXPORT Vst3X11Editor : public QObject
 {
 public:
 	Vst3X11Editor(Vst3HostBase* host, const QString& title,
-		std::function<void()> closed, QObject* parent = nullptr);
+		std::function<void()> closed, QObject* parent = nullptr,
+		bool remoteEditor = false);
 	~Vst3X11Editor() override;
 
 	static bool isAvailable();
@@ -67,6 +69,7 @@ private:
 	unsigned long m_window = 0;
 	unsigned long m_wmDelete = 0;
 	QSocketNotifier* m_notifier = nullptr;
+	Vst3RemoteEditorClient* m_remoteClient = nullptr;
 	std::function<void()> m_closed;
 	bool m_open = false;
 	bool m_resizing = false;

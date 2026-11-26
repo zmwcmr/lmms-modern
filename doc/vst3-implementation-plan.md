@@ -1,7 +1,7 @@
 # VST3 support implementation plan
 
-Status: P5.3 remote DSP and editor now share one plugin instance and are the
-default on xcb. The in-process path remains for Wayland and as a fallback.
+Status: P5.4 remote DSP and editor are the default on both xcb and Wayland,
+using a floating XWayland editor window on Wayland.
 
 ## 1. Goal
 
@@ -195,12 +195,25 @@ Verified with Surge XT and Dexed through `vst3-remote-host-test`,
 `vst3-editor-test` with `LMMS_VST3_REMOTE_DSP=1`, and LMMS renders using both
 the remote DSP and remote editor paths.
 
+### Implemented: P5.4 Wayland remote editor
+
+- On Wayland, LMMS creates an X11 parent window through Xlib and the
+  `lmms-vst3-editor-host` child attaches the plugin view to it.
+- The editor child is started with `QT_QPA_PLATFORM=xcb` so it always has an
+  X11 connection, even when LMMS itself runs on Wayland.
+- The remote DSP path is now enabled on both xcb and Wayland. Wayland no
+  longer falls back to in-process DSP when the host executable is present.
+- P4's in-process XWayland editor remains as a fallback when the editor host
+  is unavailable.
+
+Verified from the current Wayland session: the remote editor host stays alive
+for the editor lifetime, and normal LMMS renders use the remote DSP path.
+
 Still open:
 
-- Wayland remote editor and full removal of the in-process fallback,
-- Wayland remote editor,
 - crash restart/watchdog UX,
-- state snapshot caching for very large plugin states.
+- state snapshot caching for very large plugin states,
+- removing the in-process fallback entirely.
 
 ## 2. What Ardour and Carla teach us
 
@@ -532,7 +545,8 @@ Deliverables:
 - [~] watchdog/timeout behavior for the DSP host (2s timeout, no restart yet),
 - [x] remove the duplicate idle plugin instance in remote mode,
 - [x] state snapshot round-trip from the DSP host,
-- [x] make the remote path the default on xcb.
+- [x] make the remote path the default on xcb and Wayland,
+- [x] Wayland remote editor via a floating XWayland window.
 
 Estimate: 3-5 weeks.
 

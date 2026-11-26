@@ -695,7 +695,7 @@ endif()
 
 IF(WANT_VST3)
 	SET(LMMS_HAVE_VST3 TRUE)
-	SET(STATUS_VST3 "OK (P5.3: single-instance remote DSP default on xcb)")
+	SET(STATUS_VST3 "OK (P5.4: remote DSP/editor default, incl. Wayland)")
 ELSE()
 	SET(STATUS_VST3 "Not built, as requested")
 ENDIF()
