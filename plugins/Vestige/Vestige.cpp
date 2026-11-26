@@ -33,6 +33,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QtGlobal>
+#include <cstdio>
 #include <memory>
 
 #include "AudioEngine.h"

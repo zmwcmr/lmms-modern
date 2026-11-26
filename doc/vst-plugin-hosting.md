@@ -54,6 +54,11 @@ UI**:
 Hiding an embedded editor does not destroy the plugin editor; reopening it is
 cheap and avoids reinitialising plugin GUIs which are not restart-safe.
 
+Native Linux 64-bit VST2 plugins do not support host embedding through the
+VST2 ABI. Their editors always open as separate X11 windows, regardless of the
+`qt`/`xembed` setting. The setting only affects Windows VST2 plugins hosted
+through the Wine bridge.
+
 VST2 editors report a fixed pixel size through `effEditGetRect`; the host has
 no standard way to scale their content. LMMS re-reads the rectangle after
 `effEditOpen` because some plugins only report their real size then, and the
@@ -79,6 +84,9 @@ navigation. Presets are `.fxp`/`.fxb` files handled by the plugin.
   the default separate-window mode is used on Wayland. A saved `qt` embedding
   setting is ignored there instead of producing a black embedded widget.
   XEmbed and `qt` embedding require the `xcb` platform.
+- Native Linux VST2 editors ignore the embedding method and always open as
+  separate windows; the host prints `Native linux VST works only without
+  embedding` when an embedded mode is requested.
 - A remote host crash loses the plugin's current unsaved state. The parameters
   stored in the project are restored the next time it is loaded.
 - Scanning starts every candidate plugin once. A large collection can make
