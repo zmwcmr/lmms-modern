@@ -615,7 +615,7 @@ lmms--gui--AutomatableSlider::groove:horizontal {
 
 lmms--gui--AutomatableSlider::handle:horizontal {
 	background: none;
-	border-image: url("resources:horizontal_slider.png");
+	border-image: url("resources:horizontal_slider.svg");
 	width: 10px;
 	height: 26px;
 	border-radius: 2px;

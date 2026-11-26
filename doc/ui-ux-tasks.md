@@ -35,8 +35,12 @@ T1 各项尽量独立提交；T2 需要先讨论。
 
 ### T1-9 剩余 PNG → SVG
 
+**已完成**
+- `black_key*.png`、`combobox_bg.png`（第一批）。
+- `data/themes/default/horizontal_slider.png`：改为 `horizontal_slider.svg`，
+  QSS `border-image` 已验证；SVG 使用 2× 内禀尺寸（20×52），在 200% 下保持清晰。
+
 **未转换（原因）**
-- `horizontal_slider`：被 QSS `border-image` 引用（`style.css:598`），需先验证 `border-image` 对 SVG 的缩放行为。
 - `cursor_select_left/right`：灰度光标掩码，需在真实桌面验证 `QCursor` 的透明与热点。
 - `clip_rec` / `envelope_graph`：含像素字体，SVG `<text>` 依赖系统字体，需先转成路径。
 - `effect_plugin`：214×57 圆角渐变 + 半透明边框，比第一批复杂，后续单独处理。
