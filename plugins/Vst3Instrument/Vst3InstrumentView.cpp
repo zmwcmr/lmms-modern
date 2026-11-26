@@ -45,8 +45,11 @@ namespace lmms::gui
 {
 
 Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) :
-	InstrumentViewFixedSize(instrument, parent)
+	InstrumentView(instrument, parent)
 {
+	setMinimumSize(QSize(320, 320));
+	setMaximumSize(QSize(10000, 10000));
+
 	auto* layout = new QVBoxLayout(this);
 
 	auto* const vst3Instrument = dynamic_cast<Vst3Instrument*>(instrument);
@@ -132,15 +135,16 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
 			knob->setModel(parameter);
 			knob->setHintText(info.name, info.unit);
-			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
+			constexpr int columns = 2;
+			grid->addWidget(knob, index / columns, index % columns, Qt::AlignHCenter);
 		}
 		if (models.count() > shown)
 		{
 			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
-				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+				.arg(shown), parameterWidget), (shown + 1) / 2, 0, 1, 2);
 		}
 		scrollArea->setWidget(parameterWidget);
-		scrollArea->setMinimumSize(420, 260);
+		scrollArea->setMinimumSize(300, 260);
 		layout->addWidget(scrollArea);
 	}
 
@@ -178,6 +182,16 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 	layout->addWidget(new QLabel(
 		tr("MIDI input is active."), this));
 	layout->setSizeConstraint(QLayout::SetFixedSize);
+}
+
+QSize Vst3InstrumentView::sizeHint() const
+{
+	return QSize(360, 600);
+}
+
+QSize Vst3InstrumentView::minimumSizeHint() const
+{
+	return minimumSize();
 }
 
 void Vst3InstrumentView::modelChanged()

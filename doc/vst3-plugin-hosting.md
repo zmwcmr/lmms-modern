@@ -65,6 +65,11 @@ Auxiliary buses are activated when the plugin needs them, but only the first
 main output bus is routed back into LMMS. Plugins with no main output are
 marked unsupported by the scanner.
 
+VST3 instrument views are resizable and use a two-column parameter grid, so
+labels and the **Show GUI** button stay readable even in a narrow instrument
+window. Effect dialogs are resizable too and use a three-column grid. The
+parameter area scrolls vertically for plugins with many parameters.
+
 ## Editors
 
 The original plugin editor is available from **Show GUI** in the
