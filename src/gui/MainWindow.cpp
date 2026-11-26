@@ -34,6 +34,7 @@
 #include <QMessageBox>
 #include <QShortcut>
 #include <QSplitter>
+#include <QStatusBar>
 
 #include "AboutDialog.h"
 #include "AutomationEditor.h"
@@ -50,6 +51,7 @@
 #include "ImportFilter.h"
 #include "InstrumentTrackView.h"
 #include "InstrumentTrackWindow.h"
+#include "KeyboardShortcuts.h"
 #include "MicrotunerConfig.h"
 #include "PathUtil.h"
 #include "PatternEditor.h"
@@ -78,6 +80,21 @@
 
 namespace lmms::gui
 {
+
+namespace
+{
+
+//! Builds a menu/tooltip label such as "Song Editor (Ctrl+1)" or
+//! "Song Editor\tCtrl+1", using the platform's modifier glyph (⌘ on macOS)
+//! instead of a hardcoded "Ctrl".
+QString withShortcutHint(const QString& text, int key, bool forMenu)
+{
+	const auto sequence = QStringLiteral("%1+%2").arg(UI_CTRL_KEY).arg(key);
+	return forMenu ? text + QLatin1Char('\t') + sequence
+				   : text + QStringLiteral(" (%1)").arg(sequence);
+}
+
+} // namespace
 
 
 MainWindow::MainWindow() :
@@ -203,6 +220,13 @@ MainWindow::MainWindow() :
 	vbox->addWidget( m_toolBar );
 	vbox->addWidget( w );
 	setCentralWidget( main_widget );
+
+	// status bar, used for hints while hovering controls and short messages
+	// such as the result of saving the project.
+	// TODO: hidden until the gesture hints are finished (see doc/ui-ux-tasks.md,
+	// T1-4). Remove the hide() call to bring the bar back.
+	statusBar()->setSizeGripEnabled( false );
+	statusBar()->hide();
 
 	m_updateTimer.start( 1000 / 60, this );  // 60 fps
 
@@ -430,32 +454,33 @@ void MainWindow::finalize()
 
 
 	// window-toolbar
-	auto song_editor_window = new ToolButton(embed::getIconPixmap("songeditor"), tr("Song Editor") + " (Ctrl+1)", this,
+	auto song_editor_window = new ToolButton(
+		embed::getIconPixmap("songeditor"), withShortcutHint(tr("Song Editor"), 1, false), this,
 		SLOT(toggleSongEditorWin()), m_toolBar);
 	song_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_1));
 
 	auto pattern_editor_window = new ToolButton(embed::getIconPixmap("pattern_track_btn"),
-		tr("Pattern Editor") + " (Ctrl+2)", this, SLOT(togglePatternEditorWin()), m_toolBar);
+		withShortcutHint(tr("Pattern Editor"), 2, false), this, SLOT(togglePatternEditorWin()), m_toolBar);
 	pattern_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_2));
 
-	auto piano_roll_window = new ToolButton(
-		embed::getIconPixmap("piano"), tr("Piano Roll") + " (Ctrl+3)", this, SLOT(togglePianoRollWin()), m_toolBar);
+	auto piano_roll_window = new ToolButton(embed::getIconPixmap("piano"),
+		withShortcutHint(tr("Piano Roll"), 3, false), this, SLOT(togglePianoRollWin()), m_toolBar);
 	piano_roll_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_3));
 
 	auto automation_editor_window = new ToolButton(embed::getIconPixmap("automation"),
-		tr("Automation Editor") + " (Ctrl+4)", this, SLOT(toggleAutomationEditorWin()), m_toolBar);
+		withShortcutHint(tr("Automation Editor"), 4, false), this, SLOT(toggleAutomationEditorWin()), m_toolBar);
 	automation_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_4));
 
 	auto mixer_window = new ToolButton(
-		embed::getIconPixmap("mixer"), tr("Mixer") + " (Ctrl+5)", this, SLOT(toggleMixerWin()), m_toolBar);
+		embed::getIconPixmap("mixer"), withShortcutHint(tr("Mixer"), 5, false), this, SLOT(toggleMixerWin()), m_toolBar);
 	mixer_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_5));
 
 	auto controllers_window = new ToolButton(embed::getIconPixmap("controller"),
-		tr("Show/hide controller rack") + " (Ctrl+6)", this, SLOT(toggleControllerRack()), m_toolBar);
+		withShortcutHint(tr("Show/hide controller rack"), 6, false), this, SLOT(toggleControllerRack()), m_toolBar);
 	controllers_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_6));
 
 	auto project_notes_window = new ToolButton(embed::getIconPixmap("project_notes"),
-		tr("Show/hide project notes") + " (Ctrl+7)", this, SLOT(toggleProjectNotesWin()), m_toolBar);
+		withShortcutHint(tr("Show/hide project notes"), 7, false), this, SLOT(toggleProjectNotesWin()), m_toolBar);
 	project_notes_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_7));
 
 	m_toolBarLayout->addWidget( song_editor_window, 1, 1 );
@@ -591,6 +616,24 @@ void MainWindow::resetWindowTitle()
 	}
 
 	setWindowTitle( title + " - " + tr( "LMMS %1" ).arg( LMMS_VERSION ) );
+}
+
+
+void MainWindow::showStatusHint(const QString& text)
+{
+	m_statusHint = text;
+	statusBar()->showMessage(text);
+}
+
+
+void MainWindow::clearStatusHint(const QString& text)
+{
+	// Only clear the bar if no other control has replaced our hint in the
+	// meantime, otherwise moving from one control to the next would flicker.
+	if (m_statusHint != text) { return; }
+
+	m_statusHint.clear();
+	statusBar()->clearMessage();
 }
 
 
@@ -1044,32 +1087,32 @@ void MainWindow::updateViewMenu()
 	// Not that it's straight visible <-> invisible, more like
 	// not on top -> top <-> invisible
 	m_viewMenu->addAction(embed::getIconPixmap( "songeditor" ),
-			      tr( "Song Editor" ) + "\tCtrl+1",
+			      withShortcutHint(tr("Song Editor"), 1, true),
 			      this, SLOT(toggleSongEditorWin())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap("pattern_track"),
-					tr("Pattern Editor") + "\tCtrl+2",
+					withShortcutHint(tr("Pattern Editor"), 2, true),
 					this, SLOT(togglePatternEditorWin())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap( "piano" ),
-			      tr( "Piano Roll" ) + "\tCtrl+3",
+			      withShortcutHint(tr("Piano Roll"), 3, true),
 			      this, SLOT(togglePianoRollWin())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap( "automation" ),
-			      tr( "Automation Editor" ) + "\tCtrl+4",
+			      withShortcutHint(tr("Automation Editor"), 4, true),
 			      this,
 			      SLOT(toggleAutomationEditorWin())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap( "mixer" ),
-			      tr( "Mixer" ) + "\tCtrl+5",
+			      withShortcutHint(tr("Mixer"), 5, true),
 			      this, SLOT(toggleMixerWin())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap( "controller" ),
-			      tr( "Controller Rack" ) + "\tCtrl+6",
+			      withShortcutHint(tr("Controller Rack"), 6, true),
 			      this, SLOT(toggleControllerRack())
 		);
 	m_viewMenu->addAction(embed::getIconPixmap( "project_notes" ),
-			      tr( "Project Notes" ) + "\tCtrl+7",
+			      withShortcutHint(tr("Project Notes"), 7, true),
 			      this, SLOT(toggleProjectNotesWin())
 		);
 
@@ -1572,6 +1615,11 @@ bool MainWindow::guiSaveProjectAs( const QString & filename )
 	Song * song = Engine::getSong();
 	bool const songSaveResult = song->guiSaveProjectAs(filename);
 	handleSaveResult(filename, songSaveResult);
+
+	if (songSaveResult)
+	{
+		statusBar()->showMessage(tr("Saved: %1").arg(filename), 4000);
+	}
 
 	return songSaveResult;
 }

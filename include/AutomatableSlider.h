@@ -52,11 +52,20 @@ signals:
 
 
 protected:
+	//! Text shown in the status bar while the mouse hovers over the slider.
+	QString statusHint() const;
+
 	void contextMenuEvent( QContextMenuEvent * _me ) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void mouseReleaseEvent( QMouseEvent * _me ) override;
 	void wheelEvent( QWheelEvent * _me ) override;
 	void mouseDoubleClickEvent(QMouseEvent*) override;
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+	void enterEvent(QEnterEvent* event) override;
+#else
+	void enterEvent(QEvent* event) override;
+#endif
+	void leaveEvent(QEvent* event) override;
 
 	void modelChanged() override;
 

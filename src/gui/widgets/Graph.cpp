@@ -24,6 +24,7 @@
  */
 
 #include <QPainter>
+#include <QVariant>
 
 #include "Graph.h"
 #include "DeprecationHelper.h"
@@ -68,6 +69,21 @@ void Graph::setForeground( const QPixmap &_pixmap )
 void Graph::setGraphColor( QColor _graphcol )
 {
 	m_graphColor = _graphcol;
+}
+
+
+QColor Graph::pointerColor() const
+{
+	const auto color = property("_lmms_graphPointerColor").value<QColor>();
+	return color.isValid() ? color : QColor(0x70, 0x7c, 0x91);
+}
+
+
+void Graph::setPointerColor(const QColor& color)
+{
+	// Store the optional theme override outside the exported class layout.
+	setProperty("_lmms_graphPointerColor", color);
+	update();
 }
 
 /*
@@ -403,7 +419,7 @@ void Graph::paintEvent( QPaintEvent * )
 	if( m_mouseDown )
 	{
 		QPoint cursor = mapFromGlobal( QCursor::pos() );
-		p.setPen( QColor( 0x70, 0x7C, 0x91 ) );
+		p.setPen(pointerColor());
 		p.drawLine( 2, cursor.y(), width()-2, cursor.y() );
 		p.drawLine( cursor.x(), 2, cursor.x(), height()-2 );
 	}

@@ -219,6 +219,7 @@ SongEditor::SongEditor( Song * song ) :
 	m_masterVolumeSlider = new AutomatableSlider( tb,
 							tr( "Master volume" ) );
 	m_masterVolumeSlider->setModel( &m_song->m_masterVolumeModel );
+	m_masterVolumeSlider->setUnit(QStringLiteral("%"));
 	m_masterVolumeSlider->setOrientation( Qt::Vertical );
 	m_masterVolumeSlider->setPageStep( 1 );
 	m_masterVolumeSlider->setTickPosition( QSlider::TicksLeft );
@@ -251,6 +252,7 @@ SongEditor::SongEditor( Song * song ) :
 
 	m_masterPitchSlider = new AutomatableSlider( tb, tr( "Global transposition" ) );
 	m_masterPitchSlider->setModel( &m_song->m_masterPitchModel );
+	m_masterPitchSlider->setUnit(tr("semitones"));
 	m_masterPitchSlider->setOrientation( Qt::Vertical );
 	m_masterPitchSlider->setPageStep( 1 );
 	m_masterPitchSlider->setTickPosition( QSlider::TicksLeft );
@@ -1126,6 +1128,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	// Set slider zoom
 	m_zoomingSlider = new AutomatableSlider(m_toolBar, tr("Zoom"));
 	m_zoomingSlider->setModel(m_editor->m_zoomingModel);
+	m_zoomingSlider->setUnit(tr("steps"));
 	m_zoomingSlider->setOrientation(Qt::Horizontal);
 	m_zoomingSlider->setPageStep(1);
 	m_zoomingSlider->setFocusPolicy(Qt::NoFocus);

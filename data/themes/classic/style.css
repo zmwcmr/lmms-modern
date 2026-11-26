@@ -16,6 +16,20 @@ lmms--gui--Knob {
 	qproperty-arcInactiveColor: rgba(120, 120, 120, 70);
 }
 
+lmms--gui--Graph {
+	qproperty-pointerColor: #707c91;
+}
+
+lmms--gui--LedCheckBox {
+	qproperty-legacyTextColor: #ffffff;
+	qproperty-legacyTextShadowColor: #404040;
+}
+
+lmms--gui--ComboBox {
+	qproperty-textColor: #e0e0e0;
+	qproperty-textShadowColor: #404040;
+}
+
 lmms--gui--AutomationEditor {
 	background-color: rgb(0, 0, 0);
 	color: #e0e0e0;
@@ -75,7 +89,7 @@ QToolTip {
 	color: #4afd85;
 }
 
-lmms--gui--TextFloat, lmms--gui--SimpleTextFloat {
+lmms--gui--TextFloat, lmms--gui--SimpleTextFloat, QLabel#inlineValueEditorHint {
 	border-radius: 4px;
 	background: qlineargradient(spread:reflect, x1:0.5, y1:0.5, x2:0.5, y2:0,
 					stop:0 rgba(0, 0, 0, 255), stop:1 rgba(50, 50, 50, 220));
@@ -134,7 +148,7 @@ QMenu::indicator:selected {
 
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 8pt;
+	font-size: 11px;
 	color: white;
 }
 
@@ -210,6 +224,7 @@ lmms--gui--Oscilloscope {
 	qproperty-rightChannelColor: rgb(238, 253, 71);
 	qproperty-otherChannelsColor: rgb(71, 235, 253);
 	qproperty-clippingColor: rgb(255, 64, 64);
+	qproperty-hintTextColor: #c0c0c0;
 }
 
 /* main toolbar cpu load widget - this can have transparent bg now */
@@ -481,6 +496,11 @@ QPushButton#btn-solo:checked {
 
 /* font sizes */
 
+lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
+lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
+	font-size: 10px;
+}
+
 lmms--gui--Sf2InstrumentView > QLabel {
 	font-size:10px;
 }
@@ -738,19 +758,21 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 7pt;
+	font-size: 10px;
 }
 
-/* persistent peak markers for fx peak meters */
+/* Meter colors and fader ticks */
 lmms--gui--Fader {
 	qproperty-peakOk: rgb( 74, 253, 133);
 	qproperty-peakWarn: rgb(224, 222, 18);
 	qproperty-peakClip: rgb( 255, 100, 100);
+	qproperty-zeroTickColor: rgba(255, 255, 255, 216);
+	qproperty-tickColor: rgba(255, 255, 255, 128);
 }
 
 lmms--gui--TimeLineWidget {
         /* font-size only supports px and pt. */
-	font-size: 7pt;
+	font-size: 10px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
@@ -789,6 +811,8 @@ lmms--gui--TrackContainerView QLabel
 
 /* common clip colors */
 lmms--gui--ClipView   {
+	/* The underlay is always opaque to avoid transparent repaint artifacts. */
+	qproperty-underlayColor: #000000;
 	qproperty-mutedColor: rgb( 128, 128, 128 );
 	qproperty-mutedBackgroundColor: rgb( 80, 80, 80 );
 	qproperty-selectedColor: rgb( 0, 125, 255 );
@@ -877,6 +901,8 @@ lmms--gui--EnvelopeGraph {
 
 /* LFO graph */
 lmms--gui--LfoGraph {
+	qproperty-infoTextColor: #c9c9e1;
+	qproperty-infoBackgroundColor: rgba(0, 0, 0, 192);
 	qproperty-noAmountColor: rgb(96, 91, 96);
 	qproperty-fullAmountColor: rgb(0, 255, 128);
 }
@@ -1140,6 +1166,11 @@ lmms--gui--BarModelEditor {
 /* palette information  */
 
 lmms--gui--LmmsPalette {
+	qproperty-activeTitleText: #ffffff;
+	qproperty-inactiveTitleText: #c0c0c0;
+	qproperty-titleText: #404040;
+	qproperty-mdiButton: #dfe4ec;
+	qproperty-frameInner: #000000;
 	qproperty-background: #5b6571;
 	qproperty-windowText: #f0f0f0;
 	qproperty-base: #808080;

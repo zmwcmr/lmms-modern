@@ -25,6 +25,8 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
+#include <QFileInfo>
 #include <QGroupBox>
 #include <QImageReader>
 #include <QLabel>
@@ -302,6 +304,15 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 
 	guiGroupLayout->addWidget(new QLabel{tr("Auto-scroll resume delay"), guiGroupBox});
 	guiGroupLayout->addWidget(m_autoScrollResumeDelaySpinBox);
+
+	m_undoStepsSpinBox = new QSpinBox{guiGroupBox};
+	m_undoStepsSpinBox->setRange(ProjectJournal::MinUndoStates, ProjectJournal::MaxUndoStates);
+	m_undoStepsSpinBox->setToolTip(tr("How many undo steps are kept in memory. Larger values use more memory."));
+	m_undoStepsSpinBox->setValue(
+		ConfigManager::inst()->value("ui", "undosteps", QString::number(ProjectJournal::DefaultUndoStates)).toInt());
+
+	guiGroupLayout->addWidget(new QLabel{tr("Undo steps"), guiGroupBox});
+	guiGroupLayout->addWidget(m_undoStepsSpinBox);
 
 	generalControlsLayout->addWidget(guiGroupBox);
 
@@ -876,10 +887,30 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 		SLOT(setGIGDir(const QString&)),
 		SLOT(openGIGDir()),
 		m_gigDirLineEdit);
-	addPathEntry(tr("Theme directory"), m_themeDir,
-		SLOT(setThemeDir(const QString&)),
-		SLOT(openThemeDir()),
-		m_themeDirLineEdit);
+	{
+		auto themeGroupBox = new QGroupBox(tr("Theme"), pathSelectors);
+		auto themeLayout = new QHBoxLayout(themeGroupBox);
+
+		m_themeComboBox = new QComboBox(themeGroupBox);
+		populateThemes();
+		themeLayout->addWidget(m_themeComboBox, 1);
+
+		auto selectBtn = new QPushButton(embed::getIconPixmap("project_open", 16, 16), "", themeGroupBox);
+		selectBtn->setFixedSize(24, 24);
+		connect(selectBtn, SIGNAL(clicked()), this, SLOT(openThemeDir()));
+		themeLayout->addWidget(selectBtn, 0);
+
+		connect(m_themeComboBox, qOverload<int>(&QComboBox::currentIndexChanged),
+			this, [this](int index)
+			{
+				if (index < 0) { return; }
+				setThemeDir(m_themeComboBox->itemData(index).toString());
+				showRestartWarning();
+			});
+
+		pathSelectorsLayout->addWidget(themeGroupBox);
+		pathSelectorsLayout->addSpacing(10);
+	}
 	addPathEntry(tr("Background artwork"), m_backgroundPicFile,
 		SLOT(setBackgroundPicFile(const QString&)),
 		SLOT(openBackgroundPicFile()),
@@ -997,6 +1028,12 @@ void SetupDialog::accept()
 					QString::number(m_printNoteLabels));
 	ConfigManager::inst()->setValue("ui", "showfaderticks",
 					QString::number(m_showFaderTicks));
+	ConfigManager::inst()->setValue("ui", "undosteps",
+					QString::number(m_undoStepsSpinBox->value()));
+	if (Engine::projectJournal())
+	{
+		Engine::projectJournal()->setMaxUndoStates(m_undoStepsSpinBox->value());
+	}
 	ConfigManager::inst()->setValue("ui", "compacttrackbuttons",
 					QString::number(m_compactTrackButtons));
 	ConfigManager::inst()->setValue("ui", "oneinstrumenttrackwindow",
@@ -1462,14 +1499,45 @@ void SetupDialog::setGIGDir(const QString & gigDir)
 }
 
 
+void SetupDialog::populateThemes()
+{
+	QString current = m_themeDir;
+	if (!current.endsWith('/')) { current += '/'; }
+
+	// List the themes bundled with LMMS, i.e. the directories next to the
+	// default theme that contain a style sheet.
+	QDir themeRoot{QStringLiteral("data:/themes")};
+	for (const auto& name : themeRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
+	{
+		if (!QFileInfo::exists(themeRoot.filePath(name) + "/style.css")) { continue; }
+		m_themeComboBox->addItem(name, QStringLiteral("data:/themes/%1/").arg(name));
+	}
+
+	// The configured theme may live outside that directory.
+	if (!current.isEmpty() && m_themeComboBox->findData(current) < 0)
+	{
+		m_themeComboBox->addItem(QDir(current).dirName(), current);
+	}
+
+	const int index = m_themeComboBox->findData(current);
+	if (index >= 0) { m_themeComboBox->setCurrentIndex(index); }
+}
+
+
 void SetupDialog::openThemeDir()
 {
-	QString new_dir = FileDialog::getExistingDirectory(this,
+	QString newDir = FileDialog::getExistingDirectory(this,
 		tr("Choose your theme directory"), m_themeDir);
-	if(!new_dir.isEmpty())
+	if (newDir.isEmpty()) { return; }
+	if (!newDir.endsWith('/')) { newDir += '/'; }
+
+	int index = m_themeComboBox->findData(newDir);
+	if (index < 0)
 	{
-		m_themeDirLineEdit->setText(new_dir);
+		m_themeComboBox->addItem(QDir(newDir).dirName(), newDir);
+		index = m_themeComboBox->count() - 1;
 	}
+	m_themeComboBox->setCurrentIndex(index);
 }
 
 

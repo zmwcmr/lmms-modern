@@ -37,7 +37,13 @@ namespace lmms::gui
 class LMMS_EXPORT ComboBox : public QWidget, public IntModelView
 {
 	Q_OBJECT
+	Q_PROPERTY(QColor textColor READ textColor WRITE setTextColor)
+	Q_PROPERTY(QColor textShadowColor READ textShadowColor WRITE setTextShadowColor)
 public:
+	QColor textColor() const;
+	void setTextColor(const QColor& color);
+	QColor textShadowColor() const;
+	void setTextShadowColor(const QColor& color);
 	ComboBox( QWidget* parent = nullptr, const QString& name = QString() );
 	~ComboBox() override = default;
 
@@ -52,6 +58,12 @@ public:
 	}
 
 	static constexpr int DEFAULT_HEIGHT = 22;
+
+	QSize sizeHint() const override;
+
+	//! Makes the combo at least \a width pixels wide and never narrower than
+	//! its longest item, so long translations are not elided.
+	void setMinimumContentWidth(int width);
 
 public slots:
 	void selectNext();

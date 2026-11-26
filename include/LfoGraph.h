@@ -44,6 +44,8 @@ class LfoGraph : public QWidget, public ModelView
 	Q_OBJECT
 	Q_PROPERTY(QColor noAmountColor MEMBER m_noAmountColor)
 	Q_PROPERTY(QColor fullAmountColor MEMBER m_fullAmountColor)
+	Q_PROPERTY(QColor infoTextColor MEMBER m_infoTextColor)
+	Q_PROPERTY(QColor infoBackgroundColor MEMBER m_infoBackgroundColor)
 
 public:
 	LfoGraph(QWidget* parent);
@@ -62,6 +64,8 @@ private:
 	float m_randomGraph {0.};
 	QColor m_noAmountColor;
 	QColor m_fullAmountColor;
+	QColor m_infoTextColor {201, 201, 225};
+	QColor m_infoBackgroundColor {0, 0, 0, 192};
 };
 
 } // namespace gui

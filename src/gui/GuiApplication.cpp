@@ -40,15 +40,23 @@
 #include "ProjectNotes.h"
 #include "SongEditor.h"
 
+#include <QAbstractButton>
 #include <QApplication>
 #include <QDebug>
+#include <QDialogButtonBox>
 #include <QDir>
+#include <QEvent>
 #include <QtGlobal>
 #include <QHBoxLayout>
+#include <QIcon>
+#include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QSplashScreen>
 #include <QSocketNotifier>
+
+#include "embed.h"
 
 #ifdef LMMS_BUILD_WIN32
 #include <io.h>
@@ -65,6 +73,125 @@ namespace lmms
 
 namespace gui
 {
+
+namespace
+{
+
+//! Copies a widget's tooltip into its accessible name so that screen readers
+//! can announce icon-only controls. Qt emits ToolTipChange whenever
+//! QWidget::setToolTip() is called, i.e. while the UI is being constructed.
+class AccessibleNameSync : public QObject
+{
+public:
+	explicit AccessibleNameSync(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override
+	{
+		if (event->type() == QEvent::ToolTipChange)
+		{
+			if (auto* widget = qobject_cast<QWidget*>(watched))
+			{
+				if (widget->accessibleName().isEmpty() && !widget->toolTip().isEmpty())
+				{
+					widget->setAccessibleName(widget->toolTip());
+				}
+			}
+		}
+		return QObject::eventFilter(watched, event);
+	}
+};
+
+
+//! Qt's standard message boxes and input dialogs take their icons from the
+//! platform icon theme, which is usually a different visual style than LMMS'
+//! flat artwork. Replace the dialog icon and the standard button icons with
+//! LMMS' own icons when the dialog is shown.
+class StandardDialogIconSync : public QObject
+{
+public:
+	explicit StandardDialogIconSync(QObject* parent = nullptr) : QObject(parent) {}
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override
+	{
+		if (event->type() == QEvent::Show)
+		{
+			if (auto* box = qobject_cast<QMessageBox*>(watched))
+			{
+				applyToMessageBox(*box);
+			}
+			else if (auto* dialog = qobject_cast<QInputDialog*>(watched))
+			{
+				applyToInputDialog(*dialog);
+			}
+		}
+		return QObject::eventFilter(watched, event);
+	}
+
+private:
+	static void setButtonIcon(QAbstractButton* button, const char* icon)
+	{
+		if (button == nullptr) { return; }
+		constexpr int iconSize = 14;
+		button->setIconSize(QSize(iconSize, iconSize));
+		button->setIcon(QIcon(embed::getIconPixmap(icon, iconSize, iconSize)));
+	}
+
+	static void applyToMessageBox(QMessageBox& box)
+	{
+		const char* dialogIcon = nullptr;
+		switch (box.icon())
+		{
+		case QMessageBox::Question:
+			dialogIcon = "help";
+			break;
+		case QMessageBox::Warning:
+		case QMessageBox::Critical:
+			dialogIcon = "error";
+			break;
+		case QMessageBox::Information:
+			dialogIcon = "info";
+			break;
+		default:
+			break;
+		}
+		if (dialogIcon != nullptr)
+		{
+			box.setIconPixmap(embed::getIconPixmap(dialogIcon, 48, 48));
+		}
+
+		setButtonIcon(box.button(QMessageBox::Ok), "apply");
+		setButtonIcon(box.button(QMessageBox::Yes), "apply");
+		setButtonIcon(box.button(QMessageBox::YesToAll), "apply");
+		setButtonIcon(box.button(QMessageBox::Save), "project_save");
+		setButtonIcon(box.button(QMessageBox::SaveAll), "project_save");
+		setButtonIcon(box.button(QMessageBox::Apply), "apply");
+		setButtonIcon(box.button(QMessageBox::Reset), "reload");
+		setButtonIcon(box.button(QMessageBox::Retry), "reload");
+		setButtonIcon(box.button(QMessageBox::Discard), "discard");
+		setButtonIcon(box.button(QMessageBox::Cancel), "cancel");
+		setButtonIcon(box.button(QMessageBox::Close), "close");
+		setButtonIcon(box.button(QMessageBox::No), "cancel");
+		setButtonIcon(box.button(QMessageBox::NoToAll), "cancel");
+		setButtonIcon(box.button(QMessageBox::Abort), "cancel");
+		setButtonIcon(box.button(QMessageBox::Ignore), "discard");
+		setButtonIcon(box.button(QMessageBox::Help), "help");
+	}
+
+	static void applyToInputDialog(QInputDialog& dialog)
+	{
+		const auto* buttonBox = dialog.findChild<QDialogButtonBox*>();
+		if (buttonBox == nullptr) { return; }
+
+		setButtonIcon(buttonBox->button(QDialogButtonBox::Ok), "apply");
+		setButtonIcon(buttonBox->button(QDialogButtonBox::Cancel), "cancel");
+		setButtonIcon(buttonBox->button(QDialogButtonBox::Help), "help");
+	}
+};
+
+} // namespace
+
 
 GuiApplication* getGUI()
 {
@@ -91,17 +218,6 @@ GuiApplication::GuiApplication()
 	// Immediately register our SIGINT handler
 	createSocketNotifier();
 
-	// prompt the user to create the LMMS working directory (e.g. ~/Documents/lmms) if it doesn't exist
-	if ( !ConfigManager::inst()->hasWorkingDir() &&
-		QMessageBox::question( nullptr,
-				tr( "Working directory" ),
-				tr( "The LMMS working directory %1 does not "
-				"exist. Create it now? You can change the directory "
-				"later via Edit -> Settings." ).arg( ConfigManager::inst()->workingDir() ),
-					QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes ) == QMessageBox::Yes)
-	{
-		ConfigManager::inst()->createWorkingDir();
-	}
 	// Init style and palette
 	QDir::addSearchPath("artwork", ConfigManager::inst()->themeDir());
 	QDir::addSearchPath("artwork", ConfigManager::inst()->defaultThemeDir());
@@ -115,6 +231,27 @@ GuiApplication::GuiApplication()
 
 	QApplication::setPalette( *lpal );
 	LmmsStyle::s_palette = lpal;
+
+	// Give every widget that only has a tooltip an accessible name as well,
+	// so that screen readers can identify icon-only controls.
+	qApp->installEventFilter(new AccessibleNameSync(this));
+	// Standard dialogs otherwise use the platform icon theme, which does not
+	// match LMMS' flat artwork.
+	qApp->installEventFilter(new StandardDialogIconSync(this));
+
+	// Prompt the user to create the LMMS working directory (e.g.
+	// ~/Documents/lmms) if it doesn't exist. This is done after the style is
+	// applied so that the dialog is themed like the rest of the application.
+	if ( !ConfigManager::inst()->hasWorkingDir() &&
+		QMessageBox::question( nullptr,
+				tr( "Working directory" ),
+				tr( "The LMMS working directory %1 does not "
+				"exist. Create it now? You can change the directory "
+				"later via Edit -> Settings." ).arg( ConfigManager::inst()->workingDir() ),
+					QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes ) == QMessageBox::Yes)
+	{
+		ConfigManager::inst()->createWorkingDir();
+	}
 
 #ifdef LMMS_BUILD_APPLE
 	QApplication::setAttribute(Qt::AA_DontShowIconsInMenus, true);

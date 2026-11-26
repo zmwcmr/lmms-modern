@@ -110,6 +110,7 @@ SET(LMMS_SRCS
 	gui/widgets/Graph.cpp
 	gui/widgets/GroupBox.cpp
 	gui/widgets/Knob.cpp
+	gui/widgets/InlineValueEditor.cpp
 	gui/widgets/LcdFloatSpinBox.cpp
 	gui/widgets/LcdSpinBox.cpp
 	gui/widgets/LcdWidget.cpp

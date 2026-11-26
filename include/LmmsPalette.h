@@ -46,6 +46,11 @@ class LMMS_EXPORT LmmsPalette : public QWidget
 	Q_PROPERTY( QColor brightText READ brightText WRITE setBrightText )
 	Q_PROPERTY( QColor highlight READ highlight WRITE setHighlight )
 	Q_PROPERTY( QColor highlightedText READ highlightedText WRITE setHighlightedText )
+	Q_PROPERTY(QColor activeTitleText READ activeTitleText WRITE setActiveTitleText)
+	Q_PROPERTY(QColor inactiveTitleText READ inactiveTitleText WRITE setInactiveTitleText)
+	Q_PROPERTY(QColor titleText READ titleText WRITE setTitleText)
+	Q_PROPERTY(QColor mdiButton READ mdiButton WRITE setMdiButton)
+	Q_PROPERTY(QColor frameInner READ frameInner WRITE setFrameInner)
 
 public:
 	LmmsPalette( QWidget * parent, QStyle * stylearg  ); 
@@ -66,6 +71,11 @@ public:
 	ACCESSMET( brightText, setBrightText )
 	ACCESSMET( highlight, setHighlight )
 	ACCESSMET( highlightedText, setHighlightedText )
+	ACCESSMET( activeTitleText, setActiveTitleText )
+	ACCESSMET( inactiveTitleText, setInactiveTitleText )
+	ACCESSMET( titleText, setTitleText )
+	ACCESSMET( mdiButton, setMdiButton )
+	ACCESSMET( frameInner, setFrameInner )
 
 #undef ACCESSMET
 

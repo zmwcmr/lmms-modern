@@ -47,6 +47,7 @@ namespace gui
 class LMMS_EXPORT Graph : public QWidget, public ModelView
 {
 	Q_OBJECT
+	Q_PROPERTY(QColor pointerColor READ pointerColor WRITE setPointerColor)
 public:
 	enum class Style
 	{
@@ -72,6 +73,8 @@ public:
 
 
 	void setGraphColor( const QColor );
+	QColor pointerColor() const;
+	void setPointerColor(const QColor& color);
 
 	inline graphModel * model()
 	{

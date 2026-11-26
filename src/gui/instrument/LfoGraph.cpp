@@ -32,7 +32,6 @@
 #include "Oscillator.h"
 #include "ColorHelper.h"
 
-#include "FontHelper.h"
 
 namespace lmms
 {
@@ -166,7 +165,9 @@ void LfoGraph::drawInfoText(const EnvelopeAndLfoParameters& params)
 
 	// First configure the font so that we get correct results for the font metrics used below
 	QFont f = p.font();
-	p.setFont(adjustedToPixelSize(f, height() * 0.2));
+	// The info text is sized from the graph and must not be scaled twice.
+	f.setPixelSize(qRound(height() * 0.2));
+	p.setFont(f);
 
 	// This is the position where the text and its rectangle will be rendered
 	const QPoint textPosition(4, height() - 6);
@@ -176,10 +177,10 @@ void LfoGraph::drawInfoText(const EnvelopeAndLfoParameters& params)
 	// This gives the bounding rectangle if the text was rendered at the origin ...
 	const auto boundingRect = fontMetrics.boundingRect(infoText);
 	// ... so we translate it to the actual position where the text will be rendered.
-	p.fillRect(boundingRect.translated(textPosition), QColor{0, 0, 0, 192});
+	p.fillRect(boundingRect.translated(textPosition), m_infoBackgroundColor);
 
 	// Now draw the actual info text
-	p.setPen(QColor(201, 201, 225));
+	p.setPen(m_infoTextColor);
 	p.drawText(textPosition, infoText);
 }
 

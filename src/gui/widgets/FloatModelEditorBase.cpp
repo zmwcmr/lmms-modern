@@ -27,12 +27,12 @@
 #include "FloatModelEditorBase.h"
 
 #include <QApplication>
-#include <QInputDialog>
 #include <QPainter>
 #include <QTimerEvent>
 
 #include "lmms_math.h"
 #include "DeprecationHelper.h"
+#include "InlineValueEditor.h"
 #include "CaptionMenu.h"
 #include "ControllerConnection.h"
 #include "GuiApplication.h"
@@ -274,6 +274,11 @@ void FloatModelEditorBase::enterEvent(QEvent* event)
 {
 	updateInteractionState(event);
 	showTextFloat(700, 2000);
+
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->showStatusHint(statusHint());
+	}
 }
 
 
@@ -281,6 +286,19 @@ void FloatModelEditorBase::leaveEvent(QEvent *event)
 {
 	updateInteractionState(event);
 	s_textFloat->hide();
+
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->clearStatusHint(statusHint());
+	}
+}
+
+
+QString FloatModelEditorBase::statusHint() const
+{
+	return tr("Drag to adjust · Shift+wheel coarse · %1+wheel fine · "
+			  "%2+wheel finest · Middle-click resets · Double-click to type a value")
+		.arg(UI_CTRL_KEY, UI_ALT_KEY);
 }
 
 
@@ -499,24 +517,9 @@ auto FloatModelEditorBase::floatingTextType() const -> FloatingTextType
 
 void FloatModelEditorBase::enterValue()
 {
-	bool ok = false;
-	const float newVal = QInputDialog::getDouble(
-		this,
-		tr("Set value"),
-		tr("Please enter a new value between %1 and %2:")
-			.arg(model()->minValue())
-			.arg(model()->maxValue()),
-		model()->getRoundedValue(),
-		model()->minValue(),
-		model()->maxValue(),
-		model()->getDigitCount(),
-		&ok
-	);
-
-	if (ok)
-	{
-		model()->setValue(newVal);
-	}
+	if (!model()) { return; }
+	InlineValueEditor::showEditorWithHint(this, model(),
+		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue(), m_unit));
 }
 
 

@@ -58,6 +58,9 @@ const int MINIMUM_TRACK_WIDTH = 168;
 class TrackView : public QWidget, public ModelView, public JournallingObject
 {
 	Q_OBJECT
+	//! Background colour of the track. Defaults to the historical value so
+	//! that themes which do not set it keep looking the same.
+	Q_PROPERTY(QColor trackBackground READ trackBackground WRITE setTrackBackground)
 public:
 	//! @brief Create a new track View.
 	//!
@@ -121,6 +124,9 @@ public slots:
 
 	//! @brief Close this track View.
 	virtual bool close();
+
+	QColor trackBackground() const { return m_trackBackground; }
+	void setTrackBackground(const QColor& color);
 
 
 protected:
@@ -210,6 +216,9 @@ private:
 
 	Track * m_track;
 	TrackContainerView * m_trackContainerView;
+
+	//! Background colour, overridable through the style sheet.
+	QColor m_trackBackground{32, 36, 40};
 
 	TrackOperationsWidget m_trackOperationsWidget;
 	QWidget m_trackSettingsWidget;

@@ -58,7 +58,12 @@ TabWidget::TabWidget(const QString& caption, QWidget* parent, bool usePixmap,
 
 	m_tabheight = caption.isEmpty() ? m_tabbarHeight - 3 : m_tabbarHeight - 4;
 
-	setFont(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	// Tab bars have fixed heights (and some dialogs position their contents
+	// relative to them), so this is one of the few places that keeps the
+	// design pixel size instead of following the system font.
+	QFont tabFont = font();
+	tabFont.setPixelSize(DEFAULT_FONT_SIZE);
+	setFont(tabFont);
 
 	setAutoFillBackground(true);
 	QColor bg_color = QApplication::palette().color(QPalette::Active, QPalette::Window).darker(132);
@@ -212,7 +217,9 @@ void TabWidget::resizeEvent(QResizeEvent*)
 void TabWidget::paintEvent(QPaintEvent* pe)
 {
 	QPainter p(this);
-	p.setFont(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	QFont tabFont = font();
+	tabFont.setPixelSize(DEFAULT_FONT_SIZE);
+	p.setFont(tabFont);
 
 	// Draw background
 	QBrush bg_color = p.background();
@@ -258,6 +265,9 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 
 			// Get artwork
 			QPixmap artwork(embed::getIconPixmap(currentWidgetDesc.pixmap));
+			// QPixmap::width() is in device pixels for high-DPI artwork; the
+			// tab bar and highlight use logical pixels.
+			const QSize artworkSize = embed::logicalSize(artwork);
 
 			// Highlight active tab
 			if (it.key() == m_activeTab)
@@ -266,7 +276,7 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 			}
 
 			// Draw artwork
-			p.drawPixmap(tab_x_offset + (currentWidgetDesc.nwidth - artwork.width()) / 2, 1, artwork);
+			p.drawPixmap(tab_x_offset + (currentWidgetDesc.nwidth - artworkSize.width()) / 2, 1, artwork);
 		}
 		else
 		{

@@ -46,16 +46,22 @@
 
 #include "Fader.h"
 
-#include <QInputDialog>
+#include "InlineValueEditor.h"
+
+#include <limits>
+
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
+#include <QVariant>
 
 #include "lmms_math.h"
 #include "CaptionMenu.h"
 #include "ConfigManager.h"
 #include "DeprecationHelper.h"
+#include "GuiApplication.h"
 #include "KeyboardShortcuts.h"
+#include "MainWindow.h"
 #include "SimpleTextFloat.h"
 
 namespace
@@ -127,38 +133,61 @@ void Fader::adjustByDecibelDelta(float value)
 
 void Fader::adjustByDialog()
 {
-	bool ok;
-
 	if (modelIsLinear())
 	{
-		auto maxDB = ampToDbfs(model()->maxValue());
-		const auto currentValue = model()->value() <= 0. ? c_faderMinDb : ampToDbfs(model()->value());
-
-		float enteredValue = QInputDialog::getDouble(this, tr("Set value"),
-							tr("Please enter a new value between %1 and %2:").arg(c_faderMinDb).arg(maxDB),
-							currentValue, c_faderMinDb, maxDB, model()->getDigitCount(), &ok);
-
-		if (ok)
-		{
-			model()->setValue(dbfsToAmp(enteredValue));
-		}
-		return;
+		// The model stores an amplitude but the user types decibels
+		const auto minimum = model()->minValue() > 0.f
+			? ampToDbfs(model()->minValue()) : -std::numeric_limits<float>::infinity();
+		const auto maximum = ampToDbfs(model()->maxValue());
+		InlineValueEditor::showEditorWithHint(this, model(),
+			InlineValueEditor::rangeHint(minimum, maximum, QStringLiteral("dBFS")),
+			[](float amp) { return amp <= 0.f ? c_faderMinDb : ampToDbfs(amp); },
+			[](float db) { return dbfsToAmp(db); },
+			1);
 	}
 	else
 	{
-		// The model already is in dB
-		auto minv = model()->minValue() * m_conversionFactor;
-		auto maxv = model()->maxValue() * m_conversionFactor;
-		float enteredValue = QInputDialog::getDouble(this, tr("Set value"),
-							tr("Please enter a new value between %1 and %2:").arg(minv).arg(maxv),
-							model()->getRoundedValue() * m_conversionFactor, minv, maxv, model()->getDigitCount(), &ok);
-
-		if (ok)
-		{
-			model()->setValue(enteredValue / m_conversionFactor);
-		}
+		// The model already is in dB, only the conversion factor differs
+		const float factor = m_conversionFactor;
+		InlineValueEditor::showEditorWithHint(this, model(),
+			InlineValueEditor::rangeHint(model()->minValue() * factor, model()->maxValue() * factor, m_unit),
+			[factor](float value) { return value * factor; },
+			[factor](float value) { return value / factor; });
 	}
 }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+void Fader::enterEvent(QEnterEvent* event)
+#else
+void Fader::enterEvent(QEvent* event)
+#endif
+{
+	QWidget::enterEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->showStatusHint(statusHint());
+	}
+}
+
+
+void Fader::leaveEvent(QEvent* event)
+{
+	QWidget::leaveEvent(event);
+	if (getGUI() && getGUI()->mainWindow())
+	{
+		getGUI()->mainWindow()->clearStatusHint(statusHint());
+	}
+}
+
+
+QString Fader::statusHint() const
+{
+	return tr("Drag to adjust · Wheel 1 dB · Shift+wheel coarse · "
+			  "%1+wheel fine · %2+wheel finest · Middle-click resets · "
+			  "Double-click to type a value")
+		.arg(UI_CTRL_KEY, UI_ALT_KEY);
+}
+
 
 void Fader::contextMenuEvent(QContextMenuEvent* ev)
 {
@@ -269,7 +298,17 @@ void Fader::mouseReleaseEvent(QMouseEvent* mouseEvent)
 
 void Fader::wheelEvent (QWheelEvent* ev)
 {
-	const int direction = (ev->angleDelta().y() > 0 ? 1 : -1) * (ev->inverted() ? -1 : 1);
+	int delta = ev->angleDelta().y();
+
+	// Alt is a window manager modifier on some systems, so Qt may report the
+	// wheel as a horizontal scroll instead of a vertical one. Fall back to the
+	// horizontal delta so that Alt+wheel still adjusts the fader.
+	if (delta == 0)
+	{
+		delta = ev->angleDelta().x();
+	}
+
+	const int direction = (delta > 0 ? 1 : -1) * (ev->inverted() ? -1 : 1);
 
 	const float increment = determineAdjustmentDelta(ev->modifiers()) * direction;
 
@@ -293,8 +332,10 @@ float Fader::determineAdjustmentDelta(const Qt::KeyboardModifiers & modifiers) c
 	}
 	else if (modifiers & Qt::AltModifier)
 	{
-		// Work around a Qt bug in conjunction with the scroll wheel and the Alt key
-		return 0.f;
+		// Even finer than control, matching the knobs where Alt is the finest
+		// wheel step. It used to return 0 as a workaround for the Qt quirk that
+		// is now handled in wheelEvent().
+		return 0.05f;
 	}
 
 	return 1.f;
@@ -714,12 +755,37 @@ void Fader::paintLevels(QPaintEvent* ev, QPainter& painter, bool linear)
 	painter.restore();
 }
 
+QColor Fader::zeroTickColor() const
+{
+	const auto color = property("_lmms_faderZeroTickColor").value<QColor>();
+	return color.isValid() ? color : QColor(255, 255, 255, 216);
+}
+
+void Fader::setZeroTickColor(const QColor& color)
+{
+	// Keep theme overrides outside the exported class layout.
+	setProperty("_lmms_faderZeroTickColor", color);
+	update();
+}
+
+QColor Fader::tickColor() const
+{
+	const auto color = property("_lmms_faderTickColor").value<QColor>();
+	return color.isValid() ? color : QColor(255, 255, 255, 128);
+}
+
+void Fader::setTickColor(const QColor& color)
+{
+	setProperty("_lmms_faderTickColor", color);
+	update();
+}
+
 void Fader::paintFaderTicks(QPainter& painter)
 {
 	painter.save();
 
-	const QPen zeroPen(QColor(255, 255, 255, 216), 2.5);
-	const QPen nonZeroPen(QColor(255, 255, 255, 128), 1.);
+	const QPen zeroPen(zeroTickColor(), 2.5);
+	const QPen nonZeroPen(tickColor(), 1.);
 
 	// We use the maximum dB value of the model to calculate the nearest multiple
 	// of the step size that we use to paint the ticks so that we know the start point.

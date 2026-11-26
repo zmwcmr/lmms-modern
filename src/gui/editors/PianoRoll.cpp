@@ -1061,7 +1061,8 @@ void PianoRoll::drawNoteRect( QPainter & p, int x, int y,
 			QString noteKeyString = getNoteString(n->key());
 
 			QFont noteFont(p.font());
-			noteFont = adjustedToPixelSize(noteFont, noteTextHeight);
+			// The note height is already in scaled layout pixels.
+			noteFont.setPixelSize(noteTextHeight);
 			QFontMetrics fontMetrics(noteFont);
 			QSize textSize = fontMetrics.size(Qt::TextSingleLine, noteKeyString);
 
@@ -3337,7 +3338,9 @@ void PianoRoll::paintEvent(QPaintEvent * pe )
 	// set font-size to 80% of key line height
 	QFont f = p.font();
 	int keyFontSize = m_keyLineHeight * 0.8;
-	p.setFont(adjustedToPixelSize(f, keyFontSize));
+	// The key line height is already in scaled layout pixels.
+	f.setPixelSize(keyFontSize);
+	p.setFont(f);
 	QFontMetrics fontMetrics(p.font());
 	// G-1 is one of the widest; plus one pixel margin for the shadow
 	QRect const boundingRect = fontMetrics.boundingRect(QString("G-1")) + QMargins(0, 0, 1, 0);
@@ -5334,7 +5337,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingComboBox = new ComboBox( m_toolBar );
 	m_zoomingComboBox->setModel( &m_editor->m_zoomingModel );
-	m_zoomingComboBox->setFixedSize( 64, ComboBox::DEFAULT_HEIGHT );
+	m_zoomingComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_zoomingComboBox->setMinimumContentWidth(64);
 	m_zoomingComboBox->setToolTip( tr( "Horizontal zooming") );
 
 	auto zoom_y_lbl = new QLabel(m_toolBar);
@@ -5343,7 +5347,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingYComboBox = new ComboBox(m_toolBar);
 	m_zoomingYComboBox->setModel(&m_editor->m_zoomingYModel);
-	m_zoomingYComboBox->setFixedSize(64, ComboBox::DEFAULT_HEIGHT);
+	m_zoomingYComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_zoomingYComboBox->setMinimumContentWidth(64);
 	m_zoomingYComboBox->setToolTip(tr("Vertical zooming"));
 
 	// setup quantize-stuff
@@ -5353,7 +5358,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );
-	m_quantizeComboBox->setFixedSize(85, ComboBox::DEFAULT_HEIGHT);
+	m_quantizeComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_quantizeComboBox->setMinimumContentWidth(85);
 	m_quantizeComboBox->setToolTip( tr( "Quantization") );
 
 	// setup note-len-stuff
@@ -5362,13 +5368,15 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_noteLenComboBox = new ComboBox( m_toolBar );
 	m_noteLenComboBox->setModel( &m_editor->m_noteLenModel );
-	m_noteLenComboBox->setFixedSize( 105, ComboBox::DEFAULT_HEIGHT );
+	m_noteLenComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_noteLenComboBox->setMinimumContentWidth(105);
 	m_noteLenComboBox->setToolTip( tr( "Note length") );
 
 	// setup key-stuff
 	m_keyComboBox = new ComboBox(m_toolBar);
 	m_keyComboBox->setModel(&m_editor->m_keyModel);
-	m_keyComboBox->setFixedSize(72, ComboBox::DEFAULT_HEIGHT);
+	m_keyComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_keyComboBox->setMinimumContentWidth(72);
 	m_keyComboBox->setToolTip(tr("Key"));
 
 	// setup scale-stuff
@@ -5377,7 +5385,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_scaleComboBox = new ComboBox( m_toolBar );
 	m_scaleComboBox->setModel( &m_editor->m_scaleModel );
-	m_scaleComboBox->setFixedSize(155, ComboBox::DEFAULT_HEIGHT);
+	m_scaleComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_scaleComboBox->setMinimumContentWidth(155);
 	m_scaleComboBox->setToolTip( tr( "Scale") );
 
 	// setup chord-stuff
@@ -5386,7 +5395,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_chordComboBox = new ComboBox( m_toolBar );
 	m_chordComboBox->setModel( &m_editor->m_chordModel );
-	m_chordComboBox->setFixedSize(125, ComboBox::DEFAULT_HEIGHT);
+	m_chordComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_chordComboBox->setMinimumContentWidth(125);
 	m_chordComboBox->setToolTip( tr( "Chord" ) );
 
 	// setup snap-stuff
@@ -5395,7 +5405,8 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_snapComboBox = new ComboBox(m_toolBar);
 	m_snapComboBox->setModel(&m_editor->m_snapModel);
-	m_snapComboBox->setFixedSize(96, ComboBox::DEFAULT_HEIGHT);
+	m_snapComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
+	m_snapComboBox->setMinimumContentWidth(96);
 	m_snapComboBox->setToolTip(tr("Snap mode"));
 
 	// -- Clear ghost MIDI clip button

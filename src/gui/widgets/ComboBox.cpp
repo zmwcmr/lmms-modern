@@ -30,6 +30,9 @@
 #include <QPainter>
 #include <QStyleOptionFrame>
 #include <QScreen>
+#include <QVariant>
+
+#include <algorithm>
 
 #include "CaptionMenu.h"
 #include "FontHelper.h"
@@ -58,6 +61,52 @@ ComboBox::ComboBox( QWidget * _parent, const QString & _name ) :
 }
 
 
+
+
+QSize ComboBox::sizeHint() const
+{
+	// Only toolbars that opt in pay for content-based sizing. A dynamic
+	// property is used instead of a data member so the widget layout does not
+	// change for plugins built against this header.
+	if (!property("_lmms_contentWidth").toBool())
+	{
+		return QWidget::sizeHint();
+	}
+
+	const auto* comboModel = model();
+	if (comboModel == nullptr || comboModel->size() == 0)
+	{
+		return QSize(CB_ARROW_BTN_WIDTH + 32, DEFAULT_HEIGHT);
+	}
+
+	int widestItem = 0;
+	bool hasPixmap = false;
+	for (int i = 0; i < comboModel->size(); ++i)
+	{
+		widestItem = std::max(widestItem,
+			fontMetrics().horizontalAdvance(comboModel->itemText(i)));
+		hasPixmap = hasPixmap || comboModel->itemPixmap(i) != nullptr;
+	}
+
+	// 5 px left margin, 4 px right margin, and the arrow button.
+	int width = widestItem + CB_ARROW_BTN_WIDTH + 9;
+	if (hasPixmap)
+	{
+		// Pixmaps are scaled to 16 px height when painted.
+		width += 16 + 3;
+	}
+	return QSize(width, DEFAULT_HEIGHT);
+}
+
+
+void ComboBox::setMinimumContentWidth(int width)
+{
+	setProperty("_lmms_contentWidth", true);
+	setMinimumWidth(std::max(width, sizeHint().width()));
+	// Keep toolbars from squeezing the combo below its content width; they
+	// will move it into their overflow menu instead.
+	setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+}
 
 
 
@@ -198,15 +247,39 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 			tx += pm.width() + 3;
 		}
 		const int y = ( height()+p.fontMetrics().height() ) /2;
-		p.setPen( QColor( 64, 64, 64 ) );
+		p.setPen(textShadowColor());
 		p.drawText( tx+1, y-3, model()->currentText() );
-		p.setPen( QColor( 224, 224, 224 ) );
+		p.setPen(textColor());
 		p.drawText( tx, y-4, model()->currentText() );
 	}
 }
 
 
 
+
+QColor ComboBox::textColor() const
+{
+	const auto color = property("_lmms_comboTextColor").value<QColor>();
+	return color.isValid() ? color : QColor(224, 224, 224);
+}
+
+void ComboBox::setTextColor(const QColor& color)
+{
+	setProperty("_lmms_comboTextColor", color);
+	update();
+}
+
+QColor ComboBox::textShadowColor() const
+{
+	const auto color = property("_lmms_comboTextShadowColor").value<QColor>();
+	return color.isValid() ? color : QColor(64, 64, 64);
+}
+
+void ComboBox::setTextShadowColor(const QColor& color)
+{
+	setProperty("_lmms_comboTextShadowColor", color);
+	update();
+}
 
 void ComboBox::wheelEvent( QWheelEvent* event )
 {

@@ -250,8 +250,8 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 	lingrad.setColorAt( 1, c.darker( 300 ) );
 	lingrad.setColorAt( 0, c );
 
-	// paint a black rectangle under the clip to prevent glitches with transparent backgrounds
-	p.fillRect( rect(), QColor( 0, 0, 0 ) );
+	// An opaque underlay prevents glitches with transparent clip backgrounds.
+	p.fillRect(rect(), underlayColor());
 
 	if( gradient() )
 	{

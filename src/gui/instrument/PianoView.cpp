@@ -39,6 +39,7 @@
 #include <cmath>
 
 #include <QCursor>
+#include <QApplication>
 #include <QKeyEvent>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
@@ -50,7 +51,6 @@
 #include "Piano.h"
 #include "CaptionMenu.h"
 #include "Engine.h"
-#include "FontHelper.h"
 #include "InstrumentTrack.h"
 #include "Song.h"
 #include "StringPairDrag.h"
@@ -687,7 +687,10 @@ void PianoView::paintEvent( QPaintEvent * )
 	QPainter p( this );
 
 	// set smaller font for printing number of every octave
-	p.setFont(adjustedToPixelSize(p.font(), LABEL_TEXT_SIZE));
+	// The label has to fit into a fixed-size key, so it is not scaled.
+	QFont labelFont = p.font();
+	labelFont.setPixelSize(LABEL_TEXT_SIZE);
+	p.setFont(labelFont);
 
 
 	// draw bar above the keyboard (there will be the labels

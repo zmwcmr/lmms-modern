@@ -24,7 +24,7 @@ QTreeWidget::branch:hover {
 
 QTreeWidget::item:selected,
 QTreeWidget::branch:selected {
-	background-color: #17793b;
+	background-color: #0f5c2c;
 	padding-left: 0px;
 }
 
@@ -42,13 +42,27 @@ QMdiArea {
 
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 8pt;
+	font-size: 11px;
 	color: white;
 }
 
 lmms--gui--Knob {
 	qproperty-lineInactiveColor: rgb(120, 120, 120);
 	qproperty-arcInactiveColor: rgba(120, 120, 120, 70);
+}
+
+lmms--gui--Graph {
+	qproperty-pointerColor: #707c91;
+}
+
+lmms--gui--LedCheckBox {
+	qproperty-legacyTextColor: #ffffff;
+	qproperty-legacyTextShadowColor: #404040;
+}
+
+lmms--gui--ComboBox {
+	qproperty-textColor: #e0e0e0;
+	qproperty-textShadowColor: #404040;
 }
 
 lmms--gui--AutomationEditor {
@@ -95,7 +109,28 @@ QLineEdit:focus {
 
 QTextEdit, QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
 	color: #d1d8e4;
-	selection-background-color: #17793b;
+	selection-background-color: #0f5c2c;
+}
+
+/* Keyboard focus indication.
+   These rules only draw an outline; they never change border widths or
+   padding, so focus cannot shift the layout. An outline is used instead of
+   border colours because most buttons are styled through ID selectors
+   (QPushButton#btn), which outrank a plain ":focus" rule on specificity.
+   Combo boxes and spin boxes are painted by LmmsStyle and are not covered
+   here yet. */
+
+QToolButton:focus,
+QPushButton:focus {
+	outline: 1px solid #0bd556;
+	outline-offset: -2px;
+}
+
+QTreeView:focus,
+QListView:focus,
+QTableView:focus {
+	outline: 1px solid #0bd556;
+	outline-offset: -1px;
 }
 
 QToolTip {
@@ -104,7 +139,7 @@ QToolTip {
 	color: #d1d8e4;
 }
 
-lmms--gui--TextFloat, lmms--gui--SimpleTextFloat {
+lmms--gui--TextFloat, lmms--gui--SimpleTextFloat, QLabel#inlineValueEditorHint {
 	background: #040506;
 	color: #d1d8e4;
 }
@@ -240,6 +275,7 @@ lmms--gui--Oscilloscope {
 	qproperty-rightChannelColor: rgb(238, 253, 71);
 	qproperty-otherChannelsColor: rgb(71, 235, 253);
 	qproperty-clippingColor: rgb(255, 64, 64);
+	qproperty-hintTextColor: #c0c0c0;
 }
 
 /* main toolbar cpu load widget - this can have transparent bg now */
@@ -388,6 +424,11 @@ lmms--gui--TrackView > QWidget {
 	background-color: #3B424A;
 }
 
+/* background of the whole track */
+lmms--gui--TrackView {
+	qproperty-trackBackground: #202428;
+}
+
 
 QPushButton#btn {
 	color: #d1d8e4;
@@ -528,6 +569,11 @@ QPushButton#btn-solo:checked {
 }
 
 /* font sizes */
+
+lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
+lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
+	font-size: 10px;
+}
 
 lmms--gui--Sf2InstrumentView > QLabel {
 	font-size:10px;
@@ -791,19 +837,21 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 7pt;
+	font-size: 10px;
 }
 
-/* persistent peak markers for fx peak meters */
+/* Meter colors and fader ticks */
 lmms--gui--Fader {
 	qproperty-peakOk: #0ad45c;
 	qproperty-peakWarn: #d6ec52;
 	qproperty-peakClip: #c12038;
+	qproperty-zeroTickColor: rgba(255, 255, 255, 216);
+	qproperty-tickColor: rgba(255, 255, 255, 128);
 }
 
 lmms--gui--TimeLineWidget {
 	/* font-size only supports px and pt. */
-	font-size: 7pt;
+	font-size: 10px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
@@ -847,6 +895,8 @@ lmms--gui--TrackContainerView QLabel
 
 /* common clip colors */
 lmms--gui--ClipView   {
+	/* The underlay is always opaque to avoid transparent repaint artifacts. */
+	qproperty-underlayColor: #000000;
 	qproperty-mutedColor: rgba(255,255,255,100);
 	qproperty-mutedBackgroundColor: #373d48;
 	qproperty-selectedColor: #006B65;
@@ -935,6 +985,8 @@ lmms--gui--EnvelopeGraph {
 
 /* LFO graph */
 lmms--gui--LfoGraph {
+	qproperty-infoTextColor: #c9c9e1;
+	qproperty-infoBackgroundColor: rgba(0, 0, 0, 192);
 	qproperty-noAmountColor: rgb(96, 91, 96);
 	qproperty-fullAmountColor: rgb(0, 255, 128);
 }
@@ -1195,9 +1247,26 @@ lmms--gui--BarModelEditor {
 	qproperty-barBrush: rgba(17, 136, 71, 255);
 }
 
+/* status bar (hints while hovering controls, short messages) */
+
+QStatusBar {
+	background-color: #262b30;
+	color: #d1d8e4;
+	border-top: 1px solid #101213;
+}
+
+QStatusBar::item {
+	border: none;
+}
+
 /* palette information  */
 
 lmms--gui--LmmsPalette {
+	qproperty-activeTitleText: #ffffff;
+	qproperty-inactiveTitleText: #c0c0c0;
+	qproperty-titleText: #404040;
+	qproperty-mdiButton: #dfe4ec;
+	qproperty-frameInner: #000000;
 	qproperty-background: #262b30;
 	qproperty-windowText: #1de276;
 	qproperty-base: #101213;
