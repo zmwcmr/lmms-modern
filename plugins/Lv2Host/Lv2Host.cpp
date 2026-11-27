@@ -180,21 +180,22 @@ public:
 	explicit CurrentDirGuard(const std::string& directory)
 	{
 		char buffer[PATH_MAX] = {};
-		if (::getcwd(buffer, sizeof(buffer)) != nullptr)
+		if (::getcwd(buffer, sizeof(buffer)) == nullptr)
 		{
-			m_previous = buffer;
+			return;
 		}
-		if (!directory.empty())
+		m_previous = buffer;
+		if (!directory.empty() && ::chdir(directory.c_str()) == 0)
 		{
-			::chdir(directory.c_str());
+			m_changed = true;
 		}
 	}
 
 	~CurrentDirGuard()
 	{
-		if (!m_previous.empty())
+		if (m_changed && ::chdir(m_previous.c_str()) != 0)
 		{
-			::chdir(m_previous.c_str());
+			std::fprintf(stderr, "could not restore the working directory\n");
 		}
 	}
 
@@ -203,6 +204,7 @@ public:
 
 private:
 	std::string m_previous;
+	bool m_changed = false;
 };
 #endif
 
@@ -828,10 +830,24 @@ std::string Lv2HostProcess::ensureStateDir()
 {
 	if (m_stateDirPath.empty())
 	{
-		char templ[] = "/tmp/lmms-lv2host-state-XXXXXX";
-		if (char* dir = ::mkdtemp(templ))
+		std::error_code error;
+		const auto base = std::filesystem::temp_directory_path(error);
+		if (!error)
 		{
-			m_stateDirPath = dir;
+			const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+			for (int attempt = 0; attempt < 100 && m_stateDirPath.empty(); ++attempt)
+			{
+				const auto candidate = base / ("lmms-lv2host-state-"
+					+ std::to_string(nonce) + "-" + std::to_string(attempt));
+				if (std::filesystem::create_directory(candidate, error))
+				{
+					m_stateDirPath = candidate.string();
+				}
+				else if (error)
+				{
+					break;
+				}
+			}
 		}
 	}
 	return m_stateDirPath;

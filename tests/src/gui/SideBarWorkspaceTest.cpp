@@ -100,6 +100,11 @@ private slots:
 		QEnterEvent enter(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1));
 		QCoreApplication::sendEvent(closeControl, &enter);
 		QTRY_VERIFY(workspace->paintCount > paintsBeforeHover);
+		// The hover timer prepares a preview, but a repaint can discard it
+		// again on slower platforms. Prepare it synchronously right before
+		// closing so this assertion tests the close animation, not preview
+		// timing.
+		workspacePanel->preparePreview();
 		QTest::mouseClick(closeControl, Qt::LeftButton);
 		QVERIFY(!workspace->updatesEnabled());
 		QTRY_COMPARE(workspace->width(), closedWidth);
