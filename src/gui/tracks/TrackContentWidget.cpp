@@ -28,6 +28,8 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QPainter>
+#include <QPointer>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -43,6 +45,7 @@
 #include "SongEditor.h"
 #include "StringPairDrag.h"
 #include "TrackContainerView.h"
+#include "UiFeedback.h"
 #include "ClipView.h"
 #include "TrackView.h"
 
@@ -164,6 +167,18 @@ void TrackContentWidget::addClipView( ClipView * clipv )
 	clip->saveJournallingState( false );
 	changePosition();
 	clip->restoreJournallingState();
+}
+
+
+
+
+ClipView* TrackContentWidget::clipViewForClip( const Clip * clip ) const
+{
+	for (auto* clipView : m_clipViews)
+	{
+		if (clipView->getClip() == clip) { return clipView; }
+	}
+	return nullptr;
 }
 
 
@@ -446,6 +461,8 @@ bool TrackContentWidget::pasteSelection( TimePos clipPos, const QMimeData * md, 
 	// Fix offset if it sets the left most Clip to a negative position
 	offset = std::max(offset.getTicks(), -leftmostPos.getTicks());
 
+	TrackContainerView* tcv = m_trackView->trackContainerView();
+
 	for( int i = 0; i<clipNodes.length(); i++ )
 	{
 		QDomElement outerClipElement = clipNodes.item( i ).toElement();
@@ -467,6 +484,23 @@ bool TrackContentWidget::pasteSelection( TimePos clipPos, const QMimeData * md, 
 		if( wasSelection )
 		{
 			clip->selectViewOnCreate( true );
+		}
+
+		for (auto* trackView : tcv->trackViews())
+		{
+			if (trackView->getTrack() != t) { continue; }
+			TrackContentWidget* target = trackView->getTrackContentWidget();
+			QPointer<Clip> clipGuard{clip};
+			// The view is created through a queued connection, so wait for the
+			// next event-loop pass before asking the target for it.
+			QTimer::singleShot(0, target, [target, clipGuard] {
+				if (!clipGuard) { return; }
+				if (auto* clipView = target->clipViewForClip(clipGuard))
+				{
+					UiFeedback::flash(clipView);
+				}
+			});
+			break;
 		}
 	}
 

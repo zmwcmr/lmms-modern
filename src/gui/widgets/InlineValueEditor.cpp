@@ -36,6 +36,7 @@
 #include "AutomatableModel.h"
 #include "DeprecationHelper.h"
 #include "LocaleHelper.h"
+#include "UiFeedback.h"
 
 namespace lmms::gui
 {
@@ -113,6 +114,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 
 	auto* editor = new InlineValueEditor(control->window());
 	editor->m_model = model;
+	editor->m_control = control;
 	connect(model, &QObject::destroyed, editor, &InlineValueEditor::cancel);
 	editor->m_toDisplay = toDisplay;
 	editor->m_fromDisplay = fromDisplay;
@@ -228,6 +230,7 @@ void InlineValueEditor::commit()
 		float value = m_fromDisplay ? m_fromDisplay(typed) : typed;
 		value = std::clamp(value, m_model->minValue<float>(), m_model->maxValue<float>());
 		m_model->setValue(value);
+		UiFeedback::flash(m_control);
 	}
 
 	deleteLater();
