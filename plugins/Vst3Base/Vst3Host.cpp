@@ -249,9 +249,9 @@ struct RunLoop : v3_run_loop_cpp
 
 	~RunLoop()
 	{
-		for (auto& [_, notifier] : m_eventNotifiers)
+		for (auto& registration : m_eventHandlers)
 		{
-			delete notifier;
+			delete registration.notifier;
 		}
 		for (auto& [_, timer] : m_timers)
 		{
@@ -289,14 +289,28 @@ private:
 			return V3_INVALID_ARG;
 		}
 		auto* const loop = runLoop(self);
-		loop->removeEventHandler(handler);
+		// The same event handler is registered once per file descriptor.
+		// Drop only a previous registration of this handler/fd pair, not
+		// the other descriptors handled by the same object.
+		for (auto it = loop->m_eventHandlers.begin();
+			it != loop->m_eventHandlers.end();)
+		{
+			if (it->handler == handler && it->fd == fd)
+			{
+				delete it->notifier;
+				it = loop->m_eventHandlers.erase(it);
+			}
+			else
+			{
+				++it;
+			}
+		}
 		auto* notifier = new QSocketNotifier(fd, QSocketNotifier::Read);
 		QObject::connect(notifier, &QSocketNotifier::activated, notifier,
 			[handler, fd] {
 				v3_cpp_obj(handler)->on_fd_is_set(handler, fd);
 			});
-		loop->m_eventHandlers[handler] = notifier;
-		loop->m_eventNotifiers[fd] = notifier;
+		loop->m_eventHandlers.push_back({handler, fd, notifier});
 		return V3_OK;
 	}
 
@@ -335,25 +349,18 @@ private:
 
 	void removeEventHandler(v3_event_handler** handler)
 	{
-		const auto it = m_eventHandlers.find(handler);
-		if (it == m_eventHandlers.end())
+		for (auto it = m_eventHandlers.begin(); it != m_eventHandlers.end();)
 		{
-			return;
-		}
-		auto* notifier = it->second;
-		for (auto fdIt = m_eventNotifiers.begin(); fdIt != m_eventNotifiers.end();)
-		{
-			if (fdIt->second == notifier)
+			if (it->handler == handler)
 			{
-				fdIt = m_eventNotifiers.erase(fdIt);
+				delete it->notifier;
+				it = m_eventHandlers.erase(it);
 			}
 			else
 			{
-				++fdIt;
+				++it;
 			}
 		}
-		delete notifier;
-		m_eventHandlers.erase(it);
 	}
 
 	void removeTimer(v3_timer_handler** handler)
@@ -368,8 +375,13 @@ private:
 		m_timers.erase(it);
 	}
 
-	std::map<v3_event_handler**, QSocketNotifier*> m_eventHandlers;
-	std::map<int, QSocketNotifier*> m_eventNotifiers;
+	struct EventRegistration
+	{
+		v3_event_handler** handler;
+		int fd;
+		QSocketNotifier* notifier;
+	};
+	std::vector<EventRegistration> m_eventHandlers;
 	std::map<v3_timer_handler**, QTimer*> m_timers;
 };
 
