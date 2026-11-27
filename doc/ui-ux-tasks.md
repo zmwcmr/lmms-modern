@@ -57,6 +57,27 @@ T1 各项尽量独立提交；T2 需要先讨论。
 **未转换（原因）**
 - **必须保留**：`apply_css.png`、`apply-selected_css.png`（QSS 菜单指示图标，见 `74bac7745`）；`closed_branch.png`、`open_branch.png` 仅被 `QTreeView::branch` 的 `border-image` 引用。
 
+**本轮收尾（默认主题）**
+- `sin_wave_active.png` → `sin_wave_active.svg`，并把 `sin_wave_inactive.svg` 一起改为**一个完整周期的光滑正弦曲线**（描边路径），不再使用 potrace 的块状轮廓。
+- `white_noise_wave_active.png`、`white_noise_wave_inactive.png` → SVG：改用可缩放的折线路径。
+- `track_op_grip.png` → `track_op_grip.svg`：`TrackGrip` 已使用 `embed::logicalSize()`，尺寸保持 6×25。
+- 删除未引用资源：`loop_point.png`、`pr_black_key*.png`、`pr_white_key_*.png`（6 个）、`shadow_c.png`、`toolbar_bg.png`、`track_shadow_c.png`、`led_blue.png`。
+- 默认主题的 PNG 数量从 59 降到 44；已用主窗口轨道手柄和 SVG 渲染检查确认加载正常。
+
+**保留分组（44 个，默认主题）**
+
+| 类别 | 文件 | 原因 |
+| --- | --- | --- |
+| QSS 指示/背景 | `apply_css*`、`closed_branch`、`open_branch`、`shadow_p` | Qt 样式表对 SVG 的支持不稳定；菜单、树分支和阴影必须保持位图表现。 |
+| LCD 精灵图 | `lcd_*` | `LcdWidget` 按固定单元格从横向精灵图切片；SVG 的 2× 过采样会改变 `cellSize`，导致数字错位。 |
+| LED | `led_green`、`led_off`、`led_red`、`led_yellow` | `LedCheckBox` 仍用 `pixmap.width()/height()` 布局；需先迁移到 `logicalSize()`。 |
+| LFO / CPU / 波形底图 | `lfo_*`、`cpuload_*`、`output_graph` | 复杂渐变、位图底纹或插画；矢量化收益低、回归风险高。 |
+| 应用图标 | `icon`、`icon_small`、`splash` | 平台图标和启动画面按像素尺寸使用。 |
+| 钢琴键 / 步进 / 发送按钮 | `white_key*`、`step_btn_*`、`mixer_send_*` | 精灵图/固定尺寸素材，需逐项迁移 `logicalSize()` 后再转换。 |
+| 播放位置标记 | `recording_playpos_marker` | `TimeLineWidget` 用 `marker.width()` 定位；需先迁移 `logicalSize()`。 |
+
+经典主题仍有自己的 PNG 素材；本轮只处理默认主题。
+
 **验收**：转换后资源仍能加载，在对应控件及不同缩放比例下显示正常。
 
 ---
