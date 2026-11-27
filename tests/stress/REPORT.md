@@ -1,313 +1,216 @@
-# Stability campaign report
+# 稳定性测试活动报告
 
-Date: 2026-11-27 (local Fedora 45 machine)
-Branch: `stability/autotest-20261127`
+日期：2026-11-27（本机 Fedora 45）
+分支：`stability/autotest-20261127`
 
-This report records the bugs found and fixed during the local stress/fuzz
-campaign, plus the test evidence. No functional features were added.
+本报告记录本次本地压力/模糊测试活动中发现并修复的问题，以及相应的测试证据。本次工作没有新增功能特性。
 
-## Bugs found and fixed
+## 发现并修复的问题
 
-### 1. GUI deadlock while loading a VST2 instrument
+### 1. 加载 VST2 乐器时的 GUI 死锁
 
-**Symptom:** rendering/GUI loading a project with ZynAddSubFX intermittently
-hung forever (observed 4/10 runs; later 6/6 under load).
+**现象：** 渲染或 GUI 加载包含 ZynAddSubFX 的工程时会间歇性永久卡死（观察到 4/10 次；在负载下后来达到 6/6 次）。
 
-**Root cause:** `VestigeInstrument::loadFile()` held `m_pluginMutex` while
-constructing `VstInstrumentPlugin`. VST2 startup processes the Qt event loop.
-The periodic `InstrumentTrack` latency timer then called
-`VestigeInstrument::latency()`, which blocked on the same non-recursive mutex.
+**根因：** `VestigeInstrument::loadFile()` 在构造 `VstInstrumentPlugin` 期间持有 `m_pluginMutex`。VST2 插件启动过程会处理 Qt 事件循环。此时周期性的 `InstrumentTrack` latency 定时器调用 `VestigeInstrument::latency()`，在同一个非递归互斥锁上阻塞。
 
-**Fix:**
-- construct the plugin before publishing it under `m_pluginMutex`;
-- make `latency()` non-blocking (`tryLock`, return 0 while busy);
-- apply the same non-blocking latency + construct-outside-lock pattern to
-  `VstEffect`.
+**修复：**
+- 先构造插件，再在 `m_pluginMutex` 保护下发布它；
+- 让 `latency()` 非阻塞（`tryLock`，忙时返回 0）；
+- 对 `VstEffect` 应用同样的“非阻塞 latency + 锁外构造”模式。
 
-**Evidence:** the saved reproducer (`corpus/regressions/vestige-load-deadlock.mmp`)
-now completes 10/10 times in ~1 s instead of hanging.
+**证据：** 保存的复现工程（`corpus/regressions/vestige-load-deadlock.mmp`）现在 10/10 次都在约 1 秒内完成，不再卡死。
 
-### 2. VST2 plugin host handshake could block forever
+### 2. VST2 插件宿主握手可能永久阻塞
 
-**Symptom:** a plugin host that connects but never sends `IdHostInfoGotten` or
-`IdInitDone` made LMMS wait indefinitely.
+**现象：** 插件宿主连接后从不发送 `IdHostInfoGotten` 或 `IdInitDone` 时，LMMS 会无限等待。
 
-**Fix:** `RemotePluginBase::waitForMessage()` now has a deadline (15 s for
-host info/init, 30 s default, 5 s for audio processing). On timeout it
-invalidates the transport, so the plugin is treated as failed. Also hardened
-the protocol against oversized string lengths/string counts and removed an
-out-of-bounds `std::string` write.
+**修复：** `RemotePluginBase::waitForMessage()` 现在带有截止时间（宿主信息/初始化 15 秒，默认 30 秒，音频处理 5 秒）。超时后会使传输层失效，从而把插件视为加载失败。同时加固了协议解析，限制过大的字符串长度/字符串数量，并移除了一个 `std::string` 越界写入。
 
-**Evidence:** a fake `NativeLinuxRemoteVstPlugin64` that connects and sleeps
-no longer hangs; LMMS reports the plugin as failed and exits in ~16 s.
+**证据：** 一个只连接然后休眠的假 `NativeLinuxRemoteVstPlugin64` 不再导致卡死；LMMS 会报告插件加载失败，并在约 16 秒后退出。
 
-### 3. Configuration upgrades silently destroyed audio/MIDI settings
+### 3. 配置升级会静默清空音频/MIDI 设置
 
-**Symptom:** loading any config with `configversion < 3` cleared
-`audioengine/audiodev`, `mididev`, `samplerate`, `framesperaudiobuffer` and
-`hqaudio`, and dropped old `MidiAlsaRaw/Device` / `app/displaydbv` values.
+**现象：** 加载任何 `configversion < 3` 的配置都会清空 `audioengine/audiodev`、`mididev`、`samplerate`、`framesperaudiobuffer` 和 `hqaudio`，并丢失旧的 `MidiAlsaRaw/Device` / `app/displaydbv` 值。
 
-**Root cause:** `ConfigManager::value()` defaults to `""` (an empty but
-**non-null** `QString`), while the upgrade routines used `isNull()` to detect
-missing legacy keys. Every missing key was treated as present and copied as
-empty over valid settings.
+**根因：** `ConfigManager::value()` 的默认值是 `""`（一个空但**非 null** 的 `QString`），而升级代码用 `isNull()` 判断旧键是否存在。于是每个缺失的键都被当成“存在”，用空值覆盖了有效设置。
 
-**Fix:** use explicit `QString()` defaults in the upgrade routines.
+**修复：** 在升级函数中使用显式的 `QString()` 默认值。
 
-**Evidence:** `ConfigUpgradeTest` covers audio-engine preservation, legacy
-mixer migration, `displaydbv` rename and `MidiAlsaRaw` rename.
+**证据：** `ConfigUpgradeTest` 覆盖了音频引擎设置保留、旧 `mixer` 配置迁移、`displaydbv` 重命名和 `MidiAlsaRaw` 重命名。
 
-### 4. NotePlayHandle cache leaked its backing blocks
+### 4. NotePlayHandle 缓存泄漏其底层内存块
 
-**Symptom:** ASan/LSan reported 79,872 bytes leaked at exit; every cache
-extension leaked the previous block as well.
+**现象：** ASan/LSan 在退出时报告泄漏 79,872 字节；每次缓存扩容还会泄漏上一块内存。
 
-**Fix:** track all `malloc`ed note blocks and free them in
-`NotePlayHandleManager::free()`.
+**修复：** 跟踪所有由 `malloc` 分配的 note 内存块，并在 `NotePlayHandleManager::free()` 中释放。
 
-### 5. Base64 sample/state helpers
+### 5. Base64 采样/状态辅助函数
 
-- `base64::decode<T>()` allocated `size / sizeof(T)` elements but copied
-  `size` bytes. A non-multiple length caused a heap buffer overflow.
-  Fixed to copy only whole elements and return the truncated byte count.
-- `FreeBoy`, `Watsyn`, `MultitapEcho` leaked decoded buffers (Watsyn and
-  MultitapEcho leaked 3 and 1 blocks per load).
-- Those plugins (and DynamicsProcessor, WaveShaper, Xpressive, Vibed) copied
-  `graphModel::length()` floats without checking the decoded payload size.
-  Added size guards; short/corrupt state is ignored instead of reading past
-  the allocation.
+- `base64::decode<T>()` 按 `size / sizeof(T)` 分配元素，却拷贝了 `size` 字节。长度不是元素大小整数倍时会造成堆缓冲区溢出。已改为只拷贝完整元素，并返回截断后的字节数。
+- `FreeBoy`、`Watsyn`、`MultitapEcho` 会泄漏解码后的缓冲区（Watsyn 和 MultitapEcho 每次加载分别泄漏 3 块和 1 块）。
+- 这些插件（以及 DynamicsProcessor、WaveShaper、Xpressive、Vibed）在拷贝 `graphModel::length()` 个 float 前没有检查解码数据长度。已增加长度校验；过短或损坏的状态会被忽略，而不是越界读取。
 
-**Evidence:** `Base64Test` plus ASan runs of `FreeBoy`-using demo projects.
+**证据：** `Base64Test`，以及使用 FreeBoy 的示例工程的 ASan 运行。
 
-### 6. CLI render leaked the renderer and crashed on exit
+### 6. CLI 渲染泄漏 renderer，并在退出时崩溃
 
-**Symptom:** ASan reported the dummy audio device and related objects leaked;
-a first cleanup attempt crashed because `RenderManager` was destroyed after
-`QApplication`, while `restoreAudioDevice()` emitted `sampleRateChanged` to
-VST plugin slots.
+**现象：** ASan 报告 dummy 音频设备及相关对象泄漏；第一次清理尝试还导致崩溃，因为 `RenderManager` 在 `QApplication` 之后才销毁，而 `restoreAudioDevice()` 会向 VST 插件槽发送 `sampleRateChanged`。
 
-**Fix:** keep a `RenderManager*` in CLI mode and delete it after `app->exec()`
-but **before** deleting `QApplication` and destroying the engine. This
-restores the original audio device and releases the file encoder.
+**修复：** CLI 模式保留 `RenderManager*`，在 `app->exec()` 之后、删除 `QApplication` 和销毁引擎**之前**删除它。这样可以恢复原始音频设备并释放文件编码器。
 
-**Evidence:** ASan renders of built-in and real-plugin projects are leak-free.
+**证据：** 内置插件和真实插件工程的 ASan 渲染均无泄漏。
 
-### 7. Non-finite / overflowing numeric attributes caused SIGFPE and hangs
+### 7. 非有限/溢出的数值属性导致 SIGFPE 和挂起
 
-**Symptom:** a project with
-`timesig_numerator="nan"`, `timesig_denominator="inf"` crashed with SIGFPE
-inside `MidiClip::beatClipLength()`; a project with `bpm="nan"` did not finish
-rendering within 60 s.
+**现象：** 一个包含 `timesig_numerator="nan"`、`timesig_denominator="inf"` 的工程在 `MidiClip::beatClipLength()` 中触发 SIGFPE；一个 `bpm="nan"` 的工程在 60 秒内无法完成渲染。
 
-**Root cause:** `std::clamp(NaN, min, max)` keeps NaN. `IntModel`/`FloatModel`
-therefore accepted non-finite values, which later reached
-`TimePos::ticksPerBar()` / `Song::framesPerTick()` and produced zero or
-non-finite divisors.
+**根因：** `std::clamp(NaN, min, max)` 会保留 NaN。因此 `IntModel`/`FloatModel` 接受了非有限值，随后这些值进入 `TimePos::ticksPerBar()` / `Song::framesPerTick()`，产生零或非有限除数。
 
-**Fix:**
-- `AutomatableModel::fittedValue()` replaces NaN/Inf with the model's initial
-  value before clamping.
-- `TimePos::ticksPerBar(TimeSig)` clamps numerator/denominator to 1..32 and
-  `setTicksPerBar()` never stores zero.
-- `ticksPerBeat()` uses `max(1, numerator)`.
+**修复：**
+- `AutomatableModel::fittedValue()` 在钳制前把 NaN/Inf 替换为模型的初始值。
+- `TimePos::ticksPerBar(TimeSig)` 把分子/分母限制在 1..32，`setTicksPerBar()` 永不存储 0。
+- `ticksPerBeat()` 使用 `max(1, numerator)`。
 
-**Evidence:** both reproducers are in `corpus/regressions/`
-(`nonfinite-meter-sigfpe.mmp`, `nonfinite-tempo-hang.mmp`) and now render
-normally. `ValidationTest` covers non-finite model values and zero meters;
-`fuzz_numbers.py` ran 400 release + 30 ASan cases with no crashes/hangs.
+**证据：** 两个复现工程都位于 `corpus/regressions/`（`nonfinite-meter-sigfpe.mmp`、`nonfinite-tempo-hang.mmp`），现在可以正常渲染。`ValidationTest` 覆盖非有限模型值和零拍号；`fuzz_numbers.py` 运行了 400 个 release 用例和 30 个 ASan 用例，无崩溃/挂起。
 
-### 8. A FIFO/device node as sample source hung the loader
+### 8. FIFO/设备节点作为采样源会卡死加载器
 
-**Symptom:** a project whose `audiofileprocessor src` pointed at a named pipe
-(`mkfifo`) made LMMS block forever while opening the sample; `/dev/zero` was
-accepted as a sample path.
+**现象：** 工程的 `audiofileprocessor src` 指向命名管道（`mkfifo`）时，LMMS 打开采样会永久阻塞；`/dev/zero` 也会被当作采样路径接受。
 
-**Fix:** `SampleDecoder::decode()` now requires a regular file
-(`QFileInfo::isFile()`) before opening anything, so FIFOs, character devices,
-directories and sockets are rejected immediately. The same guard is applied
-to the project file itself, the configuration file on load/save, and the
-audio export path on write.
+**修复：** `SampleDecoder::decode()` 现在要求必须是普通文件（`QFileInfo::isFile()`）才会打开，因此 FIFO、字符设备、目录和套接字都会被立即拒绝。同样的检查也应用于工程文件本身、配置文件的加载/保存，以及音频导出路径的写入。
 
-**Evidence:** the FIFO reproducer now completes in ~2 s with a warning; the
-`nonregular-sample-devzero.mmp` regression is replayed by
-`run.py --replay`.
+**证据：** FIFO 复现工程现在约 2 秒内完成并给出警告；`nonregular-sample-devzero.mmp` 回归工程由 `run.py --replay` 重放。
 
-### 9. Zero-length pattern hung the GUI while creating track views
+### 9. 零长度 pattern 在创建轨道视图时卡死 GUI
 
-**Symptom:** one of 50 ASan GUI runs (a project with a 0-length pattern and
-negative meter values) never exited. The main thread was inside
-`TrackContentWidget::updateBackground()`, drawing grid lines forever.
+**现象：** 50 次 ASan GUI 运行中有 1 次（工程含 0 长度 pattern 和负数拍号）始终无法退出。主线程停在 `TrackContentWidget::updateBackground()` 中，无限绘制网格线。
 
-**Root cause:** the PatternEditor sets `pixelsPerBar` to 0 when the maximum
-clip length is 0. `TrackContentWidget::updateBackground()` then uses
-`x += ppb * resolution` with `ppb == 0`, an infinite loop.
+**根因：** 当最大 clip 长度为 0 时，PatternEditor 会把 `pixelsPerBar` 设为 0。随后 `TrackContentWidget::updateBackground()` 使用 `x += ppb * resolution`，而 `ppb == 0`，形成无限循环。
 
-**Fix:** `TrackContainerView::setPixelsPerBar()` clamps to at least 1, and
-`updateBackground()` returns early for a non-positive `ppb` and sanitizes a
-non-positive/NaN snap size.
+**修复：** `TrackContainerView::setPixelsPerBar()` 至少钳制为 1；`updateBackground()` 在 `ppb` 非正时提前返回，并清理非正/NaN 的 snap 尺寸。
 
-**Evidence:** `corpus/regressions/gui-zero-length-pattern.mmp` now starts and
-quits in ~4 s; the ASan GUI matrix is clean afterwards.
+**证据：** `corpus/regressions/gui-zero-length-pattern.mmp` 现在约 4 秒内启动并退出；之后的 ASan GUI 矩阵全部通过。
 
-### 10. Huge pattern step counts / clip lengths froze the GUI
+### 10. 超大 pattern 步数 / clip 长度会冻结 GUI
 
-**Symptom:** two numeric edge-case projects did not finish starting the GUI
-within 8 s. GDB showed the main thread in `MidiClipView::paintEvent()`:
-one project had 2,147,483,647 pattern steps (billions of step buttons), the
-other had an enormous clip length (billions of bar lines).
+**现象：** 两个数值边界工程在 8 秒内无法完成 GUI 启动。GDB 显示主线程位于 `MidiClipView::paintEvent()`：一个工程有 2,147,483,647 个 pattern steps（数十亿个 step 按钮），另一个有超大 clip 长度（数十亿条小节线）。
 
-**Fix:**
-- `MidiClip` clamps the loaded step count to 1..1024 (and keeps the
-  note-driven length sync clamped).
-- `MidiClipView::paintEvent()` uses a safe non-zero clip length and skips the
-  bar-line loop when `pixelsPerBar < 1` (lines would be denser than a pixel).
+**修复：**
+- `MidiClip` 把加载的步数限制在 1..1024（由音符驱动的长度同步也做同样限制）。
+- `MidiClipView::paintEvent()` 使用安全的非零 clip 长度，并在 `pixelsPerBar < 1` 时跳过节线循环（此时线间距已小于一个像素）。
 
-**Evidence:** `gui-huge-clip-length.mmp` and
-`gui-unbounded-pattern-steps.mmp` now start and quit in ~3 s.
+**证据：** `gui-huge-clip-length.mmp` 和 `gui-unbounded-pattern-steps.mmp` 现在约 3 秒内启动并退出。
 
-### 11. Intermittent SIGSEGV in AudioFileProcessor playback
+### 11. AudioFileProcessor 播放时间歇性 SIGSEGV
 
-**Symptom:** one numeric-fuzz case (non-finite automation values) produced a
-SIGSEGV in `AudioFileProcessor::playNote()` while passing a pointer
-`_working_buffer + offset` to `Sample::play()`.
+**现象：** 一个数值模糊测试用例（非有限自动化值）在 `AudioFileProcessor::playNote()` 中触发 SIGSEGV，当时它把 `_working_buffer + offset` 传给 `Sample::play()`。
 
-**Root cause:** a malformed/non-finite time or automation value can produce a
-negative note offset or a negative per-period frame count. The playback code
-only handled offsets that were too large, not negative ones, and
-`framesLeftForCurrentPeriod()` could return a negative count.
+**根因：** 损坏/非有限的时间或自动化值可能产生负的 note offset 或负的每周期帧数。播放代码只处理了 offset 过大的情况，没有处理负值，而且 `framesLeftForCurrentPeriod()` 可能返回负数。
 
-**Fix:** clamp negative offsets to zero in `NotePlayHandle::play()`, and clamp
-the per-period frame count to at least zero. This protects all instruments,
-not only AudioFileProcessor.
+**修复：** 在 `NotePlayHandle::play()` 中把负 offset 钳制为 0，并把每周期帧数钳制为至少 0。这保护所有乐器，而不仅是 AudioFileProcessor。
 
-**Evidence:** the reproducer is in
-`corpus/regressions/afp-note-offset-crash.mmp`; it ran 20 release and 10 ASan
-times cleanly afterwards. The original crash was intermittent, so it is kept
-as a fuzz regression case.
+**证据：** 复现工程位于 `corpus/regressions/afp-note-offset-crash.mmp`；修复后分别运行了 20 次 release 和 10 次 ASan，均正常。原始崩溃是间歇性的，因此保留为模糊测试回归用例。
 
-### 12. Deeply nested XML crashed the project loader
+### 12. 深层嵌套 XML 导致工程加载器崩溃
 
-**Symptom:**
-- 100,000 nested elements → SIGSEGV inside
-  `QXmlSimpleReaderPrivate::parseElement()` (stack overflow);
-- 10,000 nested elements → no completion within 20 s.
+**现象：**
+- 100,000 层嵌套元素 → 在 `QXmlSimpleReaderPrivate::parseElement()` 中触发 SIGSEGV（栈溢出）；
+- 10,000 层嵌套元素 → 20 秒内无法完成。
 
-**Fix:** `DataFile::loadData()` now scans the raw/uncompressed XML for element
-depth before handing it to Qt's recursive reader and rejects depth > 1000.
-It also rejects qCompress headers claiming an uncompressed size > 512 MB
-(decompression-bomb guard).
+**修复：** `DataFile::loadData()` 现在会在把原始/解压后的 XML 交给 Qt 递归解析器之前扫描元素深度，拒绝深度超过 1000 的输入。同时拒绝声称解压后大小超过 512 MB 的 qCompress 头（解压炸弹防护）。
 
-**Evidence:** 1k/10k/100k-deep files and a compressed 100k-deep file are now
-rejected gracefully (“project is empty”) in well under a second.
-`ValidationTest::deeplyNestedProjectIsRejected` covers the guard.
+**证据：** 1k/10k/100k 层文件以及压缩后的 100k 层文件现在都会在远小于 1 秒内被优雅拒绝（“project is empty”）。`ValidationTest::deeplyNestedProjectIsRejected` 覆盖该防护。
 
-## Test evidence
+## 测试证据
 
-### Unit/integration tests
+### 单元/集成测试
 
-- Release ctest: **29/29 passed** (including new `Base64Test`,
-  `ConfigUpgradeTest` and the deep-XML test).
-- ASan ctest with `QT_QPA_PLATFORM=offscreen`: **29/29 passed**
-  (external Qt/Wayland/fontconfig leaks suppressed).
+- Release ctest：**29/29 通过**（包括新增的 `Base64Test`、`ConfigUpgradeTest` 和深层 XML 测试）。
+- 使用 `QT_QPA_PLATFORM=offscreen` 的 ASan ctest：**29/29 通过**（已抑制 Qt/Wayland/fontconfig 等外部库泄漏）。
 
-### Random render campaigns (release)
+### 随机渲染测试（release）
 
-| Run | Cases | Result |
+| 运行 | 用例数 | 结果 |
 |---|---|---|
-| tiny, plugin ratio 0.3 | 150 | 148 pass, 3 timeouts (fixed deadlock), 1 silence (master volume mutation) |
-| medium, plugin ratio 0.4 | 100 | 98 pass, 2 silence (master channel volume -1) |
-| tiny + effects, plugin ratio 0.6 | 100 | 100 pass |
-| tiny, plugin ratio 0.5 | 300 | 300 pass |
-| medium + effects, plugin ratio 0.5 | 100 | 100 pass |
-| medium + effects, plugin ratio 0.5 | 200 | 200 pass |
-| medium + effects, plugin ratio 0.5 | 100 | 100 pass |
+| tiny，插件比例 0.3 | 150 | 148 通过，3 个超时（已修复死锁），1 个静音（master 音量被改） |
+| medium，插件比例 0.4 | 100 | 98 通过，2 个静音（主通道音量为 -1） |
+| tiny + 效果器，插件比例 0.6 | 100 | 100 通过 |
+| tiny，插件比例 0.5 | 300 | 300 通过 |
+| medium + 效果器，插件比例 0.5 | 100 | 100 通过 |
+| medium + 效果器，插件比例 0.5 | 200 | 200 通过 |
+| medium + 效果器，插件比例 0.5 | 100 | 100 通过 |
 
-### ASan campaigns
+### ASan 测试
 
-- 30 tiny cases with real instruments/effects: 30 pass (one silence caused by
-  a mutated missing clip length; harness now treats silence as a warning for
-  mutated projects).
-- 320 malformed XML cases under ASan, 500 under release: 0 crashes,
-  0 sanitizer reports.
-- 400 numeric edge-case projects (NaN/Inf/overflow attributes): 0 crashes,
-  0 hangs (after the meter/tempo fixes).
-- 300 corrupted sample files (and 100 under ASan): 0 crashes.
-- Real-plugin probe (Dexed, Zyn, Surge LV2/VST3, OB-Xf, sfizz, Pianoteq):
-  all load and render, ASan-clean.
-- 50 load/save cycles with Dexed state: ASan-clean.
+- 30 个带真实乐器/效果器的 tiny 用例：30 通过（其中 1 个静音由被改坏的 clip 长度导致；测试框架现在把变异工程的静音视为警告）。
+- ASan 下 320 个畸形 XML 用例，release 下 500 个：0 崩溃，0 sanitizer 报告。
+- 400 个数值边界工程（NaN/Inf/溢出属性）：0 崩溃，0 挂起（拍号/BPM 修复后）。
+- 300 个损坏采样文件（其中 100 个在 ASan 下）：0 崩溃。
+- 真实插件探活（Dexed、Zyn、Surge LV2/VST3、OB-Xf、sfizz、Pianoteq）：全部可加载并渲染，ASan 无泄漏。
+- 50 次带 Dexed 状态的加载/保存循环：ASan 无泄漏。
 
 ### GUI
 
-- 50 offscreen GUI start/load/quit cycles: all pass (exit code 3 on SIGINT).
-- 20 GUI cycles with real plugins/effects: all pass.
-- 50 ASan GUI cycles with plugins: 49 pass, 1 timeout caused by the
-  zero-length-pattern grid loop (fixed); the reproducer now passes.
-- 200 release GUI start/load/quit cycles: 200 pass.
-- 30-minute idle ASan GUI soak with a mixed real-plugin project: RSS stable
-  at 993–996 MB, clean SIGINT exit (3), no LMMS leaks.
-- GUI start/load/quit is now part of `gui_smoke.py`.
+- 50 次离屏 GUI 启动/加载/退出循环：全部通过（SIGINT 退出码 3）。
+- 20 次带真实插件/效果器的 GUI 循环：全部通过。
+- 50 次带插件的 ASan GUI 循环：49 通过，1 个超时由零长度 pattern 网格循环导致（已修复）；复现工程现在通过。
+- 200 次 release GUI 启动/加载/退出循环：200 通过。
+- 30 分钟 ASan GUI 空闲浸泡（含混合真实插件工程）：RSS 稳定在 993–996 MB，SIGINT 干净退出（3），无 LMMS 泄漏。
+- GUI 启动/加载/退出已纳入 `gui_smoke.py`。
 
-### Soak
+### 浸泡测试
 
-- 2-hour tiny soak on a copied build: 1,781 cases, RSS stable at
-  ~221–224 MB (average 222.9 MB), no crashes/hangs. Five failures were
-  harness false positives (missing root `type`, mutated clip length/master
-  volume), all addressed in the generator; the final reruns are clean.
-- 45-minute final soak on the latest build: 826 cases, 0 failures,
-  average RSS 223.6 MB (max 399 MB).
-- 1-hour final soak on the latest build: 1,169 cases, 0 failures,
-  average RSS 223.1 MB (max 563 MB).
+- 复制构建上的 2 小时 tiny 浸泡：1,781 个用例，RSS 稳定在约 221–224 MB（平均 222.9 MB），无崩溃/挂起。5 个失败是测试框架误报（缺少根节点 `type`、被改坏的 clip 长度/master 音量），均已在生成器中处理；最终重跑干净。
+- 最新构建上的 45 分钟最终浸泡：826 个用例，0 失败，平均 RSS 223.6 MB（最大 399 MB）。
+- 最新构建上的 1 小时最终浸泡：1,169 个用例，0 失败，平均 RSS 223.1 MB（最大 563 MB）。
 
-### Plugin isolation
+### 插件隔离
 
-Killing plugin host processes during render was tested:
+渲染期间杀死插件宿主进程的测试结果：
 
-- VST3 remote DSP (`lmms-vst3-host`): LMMS exits 0, partial WAV.
-- VST2 (`NativeLinuxRemoteVstPlugin64`): LMMS exits 0.
-- LV2 remote (`LMMS_LV2_REMOTE=1`, `lmms-lv2-host`): LMMS exits 0.
+- VST3 远程 DSP（`lmms-vst3-host`）：LMMS 退出码 0，输出部分 WAV。
+- VST2（`NativeLinuxRemoteVstPlugin64`）：LMMS 退出码 0。
+- LV2 远程（`LMMS_LV2_REMOTE=1`，`lmms-lv2-host`）：LMMS 退出码 0。
 
-No LMMS crash or hang was observed.
+未观察到 LMMS 崩溃或挂起。
 
-## Capacity observations
+## 容量观察
 
-- 100 instrument tracks × 500 notes: ~65 s, ~390 MB RSS.
-- 10,000 simultaneous notes in one bar: ~9 s.
-- 50,000+ simultaneous notes in one bar: CPU-bound, >5 min; not a crash.
-- 100 load/save cycles: ~3.4 s, max RSS 47 MB (no growth over 1000 cycles).
-- 64 Dexed VST3 instances: ~16 s, 2.1 GB RSS, 419 FDs.
-- 128 Dexed VST3 instances: ~37 s, 4.2 GB RSS, 803 FDs; no crash.
-- Deep XML: rejected before parser recursion.
+- 100 个乐器轨道 × 500 个音符：约 65 秒，约 390 MB RSS。
+- 一个小节内 10,000 个同时音符：约 9 秒。
+- 一个小节内 50,000+ 个同时音符：CPU 受限，超过 5 分钟；不是崩溃。
+- 100 次加载/保存循环：约 3.4 秒，最大 RSS 47 MB（1000 次循环无增长）。
+- 64 个 Dexed VST3 实例：约 16 秒，2.1 GB RSS，419 个文件描述符。
+- 128 个 Dexed VST3 实例：约 37 秒，4.2 GB RSS，803 个文件描述符；无崩溃。
+- 深层 XML：在解析器递归前被拒绝。
 
-## Remaining / future work
+## 遗留 / 后续工作
 
-- TSAN was not available on this machine (`libtsan` runtime is not installed,
-  no root); concurrency races could not be checked here.
-- Full GUI interaction needs an X server plus `xdotool`/`wmctrl`; only
-  offscreen start/load/quit is automated.
-- MIDI import of invalid files opens a modal dialog by design; automated
-  fuzzing needs a dialog auto-dismisser.
-- LADSPA/Carla third-party plugins were not part of the default matrix.
+- 本机没有 TSAN（未安装 `libtsan` 运行时，且无 root 权限），因此未能检查并发竞态。
+- 完整 GUI 交互需要 X server 以及 `xdotool`/`wmctrl`；目前只自动化了离屏启动/加载/退出。
+- 损坏 MIDI 文件导入按设计会弹出模态对话框；自动化模糊测试需要额外的对话框自动关闭器。
+- LADSPA/Carla 第三方插件未纳入默认矩阵。
 
-## Reproduce
+## 复现
 
 ```bash
-# deadlock reproducer
+# 死锁复现工程
 QT_QPA_PLATFORM=offscreen ./build/lmms render \
   tests/stress/corpus/regressions/vestige-load-deadlock.mmp -o /tmp/out.wav
 
-# deep XML regression
+# 深层 XML 回归测试
 ./build/tests/ValidationTest
 
-# config upgrade regression
+# 配置升级回归测试
 ./build/tests/ConfigUpgradeTest
 
-# base64 regression
+# base64 回归测试
 ./build/tests/Base64Test
 
-# random + real plugins
+# 随机渲染 + 真实插件
 python3 tests/stress/run.py --build build --profile tiny --cases 50 \
   --seed-start 1 --plugin-ratio 0.5
 
-# plugin probe
+# 真实插件探活
 python3 tests/stress/plugins/probe_plugins.py --build build --include-optional
 ```
