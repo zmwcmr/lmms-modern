@@ -35,6 +35,9 @@ if(LMMS_HAVE_LV2)
 	target_include_directories(FakeLv2Gain PRIVATE ${LV2_INCLUDE_DIRS})
 	set_target_properties(FakeLv2Gain PROPERTIES
 		PREFIX ""
+		# The bundle manifests reference "gain.so"; keep that name on every
+		# platform so lilv can open the module (Windows accepts any suffix).
+		SUFFIX ".so"
 		OUTPUT_NAME "gain"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2"
 	)
@@ -47,6 +50,7 @@ if(LMMS_HAVE_LV2)
 	target_include_directories(FakeLv2Midi PRIVATE ${LV2_INCLUDE_DIRS})
 	set_target_properties(FakeLv2Midi PROPERTIES
 		PREFIX ""
+		SUFFIX ".so"
 		OUTPUT_NAME "midi"
 		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2"
 	)
