@@ -70,6 +70,9 @@ public:
 	void unload() override;
 	bool isLoaded() const override;
 
+	std::vector<PluginBusInfo> inputBuses() const override;
+	std::vector<PluginBusInfo> outputBuses() const override;
+
 	const std::vector<PluginParameterInfo>& parameters() const override
 	{
 		return m_parameters;

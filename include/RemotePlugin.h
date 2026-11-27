@@ -92,6 +92,9 @@ public:
 		unlock();
 	}
 
+	int inputCount() const { return m_inputCount; }
+	int outputCount() const { return m_outputCount; }
+
 	int isUIVisible()
 	{
 		lock();

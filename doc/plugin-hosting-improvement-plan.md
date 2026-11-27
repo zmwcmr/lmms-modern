@@ -398,7 +398,11 @@ Tasks:
       `lv2:isSideChain`. This also fixed the property name (it was checked as
       `isSidechain`, so LV2 sidechain ports were never detected). The new
       `fake-lv2-sidechain` test plugin covers the layout.
-- [ ] Report VST3 and VST2 bus layouts from their component/pin metadata.
+- [x] Report VST3 bus layouts from the component's bus info (name, channels,
+      main/aux type, active flag); the remote DSP client reports the main
+      stereo buses because the bus layout is not yet in its protocol.
+- [x] Report VST2 main input/output bus counts (channels are clamped to
+      stereo); VST2 aux inputs are still not exposed.
 - [ ] Add an aux/sidechain bus to the LMMS effect/instrument routing model.
 - [ ] Map one sidechain input to VST2/LV2 plugins where declared.
 - [ ] Add multi-output track routing (first step: two stereo pairs).

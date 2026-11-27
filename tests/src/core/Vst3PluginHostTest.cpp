@@ -55,12 +55,12 @@ private slots:
 		QVERIFY(adapter.isLoaded());
 		QCOMPARE(adapter.format(), PluginFormat::Vst3);
 
-		const auto inputBuses = adapter.inputBuses();
-		QCOMPARE(inputBuses.size(), 1u);
-		QCOMPARE(inputBuses[0].channels, 2);
-		QCOMPARE(inputBuses[0].role, PluginBusRole::Main);
+		// A VST3 instrument has no audio input bus.
+		QVERIFY(adapter.inputBuses().empty());
 		const auto outputBuses = adapter.outputBuses();
 		QCOMPARE(outputBuses.size(), 1u);
+		QCOMPARE(outputBuses[0].channels, 2);
+		QCOMPARE(outputBuses[0].role, PluginBusRole::Main);
 
 		const auto& parameters = adapter.parameters();
 		QCOMPARE(parameters.size(), 1);
@@ -90,6 +90,29 @@ private slots:
 			nonZero = nonZero || std::abs(outL[frame]) > 0.001f;
 		}
 		QVERIFY(nonZero);
+	}
+
+	void reportsEffectBuses()
+	{
+		Vst3Host host;
+		Vst3PluginHost adapter(host);
+
+		PluginLoadRequest request;
+		request.path = QStringLiteral(VST3_FAKE_BUNDLE);
+		request.classId = QStringLiteral(VST3_FAKE_EFFECT_CLASS);
+		request.sampleRate = 48000.0;
+		request.maxBlockSize = 512;
+
+		QString error;
+		QVERIFY2(adapter.load(request, &error), qPrintable(error));
+		const auto inputs = adapter.inputBuses();
+		QCOMPARE(inputs.size(), 1u);
+		QCOMPARE(inputs[0].channels, 2);
+		QCOMPARE(inputs[0].role, PluginBusRole::Main);
+		const auto outputs = adapter.outputBuses();
+		QCOMPARE(outputs.size(), 1u);
+		QCOMPARE(outputs[0].channels, 2);
+		QVERIFY(!adapter.capabilities().multipleBuses);
 	}
 
 	void stateRoundTrip()

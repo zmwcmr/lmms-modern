@@ -163,6 +163,34 @@ bool Vst2PluginHost::isLoaded() const
 
 
 
+std::vector<PluginBusInfo> Vst2PluginHost::inputBuses() const
+{
+	if (!isLoaded() || m_plugin->inputCount() <= 0)
+	{
+		return {};
+	}
+	return { PluginBusInfo{ QStringLiteral("Main"),
+		std::min(m_plugin->inputCount(), 2), true, PluginBusRole::Main,
+		false } };
+}
+
+
+
+
+std::vector<PluginBusInfo> Vst2PluginHost::outputBuses() const
+{
+	if (!isLoaded() || m_plugin->outputCount() <= 0)
+	{
+		return {};
+	}
+	return { PluginBusInfo{ QStringLiteral("Main"),
+		std::min(m_plugin->outputCount(), 2), false, PluginBusRole::Main,
+		false } };
+}
+
+
+
+
 void Vst2PluginHost::rebuildParameters()
 {
 	m_parameters.clear();

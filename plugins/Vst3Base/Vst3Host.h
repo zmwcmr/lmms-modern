@@ -52,6 +52,16 @@ public:
 		QString name;
 	};
 
+	//! One audio bus as reported by the component.
+	struct BusInfo
+	{
+		QString name;
+		int channels = 0;
+		bool isInput = true;
+		bool isMain = true;
+		bool active = false;
+	};
+
 	struct Parameter
 	{
 		uint32_t id = 0;
@@ -105,6 +115,16 @@ public:
 	virtual QString classId() const = 0;
 
 	virtual const std::vector<Parameter>& parameters() const = 0;
+
+	//! Audio bus layout; the default is one active main stereo bus.
+	virtual std::vector<BusInfo> inputBuses() const
+	{
+		return { BusInfo{ QStringLiteral("Main"), 2, true, true, true } };
+	}
+	virtual std::vector<BusInfo> outputBuses() const
+	{
+		return { BusInfo{ QStringLiteral("Main"), 2, false, true, true } };
+	}
 	virtual bool setParameterNormalised(uint32_t id, double value) = 0;
 	virtual double parameterNormalised(uint32_t id) const = 0;
 
@@ -185,6 +205,8 @@ public:
 	void setParameterChangeCallback(std::function<void(uint32_t, double)> callback);
 
 	const std::vector<Parameter>& parameters() const override;
+	std::vector<BusInfo> inputBuses() const override;
+	std::vector<BusInfo> outputBuses() const override;
 	bool setParameterNormalised(uint32_t id, double value) override;
 	double parameterNormalised(uint32_t id) const override;
 

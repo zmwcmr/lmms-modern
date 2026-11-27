@@ -407,6 +407,30 @@ bool Vst3RemoteHostClient::isInstrument() const
 	return m_isInstrument;
 }
 
+
+
+
+std::vector<Vst3RemoteHostClient::BusInfo> Vst3RemoteHostClient::inputBuses() const
+{
+	if (!isLoaded() || m_isInstrument)
+	{
+		return {};
+	}
+	return Vst3HostBase::inputBuses();
+}
+
+
+
+
+std::vector<Vst3RemoteHostClient::BusInfo> Vst3RemoteHostClient::outputBuses() const
+{
+	if (!isLoaded())
+	{
+		return {};
+	}
+	return Vst3HostBase::outputBuses();
+}
+
 bool Vst3RemoteHostClient::setParameterNormalised(uint32_t id, double value)
 {
 	if (m_parameterValues.find(id) == m_parameterValues.end())
