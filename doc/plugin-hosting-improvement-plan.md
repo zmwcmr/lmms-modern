@@ -385,6 +385,10 @@ Estimate: 4-6 weeks.
 Goal: support at least one aux/sidechain input and multiple outputs without
 breaking the stereo path.
 
+Design note: the bus model should be implemented once, on the unified host
+interface described in `doc/plugin-host-unification.md`; otherwise VST2, VST3
+and LV2 each grow their own copy of the routing code.
+
 Tasks:
 
 - [ ] Add an aux/sidechain bus to the LMMS effect/instrument routing model.
@@ -438,12 +442,14 @@ Estimate: 2-3 weeks.
 3. P6.2 PDC
 4. P6.3 sample-accurate automation
 5. P6.4 RemoteLv2 isolation
-6. P6.5 multi-bus
-7. P6.6 hardening
+6. Plugin host framework design + stage 1 shared kernel
+   (`doc/plugin-host-unification.md`)
+7. P6.5 multi-bus, implemented on the unified interface
+8. P6.6 hardening
 
 P6.0 and P6.1 can run in parallel. P6.2 should start with a design spike before
-touching the audio graph. P6.4 should not start until the generic host protocol
-is agreed, because it will later be reused for VST3.
+touching the audio graph. P6.4 is done; the framework design spike and the
+shared kernel should land before P6.5 so the bus model is written once.
 
 ## What not to do in this plan
 
