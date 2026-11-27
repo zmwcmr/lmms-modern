@@ -21,6 +21,7 @@ set(LMMS_TESTS
 	src/gui/UiFeedbackTest.cpp
 	src/gui/FileBrowserTest.cpp
 	src/gui/SubWindowTest.cpp
+	src/gui/LcdFloatSpinBoxTest.cpp
 	src/gui/DropDownInteractionTest.cpp
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp
