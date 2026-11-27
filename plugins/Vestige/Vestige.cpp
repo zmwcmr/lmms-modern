@@ -153,7 +153,7 @@ private:
 
 
 
-VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
+Vst2Instrument::Vst2Instrument( InstrumentTrack * _instrument_track,
 		const Plugin::Descriptor::SubPluginFeatures::Key* key ) :
 	Instrument(_instrument_track, &vestige_plugin_descriptor, nullptr, Flag::IsSingleStreamed | Flag::IsMidiBased),
 	m_plugin( nullptr ),
@@ -182,7 +182,7 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
 
 
 
-VestigeInstrument::~VestigeInstrument()
+Vst2Instrument::~Vst2Instrument()
 {
 	if (p_subWindow != nullptr) {
 		delete p_subWindow;
@@ -203,7 +203,17 @@ VestigeInstrument::~VestigeInstrument()
 
 
 
-void VestigeInstrument::loadSettings( const QDomElement & _this )
+
+VestigeInstrument::VestigeInstrument(
+		InstrumentTrack* instrumentTrack,
+		const Plugin::Descriptor::SubPluginFeatures::Key* key) :
+	Vst2Instrument(instrumentTrack, key)
+{
+}
+
+
+
+void Vst2Instrument::loadSettings( const QDomElement & _this )
 {
 	QString plugin = _this.attribute( "plugin" );
 	if( plugin.isEmpty() )
@@ -259,7 +269,7 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 
 
-void VestigeInstrument::setParameter( Model * action )
+void Vst2Instrument::setParameter( Model * action )
 {
 	if (m_updatingParametersFromPlugin)
 	{
@@ -278,7 +288,7 @@ void VestigeInstrument::setParameter( Model * action )
 
 
 
-void VestigeInstrument::sendParameter( int index, FloatModel * model )
+void Vst2Instrument::sendParameter( int index, FloatModel * model )
 {
 	if (m_plugin == nullptr || model == nullptr)
 	{
@@ -332,7 +342,7 @@ void VestigeInstrument::sendParameter( int index, FloatModel * model )
 
 
 
-void VestigeInstrument::handleParameterAutomated( int index, float value )
+void Vst2Instrument::handleParameterAutomated( int index, float value )
 {
 	if (m_updatingParametersFromPlugin || knobFModel == nullptr
 		|| index < 0 || index >= paramCount)
@@ -354,7 +364,7 @@ void VestigeInstrument::handleParameterAutomated( int index, float value )
 
 
 
-void VestigeInstrument::handleParameterGestureBegin( int index )
+void Vst2Instrument::handleParameterGestureBegin( int index )
 {
 	if (knobFModel == nullptr || index < 0 || index >= paramCount
 		|| m_parameterGestures.contains(index))
@@ -375,12 +385,12 @@ void VestigeInstrument::handleParameterGestureBegin( int index )
 
 
 
-void VestigeInstrument::handleParameterGestureEnd( int index )
+void Vst2Instrument::handleParameterGestureEnd( int index )
 {
 	m_parameterGestures.remove(index);
 }
 
-void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString value)
+void Vst2Instrument::handleConfigChange(QString cls, QString attr, QString value)
 {
     Q_UNUSED(cls); Q_UNUSED(attr); Q_UNUSED(value);
     // Disabled for consistency with VST effects that don't implement this. (#3786)
@@ -390,7 +400,7 @@ void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString va
     // }
 }
 
-void VestigeInstrument::reloadPlugin()
+void Vst2Instrument::reloadPlugin()
 {
 	closePlugin();
 	loadFile( m_pluginDLL );
@@ -399,7 +409,7 @@ void VestigeInstrument::reloadPlugin()
 
 
 
-void VestigeInstrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
+void Vst2Instrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
 {
 	_this.setAttribute( "plugin", PathUtil::toShortestRelative(m_pluginDLL) );
 	m_pluginMutex.lock();
@@ -448,7 +458,7 @@ void VestigeInstrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 
 
-QString VestigeInstrument::nodeName( void ) const
+QString Vst2Instrument::nodeName( void ) const
 {
 	return( vestige_plugin_descriptor.name );
 }
@@ -456,7 +466,7 @@ QString VestigeInstrument::nodeName( void ) const
 
 
 
-void VestigeInstrument::loadFile( const QString & _file )
+void Vst2Instrument::loadFile( const QString & _file )
 {
 	QString previousName;
 	{
@@ -522,13 +532,13 @@ void VestigeInstrument::loadFile( const QString & _file )
 				}
 			}, Qt::DirectConnection);
 		connect(plugin, &VstPlugin::parameterAutomated, this,
-			&VestigeInstrument::handleParameterAutomated,
+			&Vst2Instrument::handleParameterAutomated,
 			Qt::QueuedConnection);
 		connect(plugin, &VstPlugin::parameterGestureBegin, this,
-			&VestigeInstrument::handleParameterGestureBegin,
+			&Vst2Instrument::handleParameterGestureBegin,
 			Qt::QueuedConnection);
 		connect(plugin, &VstPlugin::parameterGestureEnd, this,
-			&VestigeInstrument::handleParameterGestureEnd,
+			&Vst2Instrument::handleParameterGestureEnd,
 			Qt::QueuedConnection);
 	}
 
@@ -565,7 +575,7 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 
 
-void VestigeInstrument::play( SampleFrame* _buf )
+void Vst2Instrument::play( SampleFrame* _buf )
 {
 	if (!m_pluginMutex.tryLock(Engine::getSong()->isExporting() ? -1 : 0)) {return;}
 
@@ -589,7 +599,7 @@ void VestigeInstrument::play( SampleFrame* _buf )
 
 
 
-void VestigeInstrument::drainMidiOutQueue()
+void Vst2Instrument::drainMidiOutQueue()
 {
 	std::vector<MidiEvent> events;
 	{
@@ -609,7 +619,7 @@ void VestigeInstrument::drainMidiOutQueue()
 
 
 
-f_cnt_t VestigeInstrument::latency() const
+f_cnt_t Vst2Instrument::latency() const
 {
 	// This is polled from a GUI timer while the plugin may be starting up.
 	// Waiting for m_pluginMutex here can deadlock the GUI thread when plugin
@@ -626,7 +636,7 @@ f_cnt_t VestigeInstrument::latency() const
 
 
 
-bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
+bool Vst2Instrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
 {
 	m_pluginMutex.lock();
 	if( m_plugin != nullptr )
@@ -641,7 +651,7 @@ bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& 
 
 
 
-void VestigeInstrument::closePlugin( void )
+void Vst2Instrument::closePlugin( void )
 {
 	{
 		std::lock_guard<std::mutex> lock(m_midiOutMutex);
@@ -689,7 +699,7 @@ void VestigeInstrument::closePlugin( void )
 
 
 
-gui::PluginView * VestigeInstrument::instantiateView( QWidget * _parent )
+gui::PluginView * Vst2Instrument::instantiateView( QWidget * _parent )
 {
 	return new gui::VestigeInstrumentView( this, _parent );
 }
