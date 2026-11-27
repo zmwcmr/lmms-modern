@@ -51,7 +51,7 @@
 #include "ImportFilter.h"
 #include "InstrumentTrackView.h"
 #include "InstrumentTrackWindow.h"
-#include "KeyboardShortcuts.h"
+#include "EditorShortcuts.h"
 #include "MicrotunerConfig.h"
 #include "PathUtil.h"
 #include "PatternEditor.h"
@@ -84,12 +84,14 @@ namespace lmms::gui
 namespace
 {
 
-//! Builds a menu/tooltip label such as "Song Editor (Ctrl+1)" or
-//! "Song Editor\tCtrl+1", using the platform's modifier glyph (⌘ on macOS)
-//! instead of a hardcoded "Ctrl".
-QString withShortcutHint(const QString& text, int key, bool forMenu)
+const QKeySequence fullscreenShortcut(Qt::Key_F11);
+const auto detachShortcut = keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_D);
+const auto attachShortcut = keySequence(Qt::CTRL, Qt::ALT, Qt::SHIFT, Qt::Key_D);
+
+QString withShortcutHint(const QString& text, const QKeySequence& shortcut, bool forMenu)
 {
-	const auto sequence = QStringLiteral("%1+%2").arg(UI_CTRL_KEY).arg(key);
+	if (shortcut.isEmpty()) { return text; }
+	const auto sequence = shortcut.toString(QKeySequence::NativeText);
 	return forMenu ? text + QLatin1Char('\t') + sequence
 				   : text + QStringLiteral(" (%1)").arg(sequence);
 }
@@ -261,7 +263,7 @@ MainWindow::MainWindow() :
 	connect(Engine::getSong(), SIGNAL(projectFileNameChanged()), SLOT(onProjectFileNameChanged()));
 
 	maximized = isMaximized();
-	new QShortcut(QKeySequence(Qt::Key_F11), this, SLOT(toggleFullscreen()));
+	new QShortcut(fullscreenShortcut, this, SLOT(toggleFullscreen()));
 
 	if (ConfigManager::inst()->value("tooltips", "disabled").toInt())
 	{
@@ -383,6 +385,13 @@ void MainWindow::finalize()
 
 	connect(edit_menu, SIGNAL(aboutToShow()), this, SLOT(updateUndoRedoButtons()));
 
+	QList<QKeySequence> reserved{fullscreenShortcut, detachShortcut, attachShortcut};
+	for (const auto* menu : {project_menu, edit_menu})
+	{
+		for (const auto* action : menu->actions()) { reserved += action->shortcuts(); }
+	}
+	m_windowShortcuts = windowToggleShortcuts(reserved);
+
 	m_viewMenu = new QMenu( this );
 	menuBar()->addMenu( m_viewMenu )->setText( tr( "&View" ) );
 	connect( m_viewMenu, SIGNAL(aboutToShow()),
@@ -462,35 +471,28 @@ void MainWindow::finalize()
 	m_metronomeToggle->setCheckable(true);
 	m_metronomeToggle->setChecked(Engine::getSong()->metronome().active());
 
-	// window-toolbar
-	m_songEditorButton = new ToolButton(
-		embed::getIconPixmap("songeditor"), withShortcutHint(tr("Song Editor"), 1, false), this,
-		SLOT(toggleSongEditorWin()), m_toolBar);
-	m_songEditorButton->setShortcut(keySequence(Qt::CTRL, Qt::Key_1));
+	const auto windowButton = [this](std::string_view icon, const QString& text, const char* slot, const QString& id)
+	{
+		const auto sequence = m_windowShortcuts.value(id);
+		auto* button = new ToolButton(embed::getIconPixmap(icon), withShortcutHint(text, sequence, false), this, slot, m_toolBar);
+		button->setShortcut(sequence);
+		return button;
+	};
 
-	m_patternEditorButton = new ToolButton(embed::getIconPixmap("pattern_track_btn"),
-		withShortcutHint(tr("Pattern Editor"), 2, false), this, SLOT(togglePatternEditorWin()), m_toolBar);
-	m_patternEditorButton->setShortcut(keySequence(Qt::CTRL, Qt::Key_2));
-
-	auto piano_roll_window = new ToolButton(embed::getIconPixmap("piano"),
-		withShortcutHint(tr("Piano Roll"), 3, false), this, SLOT(togglePianoRollWin()), m_toolBar);
-	piano_roll_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_3));
-
-	auto automation_editor_window = new ToolButton(embed::getIconPixmap("automation"),
-		withShortcutHint(tr("Automation Editor"), 4, false), this, SLOT(toggleAutomationEditorWin()), m_toolBar);
-	automation_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_4));
-
-	auto mixer_window = new ToolButton(
-		embed::getIconPixmap("mixer"), withShortcutHint(tr("Mixer"), 5, false), this, SLOT(toggleMixerWin()), m_toolBar);
-	mixer_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_5));
-
-	auto controllers_window = new ToolButton(embed::getIconPixmap("controller"),
-		withShortcutHint(tr("Show/hide controller rack"), 6, false), this, SLOT(toggleControllerRack()), m_toolBar);
-	controllers_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_6));
-
-	auto project_notes_window = new ToolButton(embed::getIconPixmap("project_notes"),
-		withShortcutHint(tr("Show/hide project notes"), 7, false), this, SLOT(toggleProjectNotesWin()), m_toolBar);
-	project_notes_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_7));
+	m_songEditorButton = windowButton("songeditor", tr("Song Editor"),
+		SLOT(toggleSongEditorWin()), QStringLiteral("window_song_editor"));
+	m_patternEditorButton = windowButton("pattern_track_btn", tr("Pattern Editor"),
+		SLOT(togglePatternEditorWin()), QStringLiteral("window_pattern_editor"));
+	auto* piano_roll_window = windowButton("piano", tr("Piano Roll"),
+		SLOT(togglePianoRollWin()), QStringLiteral("window_piano_roll"));
+	auto* automation_editor_window = windowButton("automation", tr("Automation Editor"),
+		SLOT(toggleAutomationEditorWin()), QStringLiteral("window_automation_editor"));
+	auto* mixer_window = windowButton("mixer", tr("Mixer"),
+		SLOT(toggleMixerWin()), QStringLiteral("window_mixer"));
+	auto* controllers_window = windowButton("controller", tr("Show/hide controller rack"),
+		SLOT(toggleControllerRack()), QStringLiteral("window_controller_rack"));
+	auto* project_notes_window = windowButton("project_notes", tr("Show/hide project notes"),
+		SLOT(toggleProjectNotesWin()), QStringLiteral("window_project_notes"));
 
 	int buttonIndex = 0;
 	for (auto* button : {project_new, project_new_from_template, project_open, project_open_recent,
@@ -1109,43 +1111,47 @@ void MainWindow::toggleMicrotunerWin()
 
 void MainWindow::updateViewMenu()
 {
+	const auto windowLabel = [this](const QString& text, const QString& id)
+	{
+		return withShortcutHint(text, m_windowShortcuts.value(id), true);
+	};
 	m_viewMenu->clear();
 	// TODO: get current visibility for these and indicate in menu?
 	// Not that it's straight visible <-> invisible, more like
 	// not on top -> top <-> invisible
 	auto* songEditorAction = m_viewMenu->addAction(embed::getIconPixmap( "songeditor" ),
-			      withShortcutHint(tr("Song Editor"), 1, true),
+				      windowLabel(tr("Song Editor"), QStringLiteral("window_song_editor")),
 			      this, SLOT(toggleSongEditorWin())
 		);
 	songEditorAction->setStatusTip(tr("Show or hide the Song Editor"));
 	auto* patternEditorAction = m_viewMenu->addAction(embed::getIconPixmap("pattern_track"),
-					withShortcutHint(tr("Pattern Editor"), 2, true),
+						windowLabel(tr("Pattern Editor"), QStringLiteral("window_pattern_editor")),
 					this, SLOT(togglePatternEditorWin())
 		);
 	patternEditorAction->setStatusTip(tr("Show or hide the Pattern Editor"));
 	auto* pianoRollAction = m_viewMenu->addAction(embed::getIconPixmap( "piano" ),
-			      withShortcutHint(tr("Piano Roll"), 3, true),
+				      windowLabel(tr("Piano Roll"), QStringLiteral("window_piano_roll")),
 			      this, SLOT(togglePianoRollWin())
 		);
 	pianoRollAction->setStatusTip(tr("Show or hide the Piano Roll"));
 	auto* automationEditorAction = m_viewMenu->addAction(embed::getIconPixmap( "automation" ),
-			      withShortcutHint(tr("Automation Editor"), 4, true),
+				      windowLabel(tr("Automation Editor"), QStringLiteral("window_automation_editor")),
 			      this,
 			      SLOT(toggleAutomationEditorWin())
 		);
 	automationEditorAction->setStatusTip(tr("Show or hide the Automation Editor"));
 	auto* mixerAction = m_viewMenu->addAction(embed::getIconPixmap( "mixer" ),
-			      withShortcutHint(tr("Mixer"), 5, true),
+				      windowLabel(tr("Mixer"), QStringLiteral("window_mixer")),
 			      this, SLOT(toggleMixerWin())
 		);
 	mixerAction->setStatusTip(tr("Show or hide the Mixer"));
 	auto* controllerRackAction = m_viewMenu->addAction(embed::getIconPixmap( "controller" ),
-			      withShortcutHint(tr("Controller Rack"), 6, true),
+				      windowLabel(tr("Controller Rack"), QStringLiteral("window_controller_rack")),
 			      this, SLOT(toggleControllerRack())
 		);
 	controllerRackAction->setStatusTip(tr("Show or hide the controller rack"));
 	auto* projectNotesAction = m_viewMenu->addAction(embed::getIconPixmap( "project_notes" ),
-			      withShortcutHint(tr("Project Notes"), 7, true),
+				      windowLabel(tr("Project Notes"), QStringLiteral("window_project_notes")),
 			      this, SLOT(toggleProjectNotesWin())
 		);
 	projectNotesAction->setStatusTip(tr("Show or hide the project notes"));
@@ -1153,7 +1159,7 @@ void MainWindow::updateViewMenu()
 	m_viewMenu->addSeparator();
 
 	auto* fullscreenAction = m_viewMenu->addAction(embed::getIconPixmap( "fullscreen" ),
-				tr( "Fullscreen" ) + "\tF11",
+				withShortcutHint(tr("Fullscreen"), fullscreenShortcut, true),
 				this, SLOT(toggleFullscreen())
 		);
 	fullscreenAction->setStatusTip(tr("Toggle fullscreen mode"));
@@ -1163,12 +1169,12 @@ void MainWindow::updateViewMenu()
 	auto detachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
 		tr("Detach all subwindows"),
 		this, [this](){ setAllSubWindowsDetached(true); },
-		QKeySequence{Qt::CTRL | Qt::SHIFT | Qt::Key_D}
+		detachShortcut
 	);
 	auto attachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
 		tr("Attach all subwindows"),
 		this, [this](){ setAllSubWindowsDetached(false); },
-		QKeySequence{Qt::CTRL | Qt::ALT | Qt::SHIFT | Qt::Key_D}
+		attachShortcut
 	);
 
 	detachAllAction->setStatusTip(tr("Detach all editor windows from the main window"));

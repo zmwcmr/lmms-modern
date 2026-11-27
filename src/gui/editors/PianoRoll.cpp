@@ -55,6 +55,7 @@
 #include "DataFile.h"
 #include "DeprecationHelper.h"
 #include "DetuningHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "GuiApplication.h"
 #include "FontHelper.h"
@@ -5188,20 +5189,15 @@ PianoRollWindow::PianoRollWindow() :
 	// init edit-buttons at the top
 	auto editModeGroup = new ActionGroup(this);
 	QAction* drawAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap( "edit_draw" ), tr( "Draw mode (Shift+D)" ), editModeGroup));
+		embed::getIconPixmap( "edit_draw" ), tr( "Draw mode" ), editModeGroup));
 	QAction* eraseAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap( "edit_erase" ), tr("Erase mode (Shift+E)" ), editModeGroup));
+		embed::getIconPixmap( "edit_erase" ), tr("Erase mode" ), editModeGroup));
 	QAction* selectAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap( "edit_select" ), tr( "Select mode (Shift+S)" ), editModeGroup));
+		embed::getIconPixmap( "edit_select" ), tr( "Select mode" ), editModeGroup));
 	QAction* pitchBendAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap( "automation" ), tr("Pitch Bend mode (Shift+T)" ), editModeGroup));
+		embed::getIconPixmap( "automation" ), tr("Pitch Bend mode" ), editModeGroup));
 
 	drawAction->setChecked( true );
-
-	drawAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_D ));
-	eraseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_E));
-	selectAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_S));
-	pitchBendAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_T));
 
 	connect( editModeGroup, SIGNAL(triggered(int)), m_editor, SLOT(setEditMode(int)));
 
@@ -5254,15 +5250,11 @@ PianoRollWindow::PianoRollWindow() :
 	// Copy + paste actions
 	DropToolBar *copyPasteActionsToolBar =  addDropToolBarToTop( tr( "Copy paste controls" ) );
 
-	auto cutAction = new ToolButtonAction(embed::getIconPixmap("edit_cut"), tr("Cut (%1+X)").arg(UI_CTRL_KEY), this);
+	auto cutAction = new ToolButtonAction(embed::getIconPixmap("edit_cut"), tr("Cut"), this);
 
-	auto copyAction = new ToolButtonAction(embed::getIconPixmap("edit_copy"), tr("Copy (%1+C)").arg(UI_CTRL_KEY), this);
+	auto copyAction = new ToolButtonAction(embed::getIconPixmap("edit_copy"), tr("Copy"), this);
 
-	auto pasteAction = new ToolButtonAction(embed::getIconPixmap("edit_paste"), tr("Paste (%1+V)").arg(UI_CTRL_KEY), this);
-
-	cutAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_X));
-	copyAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_C));
-	pasteAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_V));
+	auto pasteAction = new ToolButtonAction(embed::getIconPixmap("edit_paste"), tr("Paste"), this);
 
 	connect( cutAction, SIGNAL(triggered()), m_editor, SLOT(cutSelectedNotes()));
 	connect( copyAction, SIGNAL(triggered()), m_editor, SLOT(copySelectedNotes()));
@@ -5283,23 +5275,18 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto glueAction = new QAction(embed::getIconPixmap("glue"), tr("Glue"), noteToolsButton);
 	connect(glueAction, SIGNAL(triggered()), m_editor, SLOT(glueNotes()));
-	glueAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_G));
 
 	auto knifeAction = new QAction(embed::getIconPixmap("edit_knife"), tr("Knife"), noteToolsButton);
 	connect(knifeAction, &QAction::triggered, m_editor, &PianoRoll::setKnifeAction);
-	knifeAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_K));
 
 	auto strumAction = new QAction(embed::getIconPixmap("arp_free"), tr("Strum"), noteToolsButton);
 	connect(strumAction, &QAction::triggered, m_editor, &PianoRoll::setStrumAction);
-	strumAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_J));
 
 	auto fillAction = new QAction(embed::getIconPixmap("fill"), tr("Fill"), noteToolsButton);
 	connect(fillAction, &QAction::triggered, [this](){ m_editor->fitNoteLengths(true); });
-	fillAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_F));
 
 	auto cutOverlapsAction = new QAction(embed::getIconPixmap("cut_overlaps"), tr("Cut overlaps"), noteToolsButton);
 	connect(cutOverlapsAction, &QAction::triggered, [this](){ m_editor->fitNoteLengths(false); });
-	cutOverlapsAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_C));
 
 	auto minLengthAction = new QAction(embed::getIconPixmap("min_length"), tr("Min length as last"), noteToolsButton);
 	connect(minLengthAction, &QAction::triggered, [this](){ m_editor->constrainNoteLengths(false); });
@@ -5309,7 +5296,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto reverseAction = new QAction(embed::getIconPixmap("flip_x"), tr("Reverse Notes"), noteToolsButton);
 	connect(reverseAction, &QAction::triggered, [this](){ m_editor->reverseNotes(); });
-	reverseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_R));
 
 	noteToolsButton->addAction(glueAction);
 	noteToolsButton->addAction(knifeAction);
@@ -5321,6 +5307,22 @@ PianoRollWindow::PianoRollWindow() :
 	noteToolsButton->addAction(reverseAction);
 
 	notesActionsToolBar->addWidget(noteToolsButton);
+
+	bindEditorShortcuts(*this, {
+		{QStringLiteral("piano_roll_draw"), drawAction},
+		{QStringLiteral("piano_roll_erase"), eraseAction},
+		{QStringLiteral("piano_roll_select"), selectAction},
+		{QStringLiteral("piano_roll_pitch_bend"), pitchBendAction},
+		{QStringLiteral("piano_roll_cut"), cutAction},
+		{QStringLiteral("piano_roll_copy"), copyAction},
+		{QStringLiteral("piano_roll_paste"), pasteAction},
+		{QStringLiteral("piano_roll_glue"), glueAction},
+		{QStringLiteral("piano_roll_knife"), knifeAction},
+		{QStringLiteral("piano_roll_strum"), strumAction},
+		{QStringLiteral("piano_roll_fill"), fillAction},
+		{QStringLiteral("piano_roll_cut_overlaps"), cutOverlapsAction},
+		{QStringLiteral("piano_roll_reverse"), reverseAction},
+	});
 
 	addToolBarBreak();
 

@@ -42,6 +42,7 @@
 #include "ComboBox.h"
 #include "DeprecationHelper.h"
 #include "DetuningHelper.h"
+#include "EditorShortcuts.h"
 #include "Engine.h"
 #include "FontHelper.h"
 #include "GuiApplication.h"
@@ -2020,23 +2021,25 @@ AutomationEditorWindow::AutomationEditorWindow() :
 
 	auto editModeGroup = new ActionGroup(this);
 	m_drawAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap("edit_draw"), tr("Draw mode (Shift+D)"), editModeGroup));
-
-	m_drawAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_D));
+		embed::getIconPixmap("edit_draw"), tr("Draw mode"), editModeGroup));
 	m_drawAction->setChecked(true);
 
 	m_eraseAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap("edit_erase"), tr("Erase mode (Shift+E)"), editModeGroup));
-	m_eraseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_E));
+		embed::getIconPixmap("edit_erase"), tr("Erase mode"), editModeGroup));
 
 	m_drawOutAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap("edit_draw_outvalue"), tr("Draw outValues mode (Shift+C)"), editModeGroup));
-	m_drawOutAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_C));
+		embed::getIconPixmap("edit_draw_outvalue"), tr("Draw outValues mode"), editModeGroup));
 
 	m_editTanAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap("edit_tangent"), tr("Edit tangents mode (Shift+T)"), editModeGroup));
-	m_editTanAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_T));
+		embed::getIconPixmap("edit_tangent"), tr("Edit tangents mode"), editModeGroup));
 	m_editTanAction->setEnabled(false);
+
+	bindEditorShortcuts(*this, {
+		{QStringLiteral("automation_editor_draw"), m_drawAction},
+		{QStringLiteral("automation_editor_erase"), m_eraseAction},
+		{QStringLiteral("automation_editor_draw_out"), m_drawOutAction},
+		{QStringLiteral("automation_editor_edit_tangents"), m_editTanAction},
+	});
 
 	m_flipYAction = new ToolButtonAction(embed::getIconPixmap("flip_y"), tr("Flip vertically"), this);
 	m_flipXAction = new ToolButtonAction(embed::getIconPixmap("flip_x"), tr("Flip horizontally"), this);

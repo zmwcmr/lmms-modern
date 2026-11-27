@@ -28,6 +28,8 @@
 #include <QBasicTimer>
 #include <QTimer>
 #include <QList>
+#include <QKeySequence>
+#include <QMap>
 #include <QMainWindow>
 #include <QMdiArea>
 
@@ -251,6 +253,7 @@ private:
 	friend class GuiApplication;
 
 	QMenu * m_viewMenu;
+	QMap<QString, QKeySequence> m_windowShortcuts;
 
 	ToolButton * m_metronomeToggle;
 	ToolButton* m_songEditorButton;

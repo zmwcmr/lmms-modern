@@ -19,6 +19,7 @@ set(LMMS_TESTS
 	src/gui/SideBarWorkspaceTest.cpp
 	src/gui/ToolButtonTest.cpp
 	src/gui/UiFeedbackTest.cpp
+	src/gui/EditorShortcutsTest.cpp
 	src/gui/FileBrowserTest.cpp
 	src/gui/SubWindowTest.cpp
 	src/gui/LcdFloatSpinBoxTest.cpp
