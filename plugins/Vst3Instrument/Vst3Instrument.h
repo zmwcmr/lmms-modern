@@ -30,6 +30,7 @@
 
 #include <QMutex>
 
+#include "HostedInstrument.h"
 #include "Instrument.h"
 #include "Vst3ParameterModels.h"
 
@@ -40,7 +41,7 @@ class Vst3HostBase;
 class Vst3RemoteHostClient;
 class InstrumentTrack;
 
-class Vst3Instrument : public Instrument
+class Vst3Instrument : public HostedInstrument
 {
 	Q_OBJECT
 public:
@@ -74,8 +75,6 @@ private:
 	QString m_file;
 	QString m_classId;
 	Vst3ParameterModels m_parameterModels;
-	std::vector<float> m_outputLeft;
-	std::vector<float> m_outputRight;
 };
 
 } // namespace lmms

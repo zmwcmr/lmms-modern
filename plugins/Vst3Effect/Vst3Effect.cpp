@@ -24,6 +24,8 @@
 
 #include "Vst3Effect.h"
 
+#include "Vst3PluginHost.h"
+
 #include <algorithm>
 
 #include <QDomElement>
@@ -61,7 +63,8 @@ Plugin::Descriptor PLUGIN_EXPORT vst3effect_plugin_descriptor =
 }
 
 Vst3Effect::Vst3Effect(Model* parent, const Descriptor::SubPluginFeatures::Key* key) :
-	Effect(&vst3effect_plugin_descriptor, parent, key),
+	HostedEffect(&vst3effect_plugin_descriptor, parent, key,
+		std::make_unique<Vst3PluginHost>()),
 	m_key(key != nullptr ? *key : EffectKey()),
 	m_controls(this)
 {
@@ -75,7 +78,10 @@ Vst3Effect::Vst3Effect(Model* parent, const Descriptor::SubPluginFeatures::Key* 
 	}
 }
 
-Vst3Effect::~Vst3Effect() = default;
+Vst3Effect::~Vst3Effect()
+{
+	static_cast<Vst3PluginHost*>(HostedEffect::host())->adopt(nullptr);
+}
 
 bool Vst3Effect::openPlugin()
 {
@@ -125,10 +131,12 @@ bool Vst3Effect::openPlugin()
 		if (!local->load(file, classId, sampleRate, blockSize, &error))
 		{
 			m_controls.initializeParameters();
+			static_cast<Vst3PluginHost*>(HostedEffect::host())->adopt(nullptr);
 			return false;
 		}
 		m_host = std::move(local);
 	}
+	static_cast<Vst3PluginHost*>(HostedEffect::host())->adopt(m_host.get());
 	m_controls.initializeParameters();
 
 	QStringList parameterNames;
@@ -176,37 +184,8 @@ Effect::ProcessStatus Vst3Effect::processImpl(SampleFrame* buf, const f_cnt_t fr
 	}
 
 	const auto frameCount = static_cast<int>(frames);
-	if (static_cast<int>(m_inputLeft.size()) < frameCount)
-	{
-		m_inputLeft.resize(frameCount);
-		m_inputRight.resize(frameCount);
-		m_outputLeft.resize(frameCount);
-		m_outputRight.resize(frameCount);
-	}
-
-	for (int frame = 0; frame < frameCount; ++frame)
-	{
-		m_inputLeft[frame] = buf[frame][0];
-		m_inputRight[frame] = buf[frame][1];
-	}
-
 	m_controls.queueParameterChanges(frameCount);
-	const double tempo = Engine::getSong() != nullptr
-		? Engine::getSong()->getTempo() : 120.0;
-	const bool playing = Engine::getSong() != nullptr && Engine::getSong()->isPlaying();
-	m_host->setTempo(tempo);
-	m_host->setPlaying(playing);
-	m_host->process(m_inputLeft.data(), m_inputRight.data(),
-		m_outputLeft.data(), m_outputRight.data(), frameCount);
-
-	const float wet = wetLevel();
-	const float dry = dryLevel();
-	for (int frame = 0; frame < frameCount; ++frame)
-	{
-		buf[frame][0] = wet * m_outputLeft[frame] + dry * buf[frame][0];
-		buf[frame][1] = wet * m_outputRight[frame] + dry * buf[frame][1];
-	}
-
+	HostedEffect::processImpl(buf, frames);
 	m_mutex.unlock();
 	return ProcessStatus::ContinueIfNotQuiet;
 }

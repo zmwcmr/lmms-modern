@@ -43,8 +43,13 @@ namespace lmms
 class VST3BASE_EXPORT Vst3PluginHost : public PluginHost
 {
 public:
+	Vst3PluginHost();
 	explicit Vst3PluginHost(Vst3HostBase& host);
 	~Vst3PluginHost() override = default;
+
+	//! Adopt a host created by the format wrapper; not owned.
+	void adopt(Vst3HostBase* host);
+	Vst3HostBase* nativeHost() const { return m_host; }
 
 	PluginFormat format() const override;
 	PluginHostCapabilities capabilities() const override;
@@ -81,7 +86,7 @@ public:
 private:
 	void refreshParameters();
 
-	Vst3HostBase& m_host;
+	Vst3HostBase* m_host = nullptr;
 	std::vector<PluginParameterInfo> m_parameters;
 };
 

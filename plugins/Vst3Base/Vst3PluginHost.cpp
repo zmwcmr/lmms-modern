@@ -45,9 +45,27 @@ void setError(QString* error, const QString& message)
 
 
 
+Vst3PluginHost::Vst3PluginHost() = default;
+
+
+
+
 Vst3PluginHost::Vst3PluginHost(Vst3HostBase& host) :
-	m_host(host)
+	m_host(&host)
 {
+}
+
+
+
+
+void Vst3PluginHost::adopt(Vst3HostBase* host)
+{
+	m_host = host;
+	m_parameters.clear();
+	if (m_host != nullptr)
+	{
+		refreshParameters();
+	}
 }
 
 
@@ -68,8 +86,10 @@ PluginHostCapabilities Vst3PluginHost::capabilities() const
 	// format-independent editor backend belongs to the editor-host stage.
 	capabilities.hasEditor = false;
 	capabilities.editorMustShareProcess = false;
-	capabilities.supportsPrograms = m_host.programCount() > 0;
-	capabilities.supportsUnits = !m_host.units().empty();
+	capabilities.supportsPrograms = m_host != nullptr
+		&& m_host->programCount() > 0;
+	capabilities.supportsUnits = m_host != nullptr
+		&& !m_host->units().empty();
 	capabilities.sampleAccurateParameters = true;
 	capabilities.supportsMidiOut = false;
 	capabilities.multipleBuses = false;
@@ -85,6 +105,11 @@ bool Vst3PluginHost::load(const PluginLoadRequest& request, QString* error)
 {
 	unload();
 
+	if (m_host == nullptr)
+	{
+		setError(error, QStringLiteral("No VST3 host is attached"));
+		return false;
+	}
 	if (request.path.isEmpty() || request.classId.isEmpty())
 	{
 		setError(error, QStringLiteral(
@@ -98,7 +123,7 @@ bool Vst3PluginHost::load(const PluginLoadRequest& request, QString* error)
 		return false;
 	}
 
-	if (!m_host.load(request.path, request.classId, request.sampleRate,
+	if (!m_host->load(request.path, request.classId, request.sampleRate,
 		request.maxBlockSize, error))
 	{
 		return false;
@@ -113,7 +138,10 @@ bool Vst3PluginHost::load(const PluginLoadRequest& request, QString* error)
 
 void Vst3PluginHost::unload()
 {
-	m_host.unload();
+	if (m_host != nullptr)
+	{
+		m_host->unload();
+	}
 	m_parameters.clear();
 }
 
@@ -122,7 +150,7 @@ void Vst3PluginHost::unload()
 
 bool Vst3PluginHost::isLoaded() const
 {
-	return m_host.isLoaded();
+	return m_host != nullptr && m_host->isLoaded();
 }
 
 
@@ -131,7 +159,11 @@ bool Vst3PluginHost::isLoaded() const
 void Vst3PluginHost::refreshParameters()
 {
 	m_parameters.clear();
-	for (const auto& parameter : m_host.parameters())
+	if (m_host == nullptr)
+	{
+		return;
+	}
+	for (const auto& parameter : m_host->parameters())
 	{
 		PluginParameterInfo info;
 		info.id = parameter.id;
@@ -153,7 +185,7 @@ void Vst3PluginHost::refreshParameters()
 
 bool Vst3PluginHost::setParameter(uint32_t id, double value, int sampleOffset)
 {
-	if (!m_host.isLoaded())
+	if (m_host == nullptr || !m_host->isLoaded())
 	{
 		return false;
 	}
@@ -161,10 +193,10 @@ bool Vst3PluginHost::setParameter(uint32_t id, double value, int sampleOffset)
 	const double normalised = std::clamp(value, 0.0, 1.0);
 	if (sampleOffset > 0)
 	{
-		m_host.queueParameter(id, normalised, sampleOffset);
+		m_host->queueParameter(id, normalised, sampleOffset);
 		return true;
 	}
-	return m_host.setParameterNormalised(id, normalised);
+	return m_host->setParameterNormalised(id, normalised);
 }
 
 
@@ -172,7 +204,8 @@ bool Vst3PluginHost::setParameter(uint32_t id, double value, int sampleOffset)
 
 double Vst3PluginHost::parameterValue(uint32_t id) const
 {
-	return m_host.isLoaded() ? m_host.parameterNormalised(id) : 0.0;
+	return m_host != nullptr && m_host->isLoaded()
+		? m_host->parameterNormalised(id) : 0.0;
 }
 
 
@@ -180,7 +213,7 @@ double Vst3PluginHost::parameterValue(uint32_t id) const
 
 void Vst3PluginHost::sendMidi(const PluginMidiEvent& event)
 {
-	if (!m_host.isLoaded())
+	if (m_host == nullptr || !m_host->isLoaded())
 	{
 		return;
 	}
@@ -212,7 +245,7 @@ void Vst3PluginHost::sendMidi(const PluginMidiEvent& event)
 	midi.data1 = event.data1;
 	midi.data2 = event.data2;
 	midi.value = event.value;
-	m_host.queueMidi(midi);
+	m_host->queueMidi(midi);
 }
 
 
@@ -220,7 +253,7 @@ void Vst3PluginHost::sendMidi(const PluginMidiEvent& event)
 
 bool Vst3PluginHost::process(const PluginProcessBlock& block)
 {
-	if (!m_host.isLoaded() || block.frames <= 0
+	if (m_host == nullptr || !m_host->isLoaded() || block.frames <= 0
 		|| block.outputChannels <= 0 || block.outputs == nullptr
 		|| block.outputs[0] == nullptr)
 	{
@@ -235,7 +268,7 @@ bool Vst3PluginHost::process(const PluginProcessBlock& block)
 	float* rightOut = block.outputChannels > 1 && block.outputs[1]
 		? block.outputs[1] : leftOut;
 
-	m_host.process(leftIn, rightIn, leftOut, rightOut, block.frames);
+	m_host->process(leftIn, rightIn, leftOut, rightOut, block.frames);
 	return true;
 }
 
@@ -244,7 +277,7 @@ bool Vst3PluginHost::process(const PluginProcessBlock& block)
 
 int Vst3PluginHost::latencySamples() const
 {
-	return m_host.latencySamples();
+	return m_host != nullptr ? m_host->latencySamples() : 0;
 }
 
 
@@ -252,7 +285,10 @@ int Vst3PluginHost::latencySamples() const
 
 void Vst3PluginHost::setTempo(double bpm)
 {
-	m_host.setTempo(bpm);
+	if (m_host != nullptr)
+	{
+		m_host->setTempo(bpm);
+	}
 }
 
 
@@ -260,7 +296,10 @@ void Vst3PluginHost::setTempo(double bpm)
 
 void Vst3PluginHost::setPlaying(bool playing)
 {
-	m_host.setPlaying(playing);
+	if (m_host != nullptr)
+	{
+		m_host->setPlaying(playing);
+	}
 }
 
 
@@ -268,7 +307,7 @@ void Vst3PluginHost::setPlaying(bool playing)
 
 int Vst3PluginHost::programCount() const
 {
-	return m_host.programCount();
+	return m_host != nullptr ? m_host->programCount() : 0;
 }
 
 
@@ -276,7 +315,7 @@ int Vst3PluginHost::programCount() const
 
 int Vst3PluginHost::currentProgram() const
 {
-	return m_host.currentProgram();
+	return m_host != nullptr ? m_host->currentProgram() : -1;
 }
 
 
@@ -284,7 +323,7 @@ int Vst3PluginHost::currentProgram() const
 
 QString Vst3PluginHost::programName(int index) const
 {
-	return m_host.programName(index);
+	return m_host != nullptr ? m_host->programName(index) : QString();
 }
 
 
@@ -292,7 +331,7 @@ QString Vst3PluginHost::programName(int index) const
 
 bool Vst3PluginHost::setProgram(int index)
 {
-	return m_host.setProgram(index);
+	return m_host != nullptr && m_host->setProgram(index);
 }
 
 
@@ -301,14 +340,14 @@ bool Vst3PluginHost::setProgram(int index)
 PluginStateBlob Vst3PluginHost::saveState(QString* error)
 {
 	PluginStateBlob blob;
-	if (!m_host.isLoaded())
+	if (m_host == nullptr || !m_host->isLoaded())
 	{
 		setError(error, QStringLiteral("No VST3 plugin is loaded"));
 		return blob;
 	}
 
-	blob.primary = m_host.componentState();
-	blob.secondary = m_host.controllerState();
+	blob.primary = m_host->componentState();
+	blob.secondary = m_host->controllerState();
 	if (blob.primary.isEmpty() && blob.secondary.isEmpty())
 	{
 		setError(error, QStringLiteral("The VST3 plugin returned no state"));
@@ -321,7 +360,7 @@ PluginStateBlob Vst3PluginHost::saveState(QString* error)
 
 bool Vst3PluginHost::loadState(const PluginStateBlob& state, QString* error)
 {
-	if (!m_host.isLoaded())
+	if (m_host == nullptr || !m_host->isLoaded())
 	{
 		setError(error, QStringLiteral("No VST3 plugin is loaded"));
 		return false;
@@ -332,7 +371,7 @@ bool Vst3PluginHost::loadState(const PluginStateBlob& state, QString* error)
 		return false;
 	}
 
-	if (!m_host.setState(state.primary, state.secondary))
+	if (!m_host->setState(state.primary, state.secondary))
 	{
 		setError(error, QStringLiteral("The VST3 plugin rejected the state"));
 		return false;

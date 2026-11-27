@@ -31,6 +31,7 @@
 #include <QMutex>
 
 #include "Effect.h"
+#include "HostedEffect.h"
 #include "Vst3EffectControls.h"
 
 namespace lmms
@@ -39,7 +40,7 @@ namespace lmms
 class Vst3HostBase;
 class Vst3RemoteHostClient;
 
-class Vst3Effect : public Effect
+class Vst3Effect : public HostedEffect
 {
 	Q_OBJECT
 public:
@@ -69,11 +70,6 @@ private:
 		QMutex m_mutex;
 	EffectKey m_key;
 	Vst3EffectControls m_controls;
-
-	std::vector<float> m_inputLeft;
-	std::vector<float> m_inputRight;
-	std::vector<float> m_outputLeft;
-	std::vector<float> m_outputRight;
 
 	friend class Vst3EffectControls;
 };
