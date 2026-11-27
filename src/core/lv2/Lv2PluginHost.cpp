@@ -71,7 +71,29 @@ Lv2PluginHost::Lv2PluginHost(Model* parent) :
 
 
 
+Lv2PluginHost::Lv2PluginHost(Lv2Proc* proc) :
+	m_proc(proc)
+{
+	if (m_proc)
+	{
+		refreshParameters();
+	}
+}
+
+
+
+
 Lv2PluginHost::~Lv2PluginHost() = default;
+
+
+
+
+void Lv2PluginHost::adopt(Lv2Proc* proc)
+{
+	m_ownedProc.reset();
+	m_proc = proc;
+	refreshParameters();
+}
 
 
 
@@ -122,12 +144,15 @@ bool Lv2PluginHost::load(const PluginLoadRequest& request, QString* error)
 
 	try
 	{
-		m_proc = std::make_unique<Lv2Proc>(m_parent, request.pluginUri);
+		m_ownedProc = std::make_unique<Lv2Proc>(m_parent,
+			request.pluginUri);
+		m_proc = m_ownedProc.get();
 	}
 	catch (const std::exception& exception)
 	{
 		setError(error, QString::fromLocal8Bit(exception.what()));
-		m_proc.reset();
+		m_ownedProc.reset();
+		m_proc = nullptr;
 		return false;
 	}
 
@@ -141,7 +166,8 @@ bool Lv2PluginHost::load(const PluginLoadRequest& request, QString* error)
 
 void Lv2PluginHost::unload()
 {
-	m_proc.reset();
+	m_ownedProc.reset();
+	m_proc = nullptr;
 	m_parameters.clear();
 	m_controls.clear();
 	m_currentProgram = -1;

@@ -26,13 +26,14 @@
 #define LV2_EFFECT_H
 
 #include "Effect.h"
+#include "HostedEffect.h"
 #include "Lv2FxControls.h"
 
 namespace lmms
 {
 
 
-class Lv2Effect : public Effect
+class Lv2Effect : public HostedEffect
 {
 	Q_OBJECT
 
@@ -42,17 +43,13 @@ public:
 	*/
 	Lv2Effect(Model* parent, const Descriptor::SubPluginFeatures::Key* _key);
 
-	ProcessStatus processImpl(SampleFrame* buf, const f_cnt_t frames) override;
-
 	EffectControls* controls() override { return &m_controls; }
-	f_cnt_t latency() const override { return m_controls.latency(); }
 
 	Lv2FxControls* lv2Controls() { return &m_controls; }
 	const Lv2FxControls* lv2Controls() const { return &m_controls; }
 
 private:
 	Lv2FxControls m_controls;
-	std::vector<SampleFrame> m_tmpOutputSmps;
 };
 
 

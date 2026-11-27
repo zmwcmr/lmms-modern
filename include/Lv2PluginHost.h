@@ -42,10 +42,11 @@ namespace lmms
 
 /*! PluginHost adapter for one LV2 plugin instance.
  *
- *  The adapter owns the Lv2Proc, so it can create and destroy the plugin
- *  instance without touching the models of a surrounding effect or
- *  instrument. Parameter IDs are LV2 port indices. The state blob is an XML
- *  fragment containing the model values plus the plugin's state extension.
+ *  The adapter can own the Lv2Proc (normal adapter use) or adopt an existing
+ *  one (the LV2 effect/instrument wrappers, which also need the same Lv2Proc
+ *  for their views). Parameter IDs are LV2 port indices. The state blob is
+ *  an XML fragment containing the model values plus the plugin's state
+ *  extension.
  *
  *  The editor is not available through this adapter yet: LV2 UIs need the
  *  GUI layer and are unified in the editor-host stage.
@@ -55,8 +56,13 @@ class LMMS_EXPORT Lv2PluginHost : public PluginHost
 public:
 	//! @param parent model that receives the parameter models; must outlive
 	//!        the adapter
-	explicit Lv2PluginHost(Model* parent);
+	explicit Lv2PluginHost(Model* parent = nullptr);
+	//! Adopt an already created Lv2Proc (not owned by the adapter).
+	explicit Lv2PluginHost(Lv2Proc* proc);
 	~Lv2PluginHost() override;
+
+	void adopt(Lv2Proc* proc);
+	Lv2Proc* proc() const { return m_proc; }
 
 	PluginFormat format() const override;
 	PluginHostCapabilities capabilities() const override;
@@ -94,8 +100,9 @@ private:
 	void copyInput(const PluginProcessBlock& block);
 	void copyOutput(const PluginProcessBlock& block) const;
 
-	Model* m_parent;
-	std::unique_ptr<Lv2Proc> m_proc;
+	Model* m_parent = nullptr;
+	std::unique_ptr<Lv2Proc> m_ownedProc;
+	Lv2Proc* m_proc = nullptr;
 	std::vector<PluginParameterInfo> m_parameters;
 	//! Control port lookup indexed by the same port index used in the IDs.
 	std::vector<Lv2Ports::Control*> m_controls;

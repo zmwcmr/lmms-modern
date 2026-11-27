@@ -287,8 +287,12 @@ path.
 - [ ] VST2 state still uses the native chunk XML rather than
       `PluginStateBlob`. This is deliberate for compatibility; the adapter
       exposes `saveState()` for new consumers.
-- [ ] Switch LV2/VST3 wrappers to the generic bases while keeping their
-      existing XML, views and native editors.
+- [x] LV2: `Lv2Effect` uses `HostedEffect` and `Lv2Instrument` uses
+      `HostedInstrument`; both adopt the same `Lv2Proc` for models, views,
+      ports and `<lv2state>`. `Lv2PluginHost` gained an owning and an
+      adopting mode.
+- [ ] VST3: switch the instrument/effect wrappers to the generic bases while
+      keeping `vst3pN`, component/controller state and the editor views.
 - Acceptance: old projects load and save byte-compatible state; VST2 UI
   behavior unchanged. The structural alias and audio path are done; parameter
   and state unification is the remaining part.

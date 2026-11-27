@@ -24,6 +24,8 @@
 
 #include "Lv2Instrument.h"
 
+#include "Lv2PluginHost.h"
+
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QPushButton>
@@ -73,7 +75,8 @@ Plugin::Descriptor PLUGIN_EXPORT lv2instrument_plugin_descriptor =
 
 Lv2Instrument::Lv2Instrument(InstrumentTrack *instrumentTrackArg,
 	Descriptor::SubPluginFeatures::Key *key) :
-	Instrument(instrumentTrackArg, &lv2instrument_plugin_descriptor, key,
+	HostedInstrument(instrumentTrackArg, &lv2instrument_plugin_descriptor, key,
+		std::make_unique<Lv2PluginHost>(),
 #ifdef LV2_INSTRUMENT_USE_MIDI
 		Flag::IsSingleStreamed | Flag::IsMidiBased
 #else
@@ -82,6 +85,7 @@ Lv2Instrument::Lv2Instrument(InstrumentTrack *instrumentTrackArg,
 	),
 	Lv2Proc(this, key->attributes["uri"])
 {
+	static_cast<Lv2PluginHost*>(host())->adopt(this);
 	clearRunningNotes();
 
 	connect(instrumentTrack()->pitchRangeModel(), SIGNAL(dataChanged()),
@@ -187,16 +191,7 @@ void Lv2Instrument::playNote(NotePlayHandle *nph, SampleFrame*)
 
 void Lv2Instrument::play(SampleFrame* buf)
 {
-	copyModelsFromCore();
-
-	f_cnt_t fpp = Engine::audioEngine()->framesPerPeriod();
-
-	run(fpp);
-
-	if (auto* track = instrumentTrack())
-	{
-		track->audioBusHandle()->setSourceLatency(latency());
-	}
+	HostedInstrument::play(buf);
 
 	for (const MidiOutEvent& event : midiOutEvents())
 	{
@@ -221,9 +216,6 @@ void Lv2Instrument::play(SampleFrame* buf)
 		}
 	}
 	clearMidiOutEvents();
-
-	copyModelsToCore();
-	copyBuffersToCore(buf, fpp);
 }
 
 

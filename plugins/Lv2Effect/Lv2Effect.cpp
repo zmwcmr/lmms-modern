@@ -24,6 +24,8 @@
 
 #include "Lv2Effect.h"
 
+#include "Lv2PluginHost.h"
+
 #include <QDebug>
 
 #include "Lv2SubPluginFeatures.h"
@@ -59,39 +61,11 @@ Plugin::Descriptor PLUGIN_EXPORT lv2effect_plugin_descriptor =
 
 
 Lv2Effect::Lv2Effect(Model* parent, const Descriptor::SubPluginFeatures::Key *key) :
-	Effect(&lv2effect_plugin_descriptor, parent, key),
-	m_controls(this, key->attributes["uri"]),
-	m_tmpOutputSmps(Engine::audioEngine()->framesPerPeriod())
+	HostedEffect(&lv2effect_plugin_descriptor, parent, key,
+		std::make_unique<Lv2PluginHost>()),
+	m_controls(this, key->attributes["uri"])
 {
-}
-
-
-
-
-Effect::ProcessStatus Lv2Effect::processImpl(SampleFrame* buf, const f_cnt_t frames)
-{
-	Q_ASSERT(frames <= static_cast<f_cnt_t>(m_tmpOutputSmps.size()));
-
-	m_controls.copyBuffersFromCore(buf, frames);
-	m_controls.copyModelsFromCore();
-
-//	m_pluginMutex.lock();
-	m_controls.run(frames);
-//	m_pluginMutex.unlock();
-
-	m_controls.copyModelsToCore();
-	m_controls.copyBuffersToCore(m_tmpOutputSmps.data(), frames);
-
-	bool corrupt = wetLevel() < 0; // #3261 - if w < 0, bash w := 0, d := 1
-	const float d = corrupt ? 1 : dryLevel();
-	const float w = corrupt ? 0 : wetLevel();
-	for(f_cnt_t f = 0; f < frames; ++f)
-	{
-		buf[f][0] = d * buf[f][0] + w * m_tmpOutputSmps[f][0];
-		buf[f][1] = d * buf[f][1] + w * m_tmpOutputSmps[f][1];
-	}
-
-	return ProcessStatus::ContinueIfNotQuiet;
+	static_cast<Lv2PluginHost*>(host())->adopt(&m_controls);
 }
 
 

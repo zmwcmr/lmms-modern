@@ -28,6 +28,7 @@
 #include <QString>
 #include <array>
 
+#include "HostedInstrument.h"
 #include "Instrument.h"
 #include "InstrumentView.h"
 #include "Lv2ProcView.h"
@@ -48,7 +49,7 @@ class Lv2InsView;
 
 }
 
-class Lv2Instrument : public Instrument, public Lv2Proc
+class Lv2Instrument : public HostedInstrument, public Lv2Proc
 {
 	Q_OBJECT
 signals:
