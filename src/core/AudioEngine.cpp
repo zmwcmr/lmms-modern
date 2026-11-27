@@ -599,6 +599,46 @@ void AudioEngine::removePlayHandle(PlayHandle * ph)
 void AudioEngine::removePlayHandlesOfTypes(Track * track, PlayHandle::Types types)
 {
 	requestChangeInModel();
+
+	// Also remove handles that have been queued by addPlayHandle() but not
+	// promoted to m_playHandles yet (no render happened since). Otherwise they
+	// keep a pointer to the track's audio bus after the track is deleted and
+	// crash the next caller of removePlayHandle().
+	for( LocklessListElement * e = m_newPlayHandles.first(), * ePrev = nullptr;
+			e; )
+	{
+		PlayHandle * ph = e->value;
+		LocklessListElement * eNext = e->next;
+
+		if (ph->isFromTrack(track) && (ph->type() & types))
+		{
+			ph->audioBusHandle()->removePlayHandle(ph);
+			if (ph->type() == PlayHandle::Type::NotePlayHandle)
+			{
+				NotePlayHandleManager::release((NotePlayHandle*)ph);
+			}
+			else
+			{
+				delete ph;
+			}
+
+			if (ePrev)
+			{
+				ePrev->next = eNext;
+			}
+			else
+			{
+				m_newPlayHandles.setFirst(eNext);
+			}
+			m_newPlayHandles.free(e);
+		}
+		else
+		{
+			ePrev = e;
+		}
+		e = eNext;
+	}
+
 	PlayHandleList::Iterator it = m_playHandles.begin();
 	while( it != m_playHandles.end() )
 	{
