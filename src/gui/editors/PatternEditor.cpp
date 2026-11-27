@@ -360,6 +360,17 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 }
 
 
+bool PatternEditorWindow::isPatternSelector(const QWidget* widget) const
+{
+	// Follow the parent chain across the pattern selector's popup window.
+	for (; widget; widget = widget->parentWidget())
+	{
+		if (widget == m_patternComboBox) { return true; }
+	}
+	return false;
+}
+
+
 QSize PatternEditorWindow::sizeHint() const
 {
 	return {m_editor->trackHeadWidth() + 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels, 300};

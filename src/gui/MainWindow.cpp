@@ -463,14 +463,14 @@ void MainWindow::finalize()
 	m_metronomeToggle->setChecked(Engine::getSong()->metronome().active());
 
 	// window-toolbar
-	auto song_editor_window = new ToolButton(
+	m_songEditorButton = new ToolButton(
 		embed::getIconPixmap("songeditor"), withShortcutHint(tr("Song Editor"), 1, false), this,
 		SLOT(toggleSongEditorWin()), m_toolBar);
-	song_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_1));
+	m_songEditorButton->setShortcut(keySequence(Qt::CTRL, Qt::Key_1));
 
-	auto pattern_editor_window = new ToolButton(embed::getIconPixmap("pattern_track_btn"),
+	m_patternEditorButton = new ToolButton(embed::getIconPixmap("pattern_track_btn"),
 		withShortcutHint(tr("Pattern Editor"), 2, false), this, SLOT(togglePatternEditorWin()), m_toolBar);
-	pattern_editor_window->setShortcut(keySequence(Qt::CTRL, Qt::Key_2));
+	m_patternEditorButton->setShortcut(keySequence(Qt::CTRL, Qt::Key_2));
 
 	auto piano_roll_window = new ToolButton(embed::getIconPixmap("piano"),
 		withShortcutHint(tr("Piano Roll"), 3, false), this, SLOT(togglePianoRollWin()), m_toolBar);
@@ -499,7 +499,7 @@ void MainWindow::finalize()
 		m_toolBarLayout->insertWidget(buttonIndex++, button, 0, Qt::AlignVCenter);
 	}
 	m_toolBarLayout->insertSpacing(buttonIndex++, 8);
-	for (auto* button : {song_editor_window, pattern_editor_window, piano_roll_window,
+	for (auto* button : {m_songEditorButton, m_patternEditorButton, piano_roll_window,
 		automation_editor_window, mixer_window, controllers_window, project_notes_window})
 	{
 		m_toolBarLayout->insertWidget(buttonIndex++, button, 0, Qt::AlignVCenter);
@@ -625,6 +625,12 @@ void MainWindow::resetWindowTitle()
 	}
 
 	setWindowTitle( title + " - " + tr( "LMMS %1" ).arg( LMMS_VERSION ) );
+}
+
+
+bool MainWindow::isTimelineEditorButton(const QWidget* widget) const
+{
+	return widget == m_songEditorButton || widget == m_patternEditorButton;
 }
 
 

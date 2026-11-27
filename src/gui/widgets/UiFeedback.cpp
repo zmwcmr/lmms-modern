@@ -24,9 +24,12 @@
 
 #include "UiFeedback.h"
 
+#include <algorithm>
 #include <cmath>
+#include <numbers>
 
 #include <QGraphicsColorizeEffect>
+#include <QPainter>
 #include <QPointer>
 #include <QTimer>
 #include <QVariantAnimation>
@@ -40,6 +43,12 @@ namespace lmms::gui
 namespace
 {
 
+constexpr qreal HighlightStrength = 0.65;
+constexpr qreal MaxPulseDarkening = 0.20;
+constexpr qreal MaxPulseStrength = 0.42;
+constexpr qreal MinPulseColorLightness = 0.78;
+constexpr int PulsePeriodMs = 1000;
+
 QColor accentFor(const QWidget* target)
 {
 	QColor accent = target->palette().color(QPalette::Highlight);
@@ -51,6 +60,52 @@ QColor accentFor(const QWidget* target)
 	return accent.isValid() ? accent : QColor(Qt::white);
 }
 
+class FeedbackTint : public QGraphicsColorizeEffect
+{
+public:
+	FeedbackTint(QWidget* target, bool pulse) : QGraphicsColorizeEffect(target), pulsing(pulse)
+	{
+		setColor(accentFor(target));
+		setStrength(HighlightStrength);
+	}
+
+	const bool pulsing;
+
+	void setPulsePhase(qreal phase)
+	{
+		const qreal darkening = MaxPulseDarkening * std::max(-phase, qreal(0));
+		const bool darkeningChanged = m_darkening != darkening;
+		m_darkening = darkening;
+		setStrength(MaxPulseStrength * std::max(phase, qreal(0)));
+		if (darkeningChanged) { update(); }
+	}
+
+protected:
+	void draw(QPainter* painter) override
+	{
+		if (m_darkening == 0)
+		{
+			QGraphicsColorizeEffect::draw(painter);
+			return;
+		}
+
+		QPoint offset;
+		auto source = sourcePixmap(Qt::LogicalCoordinates, &offset, NoPad);
+		if (source.isNull()) { return; }
+
+		QPainter shade(&source);
+		// Darken the widget pixels while preserving their alpha and shape.
+		shade.setCompositionMode(QPainter::CompositionMode_SourceAtop);
+		shade.fillRect(QRectF(QPointF{}, QSizeF(source.size()) / source.devicePixelRatio()),
+			QColor::fromRgbF(0, 0, 0, m_darkening));
+		shade.end();
+		painter->drawPixmap(offset, source);
+	}
+
+private:
+	qreal m_darkening = 0.0;
+};
+
 } // namespace
 
 
@@ -58,9 +113,8 @@ void UiFeedback::flash(QWidget* target)
 {
 	if (!target || target->size().isEmpty()) { return; }
 
-	// Do not steal an effect that some other code installed on this widget.
-	if (target->graphicsEffect()
-		&& !qobject_cast<QGraphicsColorizeEffect*>(target->graphicsEffect()))
+	const auto* existing = dynamic_cast<const FeedbackTint*>(target->graphicsEffect());
+	if (target->graphicsEffect() && (!existing || existing->pulsing))
 	{
 		return;
 	}
@@ -68,18 +122,13 @@ void UiFeedback::flash(QWidget* target)
 	const int duration = LmmsStyle::uiAnimationDuration(target, 260);
 	if (duration <= 0) { return; }
 
-	// Restart an earlier confirmation on the same widget instead of stacking it.
-	if (target->graphicsEffect()) { target->setGraphicsEffect(nullptr); }
-
-	auto* effect = new QGraphicsColorizeEffect(target);
-	effect->setColor(accentFor(target));
-	effect->setStrength(0.65);
+	auto* effect = new FeedbackTint(target, false);
 	target->setGraphicsEffect(effect);
 
 	auto* animation = new QVariantAnimation(effect);
 	animation->setDuration(duration);
-	animation->setStartValue(0.65);
-	animation->setKeyValueAt(0.3, 0.65);
+	animation->setStartValue(HighlightStrength);
+	animation->setKeyValueAt(0.3, HighlightStrength);
 	animation->setEndValue(0.0);
 	animation->setEasingCurve(QEasingCurve::OutCubic);
 	QObject::connect(animation, &QVariantAnimation::valueChanged, effect,
@@ -91,6 +140,38 @@ void UiFeedback::flash(QWidget* target)
 	QTimer::singleShot(duration, target, [target, guard] {
 		if (guard && target->graphicsEffect() == guard) { target->setGraphicsEffect(nullptr); }
 	});
+}
+
+
+void UiFeedback::setPulsingHighlight(QWidget* target, bool highlighted)
+{
+	if (!target) { return; }
+
+	const auto* existing = dynamic_cast<const FeedbackTint*>(target->graphicsEffect());
+	if (!highlighted)
+	{
+		if (existing && existing->pulsing) { target->setGraphicsEffect(nullptr); }
+		return;
+	}
+	if (target->graphicsEffect() && (!existing || existing->pulsing)) { return; }
+
+	auto* effect = new FeedbackTint(target, true);
+	const QColor accent = effect->color();
+	effect->setColor(QColor::fromHslF(accent.hslHueF(), accent.hslSaturationF(),
+		std::max<qreal>(accent.lightnessF(), MinPulseColorLightness), accent.alphaF()));
+	effect->setStrength(MaxPulseStrength);
+	target->setGraphicsEffect(effect);
+	if (LmmsStyle::uiAnimationDuration(target, PulsePeriodMs) <= 0) { return; }
+
+	auto* animation = new QVariantAnimation(effect);
+	animation->setDuration(PulsePeriodMs);
+	animation->setLoopCount(-1);
+	animation->setStartValue(0.0);
+	animation->setEndValue(1.0);
+	QObject::connect(animation, &QVariantAnimation::valueChanged, effect, [effect](const QVariant& value) {
+		effect->setPulsePhase(std::cos(2 * std::numbers::pi * value.toReal()));
+	});
+	animation->start();
 }
 
 } // namespace lmms::gui

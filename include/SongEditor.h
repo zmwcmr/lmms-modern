@@ -48,6 +48,7 @@ namespace gui
 class ActionGroup;
 class AutomatableSlider;
 class ComboBox;
+class ClipView;
 class LcdSpinBox;
 class MeterDialog;
 class PositionLine;
@@ -81,6 +82,7 @@ public:
 
 	TimeLineWidget* timeLine() const { return m_timeLine; }
 	PositionLine* positionLine() const { return m_positionLine; }
+	void revealClip(ClipView* view);
 
 public slots:
 	void scrolled( int new_pos );

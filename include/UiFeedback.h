@@ -30,17 +30,17 @@ class QWidget;
 namespace lmms::gui
 {
 
-/*! \brief Brief, non-interactive confirmation of a completed action.
+/*! \brief Non-interactive tint for confirmation and selection.
  *
- * Tints the target widget itself so its own shape is highlighted. No
- * additional frame or overlay is drawn. The tint fades out on its own.
- * When interface animations are disabled, nothing is changed.
+ * Tints the target widget itself so its own shape is highlighted.
  */
 class UiFeedback
 {
 public:
 	//! Briefly tints \a target to confirm a completed action.
 	static void flash(QWidget* target);
+	//! Tints \a target until cleared. The tint is steady when animations are disabled.
+	static void setPulsingHighlight(QWidget* target, bool highlighted);
 };
 
 } // namespace lmms::gui

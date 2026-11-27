@@ -137,6 +137,7 @@ public:
 	static void saveWidgetState( QWidget * _w, QDomElement & _de );
 	static void restoreWidgetState( QWidget * _w, const QDomElement & _de );
 	void setAllSubWindowsDetached(bool detached);
+	bool isTimelineEditorButton(const QWidget* widget) const;
 
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
@@ -252,6 +253,8 @@ private:
 	QMenu * m_viewMenu;
 
 	ToolButton * m_metronomeToggle;
+	ToolButton* m_songEditorButton;
+	ToolButton* m_patternEditorButton;
 
 	//! The hint currently shown in the status bar, used to avoid clearing a
 	//! hint that another control has set in the meantime.

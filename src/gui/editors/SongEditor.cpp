@@ -409,6 +409,16 @@ void SongEditor::scrolled( int new_pos )
 	updatePositionLine();
 }
 
+void SongEditor::revealClip(ClipView* view)
+{
+	if (!view->parentWidget()->rect().intersects(view->geometry()))
+	{
+		pauseAutoScroll();
+		m_leftRightScroll->setValue(view->getClip()->startPosition().getTicks());
+	}
+	scrollToTrackView(view->getTrackView());
+}
+
 
 
 void SongEditor::pauseAutoScroll()
