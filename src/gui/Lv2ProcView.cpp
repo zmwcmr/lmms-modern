@@ -177,15 +177,17 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 			m_proc = nullptr;
 		});
 	}
+	connectRemoteClient();
 
 	auto btnBox = new QHBoxLayout();
-	if (/* DISABLES CODE */ (false))
-	{
-		m_reloadPluginButton = new QPushButton(QObject::tr("Reload Plugin"),
-			meAsWidget);
-		m_reloadPluginButton->setObjectName("btn");
-		btnBox->addWidget(m_reloadPluginButton, 0);
-	}
+	m_reloadPluginButton = new QPushButton(QObject::tr("Reload Plugin"),
+		meAsWidget);
+	m_reloadPluginButton->setObjectName("btn");
+	m_reloadPluginButton->setToolTip(QObject::tr(
+		"Recreate the plugin instance and its native UI"));
+	btnBox->addWidget(m_reloadPluginButton, 0);
+	QObject::connect(m_reloadPluginButton, &QPushButton::clicked,
+		meAsWidget, [this] { reloadPlugin(); });
 
 	if (proc && !proc->presets().empty())
 	{
@@ -715,6 +717,67 @@ void Lv2ProcView::createRemoteUi()
 
 
 
+void Lv2ProcView::connectRemoteClient()
+{
+	auto* client = m_proc ? m_proc->remoteClient() : nullptr;
+	if (!client)
+	{
+		return;
+	}
+
+	// Lv2ProcView is not a QObject; use the hosting widget as context so the
+	// connections die with the plugin view.
+	QObject::connect(client, &Lv2HostClient::crashed, m_pluginWidget,
+		[this] { onRemoteCrashed(); });
+	QObject::connect(client, &Lv2HostClient::uiClosed, m_pluginWidget,
+		[this] { onRemoteUiClosed(); });
+}
+
+
+
+
+void Lv2ProcView::onRemoteCrashed()
+{
+	m_remoteCrashed = true;
+	destroyUi();
+	updateToggleButton();
+}
+
+
+
+
+void Lv2ProcView::onRemoteUiClosed()
+{
+	m_uiVisible = false;
+	updateToggleButton();
+}
+
+
+
+
+void Lv2ProcView::reloadPlugin()
+{
+	if (!m_proc)
+	{
+		return;
+	}
+
+	const bool wasVisible = m_uiVisible;
+	destroyUi();
+	m_remoteCrashed = false;
+	m_proc->reload();
+	connectRemoteClient();
+
+	if (wasVisible)
+	{
+		createUi();
+	}
+	updateToggleButton();
+}
+
+
+
+
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
@@ -1216,6 +1279,16 @@ void Lv2ProcView::updateToggleButton()
 	{
 		return;
 	}
+	if (m_remoteCrashed)
+	{
+		m_toggleUIButton->setEnabled(false);
+		m_toggleUIButton->setText(QObject::tr("Plugin crashed"));
+		m_toggleUIButton->setToolTip(QObject::tr(
+			"Use Reload Plugin to recreate the isolated host"));
+		return;
+	}
+	m_toggleUIButton->setEnabled(true);
+	m_toggleUIButton->setText(QObject::tr("Show GUI"));
 	QSignalBlocker blocker(m_toggleUIButton);
 	m_toggleUIButton->setChecked(m_uiVisible);
 }

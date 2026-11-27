@@ -101,6 +101,10 @@ private:
 	bool hasPluginUi() const;
 	void createUi();
 	void createRemoteUi();
+	void connectRemoteClient();
+	void reloadPlugin();
+	void onRemoteCrashed();
+	void onRemoteUiClosed();
 	void destroyUi();
 	void setUiVisible(bool visible);
 	void updateUi();
@@ -123,6 +127,8 @@ private:
 	// Used by both the in-process and the remote UI paths.
 	QTimer* m_uiTimer = nullptr;
 	bool m_uiVisible = false;
+	//! The isolated host of this view crashed and needs a reload
+	bool m_remoteCrashed = false;
 
 #ifdef LMMS_HAVE_SUIL
 	SuilHost* m_uiHost = nullptr;

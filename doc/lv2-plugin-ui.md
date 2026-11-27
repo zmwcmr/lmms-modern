@@ -22,6 +22,11 @@ Embedding the UI in an MDI subwindow was removed. The installed plugin UIs take
 RemoteLv2 will place both in a host child and keep the separate window. A saved
 `embedded` or `auto` value is treated as "open in a separate window".
 
+The plugin instance and its UI run in the `lmms-lv2-host` child process by
+default on Linux. `LMMS_LV2_INPROCESS=1` forces the old in-process path, and
+`LMMS_LV2_REMOTE=0` disables the isolated host (useful when the helper
+executable cannot be installed).
+
 Environment overrides:
 
 - `LMMS_DISABLE_LV2_UI=1` disables all LV2 UIs.

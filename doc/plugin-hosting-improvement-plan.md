@@ -328,36 +328,35 @@ window-ID or XEmbed work.
 
 Tasks:
 
-- [ ] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
+- [x] Implement `lmms-lv2-host`: instantiate the plugin, provide map/unmap,
       options, worker and state features, run ports and atom events.
-- [ ] Implement `Lv2HostClient` on the VST2 remote transport: control channel,
+- [x] Implement `Lv2HostClient` on the VST2 remote transport: control channel,
       shared audio/MIDI/control segment, block handshake, `QProcess` watcher.
-- [ ] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
+- [x] Reuse the VST2 lifecycle rules: `PR_SET_PDEATHSIG`, instantiate timeout,
       watchdog, crash notification, reload.
-- [ ] Create the suil UI in the child and show it as a top-level X11 window;
+- [x] Create the suil UI in the child and show it as a top-level X11 window;
       forward geometry, visibility, close, `ui:scaleFactor` and idle. Wayland
       uses an XWayland window, as today.
 - [x] Exchange state and factory presets over the filesystem.
-- [ ] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`; it also uses a
-      separate window because embedding is gone.
-- [ ] Demote the `pluginUiIsUnstable()` list once the child path is the default.
-- [ ] Add fake test plugins that crash in UI and in DSP.
-- Current status: the transport and the DSP step landed. `lmms-lv2-host`
-  starts, connects over the `RemotePluginBase` transport, instantiates the
-  plugin with lilv, reports ports, applies control values and processes audio
-  through the shared stereo segment. `Lv2HostClientTest` covers the echo,
-  `kill -9` of the child, and bit-level comparison with an in-process instance
-  of a fake gain plugin, and MIDI events are forwarded to and from the first
-  atom input/output pair. With `LMMS_LV2_REMOTE=1` the UI also moves into the
-  child (window, parent XID, instance/data access, scale, resize, idle, WM
-  close). DrumGizmo renders at 750x740 and ZynAddSubFX (DPF/OpenGL) at
-  1181x659; DPF UIs need the child to push the control values on every idle
-  tick, otherwise they stay blank. State and factory presets round-trip
-  through the child (base64 project format unchanged). The remote UI matrix
-  (DrumGizmo, ZynAddSubFX, OB-Xf, Pianoteq 8 STAGE, sfizz, Surge XT) matches
-  the in-process sizes and renders, and `Lv2HostClientTest` passes under
-  AddressSanitizer. Only the reload UX, the default flip and the packaging
-  check remain; only the first two audio ports are routed.
+- [x] Keep the in-process path behind `LMMS_LV2_INPROCESS=1`; it also uses a
+      separate window because embedding is gone. The isolated host is the
+      default on Linux since the reload/crash UX landed.
+- [x] Demote the `pluginUiIsUnstable()` list once the child path is the default.
+      The list is empty.
+- [ ] Add fake test plugins that crash in UI and in DSP (tracked by P6.6).
+- Current status: complete and enabled by default on Linux. `lmms-lv2-host`
+  runs the DSP and the UI in one child, and the host talks to it over the
+  `RemotePluginBase` transport with a stereo shared segment, MIDI events,
+  control values, latency, LV2 state and factory presets. The UI opens in the
+  child's own X11 window; a crash closes the window and enables **Reload
+  Plugin**, which recreates the instance. `LMMS_LV2_INPROCESS=1` forces the
+  old in-process path and `LMMS_LV2_REMOTE=0` disables the isolated host if it
+  cannot start. The audit matrix (DrumGizmo, ZynAddSubFX, OB-Xf, Pianoteq 8
+  STAGE, sfizz, Surge XT) matches the in-process sizes and renders;
+  `Lv2HostClientTest` passes under AddressSanitizer. `cmake --install` places
+  `lmms-lv2-host` next to the plugin modules. Remaining: only the first two
+  audio ports are routed, UI atom events are not forwarded, and the fake
+  crashing plugins still belong to P6.6.
 - Acceptance: audio parity with the in-process path, PDC unchanged, project
   save/load round trip, `kill -9` of the child leaves LMMS alive, every audited
   plugin opens its UI in the child, and a UI crash only takes the child down.

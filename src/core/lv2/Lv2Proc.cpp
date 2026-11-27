@@ -74,10 +74,26 @@ namespace
 {
 bool lv2RemoteMode()
 {
+	// The isolated host is the default on Linux; the old in-process path
+	// stays available for debugging and as an escape hatch.
 	if (qEnvironmentVariableIsSet("LMMS_LV2_INPROCESS"))
 	{
 		return false;
 	}
+	const QByteArray value = qgetenv("LMMS_LV2_REMOTE");
+	if (!value.isEmpty())
+	{
+		return value != "0";
+	}
+#ifdef LMMS_BUILD_LINUX
+	return true;
+#else
+	return false;
+#endif
+}
+
+bool lv2RemoteExplicitlyRequested()
+{
 	const QByteArray value = qgetenv("LMMS_LV2_REMOTE");
 	return !value.isEmpty() && value != "0";
 }
@@ -261,13 +277,21 @@ class Lv2ProcSuspender : NoCopyNoMove
 public:
 	Lv2ProcSuspender(Lv2Proc* proc)
 		: m_proc(proc)
-		, m_wasActive(proc->m_instance)
+		, m_wasActive(proc->m_instance != nullptr || proc->m_remote != nullptr)
 	{
 		if (m_wasActive) { m_proc->shutdownPlugin(); }
 	}
 	~Lv2ProcSuspender()
 	{
-		if (m_wasActive) { m_proc->initPlugin(); }
+		if (!m_wasActive) { return; }
+		try
+		{
+			m_proc->initPlugin();
+		}
+		catch (const std::exception& error)
+		{
+			qCritical() << "Could not reinitialize the LV2 plugin:" << error.what();
+		}
 	}
 private:
 	Lv2Proc* const m_proc;
@@ -313,7 +337,11 @@ Lv2Proc::~Lv2Proc()
 
 
 
-void Lv2Proc::reload() { Lv2ProcSuspender(this); }
+void Lv2Proc::reload()
+{
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+	Lv2ProcSuspender suspender(this);
+}
 
 
 
@@ -1424,8 +1452,15 @@ void Lv2Proc::initPlugin()
 {
 	if (lv2RemoteMode())
 	{
-		startRemote();
-		return;
+		if (startRemote())
+		{
+			return;
+		}
+		if (lv2RemoteExplicitlyRequested())
+		{
+			throw std::runtime_error("Failed to create remote Lv2 processor");
+		}
+		qWarning() << "Falling back to the in-process LV2 host";
 	}
 
 	m_features.initCommon();
@@ -1480,7 +1515,7 @@ void Lv2Proc::initPlugin()
 
 
 
-void Lv2Proc::startRemote()
+bool Lv2Proc::startRemote()
 {
 	m_remote = std::make_unique<Lv2HostClient>();
 	const QString uri = QString::fromUtf8(pluginUri());
@@ -1491,7 +1526,7 @@ void Lv2Proc::startRemote()
 		qCritical() << "Could not start the isolated LV2 host for" << uri
 			<< ":" << m_remote->errorString();
 		m_remote.reset();
-		throw std::runtime_error("Failed to create remote Lv2 processor");
+		return false;
 	}
 	if (m_remote->ports().size() != m_ports.size())
 	{
@@ -1501,6 +1536,7 @@ void Lv2Proc::startRemote()
 	}
 	m_lastRemoteControl.assign(m_ports.size(),
 		std::numeric_limits<float>::quiet_NaN());
+	return true;
 }
 
 

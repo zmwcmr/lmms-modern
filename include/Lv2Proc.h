@@ -324,7 +324,7 @@ private:
 	//! Last control values sent to the child; NaN forces the first send
 	std::vector<float> m_lastRemoteControl;
 
-	void startRemote();
+	bool startRemote();
 	void runRemote(f_cnt_t frames);
 	void copyModelsToRemote();
 	void saveStateRemote(QDomDocument& doc, QDomElement& that);
