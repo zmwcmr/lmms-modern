@@ -208,6 +208,21 @@ bool isValidTextToolBinding(const QKeySequence& sequence, bool preserveModifiedR
 		&& (modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
 }
 
+bool isValidSongTimelineBinding(const QKeySequence& sequence)
+{
+	if (sequence == QKeySequence(Qt::Key_Left) || sequence == QKeySequence(Qt::Key_Right)
+		|| sequence == QKeySequence(Qt::Key_Home)) { return true; }
+	if (!isValidTextToolBinding(sequence)) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	return !(modifiers & Qt::ControlModifier) || (key != Qt::Key_A && key != Qt::Key_0);
+}
+
 const auto notesAlignCenter = QStringLiteral("notes_align_center");
 const auto defaultNotesAlignCenter = keySequence(Qt::CTRL, Qt::Key_E);
 
@@ -218,11 +233,23 @@ QList<QKeySequence> effectiveNotesShortcuts()
 	return shortcuts.values();
 }
 
+QList<QKeySequence> effectiveSongTimelineShortcuts()
+{
+	const auto shortcuts = songTimelineShortcuts();
+	return {shortcuts.previousBar, shortcuts.nextBar, shortcuts.start};
+}
+
+QList<QKeySequence> reservedForNavigation()
+{
+	return reservedDefaults() + windowLayoutShortcuts().values() + rackReorderShortcuts().values()
+		+ fileBrowserShortcuts().values() + effectiveNotesShortcuts() + effectiveTransportShortcuts();
+}
+
 QList<QKeySequence> reservedForEditors()
 {
 	return defaultShortcuts(windowPrefix).values() + menuDefaults().values() + effectiveTransportShortcuts()
 		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
-		+ effectiveNotesShortcuts();
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values();
 }
 
 QMap<QString, QKeySequence> editorShortcuts(const QString& prefix)
@@ -310,6 +337,70 @@ TransportShortcuts::Action TransportShortcuts::match(const QKeyEvent& event) con
 	return Action::None;
 }
 
+SongTimelineShortcuts songTimelineShortcuts()
+{
+	const auto previous = QStringLiteral("song_previous_bar");
+	const auto next = QStringLiteral("song_next_bar");
+	const auto start = QStringLiteral("song_go_to_start");
+	const auto shortcuts = resolveShortcuts({
+		{previous, QKeySequence(Qt::Key_Left)}, {next, QKeySequence(Qt::Key_Right)}, {start, QKeySequence(Qt::Key_Home)},
+	}, reservedForNavigation(), isValidSongTimelineBinding);
+	return {shortcuts.value(previous), shortcuts.value(next), shortcuts.value(start)};
+}
+
+SongTimelineShortcuts::Action SongTimelineShortcuts::match(const QKeyEvent& event) const
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	const QKeySequence bareKey(event.key());
+	const auto matches = [&pressed, &bareKey](const QKeySequence& binding, Qt::Key defaultKey)
+	{
+		return pressed == binding || (bareKey == binding && binding == QKeySequence(defaultKey));
+	};
+	if (matches(previousBar, Qt::Key_Left)) { return Action::PreviousBar; }
+	if (matches(nextBar, Qt::Key_Right)) { return Action::NextBar; }
+	if (matches(start, Qt::Key_Home)) { return Action::Start; }
+	return Action::None;
+}
+
+QMap<Qt::Key, QKeySequence> automationNavigationShortcuts()
+{
+	const QMap<Qt::Key, QString> actions{
+		{Qt::Key_Up, QStringLiteral("automation_nav_up")},
+		{Qt::Key_Down, QStringLiteral("automation_nav_down")},
+		{Qt::Key_Left, QStringLiteral("automation_nav_left")},
+		{Qt::Key_Right, QStringLiteral("automation_nav_right")},
+		{Qt::Key_Home, QStringLiteral("automation_nav_start")},
+	};
+	QMap<QString, QKeySequence> defaults;
+	for (auto action = actions.cbegin(); action != actions.cend(); ++action)
+	{
+		defaults.insert(action.value(), QKeySequence(action.key()));
+	}
+	const auto resolved = resolveShortcuts(defaults, reservedForNavigation(), [&defaults](const QKeySequence& sequence)
+	{
+		return defaults.key(sequence) != QString{} || isValidTextToolBinding(sequence);
+	});
+	QMap<Qt::Key, QKeySequence> shortcuts;
+	for (auto action = actions.cbegin(); action != actions.cend(); ++action)
+	{
+		shortcuts.insert(action.key(), resolved.value(action.value()));
+	}
+	return shortcuts;
+}
+
+Qt::Key matchAutomationNavigation(const QMap<Qt::Key, QKeySequence>& shortcuts, const QKeyEvent& event)
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	for (auto shortcut = shortcuts.cbegin(); shortcut != shortcuts.cend(); ++shortcut)
+	{
+		if (pressed == shortcut.value() || (event.key() == shortcut.key() && shortcut.value() == QKeySequence(shortcut.key())))
+		{
+			return shortcut.key();
+		}
+	}
+	return Qt::Key_unknown;
+}
+
 QMap<QString, QKeySequence> patternNavigationShortcuts()
 {
 	return resolveShortcuts(defaultShortcuts(patternPrefix), reservedForEditors() + effectiveEditorShortcuts());
@@ -320,7 +411,7 @@ QMap<QString, QKeySequence> windowToggleShortcuts(const QList<QKeySequence>& res
 	return resolveShortcuts(defaultShortcuts(windowPrefix),
 		reserved + effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
 		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
-		+ effectiveNotesShortcuts());
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values());
 }
 
 QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserved)
@@ -328,7 +419,7 @@ QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserve
 	return resolveShortcuts(menuDefaults(), reserved + defaultShortcuts(windowPrefix).values()
 		+ effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
 		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
-		+ effectiveNotesShortcuts());
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values());
 }
 
 void bindEditorShortcuts(QWidget& editor,

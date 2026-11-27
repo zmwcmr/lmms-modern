@@ -51,6 +51,7 @@
 #include "ConfigManager.h"
 #include "CPULoadWidget.h"
 #include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "GuiApplication.h"
 #include "LcdSpinBox.h"
@@ -578,6 +579,9 @@ void SongEditor::toggleProportionalSnap()
 
 void SongEditor::keyPressEvent( QKeyEvent * ke )
 {
+	using TimelineAction = SongTimelineShortcuts::Action;
+	static const auto timelineShortcuts = songTimelineShortcuts();
+	const auto timelineAction = timelineShortcuts.match(*ke);
 	bool isShiftPressed = ke->modifiers() & Qt::ShiftModifier;
 	if( isShiftPressed &&
 						( ke->key() == Qt::Key_Insert || ke->key() == Qt::Key_Enter || ke->key() == Qt::Key_Return ) )
@@ -589,7 +593,7 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 	{
 		m_song->removeBar();
 	}
-	else if( ke->key() == Qt::Key_Left )
+	else if (timelineAction == TimelineAction::PreviousBar)
 	{
 		tick_t t = m_song->getPlayPos(Song::PlayMode::Song).getTicks() - TimePos::ticksPerBar();
 		if( t >= 0 )
@@ -597,8 +601,9 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 			m_song->setPlayPos( t, Song::PlayMode::Song );
 			if (!m_song->isPlaying()) { m_song->setPlayPos(t, Song::PlayMode::None); }
 		}
+		ke->accept();
 	}
-	else if( ke->key() == Qt::Key_Right )
+	else if (timelineAction == TimelineAction::NextBar)
 	{
 		tick_t t = m_song->getPlayPos(Song::PlayMode::Song).getTicks() + TimePos::ticksPerBar();
 		if( t < MaxSongLength )
@@ -606,11 +611,13 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 			m_song->setPlayPos( t, Song::PlayMode::Song );
 			if (!m_song->isPlaying()) { m_song->setPlayPos(t, Song::PlayMode::None); }
 		}
+		ke->accept();
 	}
-	else if( ke->key() == Qt::Key_Home )
+	else if (timelineAction == TimelineAction::Start)
 	{
 		m_song->setPlayPos( 0, Song::PlayMode::Song );
 		if (!m_song->isPlaying()) { m_song->setPlayPos(0, Song::PlayMode::None); }
+		ke->accept();
 	}
 	else if( ke->key() == Qt::Key_Delete || ke->key() == Qt::Key_Backspace )
 	{

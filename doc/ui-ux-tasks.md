@@ -162,7 +162,15 @@ LCD 在 Linux Qt 5 离屏环境的 100%、125%、150%、200% 缩放下通过布�
 
 第十批覆盖项目笔记的粗体、斜体、下划线和四种段落对齐（`notes_bold`、`notes_italic`、`notes_underline`、`notes_align_left`、`notes_align_center`、`notes_align_right`、`notes_align_justify`）。例如 `<shortcuts notes_bold="F7" notes_align_center="F9"/>`。可改绑单段功能键或带 Ctrl、Alt、Meta 的字母数字键。撤销、重做、剪切、复制、粘贴和全选的标准键保留给文本编辑。为避免拦截默认项目导出键 `Ctrl+E`，居中快捷键需改绑后才注册到笔记文本框。已在原生 Wayland 窗口中用 Qt 事件验证粗体、右对齐、改绑后的居中以及剪贴板和撤销/重做。
 
-省略属性、留空或填写无效值会保留该动作的默认键。重复或前缀冲突会让对应组使用整组默认键并记录警告。自定义键冲突时，依次解析项目笔记、文件浏览器、条目排序、窗口布局、播放控制、录音、钢琴卷帘与自动化编辑器、Pattern 切换、文件/编辑菜单及窗口切换。钢琴卷帘和自动化编辑器仍可复用同一键，按焦点触发。方向键、Home 和删除键等直接处理的按键尚未迁移，配置时需避开。
+第十一批覆盖歌曲编辑器的时间线导航：上一小节（`song_previous_bar`，默认 `Left`）、下一小节（`song_next_bar`，默认 `Right`）、回到开头（`song_go_to_start`，默认 `Home`）。例如 `<shortcuts song_previous_bar="Alt+F7" song_next_bar="Alt+F8" song_go_to_start="Alt+F9"/>`。只在歌曲编辑器处理按键时触发；单段功能键或带 Ctrl、Alt、Meta 的字母数字键可改绑，保留选择片段、重置缩放、插入和删除小节的操作。
+
+原生 Wayland 窗口的 Qt 事件测试覆盖了默认键、自定义键、开头边界、停止时的播放头同步，以及文本框和主窗口不触发歌曲导航。
+
+第十二批覆盖自动化编辑器的导航：`automation_nav_up`、`automation_nav_down`、`automation_nav_left`、`automation_nav_right` 和 `automation_nav_start`。默认仍为方向键与 `Home`，例如 `<shortcuts automation_nav_right="Alt+F8" automation_nav_start="Alt+F9"/>`。上下滚动的步长和左右移动的 16 tick 不变；与歌曲导航可共用同一组合键，按焦点触发。
+
+原生 Wayland 窗口的 Qt 事件测试覆盖了五个动作的默认键和改绑、归零边界、浏览步长，以及与歌曲导航共用组合键时不移动歌曲播放头。
+
+省略属性、留空或填写无效值会保留该动作的默认键。重复或前缀冲突会让对应组使用整组默认键并记录警告。自定义键冲突时，依次解析项目笔记、文件浏览器、条目排序、窗口布局、播放控制、录音、歌曲与自动化导航、钢琴卷帘与自动化编辑工具、Pattern 切换、文件/编辑菜单及窗口切换。钢琴卷帘和自动化编辑器仍可复用同一编辑工具键，按焦点触发。钢琴卷帘的直接导航键以及删除键尚未迁移，配置时需避开。
 
 ---
 

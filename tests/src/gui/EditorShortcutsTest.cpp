@@ -14,12 +14,16 @@
 #include "ToolButton.h"
 
 using lmms::ConfigManager;
+using lmms::gui::automationNavigationShortcuts;
 using lmms::gui::bindEditorShortcuts;
 using lmms::gui::fileBrowserShortcuts;
 using lmms::gui::mainMenuShortcuts;
+using lmms::gui::matchAutomationNavigation;
 using lmms::gui::patternNavigationShortcuts;
 using lmms::gui::projectNotesShortcuts;
 using lmms::gui::rackReorderShortcuts;
+using lmms::gui::SongTimelineShortcuts;
+using lmms::gui::songTimelineShortcuts;
 using lmms::gui::TransportShortcuts;
 using lmms::gui::transportShortcuts;
 using lmms::gui::windowLayoutShortcuts;
@@ -36,10 +40,80 @@ private slots:
 			"file_save", "pattern_next", "transport_play_stop", "transport_pause", "layout_fullscreen",
 			"layout_maximize_editor", "layout_detach_all", "layout_attach_all", "transport_record",
 			"transport_record_accompany", "transport_record_step", "rack_move_up", "rack_move_down",
-			"browser_search", "browser_refresh", "notes_bold", "notes_align_center"})
+			"browser_search", "browser_refresh", "notes_bold", "notes_align_center",
+			"song_previous_bar", "song_next_bar", "song_go_to_start", "automation_nav_up", "automation_nav_right",
+			"automation_nav_start"})
 		{
 			ConfigManager::inst()->deleteValue("shortcuts", id);
 		}
+	}
+
+	void resolvesAutomationNavigationShortcuts()
+	{
+		const auto defaults = automationNavigationShortcuts();
+		QCOMPARE(defaults.size(), 5);
+		for (const auto key : {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right, Qt::Key_Home})
+		{
+			QCOMPARE(defaults.value(key), QKeySequence(key));
+			QCOMPARE(matchAutomationNavigation(defaults, QKeyEvent(QEvent::KeyPress, key, Qt::ShiftModifier)), key);
+		}
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "automation_nav_right", "Alt+F7");
+		config->setValue("shortcuts", "song_previous_bar", "Alt+F7");
+		const auto shortcuts = automationNavigationShortcuts();
+		QCOMPARE(shortcuts.value(Qt::Key_Right), QKeySequence("Alt+F7"));
+		QCOMPARE(songTimelineShortcuts().previousBar, shortcuts.value(Qt::Key_Right));
+		QCOMPARE(matchAutomationNavigation(shortcuts,
+			QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::AltModifier)), Qt::Key_Right);
+		QCOMPARE(matchAutomationNavigation(shortcuts,
+			QKeyEvent(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier)), Qt::Key_unknown);
+
+		config->setValue("shortcuts", "file_save", "Alt+F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		config->setValue("shortcuts", "automation_editor_draw", "Alt+F7");
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"automation_editor_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+
+		for (const auto* invalid : {"Space", "Return", "G", "F8, F9"})
+		{
+			config->setValue("shortcuts", "automation_nav_start", invalid);
+			QCOMPARE(automationNavigationShortcuts(), shortcuts);
+		}
+		config->setValue("shortcuts", "automation_nav_start", "Alt+F7");
+		QCOMPARE(automationNavigationShortcuts(), defaults);
+	}
+
+	void resolvesSongTimelineShortcuts()
+	{
+		using Action = SongTimelineShortcuts::Action;
+		const auto defaults = songTimelineShortcuts();
+		QCOMPARE(defaults.previousBar, QKeySequence(Qt::Key_Left));
+		QCOMPARE(defaults.nextBar, QKeySequence(Qt::Key_Right));
+		QCOMPARE(defaults.start, QKeySequence(Qt::Key_Home));
+		QCOMPARE(defaults.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Left, Qt::ShiftModifier)), Action::PreviousBar);
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "song_previous_bar", "Alt+F7");
+		config->setValue("shortcuts", "song_next_bar", "Alt+F8");
+		const auto custom = songTimelineShortcuts();
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::AltModifier)), Action::PreviousBar);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier)), Action::None);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier)), Action::None);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Home, Qt::NoModifier)), Action::Start);
+
+		config->setValue("shortcuts", "file_save", "Alt+F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		for (const auto* unsafe : {"Space", "Delete", "Ctrl+Alt+A", "Ctrl+0", "F7, F8"})
+		{
+			config->setValue("shortcuts", "song_go_to_start", unsafe);
+			QCOMPARE(songTimelineShortcuts().start, defaults.start);
+			QCOMPARE(songTimelineShortcuts().previousBar, custom.previousBar);
+		}
+		config->setValue("shortcuts", "song_go_to_start", "Alt+F8");
+		QCOMPARE(songTimelineShortcuts().previousBar, defaults.previousBar);
 	}
 
 	void resolvesProjectNotesFormatting()

@@ -29,6 +29,20 @@ struct TransportShortcuts
 
 TransportShortcuts transportShortcuts();
 
+struct SongTimelineShortcuts
+{
+	enum class Action { None, PreviousBar, NextBar, Start };
+	QKeySequence previousBar;
+	QKeySequence nextBar;
+	QKeySequence start;
+	Action match(const QKeyEvent& event) const;
+};
+
+SongTimelineShortcuts songTimelineShortcuts();
+
+QMap<Qt::Key, QKeySequence> automationNavigationShortcuts();
+Qt::Key matchAutomationNavigation(const QMap<Qt::Key, QKeySequence>& shortcuts, const QKeyEvent& event);
+
 void bindEditorShortcuts(QWidget& editor,
 	std::initializer_list<std::pair<QString, QAction*>> actions);
 

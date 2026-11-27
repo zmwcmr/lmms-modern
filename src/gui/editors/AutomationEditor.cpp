@@ -253,7 +253,8 @@ void AutomationEditor::update()
 
 void AutomationEditor::keyPressEvent(QKeyEvent * ke )
 {
-	switch( ke->key() )
+	static const auto shortcuts = automationNavigationShortcuts();
+	switch (matchAutomationNavigation(shortcuts, *ke))
 	{
 		case Qt::Key_Up:
 			m_topBottomScroll->setValue(
