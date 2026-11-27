@@ -87,6 +87,16 @@ public:
 		return m_awake;
 	}
 
+	//! Optional sidechain input for this effect, owned by the caller.
+	void setSidechainBuffer(const AudioBuffer* buffer)
+	{
+		m_sidechainBuffer = buffer;
+	}
+	const AudioBuffer* sidechainBuffer() const
+	{
+		return m_sidechainBuffer;
+	}
+
 	inline bool isEnabled() const
 	{
 		return m_enabledModel.value();
@@ -196,6 +206,7 @@ private:
 
 
 	EffectChain * m_parent;
+	const AudioBuffer* m_sidechainBuffer = nullptr;
 
 	bool m_okay;
 	bool m_noRun;

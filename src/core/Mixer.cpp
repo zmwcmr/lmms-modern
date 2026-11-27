@@ -103,6 +103,32 @@ MixerChannel::~MixerChannel()
 }
 
 
+
+
+void MixerChannel::setSidechainSource(MixerChannel* source)
+{
+	if (m_sidechainSource == source)
+	{
+		return;
+	}
+	if (m_sidechainSource != nullptr)
+	{
+		auto& receivers = m_sidechainSource->m_sidechainReceivers;
+		receivers.erase(std::remove(receivers.begin(), receivers.end(), this),
+			receivers.end());
+	}
+	m_sidechainSource = source;
+	if (source != nullptr)
+	{
+		auto& receivers = source->m_sidechainReceivers;
+		if (std::find(receivers.begin(), receivers.end(), this) == receivers.end())
+		{
+			receivers.push_back(this);
+		}
+	}
+}
+
+
 inline void MixerChannel::processed()
 {
 	for( const MixerRoute * receiverRoute : m_sends )
@@ -112,12 +138,19 @@ inline void MixerChannel::processed()
 			receiverRoute->receiver()->incrementDeps();
 		}
 	}
+	for (MixerChannel* receiver : m_sidechainReceivers)
+	{
+		if (!receiver->m_muted)
+		{
+			receiver->incrementDeps();
+		}
+	}
 }
 
 void MixerChannel::incrementDeps()
 {
 	const auto i = m_dependenciesMet++ + 1;
-	if( i >= m_receives.size() && ! m_queued )
+	if( i >= dependencyCount() && ! m_queued )
 	{
 		m_queued = true;
 		AudioEngineWorkerThread::addJob( this );
@@ -248,6 +281,8 @@ void MixerChannel::doProcessing()
 
 		const float v = m_volumeModel.value();
 
+		m_fxChain.setSidechainBuffer(
+			m_sidechainSource != nullptr ? &m_sidechainSource->m_buffer : nullptr);
 		m_stillRunning = m_fxChain.processAudioBuffer(m_buffer);
 
 		const auto peakSamples = SampleFrame{m_buffer.absPeakValue(0), m_buffer.absPeakValue(1)};
@@ -332,6 +367,57 @@ void Mixer::deactivateSolo()
 		m_mixerChannels[i]->m_muteModel.setValue( m_mixerChannels[i]->m_muteBeforeSolo );
 	}
 }
+
+bool Mixer::setChannelSidechain(int channel, int source)
+{
+	if (channel < 0 || static_cast<std::size_t>(channel) >= m_mixerChannels.size())
+	{
+		return false;
+	}
+	if (source < -1 || (source >= 0
+		&& static_cast<std::size_t>(source) >= m_mixerChannels.size()))
+	{
+		return false;
+	}
+	if (source == channel || source == 0)
+	{
+		// Self-routing and the master channel as a source are not useful.
+		return false;
+	}
+
+	MixerChannel* target = m_mixerChannels[channel];
+	MixerChannel* sourceChannel = source >= 0 ? m_mixerChannels[source] : nullptr;
+
+	// Reject cycles through the sidechain graph.
+	for (MixerChannel* current = sourceChannel; current != nullptr;
+		current = current->sidechainSource())
+	{
+		if (current == target)
+		{
+			return false;
+		}
+	}
+
+	Engine::audioEngine()->requestChangeInModel();
+	target->setSidechainSource(sourceChannel);
+	Engine::audioEngine()->doneChangeInModel();
+	return true;
+}
+
+
+
+
+int Mixer::channelSidechain(int channel) const
+{
+	if (channel < 0 || static_cast<std::size_t>(channel) >= m_mixerChannels.size())
+	{
+		return -1;
+	}
+	return m_mixerChannels[channel]->sidechainSourceIndex();
+}
+
+
+
 
 void Mixer::toggledSolo()
 {
@@ -418,6 +504,16 @@ void Mixer::deleteChannel( int index )
 	}
 
 	MixerChannel * ch = m_mixerChannels[index];
+
+	// Remove sidechain edges that reference the channel being deleted.
+	ch->setSidechainSource(nullptr);
+	for (MixerChannel* other : m_mixerChannels)
+	{
+		if (other != ch && other->sidechainSource() == ch)
+		{
+			other->setSidechainSource(nullptr);
+		}
+	}
 
 	// delete all of this channel's sends and receives
 	while (!ch->m_sends.empty())
@@ -573,7 +669,7 @@ MixerRoute * Mixer::createRoute( MixerChannel * from, MixerChannel * to, float a
 	to->m_receives.push_back(route);
 
 	// add us to mixer's list
-	Engine::mixer()->m_mixerRoutes.push_back(route);
+	m_mixerRoutes.push_back(route);
 	Engine::audioEngine()->doneChangeInModel();
 
 	return route;
@@ -615,7 +711,7 @@ void Mixer::deleteChannelSend( MixerRoute * route )
 	removeFromMixerRoute(route->receiver()->m_receives);
 
 	// remove us from mixer's list
-	removeFromMixerRoute(Engine::mixer()->m_mixerRoutes);
+	removeFromMixerRoute(m_mixerRoutes);
 
 	delete route;
 	Engine::audioEngine()->doneChangeInModel();
@@ -975,6 +1071,10 @@ void Mixer::saveSettings( QDomDocument & _doc, QDomElement & _this )
 		ch->m_soloModel.saveSettings( _doc, mixch, "soloed" );
 		mixch.setAttribute("num", static_cast<qulonglong>(i));
 		mixch.setAttribute( "name", ch->m_name );
+		if (ch->sidechainSource() != nullptr)
+		{
+			mixch.setAttribute("sidechain", ch->sidechainSource()->index());
+		}
 		if (const auto& color = ch->color()) { mixch.setAttribute("color", color->name()); }
 
 		// add the channel sends
@@ -1015,6 +1115,7 @@ void Mixer::allocateChannelsTo(int num)
 void Mixer::loadSettings( const QDomElement & _this )
 {
 	clear();
+	std::vector<std::pair<int, int>> sidechains;
 	QDomNode node = _this.firstChild();
 
 	while( ! node.isNull() )
@@ -1052,6 +1153,12 @@ void Mixer::loadSettings( const QDomElement & _this )
 		m_mixerChannels[num]->m_fxChain.restoreState( mixch.firstChildElement(
 			m_mixerChannels[num]->m_fxChain.nodeName() ) );
 
+		if (mixch.hasAttribute("sidechain"))
+		{
+			sidechains.emplace_back(num,
+				mixch.attribute("sidechain").toInt());
+		}
+
 		// mixer sends
 		QDomNodeList chData = mixch.childNodes();
 		for (auto i = 0; i < chData.length(); ++i)
@@ -1078,6 +1185,20 @@ void Mixer::loadSettings( const QDomElement & _this )
 
 
 		node = node.nextSibling();
+	}
+
+	for (const auto& [channel, source] : sidechains)
+	{
+		if (source < 0)
+		{
+			continue;
+		}
+		allocateChannelsTo(source);
+		if (!setChannelSidechain(channel, source))
+		{
+			qWarning() << "Ignoring invalid sidechain route" << channel
+				<< "<-" << source;
+		}
 	}
 
 	emit dataChanged();

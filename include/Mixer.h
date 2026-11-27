@@ -75,6 +75,14 @@ public:
 	int index() const { return m_channelIndex; }
 	void setIndex(int index) { m_channelIndex = index; }
 
+	//! Optional sidechain input for this channel's effect chain.
+	void setSidechainSource(MixerChannel* source);
+	MixerChannel* sidechainSource() const { return m_sidechainSource; }
+	int sidechainSourceIndex() const
+	{
+		return m_sidechainSource != nullptr ? m_sidechainSource->index() : -1;
+	}
+
 	//! Sum of the effect-chain latencies on this channel, in samples
 	f_cnt_t latency() const { return m_fxChain.latency(); }
 
@@ -93,9 +101,16 @@ public:
 	void processed();
 
 private:
+	std::size_t dependencyCount() const
+	{
+		return m_receives.size() + (m_sidechainSource != nullptr ? 1 : 0);
+	}
+
 	void doProcessing() override;
 	int m_channelIndex;
 	std::optional<QColor> m_color;
+	MixerChannel* m_sidechainSource = nullptr;
+	std::vector<MixerChannel*> m_sidechainReceivers;
 };
 
 class MixerRoute : public QObject
@@ -210,6 +225,11 @@ public:
 
 	// rename channels when moving etc. if they still have their original name
 	void validateChannelName( int index, int oldIndex );
+
+	//! Route one channel's output into another channel's effect sidechain.
+	//! @param source channel index, or -1 to clear
+	bool setChannelSidechain(int channel, int source);
+	int channelSidechain(int channel) const;
 
 	// check if the index channel receives audio from any other channel
 	// or from any instrument or sample track

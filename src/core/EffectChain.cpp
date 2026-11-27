@@ -196,6 +196,7 @@ bool EffectChain::processAudioBuffer(AudioBuffer& buffer)
 	bool moreEffects = false;
 	for (Effect* effect : m_effects)
 	{
+		effect->setSidechainBuffer(m_sidechainBuffer);
 		moreEffects |= effect->processAudioBuffer(buffer);
 	}
 
@@ -229,6 +230,7 @@ f_cnt_t EffectChain::latency() const
 
 void EffectChain::clear()
 {
+	m_sidechainBuffer = nullptr;
 	emit aboutToClear();
 
 	Engine::audioEngine()->requestChangeInModel();

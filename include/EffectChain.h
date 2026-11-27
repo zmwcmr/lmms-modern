@@ -65,6 +65,16 @@ public:
 	void moveUp( Effect * _effect );
 	bool processAudioBuffer(AudioBuffer& buffer);
 
+	//! Optional sidechain source for the effects in this chain.
+	void setSidechainBuffer(const AudioBuffer* buffer)
+	{
+		m_sidechainBuffer = buffer;
+	}
+	const AudioBuffer* sidechainBuffer() const
+	{
+		return m_sidechainBuffer;
+	}
+
 	//! Sum of the processing latencies of all effects, in samples
 	f_cnt_t latency() const;
 
@@ -76,6 +86,7 @@ private:
 	EffectList m_effects;
 
 	BoolModel m_enabledModel;
+	const AudioBuffer* m_sidechainBuffer = nullptr;
 
 
 	friend class gui::EffectRackView;

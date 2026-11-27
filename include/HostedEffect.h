@@ -95,6 +95,8 @@ private:
 	HostedEffectControls m_controls;
 	std::vector<float> m_inputLeft;
 	std::vector<float> m_inputRight;
+	std::vector<float> m_sidechainLeft;
+	std::vector<float> m_sidechainRight;
 	std::vector<float> m_outputLeft;
 	std::vector<float> m_outputRight;
 };

@@ -29,7 +29,9 @@
 
 #include <vector>
 
+#include "AudioBuffer.h"
 #include "AutomatableModel.h"
+#include "EffectChain.h"
 #include "Engine.h"
 #include "FakePluginHost.h"
 #include "HostedEffect.h"
@@ -37,6 +39,40 @@
 #include "SampleFrame.h"
 
 using namespace lmms;
+
+namespace
+{
+
+class SidechainProbeEffect : public Effect
+{
+public:
+	SidechainProbeEffect() :
+		Effect(&descriptor, nullptr, nullptr)
+	{
+	}
+
+	ProcessStatus processImpl(SampleFrame*, const f_cnt_t) override
+	{
+		m_received = sidechainBuffer();
+		return ProcessStatus::Continue;
+	}
+
+	EffectControls* controls() override { return nullptr; }
+
+	const AudioBuffer* received() const { return m_received; }
+
+	static Plugin::Descriptor descriptor;
+
+private:
+	const AudioBuffer* m_received = nullptr;
+};
+
+Plugin::Descriptor SidechainProbeEffect::descriptor{
+	"sidechainprobe", "Sidechain Probe", "test", "LMMS", 1,
+	Plugin::Type::Effect, nullptr, ""
+};
+
+} // namespace
 
 class HostedEffectTest : public QObject
 {
@@ -83,6 +119,59 @@ private slots:
 		effect.hostedControls().parameterModels().queueChanges(frames);
 		QCOMPARE(hostPtr->m_calls.size(), 1u);
 		QCOMPARE(hostPtr->m_calls[0].id, 7u);
+	}
+
+	void passesSidechainBus()
+	{
+		static const Plugin::Descriptor descriptor{
+			"hostedeffecttest", "Hosted Effect Test", "test", "LMMS", 1,
+			Plugin::Type::Effect, nullptr, ""
+		};
+
+		auto host = std::make_unique<FakePluginHost>();
+		auto* const hostPtr = host.get();
+		hostPtr->m_inputBuses.push_back(PluginBusInfo{
+			QStringLiteral("Sidechain"), 2, true,
+			PluginBusRole::Sidechain, true });
+		HostedEffect effect(&descriptor, nullptr, nullptr, std::move(host));
+		effect.initializeModels();
+
+		constexpr f_cnt_t frames = 64;
+		AudioBuffer sidechain(frames, 2);
+		auto sideView = sidechain.groupBuffers(0);
+		for (ch_cnt_t channel = 0; channel < 2; ++channel)
+		{
+			std::fill(sideView.buffer(channel).begin(),
+				sideView.buffer(channel).end(), 0.25f);
+		}
+		effect.setSidechainBuffer(&sidechain);
+
+		std::vector<SampleFrame> buffer(
+			static_cast<std::size_t>(frames), SampleFrame(1.0f));
+		effect.processImpl(buffer.data(), frames);
+		QCOMPARE(hostPtr->m_lastInputBusCount, 2);
+		QCOMPARE(hostPtr->m_lastSidechainSample, 0.25f);
+	}
+
+	void effectChainDeliversSidechain()
+	{
+		EffectChain chain(nullptr);
+		auto* const probe = new SidechainProbeEffect();
+		chain.appendEffect(probe);
+
+		AudioBuffer main(64, 2);
+		main.allocateInterleavedBuffer();
+		auto mainView = main.groupBuffers(0);
+		for (ch_cnt_t channel = 0; channel < 2; ++channel)
+		{
+			std::fill(mainView.buffer(channel).begin(),
+				mainView.buffer(channel).end(), 1.0f);
+		}
+		main.updateAllSilenceFlags();
+		AudioBuffer sidechain(64, 2);
+		chain.setSidechainBuffer(&sidechain);
+		QVERIFY(chain.processAudioBuffer(main));
+		QCOMPARE(probe->received(), &sidechain);
 	}
 
 	void roundTripsState()

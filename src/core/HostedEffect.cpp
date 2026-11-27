@@ -28,6 +28,8 @@
 
 #include <QDomElement>
 
+#include "AudioBuffer.h"
+
 namespace lmms
 {
 
@@ -138,6 +140,8 @@ Effect::ProcessStatus HostedEffect::processImpl(
 	const auto count = static_cast<std::size_t>(frames);
 	m_inputLeft.resize(count);
 	m_inputRight.resize(count);
+	m_sidechainLeft.resize(count);
+	m_sidechainRight.resize(count);
 	m_outputLeft.resize(count);
 	m_outputRight.resize(count);
 
@@ -145,20 +149,51 @@ Effect::ProcessStatus HostedEffect::processImpl(
 	{
 		m_inputLeft[frame] = buffer[frame][0];
 		m_inputRight[frame] = buffer[frame][1];
+		m_sidechainLeft[frame] = 0.0f;
+		m_sidechainRight[frame] = 0.0f;
 		m_outputLeft[frame] = 0.0f;
 		m_outputRight[frame] = 0.0f;
+	}
+
+	if (const auto* sidechain = sidechainBuffer();
+		sidechain != nullptr && sidechain->frames() >= frames)
+	{
+		const auto group = sidechain->groupBuffers(0);
+		if (group.channels() > 0)
+		{
+			std::copy_n(group.buffer(0).data(), count, m_sidechainLeft.begin());
+		}
+		if (group.channels() > 1)
+		{
+			std::copy_n(group.buffer(1).data(), count, m_sidechainRight.begin());
+		}
+		else
+		{
+			std::copy(m_sidechainLeft.begin(), m_sidechainLeft.end(),
+				m_sidechainRight.begin());
+		}
 	}
 
 	m_controls.parameterModels().queueChanges(frames);
 
 	float* inputs[2] = { m_inputLeft.data(), m_inputRight.data() };
+	float* sidechain[2] = { m_sidechainLeft.data(), m_sidechainRight.data() };
 	float* outputs[2] = { m_outputLeft.data(), m_outputRight.data() };
+	PluginBusBlock inputBuses[2] = {
+		PluginBusBlock{ inputs, 2 },
+		PluginBusBlock{ sidechain, 2 },
+	};
 	PluginProcessBlock block;
 	block.inputs = inputs;
 	block.outputs = outputs;
 	block.inputChannels = 2;
 	block.outputChannels = 2;
 	block.frames = frames;
+	if (m_host->inputBuses().size() > 1)
+	{
+		block.inputBuses = inputBuses;
+		block.inputBusCount = 2;
+	}
 
 	if (!m_host->process(block))
 	{
