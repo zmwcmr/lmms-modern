@@ -1,12 +1,11 @@
 # RemoteLv2 process isolation design (P6.4)
 
-Status: design document. The transport, the DSP step, MIDI/atom forwarding and
-the child-hosted UI and state/preset exchange are implemented behind
-`LMMS_LV2_REMOTE=1`: the child instantiates the plugin, reports its ports,
-applies control values, runs the audio, forwards MIDI events, owns the UI
-window and saves/restores LV2 state through the filesystem. The in-process
-path remains the default until the packaging check is done. The UI always uses
-a separate X11 window.
+Status: implemented and enabled by default on Linux. The child instantiates
+the plugin, reports its ports, applies control values, runs the audio, forwards
+MIDI events, owns the UI window and saves/restores LV2 state through the
+filesystem. `LMMS_LV2_INPROCESS=1` forces the old in-process path;
+`LMMS_LV2_REMOTE=0` disables the isolated host when the helper executable
+cannot be used. The UI always uses a separate X11 window.
 
 ## Goal
 
