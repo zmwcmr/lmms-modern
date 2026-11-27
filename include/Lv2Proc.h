@@ -327,6 +327,8 @@ private:
 	bool startRemote();
 	void runRemote(f_cnt_t frames);
 	void copyModelsToRemote();
+	//! Push the current control-port values to the child (called with m_stateMutex held)
+	void pushRemoteControlValues();
 	void saveStateRemote(QDomDocument& doc, QDomElement& that);
 	void loadStateRemote(const QDomElement& that);
 	void applyRemoteControlValues();
