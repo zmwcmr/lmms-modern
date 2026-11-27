@@ -1054,8 +1054,8 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 
 	// Set up buttons
 	setTransportToolTips(tr("Play song"), tr("Stop song"));
-	m_recordAction->setToolTip(tr("Record samples from Audio-device"));
-	m_recordAccompanyAction->setToolTip(tr("Record samples from Audio-device while playing song or pattern track"));
+	setRecordingToolTips(tr("Record samples from Audio-device"),
+		tr("Record samples from Audio-device while playing song or pattern track"));
 
 	auto addTransportButton = [songToolBar](QAction* action, const char* name) {
 		songToolBar->addAction(action);

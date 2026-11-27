@@ -19,6 +19,9 @@ namespace
 {
 const auto transportPlayStop = QStringLiteral("transport_play_stop");
 const auto transportPause = QStringLiteral("transport_pause");
+const auto transportRecord = QStringLiteral("transport_record");
+const auto transportRecordAccompany = QStringLiteral("transport_record_accompany");
+const auto transportRecordStep = QStringLiteral("transport_record_step");
 const QKeySequence defaultPlayStop(Qt::Key_Space);
 const auto defaultPause = keySequence(Qt::SHIFT, Qt::Key_Space);
 
@@ -66,7 +69,7 @@ bool isValid(const QKeySequence& sequence)
 	return true;
 }
 
-bool isValidTransportBinding(const QKeySequence& sequence)
+bool isValidTransportBinding(const QKeySequence& sequence, const TransportShortcuts* playback = nullptr)
 {
 	if (!isValid(sequence) || sequence.count() != 1) { return false; }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -76,6 +79,12 @@ bool isValidTransportBinding(const QKeySequence& sequence)
 	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
 	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
 #endif
+	// Default playback also handles Space with extra modifiers.
+	if (playback && key == Qt::Key_Space)
+	{
+		const bool shift = modifiers & Qt::ShiftModifier;
+		if (shift ? playback->pause == defaultPause : playback->playStop == defaultPlayStop) { return false; }
+	}
 	const auto pianoRollValueModifiers = Qt::AltModifier | Qt::ControlModifier | Qt::KeypadModifier;
 	return key < Qt::Key_0 || key > Qt::Key_9 || !(modifiers & pianoRollValueModifiers);
 }
@@ -96,8 +105,9 @@ QMap<QString, QKeySequence> defaultShortcuts(const QString& prefix)
 	return shortcuts;
 }
 
+template<typename Accepts = decltype(&isValid)>
 QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& groupDefaults,
-	const QList<QKeySequence>& reserved, bool (*accepts)(const QKeySequence&) = isValid)
+	const QList<QKeySequence>& reserved, Accepts accepts = isValid)
 {
 	auto shortcuts = groupDefaults;
 	const auto section = QStringLiteral("shortcuts");
@@ -172,7 +182,7 @@ const QMap<QString, QKeySequence>& windowLayoutDefaults()
 QList<QKeySequence> effectiveTransportShortcuts()
 {
 	const auto shortcuts = transportShortcuts();
-	return {shortcuts.playStop, shortcuts.pause};
+	return {shortcuts.playStop, shortcuts.pause, shortcuts.record, shortcuts.recordAccompany, shortcuts.recordStep};
 }
 
 QList<QKeySequence> reservedForEditors()
@@ -201,11 +211,19 @@ QMap<QString, QKeySequence> windowLayoutShortcuts()
 
 TransportShortcuts transportShortcuts()
 {
-	const auto shortcuts = resolveShortcuts({{transportPlayStop, defaultPlayStop}, {transportPause, defaultPause}},
-		menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
-		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values() + windowLayoutShortcuts().values(),
-		isValidTransportBinding);
-	return {shortcuts.value(transportPlayStop), shortcuts.value(transportPause)};
+	const auto reserved = menuDefaults().values() + defaultShortcuts(windowPrefix).values()
+		+ defaultShortcuts(patternPrefix).values() + defaultShortcuts(pianoPrefix).values()
+		+ defaultShortcuts(automationPrefix).values() + windowLayoutShortcuts().values();
+	const auto playback = resolveShortcuts({{transportPlayStop, defaultPlayStop}, {transportPause, defaultPause}},
+		reserved, [](const QKeySequence& sequence) { return isValidTransportBinding(sequence); });
+	TransportShortcuts shortcuts{playback.value(transportPlayStop), playback.value(transportPause), {}, {}, {}};
+	const auto recording = resolveShortcuts({{transportRecord, {}}, {transportRecordAccompany, {}}, {transportRecordStep, {}}},
+		reserved + playback.values(),
+		[&shortcuts](const QKeySequence& sequence) { return isValidTransportBinding(sequence, &shortcuts); });
+	shortcuts.record = recording.value(transportRecord);
+	shortcuts.recordAccompany = recording.value(transportRecordAccompany);
+	shortcuts.recordStep = recording.value(transportRecordStep);
+	return shortcuts;
 }
 
 TransportShortcuts::Action TransportShortcuts::match(const QKeyEvent& event) const

@@ -55,6 +55,7 @@ public:
 	static bool handleTransportKey(QKeyEvent* event, Editor* target);
 protected:
 	void setTransportToolTips(const QString& play, const QString& stop);
+	void setRecordingToolTips(const QString& record, const QString& accompany, const QString& step = {});
 	DropToolBar * addDropToolBarToTop(QString const & windowTitle);
 	DropToolBar * addDropToolBar(Qt::ToolBarArea whereToAdd, QString const & windowTitle);
 	DropToolBar * addDropToolBar(QWidget * parent, Qt::ToolBarArea whereToAdd, QString const & windowTitle);

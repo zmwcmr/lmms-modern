@@ -5179,9 +5179,9 @@ PianoRollWindow::PianoRollWindow() :
 	setCentralWidget( m_editor );
 
 	setTransportToolTips(tr("Play current clip"), tr("Stop playing of current clip"));
-	m_recordAction->setToolTip(tr( "Record notes from MIDI-device/channel-piano" ) );
-	m_recordAccompanyAction->setToolTip( tr( "Record notes from MIDI-device/channel-piano while playing song or pattern track" ) );
-	m_toggleStepRecordingAction->setToolTip( tr( "Record notes from MIDI-device/channel-piano, one step at the time" ) );
+	setRecordingToolTips(tr("Record notes from MIDI-device/channel-piano"),
+		tr("Record notes from MIDI-device/channel-piano while playing song or pattern track"),
+		tr("Record notes from MIDI-device/channel-piano, one step at the time"));
 
 	DropToolBar *notesActionsToolBar = addDropToolBarToTop( tr( "Edit actions" ) );
 

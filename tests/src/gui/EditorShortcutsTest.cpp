@@ -1,6 +1,7 @@
 #include <QAction>
 #include <QFile>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QTemporaryDir>
@@ -8,6 +9,7 @@
 #include <QtTest>
 
 #include "ConfigManager.h"
+#include "Editor.h"
 #include "EditorShortcuts.h"
 #include "ToolButton.h"
 
@@ -29,7 +31,8 @@ private slots:
 	{
 		for (const auto* id : {"piano_roll_draw", "piano_roll_erase", "automation_editor_draw", "window_song_editor",
 			"file_save", "pattern_next", "transport_play_stop", "transport_pause", "layout_fullscreen",
-			"layout_maximize_editor", "layout_detach_all", "layout_attach_all"})
+			"layout_maximize_editor", "layout_detach_all", "layout_attach_all", "transport_record",
+			"transport_record_accompany", "transport_record_step"})
 		{
 			ConfigManager::inst()->deleteValue("shortcuts", id);
 		}
@@ -353,6 +356,99 @@ private slots:
 		QCOMPARE(patternNavigationShortcuts().value("pattern_next"), QKeySequence("+"));
 		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
 		QCOMPARE(windowToggleShortcuts({}).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void resolvesOptionalRecordingShortcuts()
+	{
+		const auto defaults = transportShortcuts();
+		QVERIFY(defaults.record.isEmpty());
+		QVERIFY(defaults.recordAccompany.isEmpty());
+		QVERIFY(defaults.recordStep.isEmpty());
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_play_stop", "Alt+F7");
+		config->setValue("shortcuts", "transport_record_step", "Alt+F6");
+		QCOMPARE(transportShortcuts().recordStep, QKeySequence("Alt+F6"));
+		config->setValue("shortcuts", "file_save", "Alt+F6");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+
+		for (const auto* conflicting : {"Alt+F7", "Alt+F6", "Shift+D"})
+		{
+			config->setValue("shortcuts", "transport_record", conflicting);
+			const auto shortcuts = transportShortcuts();
+			QVERIFY(shortcuts.record.isEmpty());
+			QVERIFY(shortcuts.recordStep.isEmpty());
+			QCOMPARE(shortcuts.playStop, QKeySequence("Alt+F7"));
+		}
+
+		for (const auto* invalid : {"Alt+F5, Alt+F6", "Alt+9", "Ctrl+Shift+Space"})
+		{
+			config->setValue("shortcuts", "transport_record", invalid);
+			QVERIFY(transportShortcuts().record.isEmpty());
+			QCOMPARE(transportShortcuts().recordStep, QKeySequence("Alt+F6"));
+		}
+		config->setValue("shortcuts", "transport_record", "Ctrl+Space");
+		QCOMPARE(transportShortcuts().record, QKeySequence("Ctrl+Space"));
+		config->setValue("shortcuts", "transport_play_stop", "");
+		QVERIFY(transportShortcuts().record.isEmpty());
+	}
+
+	void dispatchesRecordingOnlyInSupportingEditor()
+	{
+		using lmms::gui::Editor;
+		class RecordingEditor : public Editor
+		{
+		public:
+			RecordingEditor(bool recordEnabled, bool stepEnabled) : Editor(recordEnabled, stepEnabled)
+			{
+				setRecordingToolTips("Record", "Record with playback", "Step record");
+			}
+
+			QAction* recordAction() const { return m_recordAction; }
+			QAction* accompanyAction() const { return m_recordAccompanyAction; }
+			QAction* stepAction() const { return m_toggleStepRecordingAction; }
+		};
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_record", "Alt+F5");
+		config->setValue("shortcuts", "transport_record_accompany", "A");
+		config->setValue("shortcuts", "transport_record_step", "Alt+F6");
+
+		RecordingEditor piano(true, true);
+		RecordingEditor song(true, false);
+		RecordingEditor automation(false, false);
+		QSignalSpy record(piano.recordAction(), &QAction::triggered);
+		QSignalSpy accompany(piano.accompanyAction(), &QAction::triggered);
+		QSignalSpy step(piano.stepAction(), &QAction::triggered);
+		QSignalSpy songStep(song.stepAction(), &QAction::triggered);
+		QSignalSpy unavailableRecord(automation.recordAction(), &QAction::triggered);
+		QVERIFY(piano.stepAction()->toolTip().contains(QKeySequence("Alt+F6").toString(QKeySequence::NativeText)));
+
+		QTest::keyClick(&piano, Qt::Key_F5, Qt::AltModifier);
+		QCOMPARE(record.count(), 1);
+		QTest::keyClick(&piano, Qt::Key_A);
+		QCOMPARE(accompany.count(), 1);
+		QTest::keyClick(&piano, Qt::Key_F6, Qt::AltModifier);
+		QCOMPARE(step.count(), 1);
+		QKeyEvent repeatedStep(QEvent::KeyPress, Qt::Key_F6, Qt::AltModifier, {}, true);
+		QApplication::sendEvent(&piano, &repeatedStep);
+		QVERIFY(repeatedStep.isAccepted());
+		QCOMPARE(step.count(), 1);
+
+		QTest::keyClick(&song, Qt::Key_F6, Qt::AltModifier);
+		QTest::keyClick(&automation, Qt::Key_F5, Qt::AltModifier);
+		QCOMPARE(songStep.count(), 0);
+		QCOMPARE(unavailableRecord.count(), 0);
+
+		auto* input = new QLineEdit(&piano);
+		piano.setCentralWidget(input);
+		QTest::keyClick(input, Qt::Key_A);
+		QCOMPARE(input->text(), QStringLiteral("a"));
+		QCOMPARE(accompany.count(), 1);
+
+		QKeyEvent mainWindowFallback(QEvent::KeyPress, Qt::Key_F5, Qt::AltModifier);
+		QVERIFY(!Editor::handleTransportKey(&mainWindowFallback, &piano));
+		QCOMPARE(record.count(), 1);
 	}
 };
 

@@ -122,6 +122,9 @@ Editor::Editor(bool record, bool stepRecord) :
 	m_recordAction = new QAction(embed::getIconPixmap("record"), tr("Record"), this);
 	m_recordAccompanyAction = new QAction(embed::getIconPixmap("record_accompany"), tr("Record while playing"), this);
 	m_toggleStepRecordingAction = new QAction(embed::getIconPixmap("record_step_off"), tr("Toggle Step Recording"), this);
+	m_recordAction->setEnabled(record);
+	m_recordAccompanyAction->setEnabled(record);
+	m_toggleStepRecordingAction->setEnabled(stepRecord);
 
 	// Set up connections
 	connect(m_playAction, SIGNAL(triggered()), this, SLOT(play()));
@@ -159,6 +162,18 @@ void Editor::setTransportToolTips(const QString& play, const QString& stop)
 	m_stopAction->setToolTip(tr("%1 (%2)").arg(stop, playStopKey));
 }
 
+void Editor::setRecordingToolTips(const QString& record, const QString& accompany, const QString& step)
+{
+	const auto& shortcuts = configuredTransportShortcuts();
+	const auto setToolTip = [](QAction* action, const QString& text, const QKeySequence& shortcut) {
+		action->setToolTip(shortcut.isEmpty()
+			? text : tr("%1 (%2)").arg(text, shortcut.toString(QKeySequence::NativeText)));
+	};
+	setToolTip(m_recordAction, record, shortcuts.record);
+	setToolTip(m_recordAccompanyAction, accompany, shortcuts.recordAccompany);
+	if (!step.isEmpty()) { setToolTip(m_toggleStepRecordingAction, step, shortcuts.recordStep); }
+}
+
 bool Editor::handleTransportKey(QKeyEvent* event, Editor* target)
 {
 	using Action = TransportShortcuts::Action;
@@ -172,7 +187,21 @@ bool Editor::handleTransportKey(QKeyEvent* event, Editor* target)
 
 void Editor::keyPressEvent(QKeyEvent* ke)
 {
-	if (!handleTransportKey(ke, this)) { ke->ignore(); }
+	if (handleTransportKey(ke, this)) { return; }
+
+	const auto& shortcuts = configuredTransportShortcuts();
+	const QKeySequence pressed(ke->key() | static_cast<int>(ke->modifiers()));
+	for (const auto& [shortcut, action] : {
+		std::pair{&shortcuts.record, m_recordAction},
+		std::pair{&shortcuts.recordAccompany, m_recordAccompanyAction},
+		std::pair{&shortcuts.recordStep, m_toggleStepRecordingAction}})
+	{
+		if (shortcut->isEmpty() || pressed != *shortcut || !action->isEnabled()) { continue; }
+		if (!ke->isAutoRepeat()) { action->trigger(); }
+		ke->accept();
+		return;
+	}
+	ke->ignore();
 }
 
 DropToolBar::DropToolBar(QWidget* parent) : QToolBar(parent)

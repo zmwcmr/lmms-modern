@@ -21,6 +21,9 @@ struct TransportShortcuts
 	enum class Action { None, PlayStop, Pause };
 	QKeySequence playStop;
 	QKeySequence pause;
+	QKeySequence record;
+	QKeySequence recordAccompany;
+	QKeySequence recordStep;
 	Action match(const QKeyEvent& event) const;
 };
 
