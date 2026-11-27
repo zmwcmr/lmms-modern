@@ -31,6 +31,7 @@
 #include "ClipView.h"
 #include "ComboBox.h"
 #include "DataFile.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "MainWindow.h"
 #include "PatternStore.h"
@@ -296,8 +297,7 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 
 	setMinimumWidth(MINIMUM_TRACK_WIDTH + 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels);
 
-	m_playAction->setToolTip(tr("Play/pause current pattern (Space)"));
-	m_stopAction->setToolTip(tr("Stop playback of current pattern (Space)"));
+	setTransportToolTips(tr("Play current pattern"), tr("Stop playback of current pattern"));
 
 
 	// Pattern selector
@@ -348,14 +348,19 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 			m_editor, SLOT(updatePosition()));
 	connect(&ps->m_patternComboBoxModel, &ComboBoxModel::dataChanged, m_editor, &PatternEditor::updateMaxSteps);
 
+	const auto navigationShortcuts = patternNavigationShortcuts();
+	const auto nextShortcut = navigationShortcuts.value(QStringLiteral("pattern_next"));
+	const auto previousShortcut = navigationShortcuts.value(QStringLiteral("pattern_previous"));
+	m_patternComboBox->setToolTip(tr("Previous pattern: %1\nNext pattern: %2")
+		.arg(previousShortcut.toString(QKeySequence::NativeText), nextShortcut.toString(QKeySequence::NativeText)));
 	auto viewNext = new QAction(this);
 	connect(viewNext, SIGNAL(triggered()), m_patternComboBox, SLOT(selectNext()));
-	viewNext->setShortcut(Qt::Key_Plus);
+	viewNext->setShortcut(nextShortcut);
 	addAction(viewNext);
 
 	auto viewPrevious = new QAction(this);
 	connect(viewPrevious, SIGNAL(triggered()), m_patternComboBox, SLOT(selectPrevious()));
-	viewPrevious->setShortcut(Qt::Key_Minus);
+	viewPrevious->setShortcut(previousShortcut);
 	addAction(viewPrevious);
 }
 

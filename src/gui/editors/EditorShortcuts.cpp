@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QDebug>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QMap>
 #include <QWidget>
@@ -16,6 +17,11 @@ namespace lmms::gui
 
 namespace
 {
+const auto transportPlayStop = QStringLiteral("transport_play_stop");
+const auto transportPause = QStringLiteral("transport_pause");
+const QKeySequence defaultPlayStop(Qt::Key_Space);
+const auto defaultPause = keySequence(Qt::SHIFT, Qt::Key_Space);
+
 const QMap<QString, QKeySequence> defaults{
 	{QStringLiteral("piano_roll_draw"), keySequence(Qt::SHIFT, Qt::Key_D)},
 	{QStringLiteral("piano_roll_erase"), keySequence(Qt::SHIFT, Qt::Key_E)},
@@ -34,6 +40,8 @@ const QMap<QString, QKeySequence> defaults{
 	{QStringLiteral("automation_editor_erase"), keySequence(Qt::SHIFT, Qt::Key_E)},
 	{QStringLiteral("automation_editor_draw_out"), keySequence(Qt::SHIFT, Qt::Key_C)},
 	{QStringLiteral("automation_editor_edit_tangents"), keySequence(Qt::SHIFT, Qt::Key_T)},
+	{QStringLiteral("pattern_next"), QKeySequence(Qt::Key_Plus)},
+	{QStringLiteral("pattern_previous"), QKeySequence(Qt::Key_Minus)},
 	{QStringLiteral("window_song_editor"), keySequence(Qt::CTRL, Qt::Key_1)},
 	{QStringLiteral("window_pattern_editor"), keySequence(Qt::CTRL, Qt::Key_2)},
 	{QStringLiteral("window_piano_roll"), keySequence(Qt::CTRL, Qt::Key_3)},
@@ -57,6 +65,21 @@ bool isValid(const QKeySequence& sequence)
 	}
 	return true;
 }
+
+bool isValidTransportBinding(const QKeySequence& sequence)
+{
+	if (!isValid(sequence) || sequence.count() != 1) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	const auto pianoRollValueModifiers = Qt::AltModifier | Qt::ControlModifier | Qt::KeypadModifier;
+	return key < Qt::Key_0 || key > Qt::Key_9 || !(modifiers & pianoRollValueModifiers);
+}
+
 bool shortcutsOverlap(const QKeySequence& first, const QKeySequence& second)
 {
 	return !first.isEmpty() && !second.isEmpty()
@@ -74,7 +97,7 @@ QMap<QString, QKeySequence> defaultShortcuts(const QString& prefix)
 }
 
 QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& groupDefaults,
-	const QList<QKeySequence>& reserved)
+	const QList<QKeySequence>& reserved, bool (*accepts)(const QKeySequence&) = isValid)
 {
 	auto shortcuts = groupDefaults;
 	const auto section = QStringLiteral("shortcuts");
@@ -82,7 +105,7 @@ QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& 
 	{
 		const auto configured = ConfigManager::inst()->value(section, item.key()).trimmed();
 		const auto sequence = QKeySequence::fromString(configured, QKeySequence::PortableText);
-		if (isValid(sequence)) { item.value() = sequence; }
+		if (accepts(sequence)) { item.value() = sequence; }
 		else if (!configured.isEmpty())
 		{
 			qWarning() << "Ignoring invalid shortcut for" << item.key() << ':' << configured;
@@ -115,17 +138,106 @@ QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& 
 const QString windowPrefix = QStringLiteral("window_");
 const QString pianoPrefix = QStringLiteral("piano_roll_");
 const QString automationPrefix = QStringLiteral("automation_editor_");
+const QString patternPrefix = QStringLiteral("pattern_");
+
+const QMap<QString, QKeySequence>& menuDefaults()
+{
+	static const QMap<QString, QKeySequence> shortcuts{
+		{QStringLiteral("file_new"), QKeySequence::New},
+		{QStringLiteral("file_open"), QKeySequence::Open},
+		{QStringLiteral("file_save"), QKeySequence::Save},
+		{QStringLiteral("file_save_as"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_S)},
+		{QStringLiteral("file_save_new_version"), keySequence(Qt::CTRL, Qt::ALT, Qt::Key_S)},
+		{QStringLiteral("file_export"), keySequence(Qt::CTRL, Qt::Key_E)},
+		{QStringLiteral("file_export_tracks"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_E)},
+		{QStringLiteral("file_export_midi"), keySequence(Qt::CTRL, Qt::Key_M)},
+		{QStringLiteral("file_quit"), keySequence(Qt::CTRL, Qt::Key_Q)},
+		{QStringLiteral("edit_undo"), QKeySequence::Undo},
+		{QStringLiteral("edit_redo"), QKeySequence::Redo},
+	};
+	return shortcuts;
+}
+
+const QMap<QString, QKeySequence>& windowLayoutDefaults()
+{
+	static const QMap<QString, QKeySequence> shortcuts{
+		{QStringLiteral("layout_fullscreen"), QKeySequence(Qt::Key_F11)},
+		{QStringLiteral("layout_maximize_editor"), keySequence(Qt::SHIFT, Qt::Key_F11)},
+		{QStringLiteral("layout_detach_all"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_D)},
+		{QStringLiteral("layout_attach_all"), keySequence(Qt::CTRL, Qt::ALT, Qt::SHIFT, Qt::Key_D)},
+	};
+	return shortcuts;
+}
+
+QList<QKeySequence> effectiveTransportShortcuts()
+{
+	const auto shortcuts = transportShortcuts();
+	return {shortcuts.playStop, shortcuts.pause};
+}
+
+QList<QKeySequence> reservedForEditors()
+{
+	return defaultShortcuts(windowPrefix).values() + menuDefaults().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values();
+}
 
 QMap<QString, QKeySequence> editorShortcuts(const QString& prefix)
 {
-	return resolveShortcuts(defaultShortcuts(prefix), defaultShortcuts(windowPrefix).values());
+	return resolveShortcuts(defaultShortcuts(prefix), reservedForEditors() + defaultShortcuts(patternPrefix).values());
 }
+
+QList<QKeySequence> effectiveEditorShortcuts()
+{
+	return editorShortcuts(pianoPrefix).values() + editorShortcuts(automationPrefix).values();
+}
+}
+
+QMap<QString, QKeySequence> windowLayoutShortcuts()
+{
+	return resolveShortcuts(windowLayoutDefaults(),
+		menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
+		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values() + QList<QKeySequence>{defaultPlayStop, defaultPause});
+}
+
+TransportShortcuts transportShortcuts()
+{
+	const auto shortcuts = resolveShortcuts({{transportPlayStop, defaultPlayStop}, {transportPause, defaultPause}},
+		menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
+		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values() + windowLayoutShortcuts().values(),
+		isValidTransportBinding);
+	return {shortcuts.value(transportPlayStop), shortcuts.value(transportPause)};
+}
+
+TransportShortcuts::Action TransportShortcuts::match(const QKeyEvent& event) const
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	if (pressed == playStop) { return Action::PlayStop; }
+	if (pressed == pause) { return Action::Pause; }
+	if (event.key() == Qt::Key_Space)
+	{
+		if (event.modifiers() & Qt::ShiftModifier) { return pause == defaultPause ? Action::Pause : Action::None; }
+		if (playStop == defaultPlayStop) { return Action::PlayStop; }
+	}
+	return Action::None;
+}
+
+QMap<QString, QKeySequence> patternNavigationShortcuts()
+{
+	return resolveShortcuts(defaultShortcuts(patternPrefix), reservedForEditors() + effectiveEditorShortcuts());
 }
 
 QMap<QString, QKeySequence> windowToggleShortcuts(const QList<QKeySequence>& reserved)
 {
 	return resolveShortcuts(defaultShortcuts(windowPrefix),
-		reserved + editorShortcuts(pianoPrefix).values() + editorShortcuts(automationPrefix).values());
+		reserved + effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values());
+}
+
+QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserved)
+{
+	return resolveShortcuts(menuDefaults(), reserved + defaultShortcuts(windowPrefix).values()
+		+ effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values());
 }
 
 void bindEditorShortcuts(QWidget& editor,
@@ -133,7 +245,7 @@ void bindEditorShortcuts(QWidget& editor,
 {
 	QMap<QString, QKeySequence> groupDefaults;
 	for (const auto& binding : actions) { groupDefaults.insert(binding.first, defaults.value(binding.first)); }
-	const auto shortcuts = resolveShortcuts(groupDefaults, defaultShortcuts(windowPrefix).values());
+	const auto shortcuts = resolveShortcuts(groupDefaults, reservedForEditors() + defaultShortcuts(patternPrefix).values());
 	for (const auto& [id, action] : actions)
 	{
 		const auto sequence = shortcuts.value(id);

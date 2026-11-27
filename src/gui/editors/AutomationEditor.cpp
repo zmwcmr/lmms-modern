@@ -2012,9 +2012,7 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	connect(m_editor, &AutomationEditor::currentClipChanged, this, [this] { setEnabled(m_editor->validClip()); });
 
 	// Play/stop buttons
-	m_playAction->setToolTip(tr( "Play/pause current clip (Space)" ));
-
-	m_stopAction->setToolTip(tr("Stop playing of current clip (Space)"));
+	setTransportToolTips(tr("Play current clip"), tr("Stop playing of current clip"));
 
 	// Edit mode buttons
 	DropToolBar *editActionsToolBar = addDropToolBarToTop(tr("Edit actions"));

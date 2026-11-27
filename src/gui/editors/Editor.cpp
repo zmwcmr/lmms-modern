@@ -25,9 +25,10 @@
 #include "Editor.h"
 
 #include <QAction>
+#include <QKeyEvent>
 #include <QShortcut>
 
-#include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "GuiApplication.h"
 #include "MainWindow.h"
 #include "Song.h"
@@ -35,6 +36,15 @@
 
 namespace lmms::gui
 {
+
+namespace
+{
+const TransportShortcuts& configuredTransportShortcuts()
+{
+	static const auto shortcuts = transportShortcuts();
+	return shortcuts;
+}
+}
 
 
 void Editor::setPauseIcon(bool displayPauseIcon)
@@ -105,8 +115,9 @@ Editor::Editor(bool record, bool stepRecord) :
 	};
 
 	// Set up play and record actions
-	m_playAction = new QAction(embed::getIconPixmap("play"), tr("Play (Space)"), this);
-	m_stopAction = new QAction(embed::getIconPixmap("stop"), tr("Stop (Space)"), this);
+	m_playAction = new QAction(embed::getIconPixmap("play"), tr("Play"), this);
+	m_stopAction = new QAction(embed::getIconPixmap("stop"), tr("Stop"), this);
+	setTransportToolTips(m_playAction->text(), m_stopAction->text());
 
 	m_recordAction = new QAction(embed::getIconPixmap("record"), tr("Record"), this);
 	m_recordAccompanyAction = new QAction(embed::getIconPixmap("record_accompany"), tr("Record while playing"), this);
@@ -118,7 +129,7 @@ Editor::Editor(bool record, bool stepRecord) :
 	connect(m_recordAccompanyAction, SIGNAL(triggered()), this, SLOT(recordAccompany()));
 	connect(m_toggleStepRecordingAction, SIGNAL(triggered()), this, SLOT(toggleStepRecording()));
 	connect(m_stopAction, SIGNAL(triggered()), this, SLOT(stop()));
-	new QShortcut(keySequence(Qt::SHIFT, Qt::Key_F11), this, SLOT(toggleMaximize()));
+	new QShortcut(windowLayoutShortcuts().value(QStringLiteral("layout_maximize_editor")), this, SLOT(toggleMaximize()));
 
 	// Add actions to toolbar
 	addButton(m_playAction, "playButton");
@@ -139,21 +150,29 @@ QAction *Editor::playAction() const
 	return m_playAction;
 }
 
+void Editor::setTransportToolTips(const QString& play, const QString& stop)
+{
+	const auto& shortcuts = configuredTransportShortcuts();
+	const auto playStopKey = shortcuts.playStop.toString(QKeySequence::NativeText);
+	const auto pauseKey = shortcuts.pause.toString(QKeySequence::NativeText);
+	m_playAction->setToolTip(tr("%1 (%2)\nPause (%3)").arg(play, playStopKey, pauseKey));
+	m_stopAction->setToolTip(tr("%1 (%2)").arg(stop, playStopKey));
+}
+
+bool Editor::handleTransportKey(QKeyEvent* event, Editor* target)
+{
+	using Action = TransportShortcuts::Action;
+	const auto action = configuredTransportShortcuts().match(*event);
+	if (action == Action::None) { return false; }
+	if (target && action == Action::PlayStop) { target->togglePlayStop(); }
+	if (target && action == Action::Pause) { target->togglePause(); }
+	event->accept();
+	return true;
+}
+
 void Editor::keyPressEvent(QKeyEvent* ke)
 {
-	if (ke->key() == Qt::Key_Space)
-	{
-		if (ke->modifiers() & Qt::ShiftModifier)
-		{
-			togglePause();
-		}
-		else
-		{
-			togglePlayStop();
-		}
-		return;
-	}
-	ke->ignore();
+	if (!handleTransportKey(ke, this)) { ke->ignore(); }
 }
 
 DropToolBar::DropToolBar(QWidget* parent) : QToolBar(parent)

@@ -83,11 +83,6 @@ namespace lmms::gui
 
 namespace
 {
-
-const QKeySequence fullscreenShortcut(Qt::Key_F11);
-const auto detachShortcut = keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_D);
-const auto attachShortcut = keySequence(Qt::CTRL, Qt::ALT, Qt::SHIFT, Qt::Key_D);
-
 QString withShortcutHint(const QString& text, const QKeySequence& shortcut, bool forMenu)
 {
 	if (shortcut.isEmpty()) { return text; }
@@ -263,7 +258,7 @@ MainWindow::MainWindow() :
 	connect(Engine::getSong(), SIGNAL(projectFileNameChanged()), SLOT(onProjectFileNameChanged()));
 
 	maximized = isMaximized();
-	new QShortcut(fullscreenShortcut, this, SLOT(toggleFullscreen()));
+	new QShortcut(windowLayoutShortcuts().value(QStringLiteral("layout_fullscreen")), this, SLOT(toggleFullscreen()));
 
 	if (ConfigManager::inst()->value("tooltips", "disabled").toInt())
 	{
@@ -301,9 +296,11 @@ void MainWindow::finalize()
 	resetWindowTitle();
 	setWindowIcon( embed::getIconPixmap( "icon_small" ) );
 
-	auto addAction = [this](QMenu* menu, std::string_view icon, const QString& text,
-		const QKeySequence& shortcut, auto(MainWindow::* slot)()) -> QAction*
+	const auto menuShortcuts = mainMenuShortcuts({});
+	auto addAction = [this, &menuShortcuts](QMenu* menu, std::string_view icon, const QString& text,
+		const QString& shortcutId, auto(MainWindow::* slot)()) -> QAction*
 	{
+		const auto shortcut = menuShortcuts.value(shortcutId);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 3, 0))
 		auto* action = menu->addAction(embed::getIconPixmap(icon), text, shortcut, this, slot);
 #else
@@ -318,24 +315,24 @@ void MainWindow::finalize()
 	menuBar()->addMenu( project_menu )->setText( tr( "&File" ) );
 
 	addAction(project_menu, "project_new", tr("&New"),
-		QKeySequence::New, &MainWindow::createNewProject);
+		QStringLiteral("file_new"), &MainWindow::createNewProject);
 
 	auto templates_menu = new TemplatesMenu( this );
 	project_menu->addMenu(templates_menu);
 
 	addAction(project_menu, "project_open", tr("&Open..."),
-		QKeySequence::Open, &MainWindow::openProject);
+		QStringLiteral("file_open"), &MainWindow::openProject);
 
 	project_menu->addMenu(new RecentProjectsMenu(this));
 
 	addAction(project_menu, "project_save", tr("&Save"),
-		QKeySequence::Save, &MainWindow::saveProject);
+		QStringLiteral("file_save"), &MainWindow::saveProject);
 
 	addAction(project_menu, "project_save", tr("Save &As..."),
-		keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_S), &MainWindow::saveProjectAs);
+		QStringLiteral("file_save_as"), &MainWindow::saveProjectAs);
 
 	addAction(project_menu, "project_save", tr("Save as New &Version"),
-		keySequence(Qt::CTRL, Qt::ALT, Qt::Key_S), &MainWindow::saveProjectAsNewVersion);
+		QStringLiteral("file_save_new_version"), &MainWindow::saveProjectAsNewVersion);
 
 	auto* saveTemplateAction = project_menu->addAction(embed::getIconPixmap("project_save"),
 		tr("Save as default template"), this, &MainWindow::saveProjectAsDefaultTemplate);
@@ -348,29 +345,29 @@ void MainWindow::finalize()
 	importAction->setStatusTip(tr("Import a MIDI or Hydrogen project"));
 
 	addAction(project_menu, "project_export", tr("E&xport..."),
-		keySequence(Qt::CTRL, Qt::Key_E), &MainWindow::onExportProject);
+		QStringLiteral("file_export"), &MainWindow::onExportProject);
 
 	addAction(project_menu, "project_export", tr("Export &Tracks..."),
-		keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_E), &MainWindow::onExportProjectTracks);
+		QStringLiteral("file_export_tracks"), &MainWindow::onExportProjectTracks);
 
 	addAction(project_menu, "midi_file", tr("Export &MIDI..."),
-		keySequence(Qt::CTRL, Qt::Key_M), &MainWindow::onExportProjectMidi);
+		QStringLiteral("file_export_midi"), &MainWindow::onExportProjectMidi);
 
 	project_menu->addSeparator();
 
 	auto* quitAction = project_menu->addAction(embed::getIconPixmap("exit"), tr("&Quit"),
 		qApp, SLOT(closeAllWindows()));
-	quitAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_Q));
+	quitAction->setShortcut(menuShortcuts.value(QStringLiteral("file_quit")));
 	quitAction->setStatusTip(tr("Quit LMMS"));
 
 	auto edit_menu = new QMenu(this);
 	menuBar()->addMenu( edit_menu )->setText( tr( "&Edit" ) );
 
 	m_undoAction = addAction(edit_menu, "edit_undo", tr("Undo"),
-		QKeySequence::Undo, &MainWindow::undo);
+		QStringLiteral("edit_undo"), &MainWindow::undo);
 
 	m_redoAction = addAction(edit_menu, "edit_redo", tr("Redo"),
-		QKeySequence::Redo, &MainWindow::redo);
+		QStringLiteral("edit_redo"), &MainWindow::redo);
 
 	m_undoAction->setShortcutContext(Qt::ApplicationShortcut);
 	m_redoAction->setShortcutContext(Qt::ApplicationShortcut);
@@ -385,12 +382,7 @@ void MainWindow::finalize()
 
 	connect(edit_menu, SIGNAL(aboutToShow()), this, SLOT(updateUndoRedoButtons()));
 
-	QList<QKeySequence> reserved{fullscreenShortcut, detachShortcut, attachShortcut};
-	for (const auto* menu : {project_menu, edit_menu})
-	{
-		for (const auto* action : menu->actions()) { reserved += action->shortcuts(); }
-	}
-	m_windowShortcuts = windowToggleShortcuts(reserved);
+	m_windowShortcuts = windowToggleShortcuts(menuShortcuts.values());
 
 	m_viewMenu = new QMenu( this );
 	menuBar()->addMenu( m_viewMenu )->setText( tr( "&View" ) );
@@ -1111,6 +1103,7 @@ void MainWindow::toggleMicrotunerWin()
 
 void MainWindow::updateViewMenu()
 {
+	const auto layoutShortcuts = windowLayoutShortcuts();
 	const auto windowLabel = [this](const QString& text, const QString& id)
 	{
 		return withShortcutHint(text, m_windowShortcuts.value(id), true);
@@ -1159,7 +1152,7 @@ void MainWindow::updateViewMenu()
 	m_viewMenu->addSeparator();
 
 	auto* fullscreenAction = m_viewMenu->addAction(embed::getIconPixmap( "fullscreen" ),
-				withShortcutHint(tr("Fullscreen"), fullscreenShortcut, true),
+				withShortcutHint(tr("Fullscreen"), layoutShortcuts.value(QStringLiteral("layout_fullscreen")), true),
 				this, SLOT(toggleFullscreen())
 		);
 	fullscreenAction->setStatusTip(tr("Toggle fullscreen mode"));
@@ -1169,12 +1162,12 @@ void MainWindow::updateViewMenu()
 	auto detachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
 		tr("Detach all subwindows"),
 		this, [this](){ setAllSubWindowsDetached(true); },
-		detachShortcut
+		layoutShortcuts.value(QStringLiteral("layout_detach_all"))
 	);
 	auto attachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
 		tr("Attach all subwindows"),
 		this, [this](){ setAllSubWindowsDetached(false); },
-		attachShortcut
+		layoutShortcuts.value(QStringLiteral("layout_attach_all"))
 	);
 
 	detachAllAction->setStatusTip(tr("Detach all editor windows from the main window"));
@@ -1400,17 +1393,9 @@ void MainWindow::keyPressEvent( QKeyEvent * _ke )
 		case Qt::Key_Control: m_keyMods.m_ctrl = true; break;
 		case Qt::Key_Shift: m_keyMods.m_shift = true; break;
 		case Qt::Key_Alt: m_keyMods.m_alt = true; break;
-		case Qt::Key_Space:
-		{
-			if (Editor::lastPlayedEditor() != nullptr)
-			{
-				if (m_keyMods.m_shift) { Editor::lastPlayedEditor()->togglePause(); }
-				else { Editor::lastPlayedEditor()->togglePlayStop(); }
-			}
-			break;
-		}
 		default:
 		{
+			if (Editor::handleTransportKey(_ke, Editor::lastPlayedEditor())) { return; }
 			InstrumentTrackWindow * w =
 						InstrumentTrackView::topLevelInstrumentTrackWindow();
 			if( w )
