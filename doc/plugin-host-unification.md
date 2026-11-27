@@ -239,12 +239,33 @@ path.
 
 ### Stage 2 — `PluginHost` and adapters
 
-- `Vst2Host` wraps `VstPlugin`.
-- `Vst3Host` implements the interface directly.
-- `Lv2Host` wraps `Lv2Proc` (in-process) and `Lv2HostClient` (remote).
-- Wrappers use the interface for play, parameters, state and latency.
-- Acceptance: all three formats play, automate, save and reload projects;
-  parity with the current behavior.
+- [x] Define `PluginHost` and the neutral types in
+      `include/PluginHost.h` (`PluginLoadRequest`, `PluginProcessBlock`,
+      `PluginMidiEvent`, `PluginStateBlob`, `PluginParameterInfo`,
+      `PluginHostCapabilities`).
+- [x] `Vst2PluginHost` wraps `VstPlugin`: flat parameter indices, 0..1 values,
+      chunk/parameter-dump state, cached parameter values so the audio thread
+      never performs a synchronous round-trip.
+- [x] `Vst3PluginHost` wraps any `Vst3HostBase`, so the in-process host and
+      `Vst3RemoteHostClient` share one adapter: normalised parameter IDs,
+      component/controller state, sample-offset parameter queueing.
+- [x] `Lv2PluginHost` wraps `Lv2Proc`: port-index parameter IDs with
+      scale-point conversion, planar block copy, XML state blob, factory
+      presets. It uses the same remote/in-process path as `Lv2Proc`.
+- [x] Contract tests: `Lv2PluginHostTest` (fake gain: load, process,
+      parameters, state, editor deferred), `Vst3PluginHostTest` (fake
+      instrument: load, process, automation, state), and an optional
+      `Vst2PluginHostTest` that runs against a real plugin when
+      `LMMS_TEST_VST2_PLUGIN` is set.
+- [ ] Switch the existing effect/instrument wrappers to `PluginHost`. That is
+      Stage 3, where `HostedEffect`/`HostedInstrument` provide the models and
+      project XML; the adapters already expose everything those wrappers need.
+- Editors still return `PluginEditorHandle::Kind::Unavailable`; editor hosting
+  is Stage 5. `hasEditor` is therefore `false` in the adapters even when the
+  format supports an editor today.
+- Acceptance: parity is proven through the adapters (LV2, VST3 and an
+  optional VST2 smoke test). Playback/automation/state of the existing
+  format classes is unchanged because no consumer was switched yet.
 
 ### Stage 3 — generic wrappers and Vestige compatibility
 

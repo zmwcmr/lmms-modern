@@ -10,6 +10,7 @@ BUILD_PLUGIN(vst3base
 	../Vst3Scanner.cpp ../Vst3Scanner.h
 	../Vst3List.cpp ../Vst3List.h
 	../Vst3Host.cpp ../Vst3Host.h
+	../Vst3PluginHost.cpp ../Vst3PluginHost.h
 	../Vst3ParameterModels.cpp ../Vst3ParameterModels.h
 	../Vst3EditorWidget.cpp ../Vst3EditorWidget.h
 	../Vst3EditorWindow.cpp ../Vst3EditorWindow.h

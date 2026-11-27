@@ -6,6 +6,7 @@ ENDIF()
 
 BUILD_PLUGIN(vstbase
 	../vst_base.cpp ../VstPlugin.cpp ../VstPlugin.h ../communication.h
+	../Vst2PluginHost.cpp ../Vst2PluginHost.h
 	../VstList.cpp ../VstList.h
 	../VstSubPluginFeatures.cpp ../VstSubPluginFeatures.h
 	MOCFILES ../VstPlugin.h

@@ -31,6 +31,7 @@ if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2HostClientTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2PluginHostTest.cpp)
 
 	add_library(FakeLv2Gain MODULE plugins/fake-lv2-gain/gain.c)
 	target_include_directories(FakeLv2Gain PRIVATE ${LV2_INCLUDE_DIRS})
@@ -115,6 +116,26 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
 
+if(TARGET vstbase)
+	add_executable(Vst2PluginHostTest src/core/Vst2PluginHostTest.cpp)
+	target_include_directories(Vst2PluginHostTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+		"${CMAKE_SOURCE_DIR}/plugins/VstBase")
+	target_static_libraries(Vst2PluginHostTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst2PluginHostTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+		vstbase
+	)
+	target_compile_features(Vst2PluginHostTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst2PluginHostTest PRIVATE LMMS_TESTING)
+	# The VST2 host loads bitmaps of LMMS symbols from the executable.
+	set_target_properties(Vst2PluginHostTest PROPERTIES ENABLE_EXPORTS TRUE)
+	add_test(NAME Vst2PluginHostTest COMMAND Vst2PluginHostTest)
+	set_tests_properties(Vst2PluginHostTest PROPERTIES
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+endif()
+
 # Load/save/load helper used by the local stress harness. Not registered as
 # a ctest because it needs a project file and two output paths.
 add_executable(LmmsRoundTrip stress/roundtrip.cpp)
@@ -169,6 +190,33 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	)
 	add_dependencies(Vst3AutomationTest fake-vst3)
 	add_test(NAME Vst3AutomationTest COMMAND Vst3AutomationTest)
+
+	add_executable(Vst3PluginHostTest
+		src/core/Vst3PluginHostTest.cpp
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3PluginHost.cpp"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3Host.cpp"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/Vst3Module.cpp"
+	)
+	target_include_directories(Vst3PluginHostTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base"
+		"${CMAKE_SOURCE_DIR}/plugins/Vst3Base/travesty"
+		"${CMAKE_BINARY_DIR}/plugins/Vst3Base/vst3base"
+	)
+	target_static_libraries(Vst3PluginHostTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst3PluginHostTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+	)
+	target_compile_features(Vst3PluginHostTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst3PluginHostTest PRIVATE
+		LMMS_TESTING
+		VST3BASE_STATIC_DEFINE
+		VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+		VST3_FAKE_CLASS="${FAKE_VST3_INSTRUMENT_ID}"
+	)
+	add_dependencies(Vst3PluginHostTest fake-vst3)
+	add_test(NAME Vst3PluginHostTest COMMAND Vst3PluginHostTest)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument)
@@ -215,4 +263,20 @@ if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
 		${Lilv_INCLUDE_DIRS}
 		${LV2_INCLUDE_DIRS})
 	target_link_libraries(Lv2HostClientTest PRIVATE Lilv::lilv)
+endif()
+
+if(TARGET Lv2PluginHostTest AND TARGET FakeLv2Gain)
+	add_dependencies(Lv2PluginHostTest FakeLv2Gain)
+	if(TARGET lmms-lv2-host)
+		add_dependencies(Lv2PluginHostTest lmms-lv2-host)
+		add_test(NAME Lv2PluginHostTestRemote COMMAND Lv2PluginHostTest)
+		set_tests_properties(Lv2PluginHostTestRemote PROPERTIES
+			ENVIRONMENT "LMMS_LV2_TEST_REMOTE=1;LMMS_LV2_REMOTE=1;LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+	endif()
+	target_compile_definitions(Lv2PluginHostTest PRIVATE
+		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>")
+	target_include_directories(Lv2PluginHostTest PRIVATE
+		${Lilv_INCLUDE_DIRS}
+		${LV2_INCLUDE_DIRS})
+	target_link_libraries(Lv2PluginHostTest PRIVATE Lilv::lilv)
 endif()

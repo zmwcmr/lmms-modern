@@ -1064,6 +1064,10 @@ void Lv2Proc::saveStateRemote(QDomDocument& doc, QDomElement& that)
 
 	{
 		std::lock_guard<std::mutex> lock(m_stateMutex);
+		// The child owns the control values it saves; refresh the port values
+		// from the models and push them first so a change made just before
+		// saving is not lost.
+		copyModelsFromCore();
 		if (!m_remote->saveState(saveDir.path()))
 		{
 			qWarning() << "Could not save the remote LV2 state for"
@@ -1593,6 +1597,18 @@ void Lv2Proc::copyModelsToRemote()
 		}
 	}
 	m_remote->setMidiEvents(std::move(events));
+	pushRemoteControlValues();
+}
+
+
+
+
+void Lv2Proc::pushRemoteControlValues()
+{
+	if (!m_remote)
+	{
+		return;
+	}
 
 	for (std::size_t i = 0; i < m_ports.size(); ++i)
 	{
@@ -1602,10 +1618,15 @@ void Lv2Proc::copyModelsToRemote()
 			continue;
 		}
 		const float value = control->m_val;
-		if (std::isnan(m_lastRemoteControl[i]) || m_lastRemoteControl[i] != value)
+		if (i >= m_lastRemoteControl.size()
+			|| std::isnan(m_lastRemoteControl[i])
+			|| m_lastRemoteControl[i] != value)
 		{
 			m_remote->setControlValue(static_cast<int>(i), value);
-			m_lastRemoteControl[i] = value;
+			if (i < m_lastRemoteControl.size())
+			{
+				m_lastRemoteControl[i] = value;
+			}
 		}
 	}
 }
