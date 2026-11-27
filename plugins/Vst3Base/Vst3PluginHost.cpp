@@ -250,6 +250,22 @@ int Vst3PluginHost::latencySamples() const
 
 
 
+void Vst3PluginHost::setTempo(double bpm)
+{
+	m_host.setTempo(bpm);
+}
+
+
+
+
+void Vst3PluginHost::setPlaying(bool playing)
+{
+	m_host.setPlaying(playing);
+}
+
+
+
+
 int Vst3PluginHost::programCount() const
 {
 	return m_host.programCount();

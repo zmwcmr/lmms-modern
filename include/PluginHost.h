@@ -215,6 +215,10 @@ public:
 
 	virtual int latencySamples() const = 0;
 
+	//! Optional transport information; adapters that do not use it ignore it.
+	virtual void setTempo(double) {}
+	virtual void setPlaying(bool) {}
+
 	virtual int programCount() const { return 0; }
 	virtual int currentProgram() const { return -1; }
 	virtual QString programName(int) const { return {}; }

@@ -346,6 +346,17 @@ int Vst2PluginHost::latencySamples() const
 
 
 
+void Vst2PluginHost::setTempo(double bpm)
+{
+	if (isLoaded())
+	{
+		m_plugin->setTempo(static_cast<bpm_t>(bpm));
+	}
+}
+
+
+
+
 int Vst2PluginHost::programCount() const
 {
 	return static_cast<int>(m_programNames.size());
