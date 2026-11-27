@@ -59,6 +59,9 @@ set(LMMS_SRCS
 	core/PlayHandle.cpp
 	core/Plugin.cpp
 	core/PluginIssue.cpp
+	core/HostedEffect.cpp
+	core/HostedInstrument.cpp
+	core/HostedPluginModels.cpp
 	core/PluginProcessSupervisor.cpp
 	core/PluginFactory.cpp
 	core/PresetPreviewPlayHandle.cpp

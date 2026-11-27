@@ -66,6 +66,8 @@ public:
 	bool process(const PluginProcessBlock& block) override;
 
 	int latencySamples() const override;
+	void setTempo(double bpm) override;
+	void setPlaying(bool playing) override;
 
 	int programCount() const override;
 	int currentProgram() const override;
