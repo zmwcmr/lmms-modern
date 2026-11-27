@@ -85,6 +85,9 @@ public:
 	QString bundlePath() const override { return m_bundlePath; }
 	QString classId() const override { return m_classId; }
 
+	std::vector<BusInfo> inputBuses() const override;
+	std::vector<BusInfo> outputBuses() const override;
+
 	const std::vector<Parameter>& parameters() const override
 	{
 		return m_parameters;

@@ -72,6 +72,15 @@ private slots:
 		QVERIFY(host.isLoaded());
 		QCOMPARE(host.format(), PluginFormat::Vst2);
 		QVERIFY(!host.parameters().empty());
+		for (const auto& bus : host.inputBuses())
+		{
+			QCOMPARE(bus.role, PluginBusRole::Main);
+			QVERIFY(bus.channels > 0);
+		}
+		const auto outputBuses = host.outputBuses();
+		QCOMPARE(outputBuses.size(), 1u);
+		QCOMPARE(outputBuses[0].channels, 2);
+		QCOMPARE(outputBuses[0].role, PluginBusRole::Main);
 
 		const uint32_t id = host.parameters().front().id;
 		QVERIFY(host.setParameter(id, 0.5));

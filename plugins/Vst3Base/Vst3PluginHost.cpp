@@ -92,7 +92,8 @@ PluginHostCapabilities Vst3PluginHost::capabilities() const
 		&& !m_host->units().empty();
 	capabilities.sampleAccurateParameters = true;
 	capabilities.supportsMidiOut = false;
-	capabilities.multipleBuses = false;
+	capabilities.multipleBuses = inputBuses().size() > 1
+		|| outputBuses().size() > 1;
 	capabilities.parameterKind = PluginParameterKind::NormalisedId;
 	capabilities.stateKind = PluginStateKind::ComponentController;
 	return capabilities;
@@ -151,6 +152,56 @@ void Vst3PluginHost::unload()
 bool Vst3PluginHost::isLoaded() const
 {
 	return m_host != nullptr && m_host->isLoaded();
+}
+
+
+
+
+std::vector<PluginBusInfo> Vst3PluginHost::inputBuses() const
+{
+	if (m_host == nullptr)
+	{
+		return PluginHost::inputBuses();
+	}
+	std::vector<PluginBusInfo> buses;
+	for (const auto& bus : m_host->inputBuses())
+	{
+		PluginBusInfo info;
+		info.name = bus.name;
+		info.channels = bus.channels;
+		info.isInput = true;
+		info.optional = !bus.active;
+		info.role = bus.isMain ? PluginBusRole::Main
+			: (bus.name.contains(QStringLiteral("side"), Qt::CaseInsensitive)
+				? PluginBusRole::Sidechain : PluginBusRole::Auxiliary);
+		buses.push_back(info);
+	}
+	return buses;
+}
+
+
+
+
+std::vector<PluginBusInfo> Vst3PluginHost::outputBuses() const
+{
+	if (m_host == nullptr)
+	{
+		return PluginHost::outputBuses();
+	}
+	std::vector<PluginBusInfo> buses;
+	for (const auto& bus : m_host->outputBuses())
+	{
+		PluginBusInfo info;
+		info.name = bus.name;
+		info.channels = bus.channels;
+		info.isInput = false;
+		info.optional = !bus.active;
+		info.role = bus.isMain ? PluginBusRole::Main
+			: (bus.name.contains(QStringLiteral("side"), Qt::CaseInsensitive)
+				? PluginBusRole::Sidechain : PluginBusRole::Auxiliary);
+		buses.push_back(info);
+	}
+	return buses;
 }
 
 

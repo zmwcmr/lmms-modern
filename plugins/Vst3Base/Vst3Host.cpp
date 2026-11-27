@@ -902,6 +902,8 @@ struct Vst3Host::Impl
 
 	std::vector<int> inputBusChannels;
 	std::vector<int> outputBusChannels;
+	std::vector<Vst3HostBase::BusInfo> inputBusInfos;
+	std::vector<Vst3HostBase::BusInfo> outputBusInfos;
 	int mainInputBus = -1;
 	int mainOutputBus = -1;
 
@@ -1208,6 +1210,8 @@ void Vst3Host::Impl::unload()
 	programStepCount = 0;
 	inputBusChannels.clear();
 	outputBusChannels.clear();
+	inputBusInfos.clear();
+	outputBusInfos.clear();
 	inputBusBuffers.clear();
 	outputBusBuffers.clear();
 	inputChannelPointers.clear();
@@ -1457,6 +1461,8 @@ void Vst3Host::Impl::setupBuses()
 {
 	inputBusChannels.clear();
 	outputBusChannels.clear();
+	inputBusInfos.clear();
+	outputBusInfos.clear();
 	mainInputBus = -1;
 	mainOutputBus = -1;
 
@@ -1475,6 +1481,15 @@ void Vst3Host::Impl::setupBuses()
 			continue;
 		}
 		inputBusChannels.push_back(std::max(0, info.channel_count));
+		Vst3HostBase::BusInfo busInfo;
+		busInfo.channels = std::max(0, info.channel_count);
+		busInfo.isInput = true;
+		busInfo.isMain = info.bus_type == V3_MAIN;
+		busInfo.active = (info.flags & V3_DEFAULT_ACTIVE) != 0;
+		busInfo.name = info.bus_name[0] != 0
+			? QString::fromUtf16(reinterpret_cast<const ushort*>(info.bus_name))
+			: QStringLiteral("Input %1").arg(bus + 1);
+		inputBusInfos.push_back(busInfo);
 		if (mainInputBus < 0 && info.bus_type == V3_MAIN)
 		{
 			mainInputBus = bus;
@@ -1489,6 +1504,15 @@ void Vst3Host::Impl::setupBuses()
 			continue;
 		}
 		outputBusChannels.push_back(std::max(0, info.channel_count));
+		Vst3HostBase::BusInfo busInfo;
+		busInfo.channels = std::max(0, info.channel_count);
+		busInfo.isInput = false;
+		busInfo.isMain = info.bus_type == V3_MAIN;
+		busInfo.active = (info.flags & V3_DEFAULT_ACTIVE) != 0;
+		busInfo.name = info.bus_name[0] != 0
+			? QString::fromUtf16(reinterpret_cast<const ushort*>(info.bus_name))
+			: QStringLiteral("Output %1").arg(bus + 1);
+		outputBusInfos.push_back(busInfo);
 		if (mainOutputBus < 0 && info.bus_type == V3_MAIN)
 		{
 			mainOutputBus = bus;
@@ -1539,6 +1563,10 @@ void Vst3Host::Impl::setupBuses()
 				static_cast<int32_t>(bus), &info) == V3_OK)
 		{
 			inputBusChannels[bus] = std::max(0, info.channel_count);
+			if (bus < inputBusInfos.size())
+			{
+				inputBusInfos[bus].channels = std::max(0, info.channel_count);
+			}
 		}
 	}
 	for (size_t bus = 0; bus < outputBusChannels.size(); ++bus)
@@ -1548,6 +1576,10 @@ void Vst3Host::Impl::setupBuses()
 				static_cast<int32_t>(bus), &info) == V3_OK)
 		{
 			outputBusChannels[bus] = std::max(0, info.channel_count);
+			if (bus < outputBusInfos.size())
+			{
+				outputBusInfos[bus].channels = std::max(0, info.channel_count);
+			}
 		}
 	}
 
@@ -1771,6 +1803,22 @@ void Vst3Host::setParameterChangeCallback(
 const std::vector<Vst3Host::Parameter>& Vst3Host::parameters() const
 {
 	return m_impl->parameters;
+}
+
+
+
+
+std::vector<Vst3Host::BusInfo> Vst3Host::inputBuses() const
+{
+	return m_impl->inputBusInfos;
+}
+
+
+
+
+std::vector<Vst3Host::BusInfo> Vst3Host::outputBuses() const
+{
+	return m_impl->outputBusInfos;
 }
 
 bool Vst3Host::setParameterNormalised(uint32_t id, double value)
