@@ -26,6 +26,7 @@
 
 #include <QtTest>
 
+#include "AudioEngine.h"
 #include "AutomatableModel.h"
 #include "AutomationClip.h"
 #include "AutomationTrack.h"
@@ -40,6 +41,7 @@ private slots:
 	void initTestCase()
 	{
 		lmms::Engine::init(true);
+		lmms::Engine::audioEngine()->audioDev()->stopProcessing();
 	}
 
 	void cleanupTestCase()
