@@ -87,6 +87,19 @@ if(LMMS_HAVE_LV2)
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-ui.lv2/manifest.ttl" COPYONLY)
 	configure_file(plugins/fake-lv2-crash-ui/crashui.ttl
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-ui.lv2/crashui.ttl" COPYONLY)
+
+	add_library(FakeLv2Sidechain MODULE plugins/fake-lv2-sidechain/sidechain.c)
+	target_include_directories(FakeLv2Sidechain PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Sidechain PROPERTIES
+		PREFIX ""
+		SUFFIX ".so"
+		OUTPUT_NAME "sidechain"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2"
+	)
+	configure_file(plugins/fake-lv2-sidechain/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-sidechain/sidechain.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/sidechain.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -256,12 +269,16 @@ if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2CrashDsp AND TARGET FakeLv2CrashUi)
 		add_dependencies(Lv2HostClientTest FakeLv2CrashDsp FakeLv2CrashUi)
 	endif()
+	if(TARGET FakeLv2Sidechain)
+		add_dependencies(Lv2HostClientTest FakeLv2Sidechain)
+	endif()
 	target_compile_definitions(Lv2HostClientTest PRIVATE
 		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
 		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>"
 		LMMS_FAKE_LV2_CRASH_DSP_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashDsp>"
-		LMMS_FAKE_LV2_CRASH_UI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashUi>")
+		LMMS_FAKE_LV2_CRASH_UI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashUi>"
+		LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
 	target_include_directories(Lv2HostClientTest PRIVATE
 		${Lilv_INCLUDE_DIRS}
 		${LV2_INCLUDE_DIRS})
@@ -270,6 +287,11 @@ endif()
 
 if(TARGET Lv2PluginHostTest AND TARGET FakeLv2Gain)
 	add_dependencies(Lv2PluginHostTest FakeLv2Gain)
+	if(TARGET FakeLv2Sidechain)
+		add_dependencies(Lv2PluginHostTest FakeLv2Sidechain)
+		target_compile_definitions(Lv2PluginHostTest PRIVATE
+			LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
+	endif()
 	if(TARGET lmms-lv2-host)
 		add_dependencies(Lv2PluginHostTest lmms-lv2-host)
 		add_test(NAME Lv2PluginHostTestRemote COMMAND Lv2PluginHostTest)

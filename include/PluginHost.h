@@ -118,11 +118,36 @@ struct PluginLoadRequest
 	bool isInstrument = false;
 };
 
-/*! A non-owning planar audio block.
+enum class PluginBusRole
+{
+	Main,
+	Sidechain,
+	Auxiliary,
+};
+
+/*! Description of one plugin input or output bus. */
+struct PluginBusInfo
+{
+	QString name;
+	int channels = 2;
+	bool isInput = true;
+	PluginBusRole role = PluginBusRole::Main;
+	bool optional = false;
+};
+
+/*! One planar bus inside a PluginProcessBlock. */
+struct PluginBusBlock
+{
+	float* const* channels = nullptr;
+	int channelCount = 0;
+};
+
+/*! A non-owning audio block.
  *
- *  `inputs` and `outputs` point to arrays of channel pointers; each channel
- *  holds `frames` floats. Instruments may pass no inputs. The adapter never
- *  keeps the pointers after process() returns.
+ *  The legacy `inputs`/`outputs` fields describe one main bus. When
+ *  `inputBusCount`/`outputBusCount` are non-zero, the bus arrays describe the
+ *  layout reported by PluginHost::inputBuses()/outputBuses() instead. The
+ *  adapter never keeps the pointers after process() returns.
  */
 struct PluginProcessBlock
 {
@@ -131,6 +156,25 @@ struct PluginProcessBlock
 	int inputChannels = 0;
 	int outputChannels = 0;
 	int frames = 0;
+
+	const PluginBusBlock* inputBuses = nullptr;
+	int inputBusCount = 0;
+	PluginBusBlock* outputBuses = nullptr;
+	int outputBusCount = 0;
+
+	//! Convenience constructor for the common one-main-bus case.
+	static PluginProcessBlock singleBus(float* const* inputs,
+		int inputChannels, float* const* outputs, int outputChannels,
+		int frames)
+	{
+		PluginProcessBlock block;
+		block.inputs = inputs;
+		block.outputs = outputs;
+		block.inputChannels = inputChannels;
+		block.outputChannels = outputChannels;
+		block.frames = frames;
+		return block;
+	}
 };
 
 struct PluginMidiEvent
@@ -197,6 +241,18 @@ public:
 
 	virtual PluginFormat format() const = 0;
 	virtual PluginHostCapabilities capabilities() const = 0;
+
+	//! Bus layout in plugin order. The default is one main stereo bus.
+	virtual std::vector<PluginBusInfo> inputBuses() const
+	{
+		return { PluginBusInfo{ QStringLiteral("Main"), 2, true,
+			PluginBusRole::Main, false } };
+	}
+	virtual std::vector<PluginBusInfo> outputBuses() const
+	{
+		return { PluginBusInfo{ QStringLiteral("Main"), 2, false,
+			PluginBusRole::Main, false } };
+	}
 
 	virtual bool load(const PluginLoadRequest& request,
 		QString* error = nullptr) = 0;

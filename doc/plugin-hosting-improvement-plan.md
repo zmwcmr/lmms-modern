@@ -391,6 +391,14 @@ and LV2 each grow their own copy of the routing code.
 
 Tasks:
 
+- [x] Add bus descriptors to `PluginHost` (`PluginBusInfo`,
+      `PluginBusRole`) and a bus-aware `PluginProcessBlock`; the legacy flat
+      fields still describe one main bus.
+- [x] Report real LV2 buses: main and sidechain audio ports are grouped by
+      `lv2:isSideChain`. This also fixed the property name (it was checked as
+      `isSidechain`, so LV2 sidechain ports were never detected). The new
+      `fake-lv2-sidechain` test plugin covers the layout.
+- [ ] Report VST3 and VST2 bus layouts from their component/pin metadata.
 - [ ] Add an aux/sidechain bus to the LMMS effect/instrument routing model.
 - [ ] Map one sidechain input to VST2/LV2 plugins where declared.
 - [ ] Add multi-output track routing (first step: two stereo pairs).

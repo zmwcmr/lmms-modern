@@ -67,6 +67,9 @@ public:
 	PluginFormat format() const override;
 	PluginHostCapabilities capabilities() const override;
 
+	std::vector<PluginBusInfo> inputBuses() const override;
+	std::vector<PluginBusInfo> outputBuses() const override;
+
 	bool load(const PluginLoadRequest& request,
 		QString* error = nullptr) override;
 	void unload() override;
@@ -96,6 +99,7 @@ public:
 
 private:
 	void refreshParameters();
+	std::vector<PluginBusInfo> busesFor(bool input) const;
 	Lv2Ports::Control* controlAt(uint32_t id) const;
 	void copyInput(const PluginProcessBlock& block);
 	void copyOutput(const PluginProcessBlock& block) const;

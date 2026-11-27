@@ -2120,7 +2120,7 @@ void Lv2Proc::dumpPort(std::size_t num)
 bool Lv2Proc::portIsSideChain(const LilvPlugin *plugin, const LilvPort *port)
 {
 	return	lilv_port_has_property(plugin, port,
-									uri(LV2_CORE_PREFIX "isSidechain").get());
+									uri(LV2_CORE_PREFIX "isSideChain").get());
 }
 
 

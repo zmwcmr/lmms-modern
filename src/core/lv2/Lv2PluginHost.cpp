@@ -106,6 +106,77 @@ PluginFormat Lv2PluginHost::format() const
 
 
 
+std::vector<PluginBusInfo> Lv2PluginHost::inputBuses() const
+{
+	return busesFor(true);
+}
+
+
+
+
+std::vector<PluginBusInfo> Lv2PluginHost::outputBuses() const
+{
+	return busesFor(false);
+}
+
+
+
+
+std::vector<PluginBusInfo> Lv2PluginHost::busesFor(bool input) const
+{
+	std::vector<PluginBusInfo> buses;
+	if (!m_proc)
+	{
+		return buses;
+	}
+
+	int mainChannels = 0;
+	int sidechainChannels = 0;
+	bool mainOptional = true;
+	for (std::size_t index = 0; index < m_proc->portNum(); ++index)
+	{
+		auto* port = m_proc->port(index);
+		if (port == nullptr || port->m_type != Lv2Ports::Type::Audio)
+		{
+			continue;
+		}
+		const bool isInput = port->m_flow == Lv2Ports::Flow::Input;
+		if (isInput != input)
+		{
+			continue;
+		}
+		auto* audio = Lv2Ports::dcast<Lv2Ports::Audio>(port);
+		if (audio == nullptr)
+		{
+			continue;
+		}
+		if (audio->isSideChain())
+		{
+			++sidechainChannels;
+		}
+		else
+		{
+			++mainChannels;
+			mainOptional = mainOptional && audio->isOptional();
+		}
+	}
+
+	if (mainChannels > 0)
+	{
+		buses.push_back(PluginBusInfo{ QStringLiteral("Main"), mainChannels,
+			input, PluginBusRole::Main, mainOptional });
+	}
+	if (sidechainChannels > 0)
+	{
+		buses.push_back(PluginBusInfo{ QStringLiteral("Sidechain"),
+			sidechainChannels, input, PluginBusRole::Sidechain, true });
+	}
+	return buses;
+}
+
+
+
+
 PluginHostCapabilities Lv2PluginHost::capabilities() const
 {
 	PluginHostCapabilities capabilities;
@@ -117,7 +188,8 @@ PluginHostCapabilities Lv2PluginHost::capabilities() const
 	capabilities.supportsUnits = false;
 	capabilities.sampleAccurateParameters = false;
 	capabilities.supportsMidiOut = true;
-	capabilities.multipleBuses = false;
+	capabilities.multipleBuses = inputBuses().size() > 1
+		|| outputBuses().size() > 1;
 	capabilities.parameterKind = PluginParameterKind::PortIndex;
 	capabilities.stateKind = PluginStateKind::Lv2Bundle;
 	return capabilities;
