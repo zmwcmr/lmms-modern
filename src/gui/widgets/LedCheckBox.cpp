@@ -105,9 +105,10 @@ void LedCheckBox::setLedColor(LedColor color)
 void LedCheckBox::onTextUpdated()
 {
 	QFontMetrics const fm = fontMetrics();
+	const QSize ledSize = embed::logicalSize(m_ledOffPixmap);
 
-	int const width = m_ledOffPixmap.width() + 5 + fm.horizontalAdvance(text());
-	int const height = m_legacyMode ? m_ledOffPixmap.height() : qMax(m_ledOffPixmap.height(), fm.height());
+	int const width = ledSize.width() + 5 + fm.horizontalAdvance(text());
+	int const height = m_legacyMode ? ledSize.height() : qMax(ledSize.height(), fm.height());
 
 	setFixedSize(width, height);
 }
@@ -143,10 +144,11 @@ void LedCheckBox::paintLegacy(QPaintEvent * pe)
 
 	p.drawPixmap(0, 0, model()->value() ? m_ledOnPixmap : m_ledOffPixmap);
 
+	const int ledWidth = embed::logicalSize(m_ledOffPixmap).width();
 	p.setPen(legacyTextShadowColor());
-	p.drawText(m_ledOffPixmap.width() + 4, 11, text());
+	p.drawText(ledWidth + 4, 11, text());
 	p.setPen(legacyTextColor());
-	p.drawText(m_ledOffPixmap.width() + 3, 10, text());
+	p.drawText(ledWidth + 3, 10, text());
 }
 
 void LedCheckBox::paintNonLegacy(QPaintEvent * pe)
@@ -154,11 +156,12 @@ void LedCheckBox::paintNonLegacy(QPaintEvent * pe)
 	QPainter p(this);
 
 	auto drawnPixmap = model()->value() ? m_ledOnPixmap : m_ledOffPixmap;
+	const QSize ledSize = embed::logicalSize(drawnPixmap);
 
-	p.drawPixmap(0, rect().height() / 2 - drawnPixmap.height() / 2, drawnPixmap);
+	p.drawPixmap(0, rect().height() / 2 - ledSize.height() / 2, drawnPixmap);
 
 	QRect r = rect();
-	r -= QMargins(m_ledOffPixmap.width() + 5, 0, 0, 0);
+	r -= QMargins(embed::logicalSize(m_ledOffPixmap).width() + 5, 0, 0, 0);
 	p.drawText(r, text());
 }
 
