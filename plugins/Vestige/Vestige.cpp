@@ -57,6 +57,7 @@
 #include "SubWindow.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
+#include "Vst2PluginHost.h"
 #include "VstSubPluginFeatures.h"
 
 namespace lmms
@@ -155,7 +156,10 @@ private:
 
 Vst2Instrument::Vst2Instrument( InstrumentTrack * _instrument_track,
 		const Plugin::Descriptor::SubPluginFeatures::Key* key ) :
-	Instrument(_instrument_track, &vestige_plugin_descriptor, nullptr, Flag::IsSingleStreamed | Flag::IsMidiBased),
+	HostedInstrument(_instrument_track, &vestige_plugin_descriptor, nullptr,
+		std::make_unique<Vst2PluginHost>(),
+		Flag::IsSingleStreamed | Flag::IsMidiBased),
+	m_vst2Host( nullptr ),
 	m_plugin( nullptr ),
 	m_pluginMutex(),
 	m_subWindow( nullptr ),
@@ -164,6 +168,8 @@ Vst2Instrument::Vst2Instrument( InstrumentTrack * _instrument_track,
 	p_subWindow( nullptr ),
 	paramCount( 0 )
 {
+	m_vst2Host = static_cast<Vst2PluginHost*>(host());
+
 	// now we need a play-handle which cares for calling play()
 	auto iph = new InstrumentPlayHandle(this, _instrument_track);
 	Engine::audioEngine()->addPlayHandle( iph );
@@ -508,52 +514,60 @@ void Vst2Instrument::loadFile( const QString & _file )
 	// initialization runs the Qt event loop, and event handlers such as
 	// the periodic latency timer take this mutex. Holding it here can
 	// deadlock the GUI thread while a slow plugin is starting.
-	auto* plugin = new VstInstrumentPlugin( m_pluginDLL );
-	if( !plugin->failed() )
+	m_vst2Host->setPluginFactory([](const QString& path) {
+		return std::make_unique<VstInstrumentPlugin>(path);
+	});
+	PluginLoadRequest request;
+	request.path = m_pluginDLL;
+	request.sampleRate = Engine::audioEngine()->outputSampleRate();
+	request.maxBlockSize = Engine::audioEngine()->framesPerPeriod();
+	QString loadError;
+	const bool loaded = m_vst2Host->load(request, &loadError);
+	VstPlugin* plugin = m_vst2Host->nativePlugin();
+	if( !loaded || plugin == nullptr )
 	{
-		connect(plugin, &VstPlugin::midiOutEvent, this,
-			[this](int /*deltaFrames*/, const QByteArray& data)
-			{
-				if (data.isEmpty()) { return; }
-				const auto status = static_cast<quint8>(data[0]);
-				const auto type = static_cast<MidiEventTypes>(status & 0xF0);
-				if (type == MidiSysEx) { return; }
-				const auto channel = static_cast<int8_t>(status & 0x0F);
-				const auto param1 = data.size() > 1
-					? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
-				const auto param2 = data.size() > 2
-					? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
-
-				std::lock_guard<std::mutex> lock(m_midiOutMutex);
-				if (m_midiOutQueue.size() < 4096)
-				{
-					m_midiOutQueue.emplace_back(type, channel, param1, param2,
-						nullptr, MidiEvent::Source::Internal);
-				}
-			}, Qt::DirectConnection);
-		connect(plugin, &VstPlugin::parameterAutomated, this,
-			&Vst2Instrument::handleParameterAutomated,
-			Qt::QueuedConnection);
-		connect(plugin, &VstPlugin::parameterGestureBegin, this,
-			&Vst2Instrument::handleParameterGestureBegin,
-			Qt::QueuedConnection);
-		connect(plugin, &VstPlugin::parameterGestureEnd, this,
-			&Vst2Instrument::handleParameterGestureEnd,
-			Qt::QueuedConnection);
+		closePlugin();
+		delete tf;
+		collectErrorForUI(loadError.isEmpty()
+			? VstPlugin::tr( "The VST plugin %1 could not be loaded." ).arg( m_pluginDLL )
+			: loadError);
+		m_pluginDLL = "";
+		return;
 	}
+
+	connect(plugin, &VstPlugin::midiOutEvent, this,
+		[this](int /*deltaFrames*/, const QByteArray& data)
+		{
+			if (data.isEmpty()) { return; }
+			const auto status = static_cast<quint8>(data[0]);
+			const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+			if (type == MidiSysEx) { return; }
+			const auto channel = static_cast<int8_t>(status & 0x0F);
+			const auto param1 = data.size() > 1
+				? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
+			const auto param2 = data.size() > 2
+				? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
+
+			std::lock_guard<std::mutex> lock(m_midiOutMutex);
+			if (m_midiOutQueue.size() < 4096)
+			{
+				m_midiOutQueue.emplace_back(type, channel, param1, param2,
+					nullptr, MidiEvent::Source::Internal);
+			}
+		}, Qt::DirectConnection);
+	connect(plugin, &VstPlugin::parameterAutomated, this,
+		&Vst2Instrument::handleParameterAutomated,
+		Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureBegin, this,
+		&Vst2Instrument::handleParameterGestureBegin,
+		Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureEnd, this,
+		&Vst2Instrument::handleParameterGestureEnd,
+		Qt::QueuedConnection);
 
 	{
 		QMutexLocker lock( &m_pluginMutex );
 		m_plugin = plugin;
-	}
-
-	if( plugin->failed() )
-	{
-		closePlugin();
-		delete tf;
-		collectErrorForUI( VstPlugin::tr( "The VST plugin %1 could not be loaded." ).arg( m_pluginDLL ) );
-		m_pluginDLL = "";
-		return;
 	}
 
 	if ( !(instrumentTrack() != nullptr && instrumentTrack()->isPreviewMode()))
@@ -579,19 +593,8 @@ void Vst2Instrument::play( SampleFrame* _buf )
 {
 	if (!m_pluginMutex.tryLock(Engine::getSong()->isExporting() ? -1 : 0)) {return;}
 
-	if( m_plugin == nullptr )
-	{
-		m_pluginMutex.unlock();
-		return;
-	}
-
-	m_plugin->process( nullptr, _buf );
+	HostedInstrument::play(_buf);
 	drainMidiOutQueue();
-
-	if (auto* track = instrumentTrack())
-	{
-		track->audioBusHandle()->setSourceLatency(m_plugin->latency());
-	}
 
 	m_pluginMutex.unlock();
 }
@@ -628,7 +631,7 @@ f_cnt_t Vst2Instrument::latency() const
 	{
 		return 0;
 	}
-	const f_cnt_t value = m_plugin != nullptr ? m_plugin->latency() : 0;
+	const f_cnt_t value = HostedInstrument::latency();
 	m_pluginMutex.unlock();
 	return value;
 }
@@ -692,8 +695,11 @@ void Vst2Instrument::closePlugin( void )
 	}
 
 	m_pluginMutex.lock();
-	delete m_plugin;
 	m_plugin = nullptr;
+	if (m_vst2Host != nullptr)
+	{
+		m_vst2Host->unload();
+	}
 	m_pluginMutex.unlock();
 }
 

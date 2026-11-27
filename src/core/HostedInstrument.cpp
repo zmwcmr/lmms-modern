@@ -109,8 +109,19 @@ void HostedInstrument::play(SampleFrame* workingBuffer)
 
 	if (auto* song = Engine::getSong())
 	{
-		m_host->setTempo(song->getTempo());
-		m_host->setPlaying(song->isPlaying());
+		const double tempo = song->getTempo();
+		const bool playing = song->isPlaying();
+		if (!m_transportKnown || tempo != m_lastTempo)
+		{
+			m_host->setTempo(tempo);
+			m_lastTempo = tempo;
+		}
+		if (!m_transportKnown || playing != m_lastPlaying)
+		{
+			m_host->setPlaying(playing);
+			m_lastPlaying = playing;
+		}
+		m_transportKnown = true;
 	}
 
 	m_models.queueChanges(frames);
@@ -134,7 +145,8 @@ void HostedInstrument::play(SampleFrame* workingBuffer)
 
 	if (auto* track = instrumentTrack())
 	{
-		track->audioBusHandle()->setSourceLatency(latency());
+		track->audioBusHandle()->setSourceLatency(
+			static_cast<f_cnt_t>(m_host->latencySamples()));
 	}
 }
 

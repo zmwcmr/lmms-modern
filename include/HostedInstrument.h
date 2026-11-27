@@ -81,6 +81,9 @@ private:
 	HostedPluginModels m_models;
 	std::vector<float> m_outputLeft;
 	std::vector<float> m_outputRight;
+	double m_lastTempo = -1.0;
+	bool m_lastPlaying = false;
+	bool m_transportKnown = false;
 };
 
 } // namespace lmms

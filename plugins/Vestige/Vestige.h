@@ -35,6 +35,7 @@
 #include <QPointer>
 #include <QSet>
 
+#include "HostedInstrument.h"
 #include "Instrument.h"
 #include "InstrumentView.h"
 #include "MidiEvent.h"
@@ -50,6 +51,7 @@ namespace lmms
 {
 
 class FloatModel;
+class Vst2PluginHost;
 class VstPlugin;
 
 namespace gui
@@ -61,7 +63,7 @@ class VstPluginKnob;
 } // namespace gui
 
 
-class Vst2Instrument : public Instrument
+class Vst2Instrument : public HostedInstrument
 {
 	Q_OBJECT
 public:
@@ -99,6 +101,7 @@ private:
 	void sendParameter(int index, FloatModel* model);
 
 
+	Vst2PluginHost* m_vst2Host = nullptr;
 	VstPlugin * m_plugin;
 	mutable QMutex m_pluginMutex;
 
