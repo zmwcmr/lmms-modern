@@ -75,61 +75,6 @@ HANDLE getRemotePluginJob()
 namespace lmms
 {
 
-// simple helper thread monitoring our RemotePlugin - if process terminates
-// unexpectedly invalidate plugin so LMMS doesn't lock up
-ProcessWatcher::ProcessWatcher( RemotePlugin * _p ) :
-	QThread(),
-	m_plugin( _p ),
-	m_quit( false )
-{
-}
-
-
-void ProcessWatcher::run()
-{
-	auto& process = m_plugin->m_process;
-	process.start(m_plugin->m_exec, m_plugin->m_args);
-
-#ifdef LMMS_BUILD_WIN32
-	// Add the process to our job so it is killed if we crash
-	if (process.waitForStarted(-1))
-	{
-		if (const auto processHandle = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, process.processId()))
-		{
-			// Ensure the process is still running, otherwise the handle we
-			// obtained may be for a different process that happened to reuse
-			// the same process id.
-			// QProcess::state() alone is insufficient as it only returns a
-			// cached state variable that is updated asynchronously. To query
-			// the process itself, we can use QProcess::waitForFinished() with a
-			// zero timeout, but that too is insufficient as it fails if the
-			// process has already finished. Therefore, we check both.
-			if (!process.waitForFinished(0) && process.state() == QProcess::Running)
-			{
-				AssignProcessToJobObject(getRemotePluginJob(), processHandle);
-			}
-			CloseHandle(processHandle);
-		}
-	}
-#endif // LMMS_BUILD_WIN32
-
-	exec();
-	process.moveToThread(m_plugin->thread());
-	while (!m_quit && m_plugin->messagesLeft())
-	{
-		msleep(200);
-	}
-	if (!m_quit)
-	{
-		fprintf(stderr, "remote plugin died! invalidating now.\n");
-		m_plugin->invalidate();
-	}
-}
-
-
-
-
-
 RemotePlugin::RemotePlugin() :
 	QObject(),
 #ifdef SYNC_WITH_SHM_FIFO
@@ -138,7 +83,7 @@ RemotePlugin::RemotePlugin() :
 	RemotePluginBase(),
 #endif
 	m_failed( true ),
-	m_watcher( this ),
+	m_supervisor(PluginProcessSupervisor::Mode::WatcherThread),
 	m_splitChannels( false ),
 	m_audioBufferSize( 0 ),
 	m_inputCount( DEFAULT_CHANNELS ),
@@ -173,14 +118,19 @@ RemotePlugin::RemotePlugin() :
 	}
 #endif
 
-	connect( &m_process, SIGNAL(finished(int,QProcess::ExitStatus)),
+	connect( m_supervisor.process(), SIGNAL(finished(int,QProcess::ExitStatus)),
 		this, SLOT(processFinished(int,QProcess::ExitStatus)),
 		Qt::DirectConnection );
-	connect( &m_process, SIGNAL(errorOccurred(QProcess::ProcessError)),
+	connect( m_supervisor.process(), SIGNAL(errorOccurred(QProcess::ProcessError)),
 			 this, SLOT(processErrored(QProcess::ProcessError)),
 		Qt::DirectConnection );
-	connect( &m_process, SIGNAL(finished(int,QProcess::ExitStatus)),
-		&m_watcher, SLOT(quit()), Qt::DirectConnection );
+	// The old ProcessWatcher invalidated the transport after draining pending
+	// messages; keep that behavior on the watcher thread.
+	connect( &m_supervisor, &PluginProcessSupervisor::crashed, this,
+		[this] { invalidate(); }, Qt::DirectConnection );
+	m_supervisor.setPendingMessagesCallback([this] {
+		return messagesLeft();
+	});
 }
 
 
@@ -188,24 +138,17 @@ RemotePlugin::RemotePlugin() :
 
 RemotePlugin::~RemotePlugin()
 {
-	m_watcher.stop();
-	m_watcher.wait();
-
-	if( m_failed == false )
+	if( m_failed == false && isRunning() )
 	{
-		if( isRunning() )
-		{
+		m_supervisor.stop( [this] {
 			lock();
 			sendMessage( IdQuit );
-
-			m_process.waitForFinished( 1000 );
-			if( m_process.state() != QProcess::NotRunning )
-			{
-				m_process.terminate();
-				m_process.kill();
-			}
 			unlock();
-		}
+		} );
+	}
+	else
+	{
+		m_supervisor.stop();
 	}
 
 #ifndef SYNC_WITH_SHM_FIFO
@@ -262,11 +205,6 @@ bool RemotePlugin::init(const QString &pluginExecutable,
 		return failed();
 	}
 
-	// ensure the watcher is ready in case we're running again
-	// (e.g. 32-bit VST plugins on Windows)
-	m_watcher.wait();
-	m_watcher.reset();
-
 	QStringList args;
 #ifdef SYNC_WITH_SHM_FIFO
 	// swap in and out for bidirectional communication
@@ -277,13 +215,12 @@ bool RemotePlugin::init(const QString &pluginExecutable,
 #endif
 	args << extraArgs;
 #ifndef DEBUG_REMOTE_PLUGIN
-	m_process.setProcessChannelMode( QProcess::ForwardedChannels );
-	m_process.setWorkingDirectory( QCoreApplication::applicationDirPath() );
-	m_exec = exec;
-	m_args = args;
-	// we start the process on the watcher thread to work around QTBUG-8819
-	m_process.moveToThread( &m_watcher );
-	m_watcher.start( QThread::LowestPriority );
+	m_supervisor.process()->setProcessChannelMode( QProcess::ForwardedChannels );
+	m_supervisor.process()->setWorkingDirectory(
+		QCoreApplication::applicationDirPath() );
+	// the supervisor starts the process on the watcher thread to work
+	// around QTBUG-8819
+	m_supervisor.start( exec, args );
 #else
 	qDebug() << exec << args;
 #endif

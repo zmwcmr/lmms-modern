@@ -26,7 +26,6 @@
 #define LMMS_LV2_HOST_CLIENT_H
 
 #include <QObject>
-#include <QProcess>
 #include <QString>
 #include <QStringList>
 
@@ -34,6 +33,7 @@
 
 #include "LmmsTypes.h"
 #include "Lv2HostProtocol.h"
+#include "PluginProcessSupervisor.h"
 #include "RemotePluginBase.h"
 #include "SharedMemory.h"
 #include "lmms_export.h"
@@ -131,7 +131,7 @@ public:
 	const std::vector<float>& controlValues() const { return m_controlSnapshot; }
 
 	//! Process ID of the child, 0 when not running (used by tests).
-	qint64 processId() const { return m_process.processId(); }
+	qint64 processId() const { return m_supervisor.processId(); }
 
 	/*! Process one stereo block.
 	 *
@@ -155,7 +155,7 @@ private:
 	void clearAudioSegment();
 	void silenceOutput(float* const* out, f_cnt_t frames) const;
 
-	QProcess m_process;
+	PluginProcessSupervisor m_supervisor;
 	SharedMemory<float[]> m_audio;
 	std::vector<Lv2HostPort> m_ports;
 	std::vector<lv2host::MidiEventData> m_pendingMidi;

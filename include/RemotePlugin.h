@@ -29,6 +29,7 @@
 #include <QProcess>
 #include <QRecursiveMutex>
 
+#include "PluginProcessSupervisor.h"
 #include "RemotePluginBase.h"
 #include "SharedMemory.h"
 #include "LmmsTypes.h"
@@ -37,35 +38,7 @@ namespace lmms
 {
 
 class MidiEvent;
-class RemotePlugin;
 class SampleFrame;
-
-class ProcessWatcher : public QThread
-{
-	Q_OBJECT
-public:
-	ProcessWatcher( RemotePlugin * );
-	~ProcessWatcher() override = default;
-
-	void stop()
-	{
-		m_quit = true;
-		quit();
-	}
-
-	void reset()
-	{
-		m_quit = false;
-	}
-
-private:
-	void run() override;
-
-	RemotePlugin * m_plugin;
-	volatile bool m_quit;
-
-} ;
-
 
 class LMMS_EXPORT RemotePlugin : public QObject, public RemotePluginBase
 {
@@ -79,7 +52,7 @@ public:
 #ifdef DEBUG_REMOTE_PLUGIN
 		return true;
 #else
-		return m_process.state() != QProcess::NotRunning;
+		return m_supervisor.isRunning();
 #endif // DEBUG_REMOTE_PLUGIN
 	}
 
@@ -159,11 +132,7 @@ private:
 	void resizeSharedProcessingMemory();
 
 
-	QProcess m_process;
-	ProcessWatcher m_watcher;
-
-	QString m_exec;
-	QStringList m_args;
+	PluginProcessSupervisor m_supervisor;
 
 	QRecursiveMutex m_commMutex;
 	bool m_splitChannels;
@@ -179,7 +148,6 @@ private:
 	QString m_socketFile;
 #endif // not SYNC_WITH_SHM_FIFO
 
-	friend class ProcessWatcher;
 
 
 private slots:

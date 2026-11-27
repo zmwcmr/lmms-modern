@@ -56,14 +56,12 @@ Lv2HostClient::Lv2HostClient(QObject* parent) :
 #else
 	RemotePluginBase(),
 #endif
-	m_process()
+	m_supervisor(PluginProcessSupervisor::Mode::Direct, this)
 {
-	m_process.setProcessChannelMode(QProcess::ForwardedChannels);
-	connect(&m_process,
-		QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-		this, [this](int code, QProcess::ExitStatus status) {
-			m_lastExitCode = code;
-			m_lastExitStatus = static_cast<int>(status);
+	connect(&m_supervisor, &PluginProcessSupervisor::crashed,
+		this, [this] {
+			m_lastExitCode = m_supervisor.exitCode();
+			m_lastExitStatus = static_cast<int>(m_supervisor.exitStatus());
 		}, Qt::DirectConnection);
 
 	// Writing to a child that has just died must not raise SIGPIPE and take
@@ -196,8 +194,7 @@ bool Lv2HostClient::start(const QString& hostExecutable, const QString& pluginUr
 	args = QStringList{ m_socketFile, pluginUri };
 #endif
 
-	m_process.start(resolved, args);
-	if (!m_process.waitForStarted(timeoutMs))
+	if (!m_supervisor.start(resolved, args, timeoutMs))
 	{
 		markFailed(tr("Could not start the LV2 host '%1'").arg(resolved));
 		stop();
@@ -252,22 +249,7 @@ void Lv2HostClient::stop()
 {
 	m_stopping = true;
 
-	if (m_process.state() != QProcess::NotRunning)
-	{
-		sendMessage(message(IdQuit));
-
-		m_process.waitForFinished(1000);
-		if (m_process.state() != QProcess::NotRunning)
-		{
-			m_process.terminate();
-			m_process.waitForFinished(500);
-		}
-		if (m_process.state() != QProcess::NotRunning)
-		{
-			m_process.kill();
-			m_process.waitForFinished(500);
-		}
-	}
+	m_supervisor.stop([this] { sendMessage(message(IdQuit)); });
 
 #ifndef SYNC_WITH_SHM_FIFO
 	if (m_socket != -1)
@@ -298,7 +280,7 @@ void Lv2HostClient::stop()
 
 bool Lv2HostClient::isRunning() const
 {
-	return !m_failed && m_process.state() != QProcess::NotRunning;
+	return !m_failed && m_supervisor.isRunning();
 }
 
 
@@ -566,10 +548,11 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 	{
 		if (isInvalid())
 		{
-			m_process.waitForFinished(500);
+			m_supervisor.process()->waitForFinished(500);
 			qWarning() << "LV2 host transport invalidated; process state"
-				<< m_process.state() << "exit code" << m_process.exitCode()
-				<< "exit status" << m_process.exitStatus();
+				<< m_supervisor.process()->state() << "exit code"
+				<< m_supervisor.exitCode() << "exit status"
+				<< m_supervisor.exitStatus();
 			if (m_error.isEmpty())
 			{
 				markFailed(tr("The LV2 host process died"));
@@ -599,10 +582,11 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 
 		if (isInvalid())
 		{
-			m_process.waitForFinished(500);
+			m_supervisor.process()->waitForFinished(500);
 			qWarning() << "LV2 host transport invalidated; process state"
-				<< m_process.state() << "exit code" << m_process.exitCode()
-				<< "exit status" << m_process.exitStatus();
+				<< m_supervisor.process()->state() << "exit code"
+				<< m_supervisor.exitCode() << "exit status"
+				<< m_supervisor.exitStatus();
 			if (m_error.isEmpty())
 			{
 				markFailed(tr("The LV2 host process died"));
@@ -610,7 +594,7 @@ bool Lv2HostClient::waitForReply(int messageId, int timeoutMs)
 			return false;
 		}
 
-		if (m_process.state() == QProcess::NotRunning)
+		if (!m_supervisor.isRunning())
 		{
 			if (!m_stopping)
 			{
