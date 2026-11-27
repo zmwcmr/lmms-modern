@@ -223,10 +223,19 @@ path.
 
 ### Stage 1 — shared kernel
 
-- Extract `ProcessSupervisor` and `SharedAudio` from VST3 and `RemotePlugin`.
-- Port `Lv2HostClient` and `VstPlugin` to the supervisor.
-- Keep every wire format and environment switch unchanged.
-- Acceptance: existing ctest, LV2 crash tests, VST2 smoke test.
+- [x] Extract `ProcessSupervisor`. `PluginProcessSupervisor` now owns the
+      start/stop sequence, the watcher thread, orphan prevention, pending
+      message draining and crash reporting.
+- [x] Port `Lv2HostClient` (direct mode) and `VstPlugin`/`RemotePlugin`
+      (watcher mode) to the supervisor.
+- [x] Keep every wire format and environment switch unchanged.
+- [x] Acceptance: full ctest, LV2 crash tests, VST2 start/play/UI and
+      `kill -9` smoke test.
+- [ ] Extract `SharedAudio`. Deferred to Stage 2: the canonical layout should
+      be defined by the `ProcessBlock` type, and VST3's semaphore-backed
+      segment should only move once the interface exists. Both current
+      clients already use the same planar block layout, so this is a naming
+      and ownership cleanup rather than a protocol change.
 
 ### Stage 2 — `PluginHost` and adapters
 
