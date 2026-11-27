@@ -269,11 +269,24 @@ path.
 
 ### Stage 3 — generic wrappers and Vestige compatibility
 
-- Introduce `HostedInstrument` / `HostedEffect`.
-- `VestigeInstrument` becomes a thin VST2 alias; XML nodes `<vestige>` and
-  `<vstplugin>` keep their exact meaning.
+- [x] `HostedPluginModels`: one FloatModel per `PluginHost` parameter, with
+      configurable XML names (`paramN`, `vst3pN`, `lv2pN`), automation
+      buffers, callbacks and host refresh.
+- [x] `HostedInstrument` / `HostedEffect`: audio block, MIDI, latency,
+      parameter models and a generic state blob.
+- [x] `Vst2Instrument` moved out of `VestigeInstrument`; `VestigeInstrument`
+      is a thin subclass keeping the historical class name and node name.
+- [x] `Vst2Instrument` derives from `HostedInstrument` and routes audio and
+      latency through `Vst2PluginHost`. The native `VstInstrumentPlugin` still
+      provides the MDI editor, parameter gestures and the existing XML.
+- [ ] Move the VST2 parameter models, parameter curves and state to
+      `HostedPluginModels` / `PluginStateBlob` while keeping `paramN`,
+      `chunk`, `numparams`, `guivisible` and `program` byte-compatible.
+- [ ] Switch LV2/VST3 wrappers to the generic bases while keeping their
+      existing XML, views and native editors.
 - Acceptance: old projects load and save byte-compatible state; VST2 UI
-  behavior unchanged.
+  behavior unchanged. The structural alias and audio path are done; parameter
+  and state unification is the remaining part.
 
 ### Stage 4 — scanner unification
 

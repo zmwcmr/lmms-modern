@@ -25,6 +25,7 @@
 #ifndef LMMS_VST2_PLUGIN_HOST_H
 #define LMMS_VST2_PLUGIN_HOST_H
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -56,6 +57,12 @@ public:
 
 	PluginFormat format() const override;
 	PluginHostCapabilities capabilities() const override;
+
+	//! Optional factory for subclasses of VstPlugin (Vestige uses one to
+	//! provide its MDI subwindow editor).
+	using PluginFactory = std::function<std::unique_ptr<VstPlugin>(const QString&)>;
+	void setPluginFactory(PluginFactory factory) { m_factory = std::move(factory); }
+	VstPlugin* nativePlugin() const { return m_plugin.get(); }
 
 	bool load(const PluginLoadRequest& request,
 		QString* error = nullptr) override;
@@ -90,6 +97,7 @@ private:
 	void refreshValues();
 	void ensureBuffers(int frames);
 
+	PluginFactory m_factory;
 	std::unique_ptr<VstPlugin> m_plugin;
 	std::vector<PluginParameterInfo> m_parameters;
 	std::vector<double> m_values;

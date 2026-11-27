@@ -35,6 +35,7 @@
 #include <QPointer>
 #include <QSet>
 
+#include "HostedInstrument.h"
 #include "Instrument.h"
 #include "InstrumentView.h"
 #include "MidiEvent.h"
@@ -50,6 +51,7 @@ namespace lmms
 {
 
 class FloatModel;
+class Vst2PluginHost;
 class VstPlugin;
 
 namespace gui
@@ -61,13 +63,13 @@ class VstPluginKnob;
 } // namespace gui
 
 
-class VestigeInstrument : public Instrument
+class Vst2Instrument : public HostedInstrument
 {
 	Q_OBJECT
 public:
-	VestigeInstrument( InstrumentTrack * _instrument_track,
+	Vst2Instrument( InstrumentTrack * _instrument_track,
 			const Plugin::Descriptor::SubPluginFeatures::Key* key = nullptr );
-	virtual ~VestigeInstrument();
+	virtual ~Vst2Instrument();
 
 	virtual void play( SampleFrame* _working_buffer );
 
@@ -99,6 +101,7 @@ private:
 	void sendParameter(int index, FloatModel* model);
 
 
+	Vst2PluginHost* m_vst2Host = nullptr;
 	VstPlugin * m_plugin;
 	mutable QMutex m_pluginMutex;
 
@@ -125,6 +128,25 @@ private:
 	friend class gui::ManageVestigeInstrumentView;
 
 } ;
+
+
+
+
+/*! Backwards-compatible VST2 instrument name.
+ *
+ *  The implementation lives in Vst2Instrument; this subclass only keeps the
+ *  historical class name used by the plugin descriptor and old project files.
+ */
+class VestigeInstrument : public Vst2Instrument
+{
+	Q_OBJECT
+public:
+	VestigeInstrument(InstrumentTrack* instrumentTrack,
+		const Plugin::Descriptor::SubPluginFeatures::Key* key = nullptr);
+	~VestigeInstrument() override = default;
+};
+
+
 
 
 namespace gui

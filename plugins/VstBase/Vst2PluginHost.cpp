@@ -110,7 +110,9 @@ bool Vst2PluginHost::load(const PluginLoadRequest& request, QString* error)
 
 	try
 	{
-		m_plugin = std::make_unique<VstPlugin>(request.path);
+		m_plugin = m_factory
+			? m_factory(request.path)
+			: std::make_unique<VstPlugin>(request.path);
 	}
 	catch (const std::exception& exception)
 	{

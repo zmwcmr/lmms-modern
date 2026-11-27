@@ -57,6 +57,7 @@
 #include "SubWindow.h"
 #include "TextFloat.h"
 #include "VstPlugin.h"
+#include "Vst2PluginHost.h"
 #include "VstSubPluginFeatures.h"
 
 namespace lmms
@@ -153,9 +154,12 @@ private:
 
 
 
-VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
+Vst2Instrument::Vst2Instrument( InstrumentTrack * _instrument_track,
 		const Plugin::Descriptor::SubPluginFeatures::Key* key ) :
-	Instrument(_instrument_track, &vestige_plugin_descriptor, nullptr, Flag::IsSingleStreamed | Flag::IsMidiBased),
+	HostedInstrument(_instrument_track, &vestige_plugin_descriptor, nullptr,
+		std::make_unique<Vst2PluginHost>(),
+		Flag::IsSingleStreamed | Flag::IsMidiBased),
+	m_vst2Host( nullptr ),
 	m_plugin( nullptr ),
 	m_pluginMutex(),
 	m_subWindow( nullptr ),
@@ -164,6 +168,8 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
 	p_subWindow( nullptr ),
 	paramCount( 0 )
 {
+	m_vst2Host = static_cast<Vst2PluginHost*>(host());
+
 	// now we need a play-handle which cares for calling play()
 	auto iph = new InstrumentPlayHandle(this, _instrument_track);
 	Engine::audioEngine()->addPlayHandle( iph );
@@ -182,7 +188,7 @@ VestigeInstrument::VestigeInstrument( InstrumentTrack * _instrument_track,
 
 
 
-VestigeInstrument::~VestigeInstrument()
+Vst2Instrument::~Vst2Instrument()
 {
 	if (p_subWindow != nullptr) {
 		delete p_subWindow;
@@ -203,7 +209,17 @@ VestigeInstrument::~VestigeInstrument()
 
 
 
-void VestigeInstrument::loadSettings( const QDomElement & _this )
+
+VestigeInstrument::VestigeInstrument(
+		InstrumentTrack* instrumentTrack,
+		const Plugin::Descriptor::SubPluginFeatures::Key* key) :
+	Vst2Instrument(instrumentTrack, key)
+{
+}
+
+
+
+void Vst2Instrument::loadSettings( const QDomElement & _this )
 {
 	QString plugin = _this.attribute( "plugin" );
 	if( plugin.isEmpty() )
@@ -259,7 +275,7 @@ void VestigeInstrument::loadSettings( const QDomElement & _this )
 
 
 
-void VestigeInstrument::setParameter( Model * action )
+void Vst2Instrument::setParameter( Model * action )
 {
 	if (m_updatingParametersFromPlugin)
 	{
@@ -278,7 +294,7 @@ void VestigeInstrument::setParameter( Model * action )
 
 
 
-void VestigeInstrument::sendParameter( int index, FloatModel * model )
+void Vst2Instrument::sendParameter( int index, FloatModel * model )
 {
 	if (m_plugin == nullptr || model == nullptr)
 	{
@@ -332,7 +348,7 @@ void VestigeInstrument::sendParameter( int index, FloatModel * model )
 
 
 
-void VestigeInstrument::handleParameterAutomated( int index, float value )
+void Vst2Instrument::handleParameterAutomated( int index, float value )
 {
 	if (m_updatingParametersFromPlugin || knobFModel == nullptr
 		|| index < 0 || index >= paramCount)
@@ -354,7 +370,7 @@ void VestigeInstrument::handleParameterAutomated( int index, float value )
 
 
 
-void VestigeInstrument::handleParameterGestureBegin( int index )
+void Vst2Instrument::handleParameterGestureBegin( int index )
 {
 	if (knobFModel == nullptr || index < 0 || index >= paramCount
 		|| m_parameterGestures.contains(index))
@@ -375,12 +391,12 @@ void VestigeInstrument::handleParameterGestureBegin( int index )
 
 
 
-void VestigeInstrument::handleParameterGestureEnd( int index )
+void Vst2Instrument::handleParameterGestureEnd( int index )
 {
 	m_parameterGestures.remove(index);
 }
 
-void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString value)
+void Vst2Instrument::handleConfigChange(QString cls, QString attr, QString value)
 {
     Q_UNUSED(cls); Q_UNUSED(attr); Q_UNUSED(value);
     // Disabled for consistency with VST effects that don't implement this. (#3786)
@@ -390,7 +406,7 @@ void VestigeInstrument::handleConfigChange(QString cls, QString attr, QString va
     // }
 }
 
-void VestigeInstrument::reloadPlugin()
+void Vst2Instrument::reloadPlugin()
 {
 	closePlugin();
 	loadFile( m_pluginDLL );
@@ -399,7 +415,7 @@ void VestigeInstrument::reloadPlugin()
 
 
 
-void VestigeInstrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
+void Vst2Instrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
 {
 	_this.setAttribute( "plugin", PathUtil::toShortestRelative(m_pluginDLL) );
 	m_pluginMutex.lock();
@@ -448,7 +464,7 @@ void VestigeInstrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
 
 
 
-QString VestigeInstrument::nodeName( void ) const
+QString Vst2Instrument::nodeName( void ) const
 {
 	return( vestige_plugin_descriptor.name );
 }
@@ -456,7 +472,7 @@ QString VestigeInstrument::nodeName( void ) const
 
 
 
-void VestigeInstrument::loadFile( const QString & _file )
+void Vst2Instrument::loadFile( const QString & _file )
 {
 	QString previousName;
 	{
@@ -498,52 +514,60 @@ void VestigeInstrument::loadFile( const QString & _file )
 	// initialization runs the Qt event loop, and event handlers such as
 	// the periodic latency timer take this mutex. Holding it here can
 	// deadlock the GUI thread while a slow plugin is starting.
-	auto* plugin = new VstInstrumentPlugin( m_pluginDLL );
-	if( !plugin->failed() )
+	m_vst2Host->setPluginFactory([](const QString& path) {
+		return std::make_unique<VstInstrumentPlugin>(path);
+	});
+	PluginLoadRequest request;
+	request.path = m_pluginDLL;
+	request.sampleRate = Engine::audioEngine()->outputSampleRate();
+	request.maxBlockSize = Engine::audioEngine()->framesPerPeriod();
+	QString loadError;
+	const bool loaded = m_vst2Host->load(request, &loadError);
+	VstPlugin* plugin = m_vst2Host->nativePlugin();
+	if( !loaded || plugin == nullptr )
 	{
-		connect(plugin, &VstPlugin::midiOutEvent, this,
-			[this](int /*deltaFrames*/, const QByteArray& data)
-			{
-				if (data.isEmpty()) { return; }
-				const auto status = static_cast<quint8>(data[0]);
-				const auto type = static_cast<MidiEventTypes>(status & 0xF0);
-				if (type == MidiSysEx) { return; }
-				const auto channel = static_cast<int8_t>(status & 0x0F);
-				const auto param1 = data.size() > 1
-					? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
-				const auto param2 = data.size() > 2
-					? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
-
-				std::lock_guard<std::mutex> lock(m_midiOutMutex);
-				if (m_midiOutQueue.size() < 4096)
-				{
-					m_midiOutQueue.emplace_back(type, channel, param1, param2,
-						nullptr, MidiEvent::Source::Internal);
-				}
-			}, Qt::DirectConnection);
-		connect(plugin, &VstPlugin::parameterAutomated, this,
-			&VestigeInstrument::handleParameterAutomated,
-			Qt::QueuedConnection);
-		connect(plugin, &VstPlugin::parameterGestureBegin, this,
-			&VestigeInstrument::handleParameterGestureBegin,
-			Qt::QueuedConnection);
-		connect(plugin, &VstPlugin::parameterGestureEnd, this,
-			&VestigeInstrument::handleParameterGestureEnd,
-			Qt::QueuedConnection);
+		closePlugin();
+		delete tf;
+		collectErrorForUI(loadError.isEmpty()
+			? VstPlugin::tr( "The VST plugin %1 could not be loaded." ).arg( m_pluginDLL )
+			: loadError);
+		m_pluginDLL = "";
+		return;
 	}
+
+	connect(plugin, &VstPlugin::midiOutEvent, this,
+		[this](int /*deltaFrames*/, const QByteArray& data)
+		{
+			if (data.isEmpty()) { return; }
+			const auto status = static_cast<quint8>(data[0]);
+			const auto type = static_cast<MidiEventTypes>(status & 0xF0);
+			if (type == MidiSysEx) { return; }
+			const auto channel = static_cast<int8_t>(status & 0x0F);
+			const auto param1 = data.size() > 1
+				? static_cast<int16_t>(static_cast<quint8>(data[1])) : 0;
+			const auto param2 = data.size() > 2
+				? static_cast<int16_t>(static_cast<quint8>(data[2])) : 0;
+
+			std::lock_guard<std::mutex> lock(m_midiOutMutex);
+			if (m_midiOutQueue.size() < 4096)
+			{
+				m_midiOutQueue.emplace_back(type, channel, param1, param2,
+					nullptr, MidiEvent::Source::Internal);
+			}
+		}, Qt::DirectConnection);
+	connect(plugin, &VstPlugin::parameterAutomated, this,
+		&Vst2Instrument::handleParameterAutomated,
+		Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureBegin, this,
+		&Vst2Instrument::handleParameterGestureBegin,
+		Qt::QueuedConnection);
+	connect(plugin, &VstPlugin::parameterGestureEnd, this,
+		&Vst2Instrument::handleParameterGestureEnd,
+		Qt::QueuedConnection);
 
 	{
 		QMutexLocker lock( &m_pluginMutex );
 		m_plugin = plugin;
-	}
-
-	if( plugin->failed() )
-	{
-		closePlugin();
-		delete tf;
-		collectErrorForUI( VstPlugin::tr( "The VST plugin %1 could not be loaded." ).arg( m_pluginDLL ) );
-		m_pluginDLL = "";
-		return;
 	}
 
 	if ( !(instrumentTrack() != nullptr && instrumentTrack()->isPreviewMode()))
@@ -565,23 +589,12 @@ void VestigeInstrument::loadFile( const QString & _file )
 
 
 
-void VestigeInstrument::play( SampleFrame* _buf )
+void Vst2Instrument::play( SampleFrame* _buf )
 {
 	if (!m_pluginMutex.tryLock(Engine::getSong()->isExporting() ? -1 : 0)) {return;}
 
-	if( m_plugin == nullptr )
-	{
-		m_pluginMutex.unlock();
-		return;
-	}
-
-	m_plugin->process( nullptr, _buf );
+	HostedInstrument::play(_buf);
 	drainMidiOutQueue();
-
-	if (auto* track = instrumentTrack())
-	{
-		track->audioBusHandle()->setSourceLatency(m_plugin->latency());
-	}
 
 	m_pluginMutex.unlock();
 }
@@ -589,7 +602,7 @@ void VestigeInstrument::play( SampleFrame* _buf )
 
 
 
-void VestigeInstrument::drainMidiOutQueue()
+void Vst2Instrument::drainMidiOutQueue()
 {
 	std::vector<MidiEvent> events;
 	{
@@ -609,7 +622,7 @@ void VestigeInstrument::drainMidiOutQueue()
 
 
 
-f_cnt_t VestigeInstrument::latency() const
+f_cnt_t Vst2Instrument::latency() const
 {
 	// This is polled from a GUI timer while the plugin may be starting up.
 	// Waiting for m_pluginMutex here can deadlock the GUI thread when plugin
@@ -618,7 +631,7 @@ f_cnt_t VestigeInstrument::latency() const
 	{
 		return 0;
 	}
-	const f_cnt_t value = m_plugin != nullptr ? m_plugin->latency() : 0;
+	const f_cnt_t value = HostedInstrument::latency();
 	m_pluginMutex.unlock();
 	return value;
 }
@@ -626,7 +639,7 @@ f_cnt_t VestigeInstrument::latency() const
 
 
 
-bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
+bool Vst2Instrument::handleMidiEvent( const MidiEvent& event, const TimePos& time, f_cnt_t offset )
 {
 	m_pluginMutex.lock();
 	if( m_plugin != nullptr )
@@ -641,7 +654,7 @@ bool VestigeInstrument::handleMidiEvent( const MidiEvent& event, const TimePos& 
 
 
 
-void VestigeInstrument::closePlugin( void )
+void Vst2Instrument::closePlugin( void )
 {
 	{
 		std::lock_guard<std::mutex> lock(m_midiOutMutex);
@@ -682,14 +695,17 @@ void VestigeInstrument::closePlugin( void )
 	}
 
 	m_pluginMutex.lock();
-	delete m_plugin;
 	m_plugin = nullptr;
+	if (m_vst2Host != nullptr)
+	{
+		m_vst2Host->unload();
+	}
 	m_pluginMutex.unlock();
 }
 
 
 
-gui::PluginView * VestigeInstrument::instantiateView( QWidget * _parent )
+gui::PluginView * Vst2Instrument::instantiateView( QWidget * _parent )
 {
 	return new gui::VestigeInstrumentView( this, _parent );
 }
