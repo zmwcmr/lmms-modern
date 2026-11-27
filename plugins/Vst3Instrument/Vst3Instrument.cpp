@@ -24,6 +24,8 @@
 
 #include "Vst3Instrument.h"
 
+#include "Vst3PluginHost.h"
+
 #include <algorithm>
 
 #include <QDomElement>
@@ -66,7 +68,8 @@ Plugin::Descriptor PLUGIN_EXPORT vst3instrument_plugin_descriptor =
 
 Vst3Instrument::Vst3Instrument(InstrumentTrack* instrumentTrack,
 	const Plugin::Descriptor::SubPluginFeatures::Key* key) :
-	Instrument(instrumentTrack, &vst3instrument_plugin_descriptor, key,
+	HostedInstrument(instrumentTrack, &vst3instrument_plugin_descriptor, key,
+		std::make_unique<Vst3PluginHost>(),
 		Flag::IsSingleStreamed | Flag::IsMidiBased)
 {
 	if (key != nullptr)
@@ -140,10 +143,12 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 		if (!local->load(file, classId, sampleRate, blockSize, &error))
 		{
 			m_parameterModels.initialize(this, nullptr);
+			static_cast<Vst3PluginHost*>(HostedInstrument::host())->adopt(nullptr);
 			return false;
 		}
 		m_host = std::move(local);
 	}
+	static_cast<Vst3PluginHost*>(HostedInstrument::host())->adopt(m_host.get());
 	m_parameterModels.initialize(this, m_host.get());
 
 	setDisplayName(m_host->name());
@@ -155,6 +160,7 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 void Vst3Instrument::closePlugin()
 {
 	m_parameterModels.setQueueCallback({});
+	static_cast<Vst3PluginHost*>(HostedInstrument::host())->adopt(nullptr);
 	m_host.reset();
 }
 
@@ -180,37 +186,8 @@ void Vst3Instrument::play(SampleFrame* workingBuffer)
 		return;
 	}
 
-	if (m_host == nullptr)
-	{
-		m_mutex.unlock();
-		for (int frame = 0; frame < frames; ++frame)
-		{
-			workingBuffer[frame][0] = 0.0f;
-			workingBuffer[frame][1] = 0.0f;
-		}
-		return;
-	}
-
-	if (static_cast<int>(m_outputLeft.size()) < frames)
-	{
-		m_outputLeft.resize(frames);
-		m_outputRight.resize(frames);
-	}
-
 	m_parameterModels.queueChanges(frames);
-	const double tempo = Engine::getSong() != nullptr
-		? Engine::getSong()->getTempo() : 120.0;
-	const bool playing = Engine::getSong() != nullptr && Engine::getSong()->isPlaying();
-	m_host->setTempo(tempo);
-	m_host->setPlaying(playing);
-	m_host->process(nullptr, nullptr, m_outputLeft.data(),
-		m_outputRight.data(), frames);
-
-	for (int frame = 0; frame < frames; ++frame)
-	{
-		workingBuffer[frame][0] = m_outputLeft[frame];
-		workingBuffer[frame][1] = m_outputRight[frame];
-	}
+	HostedInstrument::play(workingBuffer);
 	m_mutex.unlock();
 }
 
