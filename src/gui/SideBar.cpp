@@ -45,6 +45,8 @@ namespace lmms::gui
 
 namespace
 {
+constexpr int PreviewQuietTime = 24;
+
 int slideDuration(const QWidget* widget)
 {
 	return LmmsStyle::uiAnimationDuration(widget, 240);
@@ -119,8 +121,11 @@ bool SideBarWorkspace::canClipWorkspace() const
 
 void SideBarWorkspace::preparePreview()
 {
-	if (m_layoutDeferred || !m_preparedSnapshot.isNull() || !m_workspace->isVisible()
-		|| !m_workspace->updatesEnabled() || !canClipWorkspace()) { return; }
+	if (!m_preparedSnapshot.isNull()) { return; }
+	// The capture sends paint events itself. Observe the workspace again once it is ready.
+	QCoreApplication::instance()->removeEventFilter(this);
+	if (m_layoutDeferred || !m_workspace->isVisible() || !m_workspace->updatesEnabled()
+		|| !canClipWorkspace()) { return; }
 	m_preparedSnapshot = m_workspace->grab();
 	if (m_preparedSnapshot.isNull()) { return; }
 	QCoreApplication::instance()->installEventFilter(this);
@@ -128,7 +133,6 @@ void SideBarWorkspace::preparePreview()
 
 void SideBarWorkspace::discardPreparedPreview()
 {
-	if (m_preparedSnapshot.isNull()) { return; }
 	QCoreApplication::instance()->removeEventFilter(this);
 	m_preparedSnapshot = QPixmap{};
 }
@@ -148,7 +152,9 @@ bool SideBarWorkspace::eventFilter(QObject* watched, QEvent* event)
 		if (auto* widget = qobject_cast<QWidget*>(watched);
 			widget && (widget == m_workspace || m_workspace->isAncestorOf(widget)))
 		{
-			discardPreparedPreview();
+			// Keep observing while a refresh is pending so it waits for a quiet workspace.
+			m_preparedSnapshot = QPixmap{};
+			emit previewInvalidated();
 		}
 		break;
 	default: break;
@@ -161,6 +167,7 @@ void SideBarWorkspace::freeze()
 	if (m_layoutDeferred || !m_workspace->isVisible() || !m_workspace->updatesEnabled()) { return; }
 	if (m_preparedSnapshot.isNull())
 	{
+		discardPreparedPreview();
 		m_layoutDeferred = canClipWorkspace();
 		return;
 	}
@@ -540,11 +547,17 @@ SideBar::SideBar( Qt::Orientation _orientation, QWidget * _parent ) :
 
 	installEventFilter(this);
 	m_previewTimer.setSingleShot(true);
+	m_previewTimer.setTimerType(Qt::PreciseTimer);
 	connect(&m_previewTimer, &QTimer::timeout, this, [this] {
 		if (!m_panel || m_slideAnimation.isUpdating() || (!underMouse() && !m_panel->underMouse())
 			|| QGuiApplication::mouseButtons() != Qt::NoButton || slideDuration(this) == 0) { return; }
 		auto* splitter = static_cast<SideBarSplitter*>(m_panel->parentWidget());
-		if (auto* workspace = splitter->workspace()) { workspace->preparePreview(); }
+		if (auto* workspace = splitter->workspace())
+		{
+			connect(workspace, &SideBarWorkspace::previewInvalidated, this,
+				&SideBar::schedulePreviewRefresh, Qt::UniqueConnection);
+			workspace->preparePreview();
+		}
 	});
 
 	connect(&m_slideAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
@@ -566,7 +579,7 @@ SideBar::~SideBar()
 
 bool SideBar::eventFilter(QObject* watched, QEvent* event)
 {
-	if (event->type() == QEvent::Enter) { schedulePreview(24); }
+	if (event->type() == QEvent::Enter && !m_previewTimer.isActive()) { schedulePreview(0); }
 	else if (event->type() == QEvent::Leave && (watched == this || watched == m_panel))
 	{
 		QTimer::singleShot(0, this, [this] {
@@ -583,6 +596,11 @@ void SideBar::schedulePreview(int delay)
 {
 	if (!m_panel || (!underMouse() && !m_panel->underMouse()) || slideDuration(this) <= 0) { return; }
 	m_previewTimer.start(delay);
+}
+
+void SideBar::schedulePreviewRefresh()
+{
+	schedulePreview(PreviewQuietTime);
 }
 
 

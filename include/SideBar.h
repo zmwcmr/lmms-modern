@@ -47,6 +47,8 @@ class SlidingSideBarPanel;
 
 class SideBarWorkspace : public QWidget
 {
+	Q_OBJECT
+
 public:
 	SideBarWorkspace(QSplitter* splitter, QMdiArea* workspace);
 	QSize sizeHint() const override;
@@ -55,6 +57,9 @@ public:
 	void discardPreparedPreview();
 	void freeze();
 	void thaw();
+
+signals:
+	void previewInvalidated();
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
@@ -139,6 +144,7 @@ private slots:
 
 private:
 	void schedulePreview(int delay);
+	void schedulePreviewRefresh();
 
 	QButtonGroup m_btnGroup;
 	using ButtonMap = QMap<QToolButton*, SideBarWidget*>;

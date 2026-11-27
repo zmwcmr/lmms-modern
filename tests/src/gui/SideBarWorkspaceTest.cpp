@@ -1,5 +1,6 @@
 #include <QEnterEvent>
 #include <QMdiArea>
+#include <QMoveEvent>
 #include <QPushButton>
 #include <QToolButton>
 #include <QtTest>
@@ -100,6 +101,12 @@ private slots:
 		QEnterEvent enter(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1));
 		QCoreApplication::sendEvent(closeControl, &enter);
 		QTRY_VERIFY(workspace->paintCount > paintsBeforeHover);
+
+		// Changes inside the workspace should refresh the snapshot without another hover event.
+		const auto paintsBeforeInvalidation = workspace->paintCount;
+		QMoveEvent move(QPoint(1, 0), QPoint(0, 0));
+		QCoreApplication::sendEvent(workspace->viewport(), &move);
+		QTRY_VERIFY(workspace->paintCount > paintsBeforeInvalidation);
 		QTest::mouseClick(closeControl, Qt::LeftButton);
 		QVERIFY(!workspace->updatesEnabled());
 		QTRY_COMPARE(workspace->width(), closedWidth);
