@@ -39,6 +39,7 @@ namespace lmms
 {
 
 class VstPlugin;
+struct ParameterEvent;
 
 /*! PluginHost adapter for the remote VST2 host.
  *
@@ -82,6 +83,14 @@ public:
 
 	int latencySamples() const override;
 	void setTempo(double bpm) override;
+
+	//! Send a parameter curve; also keeps the cached value in sync.
+	void sendParameterEvents(uint32_t id,
+		const std::vector<ParameterEvent>& events);
+	//! Re-read all parameter values from the plugin dump.
+	void refreshParameterValues();
+	//! Update the cached value after a plugin-originated change.
+	void noteParameterValue(uint32_t id, double value);
 
 	int programCount() const override;
 	int currentProgram() const override;

@@ -86,6 +86,9 @@ public:
 
 	virtual gui::PluginView* instantiateView( QWidget * _parent );
 
+	//! Index of one of the parameter models, or -1.
+	int indexOfModel(const Model* model) const;
+
 protected slots:
 	void setParameter( lmms::Model * action );
 	void handleConfigChange( QString cls, QString attr, QString value );
@@ -97,6 +100,8 @@ protected slots:
 private:
 	void closePlugin();
 	void drainMidiOutQueue();
+	//! Rebuild the model array view after the host parameter list changed.
+	void setupParameterModels();
 	//! Send one parameter value, or a sample-accurate curve when automated
 	void sendParameter(int index, FloatModel* model);
 
