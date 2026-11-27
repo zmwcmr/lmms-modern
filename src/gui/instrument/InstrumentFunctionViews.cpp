@@ -51,7 +51,7 @@ InstrumentFunctionNoteStackingView::InstrumentFunctionNoteStackingView( Instrume
 	topLayout->addWidget( m_chordsGroupBox );
 
 	auto mainLayout = new QGridLayout(m_chordsGroupBox);
-	mainLayout->setContentsMargins( 8, 18, 8, 8 );
+	mainLayout->setContentsMargins(8, m_chordsGroupBox->titleBarHeight() + 7, 8, 8);
 	mainLayout->setColumnStretch( 0, 1 );
 	mainLayout->setHorizontalSpacing( 20 );
 	mainLayout->setVerticalSpacing( 1 );
@@ -112,7 +112,7 @@ InstrumentFunctionArpeggioView::InstrumentFunctionArpeggioView( InstrumentFuncti
 	topLayout->addWidget( m_arpGroupBox );
 
 	auto mainLayout = new QGridLayout(m_arpGroupBox);
-	mainLayout->setContentsMargins( 8, 18, 8, 8 );
+	mainLayout->setContentsMargins(8, m_arpGroupBox->titleBarHeight() + 7, 8, 8);
 	mainLayout->setColumnStretch( 0, 1 );
 	mainLayout->setHorizontalSpacing( 20 );
 	mainLayout->setVerticalSpacing( 1 );

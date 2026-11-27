@@ -70,7 +70,7 @@ MidiCCRackView::MidiCCRackView(InstrumentTrack * track) :
 
 	// Layout to keep scrollable area under the GroupBox header
 	auto knobsGroupBoxLayout = new QVBoxLayout();
-	knobsGroupBoxLayout->setContentsMargins(5, 16, 5, 5);
+	knobsGroupBoxLayout->setContentsMargins(5, m_midiCCGroupBox->titleBarHeight() + 5, 5, 5);
 
 	m_midiCCGroupBox->setLayout(knobsGroupBoxLayout);
 

@@ -34,7 +34,6 @@
 #include "AutomatableModel.h"
 
 
-class QLineEdit;
 class QListView;
 class QScrollArea;
 
@@ -48,7 +47,6 @@ namespace gui
 
 class ComboBox;
 class GroupBox;
-class TabWidget;
 class LcdSpinBox;
 class LedCheckBox;
 class MidiPortMenu;
@@ -93,10 +91,6 @@ private:
 	// User
 	GroupBox * m_userGroupBox;
 	ComboBox * m_userController;
-
-	// Mapping
-	TabWidget * m_mappingBox;
-	QLineEdit * m_mappingFunction;
 
 	Controller * m_controller;
 	const AutomatableModel * m_targetModel;

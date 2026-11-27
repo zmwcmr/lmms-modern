@@ -24,9 +24,11 @@
  */
 
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QMessageBox>
+#include <QVBoxLayout>
 
 #include <algorithm>
 
@@ -41,7 +43,6 @@
 #include "ComboBox.h"
 #include "GroupBox.h"
 #include "Song.h"
-#include "TabWidget.h"
 #include "ToolButton.h"
 
 #include "embed.h"
@@ -140,30 +141,51 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 	setWindowTitle( tr( "Connection Settings" ) );
 	setModal( true );
 
+	auto* dialogLayout = new QVBoxLayout(this);
+	const auto addSection = [this, dialogLayout](const QString& title, bool showLed = true)
+	{
+		auto* section = new GroupBox(title, this);
+		section->setLedButtonShown(showLed);
+		auto* layout = new QVBoxLayout(section);
+		layout->setContentsMargins(10, section->titleBarHeight() + 10, 10, 10);
+		dialogLayout->addWidget(section);
+		return section;
+	};
+
 	// Midi stuff
-	m_midiGroupBox = new GroupBox( tr( "MIDI CONTROLLER" ), this );
-	m_midiGroupBox->setGeometry( 8, 10, 240, 80 );
+	m_midiGroupBox = addSection(tr("MIDI CONTROLLER"));
 	connect( m_midiGroupBox->model(), SIGNAL(dataChanged()),
 			this, SLOT(midiToggled()));
 	
 	m_midiChannelSpinBox = new LcdSpinBox( 2, m_midiGroupBox,
 			tr( "Input channel" ) );
 	m_midiChannelSpinBox->addTextForValue( 0, "--" );
-	m_midiChannelSpinBox->setLabel( tr( "CHANNEL" ) );
-	m_midiChannelSpinBox->move( 8, 24 );
 
 	m_midiControllerSpinBox = new LcdSpinBox( 3, m_midiGroupBox,
 			tr( "Input controller" ) );
 	m_midiControllerSpinBox->addTextForValue(MidiController::NONE, "---" );
-	m_midiControllerSpinBox->setLabel( tr( "CONTROLLER" ) );
-	m_midiControllerSpinBox->move( 68, 24 );
-	
+
+	auto* midiControls = new QHBoxLayout;
+	midiControls->setSpacing(12);
+	static_cast<QVBoxLayout*>(m_midiGroupBox->layout())->addLayout(midiControls);
+	const auto addMidiField = [this, midiControls](LcdSpinBox* field, const QString& caption)
+	{
+		auto* column = new QVBoxLayout;
+		column->setSpacing(3);
+		auto* label = new QLabel(caption, m_midiGroupBox);
+		label->setBuddy(field);
+		column->addWidget(field, 0, Qt::AlignHCenter);
+		column->addWidget(label, 0, Qt::AlignHCenter);
+		midiControls->addLayout(column);
+	};
+	addMidiField(m_midiChannelSpinBox, tr("CHANNEL"));
+	addMidiField(m_midiControllerSpinBox, tr("CONTROLLER"));
 
 	m_midiAutoDetectCheckBox =
 			new LedCheckBox( tr("Auto Detect"),
-				m_midiGroupBox, tr("Auto Detect") );
+				m_midiGroupBox, tr("Auto Detect"), LedCheckBox::LedColor::Yellow, false );
 	m_midiAutoDetectCheckBox->setModel( &m_midiAutoDetect );
-	m_midiAutoDetectCheckBox->move( 8, 60 );
+	m_midiGroupBox->layout()->addWidget(m_midiAutoDetectCheckBox);
 	connect( &m_midiAutoDetect, SIGNAL(dataChanged()),
 			this, SLOT(autoDetectToggled()));
 
@@ -178,20 +200,22 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 		rp_btn->setText( tr( "MIDI-devices to receive "
 						"MIDI-events from" ) );
 		rp_btn->setIcon( embed::getIconPixmap( "piano" ) );
-		rp_btn->setGeometry( 160, 24, 32, 32 );
+		rp_btn->setMinimumSize(32, 32);
 		rp_btn->setMenu( m_readablePorts );
 		rp_btn->setPopupMode( QToolButton::InstantPopup );
+		midiControls->addWidget(rp_btn, 0, Qt::AlignTop);
 	}
+	midiControls->addStretch();
 
 
 	// User stuff
-	m_userGroupBox = new GroupBox( tr( "USER CONTROLLER" ), this );
-	m_userGroupBox->setGeometry( 8, 100, 240, 60 );
+	m_userGroupBox = addSection(tr("USER CONTROLLER"));
 	connect( m_userGroupBox->model(), SIGNAL(dataChanged()),
 			this, SLOT(userToggled()));
 
 	m_userController = new ComboBox( m_userGroupBox, "Controller" );
-	m_userController->setGeometry( 10, 24, 200, ComboBox::DEFAULT_HEIGHT );
+	m_userController->setFixedHeight(qMax(ComboBox::DEFAULT_HEIGHT, m_userController->fontMetrics().height() + 6));
+	m_userGroupBox->layout()->addWidget(m_userController);
 	for (Controller * c : Engine::getSong()->controllers())
 	{
 		m_userController->model()->addItem( c->name() );
@@ -203,38 +227,29 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 
 
 	// Mapping functions
-	m_mappingBox = new TabWidget( tr( "MAPPING FUNCTION" ), this );
-	m_mappingBox->setGeometry( 8, 170, 240, 64 );
-	m_mappingFunction = new QLineEdit( m_mappingBox );
-	m_mappingFunction->setGeometry( 10, 20, 170, 16 );
-	m_mappingFunction->setText( "input" );
-	m_mappingFunction->setReadOnly( true );
+	auto* mappingBox = addSection(tr("MAPPING FUNCTION"), false);
+	auto* mappingFunction = new QLineEdit(QStringLiteral("input"), mappingBox);
+	mappingFunction->setReadOnly(true);
+	mappingBox->layout()->addWidget(mappingFunction);
 
 
 	// Buttons
-	auto buttons = new QWidget(this);
-	buttons->setGeometry( 8, 240, 240, 32 );
+	auto btn_layout = new QHBoxLayout;
+	dialogLayout->addLayout(btn_layout);
 
-	auto btn_layout = new QHBoxLayout(buttons);
-	btn_layout->setSpacing( 0 );
-	btn_layout->setContentsMargins(0, 0, 0, 0);
-
-	auto select_btn = new QPushButton(embed::getIconPixmap("add"), tr("OK"), buttons);
+	auto select_btn = new QPushButton(embed::getIconPixmap("add"), tr("OK"), this);
 	connect( select_btn, SIGNAL(clicked()), 
 				this, SLOT(selectController()));
 
-	auto cancel_btn = new QPushButton(embed::getIconPixmap("cancel"), tr("Cancel"), buttons);
+	auto cancel_btn = new QPushButton(embed::getIconPixmap("cancel"), tr("Cancel"), this);
 	connect( cancel_btn, SIGNAL(clicked()),
 				this, SLOT(reject()));
 
 	btn_layout->addStretch();
-	btn_layout->addSpacing( 10 );
 	btn_layout->addWidget( select_btn );
-	btn_layout->addSpacing( 10 );
 	btn_layout->addWidget( cancel_btn );
-	btn_layout->addSpacing( 10 );
 
-	setFixedSize( 256, 280 );
+	setMinimumWidth(280);
 
 	// Crazy MIDI View stuff
 	

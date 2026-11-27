@@ -64,7 +64,7 @@ InstrumentSoundShapingView::InstrumentSoundShapingView(QWidget* parent) :
 	m_filterGroupBox = new GroupBox(tr("FILTER"), this);
 	QHBoxLayout* filterLayout = new QHBoxLayout(m_filterGroupBox);
 	QMargins filterMargins = filterLayout->contentsMargins();
-	filterMargins.setTop(18);
+	filterMargins.setTop(m_filterGroupBox->titleBarHeight() + 7);
 	filterLayout->setContentsMargins(filterMargins);
 
 	m_filterComboBox = new ComboBox(m_filterGroupBox);
