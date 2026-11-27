@@ -19,6 +19,7 @@ set(LMMS_TESTS
 	src/gui/SideBarWorkspaceTest.cpp
 	src/gui/ToolButtonTest.cpp
 	src/gui/UiFeedbackTest.cpp
+	src/gui/FileBrowserTest.cpp
 	src/gui/DropDownInteractionTest.cpp
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp

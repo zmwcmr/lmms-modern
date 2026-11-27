@@ -36,6 +36,11 @@ QTreeView::branch:has-children:closed {
 	image: url("resources:closed_branch.png");
 }
 
+lmms--gui--FileBrowserTreeWidget::branch:has-children:open,
+lmms--gui--FileBrowserTreeWidget::branch:has-children:closed {
+	image: none;
+}
+
 QMdiArea {
 	background-color: #111314;
 }

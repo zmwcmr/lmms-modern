@@ -807,6 +807,11 @@ QTreeView {
 	alternate-background-color: #747474;
 }
 
+lmms--gui--FileBrowserTreeWidget::branch:has-children:open,
+lmms--gui--FileBrowserTreeWidget::branch:has-children:closed {
+	image: none;
+}
+
 lmms--gui--TrackContainerView QLabel
 {
 	background: none;

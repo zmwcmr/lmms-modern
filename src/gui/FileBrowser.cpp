@@ -35,11 +35,15 @@
 #include <QMdiSubWindow>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPainterPath>
 #include <QProgressBar>
 #include <QScrollBar>
 #include <QPushButton>
 #include <QShortcut>
 #include <QStringList>
+#include <QVariantAnimation>
+#include <QVector>
 #include <cassert>
 
 #include "AudioEngine.h"
@@ -55,6 +59,7 @@
 #include "InstrumentTrack.h"
 #include "InstrumentTrackWindow.h"
 #include "KeyboardShortcuts.h"
+#include "LmmsStyle.h"
 #include "MainWindow.h"
 #include "PatternStore.h"
 #include "Plugin.h"
@@ -478,6 +483,118 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 				SLOT(updateDirectory(QTreeWidgetItem*)));
 	connect( this, SIGNAL(itemExpanded(QTreeWidgetItem*)),
 				SLOT(updateDirectory(QTreeWidgetItem*)));
+	connect(this, &QTreeWidget::itemExpanded, this, [this](QTreeWidgetItem* item) {
+		animateBranch(indexFromItem(item), true);
+	});
+	connect(this, &QTreeWidget::itemCollapsed, this, [this](QTreeWidgetItem* item) {
+		animateBranch(indexFromItem(item), false);
+	});
+}
+
+
+
+
+void FileBrowserTreeWidget::animateBranch(const QModelIndex& index, bool expanded)
+{
+	if (!index.isValid() || !index.model()->hasChildren(index)) { return; }
+
+	const QPersistentModelIndex key{index};
+	const qreal target = expanded ? 90.0 : 0.0;
+	const qreal start = m_branchAngles.value(key, expanded ? 0.0 : 90.0);
+
+	if (auto* previous = m_branchAnimations.take(key))
+	{
+		QObject::disconnect(previous, nullptr, this, nullptr);
+		previous->stop();
+		previous->deleteLater();
+	}
+
+	if (qFuzzyCompare(start, target))
+	{
+		m_branchAngles[key] = target;
+		viewport()->update();
+		return;
+	}
+
+	const int duration = LmmsStyle::uiAnimationDuration(this, 140);
+	if (duration <= 0)
+	{
+		m_branchAngles[key] = target;
+		viewport()->update();
+		return;
+	}
+
+	auto* animation = new QVariantAnimation(this);
+	animation->setDuration(duration);
+	animation->setStartValue(start);
+	animation->setEndValue(target);
+	animation->setEasingCurve(QEasingCurve::OutCubic);
+	m_branchAnimations[key] = animation;
+
+	connect(animation, &QVariantAnimation::valueChanged, this, [this, key](const QVariant& value) {
+		m_branchAngles[key] = value.toReal();
+		viewport()->update();
+	});
+	connect(animation, &QVariantAnimation::finished, this, [this, key, animation, target] {
+		m_branchAngles[key] = target;
+		if (m_branchAnimations.value(key) == animation) { m_branchAnimations.remove(key); }
+		animation->deleteLater();
+		viewport()->update();
+	});
+	animation->start();
+}
+
+
+
+
+void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
+{
+	QTreeWidget::drawBranches(painter, rect, index);
+	if (!rootIsDecorated() || !index.isValid()) { return; }
+
+	int depth = 0;
+	for (auto parent = index.parent(); parent.isValid(); parent = parent.parent()) { ++depth; }
+
+	QVector<QModelIndex> path(depth + 1);
+	QModelIndex current = index;
+	for (int level = depth; level >= 0; --level)
+	{
+		path[level] = current;
+		current = current.parent();
+	}
+
+	const int indent = indentation();
+	if (indent <= 0) { return; }
+
+	const bool selected = selectionModel() && selectionModel()->isSelected(index);
+	QColor color = palette().color(selected ? QPalette::HighlightedText : QPalette::Text);
+	if (!isEnabled()) { color = palette().color(QPalette::Disabled, QPalette::Text); }
+
+	painter->save();
+	painter->setRenderHint(QPainter::Antialiasing);
+	painter->setPen(Qt::NoPen);
+	painter->setBrush(color);
+
+	for (int level = 0; level <= depth; ++level)
+	{
+		const QModelIndex item = path.at(level);
+		if (!model()->hasChildren(item)) { continue; }
+
+		const qreal angle = m_branchAngles.value(QPersistentModelIndex{item},
+			isExpanded(item) ? 90.0 : 0.0);
+		painter->save();
+		painter->translate(level * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
+		painter->rotate(angle);
+		QPainterPath arrow;
+		arrow.moveTo(-2.0, -3.5);
+		arrow.lineTo(2.5, 0.0);
+		arrow.lineTo(-2.0, 3.5);
+		arrow.closeSubpath();
+		painter->drawPath(arrow);
+		painter->restore();
+	}
+
+	painter->restore();
 }
 
 

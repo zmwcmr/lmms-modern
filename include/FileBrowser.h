@@ -26,7 +26,9 @@
 #define LMMS_GUI_FILE_BROWSER_H
 
 #include <QDir>
+#include <QHash>
 #include <QMutex>
+#include <QPersistentModelIndex>
 
 #include "FileSearchJob.h"
 #include "embed.h"
@@ -38,7 +40,9 @@
 
 class QCheckBox;
 class QLineEdit;
+class QPainter;
 class QProgressBar;
+class QVariantAnimation;
 
 namespace lmms
 {
@@ -153,9 +157,12 @@ protected:
 	void focusOutEvent( QFocusEvent * fe ) override;
 	void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
 	void wheelEvent(QWheelEvent * event) override;
-
+	void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override;
 
 private:
+	//! Animates the disclosure arrow of \a index between its closed and open angle.
+	void animateBranch(const QModelIndex& index, bool expanded);
+
 	//! Start a preview of a file item
 	void previewFileItem(FileItem* file);
 	//! If a preview is playing, stop it.
@@ -167,6 +174,9 @@ private:
 
 	bool m_mousePressed;
 	QPoint m_pressPos;
+
+	QHash<QPersistentModelIndex, qreal> m_branchAngles;
+	QHash<QPersistentModelIndex, QVariantAnimation*> m_branchAnimations;
 
 	//! This should only be accessed or modified when m_pphMutex is held
 	PlayHandle* m_previewPlayHandle;
