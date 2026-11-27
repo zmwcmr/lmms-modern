@@ -27,6 +27,7 @@
 
 #include <QDir>
 #include <QHash>
+#include <QKeySequence>
 #include <QMutex>
 #include <QPersistentModelIndex>
 
@@ -112,6 +113,7 @@ private:
 	FileBrowserTreeWidget * m_searchTreeWidget;
 
 	QLineEdit * m_filterEdit;
+	QKeySequence m_refreshShortcut;
 	Type m_type;
 
 	QProgressBar* m_searchIndicator = nullptr;

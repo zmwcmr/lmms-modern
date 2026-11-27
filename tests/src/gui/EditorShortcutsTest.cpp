@@ -15,8 +15,11 @@
 
 using lmms::ConfigManager;
 using lmms::gui::bindEditorShortcuts;
+using lmms::gui::fileBrowserShortcuts;
 using lmms::gui::mainMenuShortcuts;
 using lmms::gui::patternNavigationShortcuts;
+using lmms::gui::projectNotesShortcuts;
+using lmms::gui::rackReorderShortcuts;
 using lmms::gui::TransportShortcuts;
 using lmms::gui::transportShortcuts;
 using lmms::gui::windowLayoutShortcuts;
@@ -32,10 +35,90 @@ private slots:
 		for (const auto* id : {"piano_roll_draw", "piano_roll_erase", "automation_editor_draw", "window_song_editor",
 			"file_save", "pattern_next", "transport_play_stop", "transport_pause", "layout_fullscreen",
 			"layout_maximize_editor", "layout_detach_all", "layout_attach_all", "transport_record",
-			"transport_record_accompany", "transport_record_step"})
+			"transport_record_accompany", "transport_record_step", "rack_move_up", "rack_move_down",
+			"browser_search", "browser_refresh", "notes_bold", "notes_align_center"})
 		{
 			ConfigManager::inst()->deleteValue("shortcuts", id);
 		}
+	}
+
+	void resolvesProjectNotesFormatting()
+	{
+		const auto defaults = projectNotesShortcuts();
+		QCOMPARE(defaults.size(), 7);
+		QCOMPARE(defaults.value("notes_bold"), QKeySequence("Ctrl+B"));
+		QCOMPARE(defaults.value("notes_align_center"), QKeySequence("Ctrl+E"));
+		QCOMPARE(defaults.value("notes_underline"), QKeySequence(QKeySequence::Underline));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "notes_align_center", "F7");
+		QCOMPARE(projectNotesShortcuts().value("notes_align_center"), QKeySequence("F7"));
+		config->setValue("shortcuts", "file_save", "F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		for (const auto* conflicting : {"Ctrl+C", "Ctrl+V", "Ctrl+X", "Ctrl+Z", "Ctrl+A", "Ctrl+E", "F7"})
+		{
+			config->setValue("shortcuts", "notes_bold", conflicting);
+			QCOMPARE(projectNotesShortcuts(), defaults);
+		}
+		config->setValue("shortcuts", "notes_bold", "B");
+		QCOMPARE(projectNotesShortcuts().value("notes_bold"), defaults.value("notes_bold"));
+		QCOMPARE(projectNotesShortcuts().value("notes_align_center"), QKeySequence("F7"));
+	}
+
+	void resolvesRackReorderShortcuts()
+	{
+		const auto defaults = rackReorderShortcuts();
+		QCOMPARE(defaults.value("rack_move_up"), QKeySequence("Alt+Up"));
+		QCOMPARE(defaults.value("rack_move_down"), QKeySequence("Alt+Down"));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "rack_move_up", "Ctrl+Shift+F7");
+		QCOMPARE(rackReorderShortcuts().value("rack_move_up"), QKeySequence("Ctrl+Shift+F7"));
+		QCOMPARE(rackReorderShortcuts().value("rack_move_down"), defaults.value("rack_move_down"));
+
+		for (const auto* conflicting : {"F11", "Space", "Ctrl+1", "Ctrl+Shift+F7, F8"})
+		{
+			config->setValue("shortcuts", "rack_move_down", conflicting);
+			QCOMPARE(rackReorderShortcuts(), defaults);
+		}
+	}
+
+	void resolvesBrowserShortcutsWithoutStealingTreeInput()
+	{
+		const auto defaults = fileBrowserShortcuts();
+		QCOMPARE(defaults.value("browser_search"), QKeySequence(QKeySequence::Find));
+		QCOMPARE(defaults.value("browser_refresh"), QKeySequence("F5"));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "browser_refresh", "F7");
+		for (const auto* unsafe : {"Space", "Alt+Space", "A", "Ctrl+Return", "Alt+Right", "F6, F7"})
+		{
+			config->setValue("shortcuts", "browser_search", unsafe);
+			QCOMPARE(fileBrowserShortcuts().value("browser_search"), defaults.value("browser_search"));
+			QCOMPARE(fileBrowserShortcuts().value("browser_refresh"), QKeySequence("F7"));
+		}
+		config->setValue("shortcuts", "browser_search", "F6");
+		config->setValue("shortcuts", "layout_fullscreen", "F6");
+		QCOMPARE(fileBrowserShortcuts().value("browser_search"), QKeySequence("F6"));
+		QCOMPARE(windowLayoutShortcuts().value("layout_fullscreen"), QKeySequence("F11"));
+		config->setValue("shortcuts", "browser_search", "F7");
+		QCOMPARE(fileBrowserShortcuts(), defaults);
+	}
+
+	void rackOverrideCannotBeShadowedByOtherGroups()
+	{
+		auto* config = ConfigManager::inst();
+		for (const auto* id : {"rack_move_up", "layout_fullscreen", "transport_play_stop",
+			"transport_record", "file_save", "window_song_editor"})
+		{
+			config->setValue("shortcuts", id, "Ctrl+Shift+F7");
+		}
+		QCOMPARE(rackReorderShortcuts().value("rack_move_up"), QKeySequence("Ctrl+Shift+F7"));
+		QCOMPARE(windowLayoutShortcuts().value("layout_fullscreen"), QKeySequence("F11"));
+		QCOMPARE(transportShortcuts().playStop, QKeySequence("Space"));
+		QVERIFY(transportShortcuts().record.isEmpty());
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		QCOMPARE(windowToggleShortcuts({}).value("window_song_editor"), QKeySequence("Ctrl+1"));
 	}
 
 	void readsAndPreservesPortableOverrides()

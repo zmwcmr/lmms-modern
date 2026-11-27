@@ -1,5 +1,9 @@
 #include <QApplication>
+#include <QFile>
+#include <QLineEdit>
 #include <QProxyStyle>
+#include <QTemporaryDir>
+#include <QVBoxLayout>
 #include <QVariantAnimation>
 #include <QtTest>
 
@@ -36,6 +40,62 @@ private slots:
 	}
 
 	void cleanupTestCase() { lmms::Engine::destroy(); }
+
+	void cleanup()
+	{
+		auto* config = lmms::ConfigManager::inst();
+		config->deleteValue("shortcuts", "browser_search");
+		config->deleteValue("shortcuts", "browser_refresh");
+	}
+
+	void dispatchesBrowserShortcuts()
+	{
+		auto* config = lmms::ConfigManager::inst();
+		config->setValue("shortcuts", "browser_search", "F6");
+		config->setValue("shortcuts", "browser_refresh", "F7");
+		QTemporaryDir directory;
+		QVERIFY(directory.isValid());
+
+		QWidget host;
+		QVBoxLayout layout(&host);
+		QLineEdit outside(&host);
+		lmms::gui::FileBrowser browser(lmms::gui::FileBrowser::Type::Normal, directory.path(), "*.wav",
+			"Test Browser", QPixmap{}, &host);
+		layout.addWidget(&outside);
+		layout.addWidget(&browser);
+		host.show();
+		QVERIFY(QTest::qWaitForWindowExposed(&host));
+		QApplication::setActiveWindow(&host);
+
+		auto* filter = browser.findChild<QLineEdit*>();
+		QVERIFY(filter);
+		outside.setFocus();
+		QTest::keyClick(&outside, Qt::Key_F6);
+		QCOMPARE(QApplication::focusWidget(), &outside);
+
+		lmms::gui::FileBrowserTreeWidget* tree = nullptr;
+		for (auto* candidate : browser.findChildren<lmms::gui::FileBrowserTreeWidget*>())
+		{
+			if (candidate->isVisible()) { tree = candidate; }
+		}
+		QVERIFY(tree);
+		tree->setFocus();
+		QTest::keyClick(tree, Qt::Key_F6);
+		QCOMPARE(QApplication::focusWidget(), filter);
+		QTest::keyClicks(filter, "a");
+		QCOMPARE(filter->text(), QStringLiteral("a"));
+		QTest::keyClick(filter, Qt::Key_Backspace);
+
+		QFile sample(directory.filePath("new.wav"));
+		QVERIFY(sample.open(QIODevice::WriteOnly));
+		sample.close();
+		tree->setFocus();
+		QTest::keyClick(tree, Qt::Key_F5);
+		QCOMPARE(tree->topLevelItemCount(), 0);
+		QTest::keyClick(tree, Qt::Key_F7);
+		QCOMPARE(tree->topLevelItemCount(), 1);
+		QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("new.wav"));
+	}
 
 	void animatesExpansion()
 	{

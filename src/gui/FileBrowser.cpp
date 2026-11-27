@@ -40,6 +40,7 @@
 #include <QProgressBar>
 #include <QScrollBar>
 #include <QPushButton>
+#include <QKeyEvent>
 #include <QShortcut>
 #include <QStringList>
 #include <QVariantAnimation>
@@ -50,6 +51,7 @@
 #include "ConfigManager.h"
 #include "DataFile.h"
 #include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "Engine.h"
 #include "FileBrowser.h"
 #include "FileRevealer.h"
@@ -98,6 +100,10 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 {
 	setWindowTitle( tr( "Browser" ) );
 
+	const auto shortcuts = fileBrowserShortcuts();
+	const auto searchShortcut = shortcuts.value(QStringLiteral("browser_search"));
+	m_refreshShortcut = shortcuts.value(QStringLiteral("browser_refresh"));
+
 	addContentCheckBox();
 
 	auto searchWidget = new QWidget(contentParent());
@@ -109,6 +115,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 
 	m_filterEdit = new QLineEdit(searchWidget);
 	m_filterEdit->setPlaceholderText(tr("Search"));
+	m_filterEdit->setToolTip(tr("Search (%1)").arg(searchShortcut.toString(QKeySequence::NativeText)));
 	m_filterEdit->setClearButtonEnabled(true);
 	m_filterEdit->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
 
@@ -118,7 +125,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	connect(&m_searchJob, &FileSearchJob::foundMatch, this, &FileBrowser::onSearchMatch, Qt::QueuedConnection);
 
 	auto reload_btn = new QPushButton(embed::getIconPixmap("reload"), QString(), searchWidget);
-	reload_btn->setToolTip( tr( "Refresh list" ) );
+	reload_btn->setToolTip(tr("Refresh list (%1)").arg(m_refreshShortcut.toString(QKeySequence::NativeText)));
 	connect( reload_btn, SIGNAL(clicked()), this, SLOT(reloadTree()));
 
 	searchWidgetLayout->addWidget( m_filterEdit );
@@ -138,8 +145,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	m_searchIndicator->setRange(0, 1);
 	addContentWidget(m_searchIndicator);
 
-	// Whenever the FileBrowser has focus, Ctrl+F should direct focus to its filter box.
-	auto filterFocusShortcut = new QShortcut(QKeySequence(QKeySequence::Find), this, SLOT(giveFocusToFilter()));
+	auto filterFocusShortcut = new QShortcut(searchShortcut, this, SLOT(giveFocusToFilter()));
 	filterFocusShortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
 	m_previousFilterValue = "";
@@ -446,13 +452,14 @@ void FileBrowser::addItems(const QString & path )
 
 void FileBrowser::keyPressEvent(QKeyEvent * ke )
 {
-	switch( ke->key() ){
-		case Qt::Key_F5:
-			reloadTree();
-			break;
-		default:
-			ke->ignore();
+	const auto pressed = QKeySequence(ke->key() | static_cast<int>(ke->modifiers()));
+	if (pressed == m_refreshShortcut || (ke->key() == Qt::Key_F5 && m_refreshShortcut == QKeySequence(Qt::Key_F5)))
+	{
+		reloadTree();
+		ke->accept();
+		return;
 	}
+	ke->ignore();
 }
 
 

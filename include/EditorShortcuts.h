@@ -36,6 +36,9 @@ QMap<QString, QKeySequence> windowToggleShortcuts(const QList<QKeySequence>& res
 QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserved);
 QMap<QString, QKeySequence> patternNavigationShortcuts();
 QMap<QString, QKeySequence> windowLayoutShortcuts();
+QMap<QString, QKeySequence> rackReorderShortcuts();
+QMap<QString, QKeySequence> fileBrowserShortcuts();
+QMap<QString, QKeySequence> projectNotesShortcuts();
 
 }
 

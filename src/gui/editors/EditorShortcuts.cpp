@@ -107,7 +107,7 @@ QMap<QString, QKeySequence> defaultShortcuts(const QString& prefix)
 
 template<typename Accepts = decltype(&isValid)>
 QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& groupDefaults,
-	const QList<QKeySequence>& reserved, Accepts accepts = isValid)
+	const QList<QKeySequence>& reserved, Accepts accepts = isValid, const QString& legacyOverlap = {})
 {
 	auto shortcuts = groupDefaults;
 	const auto section = QStringLiteral("shortcuts");
@@ -126,7 +126,8 @@ QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& 
 	{
 		for (const auto& sequence : reserved)
 		{
-			if (shortcutsOverlap(first.value(), sequence))
+			if (shortcutsOverlap(first.value(), sequence)
+				&& !(first.key() == legacyOverlap && first.value() == groupDefaults.value(legacyOverlap)))
 			{
 				qWarning() << "Shortcut for" << first.key() << "conflicts with" << sequence << "; using group defaults";
 				return groupDefaults;
@@ -179,16 +180,49 @@ const QMap<QString, QKeySequence>& windowLayoutDefaults()
 	return shortcuts;
 }
 
+QList<QKeySequence> reservedDefaults()
+{
+	return menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
+		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values();
+}
+
 QList<QKeySequence> effectiveTransportShortcuts()
 {
 	const auto shortcuts = transportShortcuts();
 	return {shortcuts.playStop, shortcuts.pause, shortcuts.record, shortcuts.recordAccompany, shortcuts.recordStep};
 }
 
+bool isValidTextToolBinding(const QKeySequence& sequence, bool preserveModifiedRefresh = false)
+{
+	if (!isValid(sequence) || sequence.count() != 1) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	if (preserveModifiedRefresh && key == Qt::Key_F5) { return !modifiers; }
+	if (key >= Qt::Key_F1 && key <= Qt::Key_F35) { return true; }
+	return ((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9))
+		&& (modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
+}
+
+const auto notesAlignCenter = QStringLiteral("notes_align_center");
+const auto defaultNotesAlignCenter = keySequence(Qt::CTRL, Qt::Key_E);
+
+QList<QKeySequence> effectiveNotesShortcuts()
+{
+	auto shortcuts = projectNotesShortcuts();
+	if (shortcuts.value(notesAlignCenter) == defaultNotesAlignCenter) { shortcuts.remove(notesAlignCenter); }
+	return shortcuts.values();
+}
+
 QList<QKeySequence> reservedForEditors()
 {
 	return defaultShortcuts(windowPrefix).values() + menuDefaults().values() + effectiveTransportShortcuts()
-		+ windowLayoutShortcuts().values();
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts();
 }
 
 QMap<QString, QKeySequence> editorShortcuts(const QString& prefix)
@@ -202,18 +236,55 @@ QList<QKeySequence> effectiveEditorShortcuts()
 }
 }
 
+QMap<QString, QKeySequence> projectNotesShortcuts()
+{
+	auto reserved = reservedDefaults() + windowLayoutDefaults().values()
+		+ QList<QKeySequence>{QKeySequence(QKeySequence::Find), QKeySequence(Qt::Key_F5)};
+	for (const auto standard : {QKeySequence::Undo, QKeySequence::Redo, QKeySequence::Cut,
+		QKeySequence::Copy, QKeySequence::Paste, QKeySequence::SelectAll})
+	{
+		reserved += QKeySequence::keyBindings(standard);
+	}
+	return resolveShortcuts({
+		{QStringLiteral("notes_bold"), keySequence(Qt::CTRL, Qt::Key_B)},
+		{QStringLiteral("notes_italic"), keySequence(Qt::CTRL, Qt::Key_I)},
+		{QStringLiteral("notes_underline"), QKeySequence::Underline},
+		{QStringLiteral("notes_align_left"), keySequence(Qt::CTRL, Qt::Key_L)},
+		{notesAlignCenter, defaultNotesAlignCenter},
+		{QStringLiteral("notes_align_right"), keySequence(Qt::CTRL, Qt::Key_R)},
+		{QStringLiteral("notes_align_justify"), keySequence(Qt::CTRL, Qt::Key_J)},
+	}, reserved, [](const QKeySequence& sequence) { return isValidTextToolBinding(sequence); }, notesAlignCenter);
+}
+
+QMap<QString, QKeySequence> fileBrowserShortcuts()
+{
+	return resolveShortcuts({
+		{QStringLiteral("browser_search"), QKeySequence::Find},
+		{QStringLiteral("browser_refresh"), QKeySequence(Qt::Key_F5)},
+	}, reservedDefaults() + windowLayoutDefaults().values() + effectiveNotesShortcuts(),
+		[](const QKeySequence& sequence) { return isValidTextToolBinding(sequence, true); });
+}
+
+QMap<QString, QKeySequence> rackReorderShortcuts()
+{
+	return resolveShortcuts({
+		{QStringLiteral("rack_move_up"), keySequence(Qt::ALT, Qt::Key_Up)},
+		{QStringLiteral("rack_move_down"), keySequence(Qt::ALT, Qt::Key_Down)},
+	}, reservedDefaults() + windowLayoutDefaults().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + QList<QKeySequence>{defaultPlayStop, defaultPause});
+}
+
 QMap<QString, QKeySequence> windowLayoutShortcuts()
 {
 	return resolveShortcuts(windowLayoutDefaults(),
-		menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
-		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values() + QList<QKeySequence>{defaultPlayStop, defaultPause});
+		reservedDefaults() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + QList<QKeySequence>{defaultPlayStop, defaultPause});
 }
 
 TransportShortcuts transportShortcuts()
 {
-	const auto reserved = menuDefaults().values() + defaultShortcuts(windowPrefix).values()
-		+ defaultShortcuts(patternPrefix).values() + defaultShortcuts(pianoPrefix).values()
-		+ defaultShortcuts(automationPrefix).values() + windowLayoutShortcuts().values();
+	const auto reserved = reservedDefaults() + windowLayoutShortcuts().values() + rackReorderShortcuts().values()
+		+ fileBrowserShortcuts().values() + effectiveNotesShortcuts();
 	const auto playback = resolveShortcuts({{transportPlayStop, defaultPlayStop}, {transportPause, defaultPause}},
 		reserved, [](const QKeySequence& sequence) { return isValidTransportBinding(sequence); });
 	TransportShortcuts shortcuts{playback.value(transportPlayStop), playback.value(transportPause), {}, {}, {}};
@@ -248,14 +319,16 @@ QMap<QString, QKeySequence> windowToggleShortcuts(const QList<QKeySequence>& res
 {
 	return resolveShortcuts(defaultShortcuts(windowPrefix),
 		reserved + effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
-		+ windowLayoutShortcuts().values());
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts());
 }
 
 QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserved)
 {
 	return resolveShortcuts(menuDefaults(), reserved + defaultShortcuts(windowPrefix).values()
 		+ effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
-		+ windowLayoutShortcuts().values());
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts());
 }
 
 void bindEditorShortcuts(QWidget& editor,

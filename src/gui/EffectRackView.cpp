@@ -33,7 +33,7 @@
 
 #include <algorithm>
 
-#include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "EffectSelectDialog.h"
 #include "EffectView.h"
 #include "GroupBox.h"
@@ -157,6 +157,7 @@ void EffectRackView::deletePlugin( EffectView* view )
 
 void EffectRackView::update()
 {
+	const auto shortcuts = rackReorderShortcuts();
 	QWidget * w = m_scrollArea->widget();
 	QVector<bool> view_map( qMax<int>( fxChain()->m_effects.size(),
 						m_effectViews.size() ), false );
@@ -181,13 +182,13 @@ void EffectRackView::update()
 			connect(view, &EffectView::deletedPlugin, this, &EffectRackView::deletePlugin, Qt::QueuedConnection);
 
 			QAction* moveUpAction = new QAction(view);
-			moveUpAction->setShortcut(keySequence(Qt::Key_Up, Qt::AltModifier));
+			moveUpAction->setShortcut(shortcuts.value(QStringLiteral("rack_move_up")));
 			moveUpAction->setShortcutContext(Qt::WidgetShortcut);
 			connect(moveUpAction, &QAction::triggered, view, &EffectView::moveUp);
 			view->addAction(moveUpAction);
 
 			QAction* moveDownAction = new QAction(view);
-			moveDownAction->setShortcut(keySequence(Qt::Key_Down, Qt::AltModifier));
+			moveDownAction->setShortcut(shortcuts.value(QStringLiteral("rack_move_down")));
 			moveDownAction->setShortcutContext(Qt::WidgetShortcut);
 			connect(moveDownAction, &QAction::triggered, view, &EffectView::moveDown);
 			view->addAction(moveDownAction);

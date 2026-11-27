@@ -35,7 +35,7 @@
 #include <algorithm>
 
 #include "ControllerView.h"
-#include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "GuiApplication.h"
 #include "LfoController.h"
@@ -170,14 +170,15 @@ void ControllerRackView::addController(Controller* controller)
 	connect(controllerView, &ControllerView::movedDown, this, &ControllerRackView::moveDown);
 	connect(controllerView, &ControllerView::removedController, this, &ControllerRackView::deleteController, Qt::QueuedConnection);
 
+	const auto shortcuts = rackReorderShortcuts();
 	auto moveUpAction = new QAction(controllerView);
-	moveUpAction->setShortcut(keySequence(Qt::Key_Up, Qt::AltModifier));
+	moveUpAction->setShortcut(shortcuts.value(QStringLiteral("rack_move_up")));
 	moveUpAction->setShortcutContext(Qt::WidgetShortcut);
 	connect(moveUpAction, &QAction::triggered, controllerView, &ControllerView::moveUp);
 	controllerView->addAction(moveUpAction);
 
 	auto moveDownAction = new QAction(controllerView);
-	moveDownAction->setShortcut(keySequence(Qt::Key_Down, Qt::AltModifier));
+	moveDownAction->setShortcut(shortcuts.value(QStringLiteral("rack_move_down")));
 	moveDownAction->setShortcutContext(Qt::WidgetShortcut);
 	connect(moveDownAction, &QAction::triggered, controllerView, &ControllerView::moveDown);
 	controllerView->addAction(moveDownAction);
