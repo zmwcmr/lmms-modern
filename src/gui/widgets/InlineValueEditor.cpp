@@ -29,12 +29,17 @@
 
 #include <QApplication>
 #include <QFontMetrics>
+#include <QGraphicsOpacityEffect>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QPointer>
+#include <QPropertyAnimation>
+#include <QTimer>
 
 #include "AutomatableModel.h"
 #include "DeprecationHelper.h"
+#include "LmmsStyle.h"
 #include "LocaleHelper.h"
 #include "UiFeedback.h"
 
@@ -47,6 +52,34 @@ namespace
 constexpr int MinWidth = 64;
 constexpr int MinHeight = 20;
 constexpr int HorizontalMargin = 2;
+constexpr int MaxFadeInDuration = 120;
+
+//! Briefly fades \a widget in without delaying focus or input handling.
+void fadeIn(QWidget* widget)
+{
+	const int duration = LmmsStyle::uiAnimationDuration(widget, MaxFadeInDuration);
+	if (duration <= 0) { return; }
+
+	auto* effect = new QGraphicsOpacityEffect(widget);
+	effect->setOpacity(0.0);
+	widget->setGraphicsEffect(effect);
+
+	auto* animation = new QPropertyAnimation(effect, "opacity", effect);
+	animation->setDuration(duration);
+	animation->setStartValue(0.0);
+	animation->setEndValue(1.0);
+	animation->setEasingCurve(QEasingCurve::OutCubic);
+	QObject::connect(animation, &QPropertyAnimation::finished, widget, [widget, effect] {
+		// Removing the effect inside the animation's finished signal would
+		// delete the animation while it is still emitting. Defer it by one
+		// event-loop pass and guard against an early teardown.
+		QPointer<QGraphicsOpacityEffect> guard{effect};
+		QTimer::singleShot(0, widget, [widget, guard] {
+			if (guard && widget->graphicsEffect() == guard) { widget->setGraphicsEffect(nullptr); }
+		});
+	});
+	animation->start();
+}
 
 //! How many decimals the model's step suggests, used when the caller does not
 //! specify a number.
@@ -140,6 +173,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 	editor->show();
 	editor->raise();
 	editor->setFocus(Qt::MouseFocusReason);
+	fadeIn(editor);
 	qApp->installEventFilter(editor);
 
 	if (!hint.trimmed().isEmpty())
@@ -172,6 +206,7 @@ void InlineValueEditor::showEditorWithHint(QWidget* control, AutomatableModel* m
 		QObject::connect(editor, &QObject::destroyed, label, &QObject::deleteLater);
 		label->show();
 		label->raise();
+		fadeIn(label);
 	}
 }
 
