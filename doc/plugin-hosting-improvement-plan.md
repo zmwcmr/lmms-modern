@@ -343,7 +343,9 @@ Tasks:
       default on Linux since the reload/crash UX landed.
 - [x] Demote the `pluginUiIsUnstable()` list once the child path is the default.
       The list is empty.
-- [ ] Add fake test plugins that crash in UI and in DSP (tracked by P6.6).
+- [x] Add fake test plugins that crash in UI and in DSP. `fake-lv2-crash-dsp`
+      aborts in `run()`, `fake-lv2-crash-ui` aborts in the UI instantiate
+      callback; `Lv2HostClientTest` proves both are contained.
 - Current status: complete and enabled by default on Linux. `lmms-lv2-host`
   runs the DSP and the UI in one child, and the host talks to it over the
   `RemotePluginBase` transport with a stereo shared segment, MIDI events,
@@ -417,7 +419,9 @@ Estimate: 6-8 weeks.
 
 Tasks:
 
-- [ ] Add fake VST2/LV2 plugins for automated tests.
+- [~] Add fake VST2/LV2 plugins for automated tests: the LV2 gain, MIDI,
+      DSP-crash and UI-crash bundles are built by `tests/CMakeLists.txt`; the
+      VST2 fake MIDI plugin exists, a VST2 crash plugin is still missing.
 - [ ] Add host callback/parameter/state tests to `ctest`.
 - [ ] Add VST2 32-bit and LV2 crash tests to the manual matrix.
 - [ ] Run AddressSanitizer on the host code.

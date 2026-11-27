@@ -58,6 +58,30 @@ if(LMMS_HAVE_LV2)
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/manifest.ttl" COPYONLY)
 	configure_file(plugins/fake-lv2-midi/midi.ttl
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/midi.ttl" COPYONLY)
+
+	add_library(FakeLv2CrashDsp MODULE plugins/fake-lv2-crash-dsp/crash.c)
+	target_include_directories(FakeLv2CrashDsp PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2CrashDsp PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "crash"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-dsp.lv2"
+	)
+	configure_file(plugins/fake-lv2-crash-dsp/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-dsp.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-crash-dsp/crash.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-dsp.lv2/crash.ttl" COPYONLY)
+
+	add_library(FakeLv2CrashUi MODULE plugins/fake-lv2-crash-ui/crashui.c)
+	target_include_directories(FakeLv2CrashUi PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2CrashUi PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "crashui"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-ui.lv2"
+	)
+	configure_file(plugins/fake-lv2-crash-ui/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-ui.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-crash-ui/crashui.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-crash-ui.lv2/crashui.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -177,10 +201,15 @@ if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2Midi)
 		add_dependencies(Lv2HostClientTest FakeLv2Midi)
 	endif()
+	if(TARGET FakeLv2CrashDsp AND TARGET FakeLv2CrashUi)
+		add_dependencies(Lv2HostClientTest FakeLv2CrashDsp FakeLv2CrashUi)
+	endif()
 	target_compile_definitions(Lv2HostClientTest PRIVATE
 		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
-		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>")
+		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>"
+		LMMS_FAKE_LV2_CRASH_DSP_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashDsp>"
+		LMMS_FAKE_LV2_CRASH_UI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashUi>")
 	target_include_directories(Lv2HostClientTest PRIVATE
 		${Lilv_INCLUDE_DIRS}
 		${LV2_INCLUDE_DIRS})

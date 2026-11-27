@@ -111,6 +111,8 @@ private slots:
 	void matchesInProcessGain();
 	void forwardsMidiEvents();
 	void stateRoundTrip();
+	void dspCrashIsContained();
+	void uiCrashIsContained();
 	//! Manual UI audit: LMMS_LV2_UI_AUDIT_URI=<uri> opens the child UI for 15 s.
 	void uiSmoke();
 };
@@ -363,6 +365,66 @@ void Lv2HostClientTest::stateRoundTrip()
 		}
 	}
 }
+
+
+void Lv2HostClientTest::dspCrashIsContained()
+{
+	qputenv("LV2_PATH",
+		QFileInfo(QString::fromUtf8(LMMS_FAKE_LV2_CRASH_DSP_BUNDLE))
+			.absolutePath().toUtf8());
+
+	Lv2HostClient client;
+	QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+		QStringLiteral("http://lmms.io/lv2/fake-crash-dsp"), 48000, BlockSize,
+		15000),
+		qPrintable(client.errorString()));
+	QVERIFY(client.isRunning());
+
+	std::vector<float> buffer(BlockSize, 0.0f);
+	const float* in[2] = { buffer.data(), buffer.data() };
+	float* out[2] = { buffer.data(), buffer.data() };
+
+	// The child aborts in run(); the host must report a failed block instead
+	// of blocking or crashing the test process.
+	QVERIFY(!client.processBlock(in, out, BlockSize));
+	QTRY_VERIFY_WITH_TIMEOUT(!client.isRunning(), 5000);
+	QVERIFY(!client.errorString().isEmpty());
+	client.stop();
+}
+
+
+
+
+void Lv2HostClientTest::uiCrashIsContained()
+{
+	if (qEnvironmentVariableIsEmpty("DISPLAY"))
+	{
+		QSKIP("needs an X11 or XWayland display for the child UI");
+	}
+
+	qputenv("LV2_PATH",
+		QFileInfo(QString::fromUtf8(LMMS_FAKE_LV2_CRASH_UI_BUNDLE))
+			.absolutePath().toUtf8());
+
+	Lv2HostClient client;
+	QVERIFY2(client.start(QStringLiteral(LMMS_LV2_HOST_EXECUTABLE),
+		QStringLiteral("http://lmms.io/lv2/fake-crash-ui"), 48000, BlockSize,
+		15000),
+		qPrintable(client.errorString()));
+	QVERIFY(client.showUi(1.0f));
+
+	// The UI aborts in its instantiate callback. The child dies, the host must
+	// stay alive and report the failure.
+	QTRY_VERIFY_WITH_TIMEOUT(!client.isRunning(), 8000);
+
+	std::vector<float> buffer(BlockSize, 0.0f);
+	const float* in[2] = { buffer.data(), buffer.data() };
+	float* out[2] = { buffer.data(), buffer.data() };
+	QVERIFY(!client.processBlock(in, out, BlockSize));
+	client.stop();
+}
+
+
 
 
 void Lv2HostClientTest::uiSmoke()
