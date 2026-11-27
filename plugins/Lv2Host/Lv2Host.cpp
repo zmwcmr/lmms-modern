@@ -67,6 +67,7 @@
 #include <lv2/options/options.h>
 #include <lv2/state/state.h>
 #include <lv2/parameters/parameters.h>
+#include <lv2/ui/ui.h>
 #include <lv2/urid/urid.h>
 #include <lv2/worker/worker.h>
 #endif
@@ -79,7 +80,6 @@
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <lv2/ui/ui.h>
 #include <suil/suil.h>
 #endif
 
@@ -137,10 +137,12 @@ private:
 
 #ifdef LMMS_HAVE_LV2
 
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 namespace
 {
 LilvInstance* g_extDataInstance = nullptr;
 }
+#endif
 
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 /*! Asset root some UIs (Zyn Fusion) resolve relative to the working dir. */
@@ -204,12 +206,14 @@ private:
 };
 #endif
 
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 const void* extDataAccess(const char* uri)
 {
 	return g_extDataInstance != nullptr
 		? lilv_instance_get_extension_data(g_extDataInstance, uri)
 		: nullptr;
 }
+#endif
 
 int logPrintf(LV2_Log_Handle, LV2_URID, const char* fmt, ...)
 {
@@ -419,10 +423,12 @@ private:
 	void idleUi();
 	void processUiEvents();
 	bool waitForMessage(int timeoutMs);
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	static void writeToUiPort(void* handle, uint32_t port, uint32_t size,
 		uint32_t protocol, const void* buffer);
 	static uint32_t portIndexBySymbol(void* handle, const char* symbol);
 	static void touchUiPort(void* handle, uint32_t port, bool grabbed);
+#endif
 
 	SharedMemory<float[]> m_audio;
 	f_cnt_t m_frames = 0;
@@ -496,7 +502,7 @@ private:
 	//! Last control values pushed to the UI
 	std::vector<float> m_lastUiControl;
 #endif
-#endif
+#endif // LMMS_HAVE_LV2
 };
 
 
@@ -711,7 +717,7 @@ void Lv2HostProcess::processBlock()
 			sendMessage(message(lv2host::IdLatency).addInt(latency));
 		}
 	}
-#endif
+#endif // LMMS_HAVE_LV2
 }
 
 
@@ -1130,6 +1136,7 @@ void Lv2HostProcess::idleUi()
 
 
 
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 void Lv2HostProcess::writeToUiPort(void* handle, uint32_t port, uint32_t size,
 	uint32_t protocol, const void* buffer)
 {
@@ -1182,6 +1189,7 @@ void Lv2HostProcess::touchUiPort(void* handle, uint32_t port, bool grabbed)
 	(void)port;
 	(void)grabbed;
 }
+#endif
 
 
 

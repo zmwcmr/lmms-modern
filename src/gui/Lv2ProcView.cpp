@@ -87,12 +87,14 @@ namespace lmms::gui
 
 namespace
 {
+#ifdef LMMS_HAVE_SUIL
 // UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
 // ui:resize. Clamp them before they reach the plugin, which may assert.
 int clampUiDimension(int value, int maximum)
 {
 	return std::clamp(value, 1, std::max(maximum, 1));
 }
+#endif
 
 // Temporarily switch the working directory for plugin calls that resolve
 // assets relative to the CWD (Zyn Fusion's qml/ and libzest.so).
@@ -117,7 +119,7 @@ private:
 };
 }
 
-#if defined(LMMS_BUILD_LINUX)
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 namespace
 {
 XErrorHandler g_previousXErrorHandler = nullptr;
@@ -852,6 +854,7 @@ void Lv2ProcView::resizeUiToPlugin()
 
 int Lv2ProcView::resizeUiRequest(int width, int height)
 {
+#ifdef LMMS_HAVE_SUIL
 	if (width <= 0 || height <= 0)
 	{
 		return 1;
@@ -883,6 +886,11 @@ int Lv2ProcView::resizeUiRequest(int width, int height)
 
 	applyUiResize(width, height);
 	return 0;
+#else
+	Q_UNUSED(width);
+	Q_UNUSED(height);
+	return 1;
+#endif
 }
 
 
@@ -890,7 +898,7 @@ int Lv2ProcView::resizeUiRequest(int width, int height)
 
 void Lv2ProcView::applyUiResize(int width, int height)
 {
-#if defined(LMMS_BUILD_LINUX)
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	if (m_x11Window && m_x11Display)
 	{
 		Display* dpy = static_cast<Display*>(m_x11Display);
@@ -1241,7 +1249,11 @@ void Lv2ProcView::modelChanged(Lv2Proc *proc)
 	if (m_toggleUIButton)
 	{
 		QSignalBlocker blocker(m_toggleUIButton);
+#ifdef LMMS_HAVE_SUIL
 		m_toggleUIButton->setChecked(m_uiInstance != nullptr);
+#else
+		m_toggleUIButton->setChecked(m_uiVisible);
+#endif
 	}
 
 	ModelGroupView::modelChanged(proc);

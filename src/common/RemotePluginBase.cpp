@@ -158,10 +158,10 @@ RemotePluginBase::message RemotePluginBase::waitForMessage(
 							bool _busy_waiting,
 							int timeoutMs)
 {
+#ifndef BUILD_REMOTE_PLUGIN_CLIENT
 	const auto deadline = timeoutMs > 0
 		? std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs)
 		: std::chrono::steady_clock::time_point::max();
-#ifndef BUILD_REMOTE_PLUGIN_CLIENT
 	if (_busy_waiting)
 	{
 		// No point processing events outside of the main thread
@@ -239,7 +239,7 @@ RemotePluginBase::message RemotePluginBase::waitForMessage(
 			}
 		}
 #	endif
-#endif
+#endif // BUILD_REMOTE_PLUGIN_CLIENT
 		message m = receiveMessage();
 		processMessage(m);
 		if (m.id == _wm.id)

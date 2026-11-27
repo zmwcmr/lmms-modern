@@ -120,10 +120,13 @@ private:
 	Lv2Proc* m_proc = nullptr;
 	QWidget* m_pluginWidget = nullptr;
 
+	// Used by both the in-process and the remote UI paths.
+	QTimer* m_uiTimer = nullptr;
+	bool m_uiVisible = false;
+
 #ifdef LMMS_HAVE_SUIL
 	SuilHost* m_uiHost = nullptr;
 	SuilInstance* m_uiInstance = nullptr;
-	QTimer* m_uiTimer = nullptr;
 
 	// The plugin UI may keep pointers to these features for its whole
 	// lifetime, so they must outlive suil_instance_new().
@@ -139,7 +142,6 @@ private:
 	QString m_uiDataRoot;
 	float m_uiScale = 1.0f;
 	float m_uiSampleRate = 0.0f;
-	bool m_uiVisible = false;
 	bool m_uiResizable = true;
 	//! Size requested by the UI while suil_instance_new() was running
 	int m_pendingUiWidth = 0;

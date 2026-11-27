@@ -68,6 +68,11 @@ known_no_namespace_lmms = {
     'plugins/CarlaBase/DummyCarla.cpp',
     # unclear why it has no namespace
     'plugins/ZynAddSubFx/RemoteZynAddSubFx.cpp',
+    # standalone executables with main()
+    'plugins/Lv2Host/Lv2Host.cpp',
+    'plugins/Vst3Base/dsp-host/main.cpp',
+    'plugins/Vst3Base/editor-host/editor_host_main.cpp',
+    'plugins/Vst3Base/scanner/main.cpp',
 }
 
 exclude_files = re.compile(
@@ -78,6 +83,8 @@ exclude_files = re.compile(
     'plugins/ReverbSC/[a-z]|'
     'plugins/Sf2Player/fluidsynthshims.h|'
     '/portsmf/|'
+    # vendored VST3 headers and the standalone VST3 host test programs:
+    'plugins/Vst3Base/travesty/|plugins/Vst3Base/tests/|'
     # only forward to headers that are not ours:
     'plugins/ZynAddSubFx/ThreadShims.h'
 )
