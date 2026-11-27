@@ -89,6 +89,16 @@ private slots:
 		QCOMPARE(parameters[0].defaultValue, 0.5);
 		QCOMPARE(host.parameterValue(4), 0.5);
 
+		const auto inputBuses = host.inputBuses();
+		QCOMPARE(inputBuses.size(), 1u);
+		QCOMPARE(inputBuses[0].channels, 2);
+		QCOMPARE(inputBuses[0].role, PluginBusRole::Main);
+		QVERIFY(inputBuses[0].isInput);
+		const auto outputBuses = host.outputBuses();
+		QCOMPARE(outputBuses.size(), 1u);
+		QCOMPARE(outputBuses[0].channels, 2);
+		QVERIFY(!outputBuses[0].isInput);
+
 		QVERIFY(host.setParameter(4, 0.25));
 		QCOMPARE(host.parameterValue(4), 0.25);
 
@@ -115,6 +125,36 @@ private slots:
 			QCOMPARE(outL[frame], 0.25f);
 			QCOMPARE(outR[frame], 0.25f);
 		}
+	}
+
+	void reportsSidechainBuses()
+	{
+		Model parent(nullptr);
+		Lv2PluginHost host(&parent);
+
+		PluginLoadRequest request;
+		request.pluginUri = QStringLiteral(
+			"http://lmms.io/lv2/fake-sidechain");
+		request.sampleRate = 44100.0;
+		request.maxBlockSize = 256;
+
+		QString error;
+		QVERIFY2(host.load(request, &error), qPrintable(error));
+
+		const auto inputs = host.inputBuses();
+		QCOMPARE(inputs.size(), 2u);
+		QCOMPARE(inputs[0].channels, 2);
+		QCOMPARE(inputs[0].role, PluginBusRole::Main);
+		QVERIFY(inputs[0].isInput);
+		QCOMPARE(inputs[1].channels, 2);
+		QCOMPARE(inputs[1].role, PluginBusRole::Sidechain);
+		QVERIFY(inputs[1].isInput);
+
+		const auto outputs = host.outputBuses();
+		QCOMPARE(outputs.size(), 1u);
+		QCOMPARE(outputs[0].channels, 2);
+		QCOMPARE(outputs[0].role, PluginBusRole::Main);
+		QVERIFY(!outputs[0].isInput);
 	}
 
 	void stateRoundTrip()

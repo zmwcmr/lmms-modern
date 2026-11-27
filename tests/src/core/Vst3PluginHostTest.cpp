@@ -55,6 +55,13 @@ private slots:
 		QVERIFY(adapter.isLoaded());
 		QCOMPARE(adapter.format(), PluginFormat::Vst3);
 
+		const auto inputBuses = adapter.inputBuses();
+		QCOMPARE(inputBuses.size(), 1u);
+		QCOMPARE(inputBuses[0].channels, 2);
+		QCOMPARE(inputBuses[0].role, PluginBusRole::Main);
+		const auto outputBuses = adapter.outputBuses();
+		QCOMPARE(outputBuses.size(), 1u);
+
 		const auto& parameters = adapter.parameters();
 		QCOMPARE(parameters.size(), 1);
 		QCOMPARE(parameters[0].id, 1u);
