@@ -1,0 +1,12 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
+@prefix ui:   <http://lv2plug.in/ns/extensions/ui#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://lmms.io/lv2/fake-crash-ui>
+	a lv2:Plugin ;
+	lv2:binary <crashui.so> ;
+	rdfs:seeAlso <crashui.ttl> .
+
+<http://lmms.io/lv2/fake-crash-ui#ui>
+	a ui:X11UI ;
+	ui:binary <crashui.so> .
