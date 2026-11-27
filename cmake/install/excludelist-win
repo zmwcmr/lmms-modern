@@ -1,8 +1,11 @@
 # List of DLLs considered to be system libraries.
 # This is needed when cross-compiling for Windows.
 ADVAPI32.dll
+BCRYPT.dll
 COMCTL32.dll
 comdlg32.dll
+CRYPT32.dll
+CRYPTBASE.dll
 d3d11.dll
 dwmapi.dll
 dxgi.dll
@@ -25,4 +28,13 @@ WINMM.DLL
 WS2_32.dll
 RPCRT4.dll
 dsound.dll
+DNSAPI.dll
+IPHLPAPI.dll
+MSWSOCK.dll
+NCrypt.dll
+NTDLL.dll
+SECUR32.dll
 SETUPAPI.dll
+SSPICLI.dll
+ucrtbase.dll
+WLDP.dll
