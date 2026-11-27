@@ -291,8 +291,10 @@ path.
       `HostedInstrument`; both adopt the same `Lv2Proc` for models, views,
       ports and `<lv2state>`. `Lv2PluginHost` gained an owning and an
       adopting mode.
-- [ ] VST3: switch the instrument/effect wrappers to the generic bases while
-      keeping `vst3pN`, component/controller state and the editor views.
+- [x] VST3: `Vst3Instrument` uses `HostedInstrument` and `Vst3Effect` uses
+      `HostedEffect`; both adopt the `Vst3HostBase` they already own.
+      `Vst3ParameterModels`, component/controller state and the editor views
+      are unchanged.
 - Acceptance: old projects load and save byte-compatible state; VST2 UI
   behavior unchanged. The structural alias and audio path are done; parameter
   and state unification is the remaining part.
