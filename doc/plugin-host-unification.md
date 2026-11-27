@@ -296,8 +296,9 @@ path.
       `Vst3ParameterModels`, component/controller state and the editor views
       are unchanged.
 - Acceptance: old projects load and save byte-compatible state; VST2 UI
-  behavior unchanged. The structural alias and audio path are done; parameter
-  and state unification is the remaining part.
+  behavior unchanged. VST2 keeps its native chunk XML on purpose; the
+  adapter's `PluginStateBlob` is available for new consumers.
+- Stage 3 is complete for all three formats.
 
 ### Stage 4 — scanner unification
 
