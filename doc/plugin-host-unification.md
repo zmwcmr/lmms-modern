@@ -279,9 +279,14 @@ path.
 - [x] `Vst2Instrument` derives from `HostedInstrument` and routes audio and
       latency through `Vst2PluginHost`. The native `VstInstrumentPlugin` still
       provides the MDI editor, parameter gestures and the existing XML.
-- [ ] Move the VST2 parameter models, parameter curves and state to
-      `HostedPluginModels` / `PluginStateBlob` while keeping `paramN`,
-      `chunk`, `numparams`, `guivisible` and `program` byte-compatible.
+- [x] Move the VST2 parameter models and parameter curves to
+      `HostedPluginModels` / `Vst2PluginHost`; `knobFModel` is now a
+      non-owning view. The legacy `paramN`, `chunk`, `numparams`,
+      `guivisible` and `program` XML is produced by the native
+      `VstPlugin::saveSettings`, so old projects stay byte-compatible.
+- [ ] VST2 state still uses the native chunk XML rather than
+      `PluginStateBlob`. This is deliberate for compatibility; the adapter
+      exposes `saveState()` for new consumers.
 - [ ] Switch LV2/VST3 wrappers to the generic bases while keeping their
       existing XML, views and native editors.
 - Acceptance: old projects load and save byte-compatible state; VST2 UI

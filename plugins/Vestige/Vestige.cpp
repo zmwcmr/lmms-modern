@@ -245,31 +245,48 @@ void Vst2Instrument::loadSettings( const QDomElement & _this )
 			m_plugin->hideUI();
 		}
 
-		const QMap<QString, QString> & dump = m_plugin->parameterDump();
-		paramCount = dump.size();
-		m_lastParameterPeriod.assign(paramCount, -1);
-		auto paramStr = std::array<char, 35>{};
-		knobFModel = new FloatModel *[ paramCount ];
-		QStringList s_dumpValues;
-		for( int i = 0; i < paramCount; i++ )
+		// The VST plugin restored its chunk/parameter dump above. Refresh the
+		// non-automated models from that state, then let the XML restore the
+		// automated ones.
+		m_vst2Host->refreshParameterValues();
+		m_updatingParametersFromPlugin = true;
+		for (int i = 0; i < paramCount; ++i)
 		{
-			std::snprintf(paramStr.data(), paramStr.size(), "param%d", i);
-			s_dumpValues = dump[paramStr.data()].split(":");
-
-			knobFModel[i] = new FloatModel( 0.0f, 0.0f, 1.0f, 0.01f, this, QString::number(i) );
-			knobFModel[i]->loadSettings(_this, paramStr.data());
-
-			if( !( knobFModel[ i ]->isAutomated() || knobFModel[ i ]->controllerConnection() ) )
+			FloatModel* model = knobFModel[i];
+			if (model == nullptr
+				|| model->isAutomatedOrControlled())
 			{
-				knobFModel[ i ]->setValue(LocaleHelper::toFloat(s_dumpValues.at(2)));
-				knobFModel[ i ]->setInitValue(LocaleHelper::toFloat(s_dumpValues.at(2)));
+				continue;
 			}
-
-			connect( knobFModel[i], &FloatModel::dataChanged, this,
-				[this, i]() { setParameter( knobFModel[i] ); }, Qt::DirectConnection);
+			const uint32_t id = parameterModels().parameter(i).id;
+			const float value = static_cast<float>(
+				m_vst2Host->parameterValue(id));
+			model->setValue(value);
+			model->setInitValue(value);
 		}
+		parameterModels().loadSettings(_this);
+		m_updatingParametersFromPlugin = false;
 	}
 	m_pluginMutex.unlock();
+}
+
+
+
+
+int Vst2Instrument::indexOfModel(const Model* model) const
+{
+	if (knobFModel == nullptr || model == nullptr)
+	{
+		return -1;
+	}
+	for (int i = 0; i < paramCount; ++i)
+	{
+		if (knobFModel[i] == model)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 
@@ -282,8 +299,8 @@ void Vst2Instrument::setParameter( Model * action )
 		return;
 	}
 
-	const int knobUNID = action->displayName().toInt();
-	if (knobUNID < 0 || knobUNID >= paramCount || knobFModel == nullptr)
+	const int knobUNID = indexOfModel(action);
+	if (knobUNID < 0)
 	{
 		return;
 	}
@@ -296,7 +313,7 @@ void Vst2Instrument::setParameter( Model * action )
 
 void Vst2Instrument::sendParameter( int index, FloatModel * model )
 {
-	if (m_plugin == nullptr || model == nullptr)
+	if (m_vst2Host == nullptr || !m_vst2Host->isLoaded() || model == nullptr)
 	{
 		return;
 	}
@@ -309,8 +326,8 @@ void Vst2Instrument::sendParameter( int index, FloatModel * model )
 	{
 		const f_cnt_t frameOffset = Engine::getSong() != nullptr
 			? Engine::getSong()->currentFrameOffsetInPeriod() : 0;
-		m_plugin->setParamEvents(index, {
-			{static_cast<int>(frameOffset), model->value()}});
+		m_vst2Host->setParameter(index, model->value(),
+			static_cast<int>(frameOffset));
 		return;
 	}
 
@@ -336,13 +353,13 @@ void Vst2Instrument::sendParameter( int index, FloatModel * model )
 				model->minValue(), model->maxValue());
 			if (!events.empty())
 			{
-				m_plugin->setParamEvents(index, events);
+				m_vst2Host->sendParameterEvents(index, events);
 				return;
 			}
 		}
 	}
 
-	m_plugin->setParam(index, model->value());
+	m_vst2Host->setParameter(index, model->value(), 0);
 }
 
 
@@ -364,6 +381,7 @@ void Vst2Instrument::handleParameterAutomated( int index, float value )
 
 	m_updatingParametersFromPlugin = true;
 	model->setValue(value, true);
+	m_vst2Host->noteParameterValue(static_cast<uint32_t>(index), value);
 	m_updatingParametersFromPlugin = false;
 }
 
@@ -423,8 +441,6 @@ void Vst2Instrument::saveSettings( QDomDocument & _doc, QDomElement & _this )
 	{
 		m_plugin->saveSettings( _doc, _this );
 		if (knobFModel != nullptr) {
-			const QMap<QString, QString> & dump = m_plugin->parameterDump();
-			paramCount = dump.size();
 			auto paramStr = std::array<char, 35>{};
 			for( int i = 0; i < paramCount; i++ )
 			{
@@ -581,9 +597,39 @@ void Vst2Instrument::loadFile( const QString & _file )
 		instrumentTrack()->setName( plugin->name() );
 	}
 
+	setupParameterModels();
 	emit dataChanged();
 
 	delete tf;
+}
+
+
+
+
+void Vst2Instrument::setupParameterModels()
+{
+	if (knobFModel != nullptr)
+	{
+		delete [] knobFModel;
+		knobFModel = nullptr;
+	}
+
+	initializeModels();
+	// VST2 keeps its own parameter curves and gestures; the generic queue
+	// must not send a second copy of every change.
+	parameterModels().setParameterChangeCallback(
+		[](uint32_t, double, int) {});
+
+	paramCount = parameterModels().count();
+	m_lastParameterPeriod.assign(paramCount, -1);
+	knobFModel = new FloatModel*[paramCount];
+	for (int i = 0; i < paramCount; ++i)
+	{
+		knobFModel[i] = parameterModels().model(i);
+		connect(knobFModel[i], &FloatModel::dataChanged, this,
+			[this, i]() { setParameter(knobFModel[i]); },
+			Qt::DirectConnection);
+	}
 }
 
 
@@ -661,21 +707,14 @@ void Vst2Instrument::closePlugin( void )
 		m_midiOutQueue.clear();
 	}
 
-	// disconnect all signals
-	if( knobFModel != nullptr )
-	{
-		for( int i = 0; i < paramCount; i++ )
-		{
-			delete knobFModel[ i ];
-		}
-	}
-
 	if( knobFModel != nullptr )
 	{
 		delete [] knobFModel;
 		knobFModel = nullptr;
 	}
+	paramCount = 0;
 	m_lastParameterPeriod.clear();
+	m_parameterGestures.clear();
 
 	if( m_scrollArea != nullptr )
 	{
@@ -693,6 +732,10 @@ void Vst2Instrument::closePlugin( void )
 	{
 		p_subWindow = nullptr;
 	}
+
+	// The editor view (and its knobs) must be gone before the models it
+	// references are deleted.
+	parameterModels().clear();
 
 	m_pluginMutex.lock();
 	m_plugin = nullptr;
@@ -1186,15 +1229,6 @@ ManageVestigeInstrumentView::ManageVestigeInstrumentView( Instrument * _instrume
 
 	m_vstKnobs.reserve(m_vi->paramCount);
 
-	bool hasKnobModel = true;
-	if (m_vi->knobFModel == nullptr) {
-		m_vi->knobFModel = new FloatModel *[ m_vi->paramCount ];
-		hasKnobModel = false;
-	}
-	if (!hasKnobModel) {
-		m_vi->m_lastParameterPeriod.assign(m_vi->paramCount, -1);
-	}
-
 	auto paramStr = std::array<char, 35>{};
 	QStringList s_dumpValues;
 
@@ -1208,17 +1242,11 @@ ManageVestigeInstrumentView::ManageVestigeInstrumentView( Instrument * _instrume
 		auto knob = new VstPluginKnob{m_vi->m_plugin, i, description, this};
 		m_vstKnobs.push_back(knob);
 
-		if( !hasKnobModel )
+		if (m_vi->knobFModel == nullptr || m_vi->knobFModel[i] == nullptr)
 		{
-			std::snprintf(paramStr.data(), paramStr.size(), "%d", i);
-			m_vi->knobFModel[i] = new FloatModel(LocaleHelper::toFloat(s_dumpValues.at(2)),
-				0.0f, 1.0f, 0.01f, castModel<VestigeInstrument>(), paramStr.data());
+			continue;
 		}
-
-		FloatModel * model = m_vi->knobFModel[i];
-		connect( model, &FloatModel::dataChanged, this,
-			[this, model]() { setParameter( model ); }, Qt::DirectConnection);
-		knob->setModel(model);
+		knob->setModel(m_vi->knobFModel[i]);
 	}
 	m_vi->m_plugin->loadParameterLabels();
 	m_vi->m_plugin->loadParameterDisplays();
@@ -1312,25 +1340,12 @@ void ManageVestigeInstrumentView::displayAutomatedOnly( void )
 
 ManageVestigeInstrumentView::~ManageVestigeInstrumentView()
 {
-	// Delete the knobs first: their ModelView destructor still looks at the
-	// model, and the models are owned by the instrument.
-	if( m_vi->knobFModel != nullptr )
+	// The knob models and the pointer array are owned by the instrument.
+	for (auto* knob : m_vstKnobs)
 	{
-		for( int i = 0; i < m_vi->paramCount; i++ )
-		{
-			delete m_vstKnobs[i];
-		}
-		for( int i = 0; i < m_vi->paramCount; i++ )
-		{
-			delete m_vi->knobFModel[ i ];
-		}
+		delete knob;
 	}
-
-	if( m_vi->knobFModel != nullptr )
-	{
-		delete [] m_vi->knobFModel;
-		m_vi->knobFModel = nullptr;
-	}
+	m_vstKnobs.clear();
 
 	if (m_vi->m_scrollArea != nullptr) {
 		delete m_vi->m_scrollArea;
@@ -1355,7 +1370,7 @@ void ManageVestigeInstrumentView::setParameter( Model * action )
 		return;
 	}
 
-	int knobUNID = action->displayName().toInt();
+	const int knobUNID = m_vi->indexOfModel(action);
 
 	if ( m_vi->m_plugin != nullptr && m_vi->knobFModel != nullptr
 		&& knobUNID >= 0 && knobUNID < m_vi->paramCount )

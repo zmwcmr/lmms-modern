@@ -31,6 +31,7 @@
 #include <QDomElement>
 
 #include "LocaleHelper.h"
+#include "ParameterCurve.h"
 #include "MidiEvent.h"
 #include "VstPlugin.h"
 
@@ -353,6 +354,39 @@ void Vst2PluginHost::setTempo(double bpm)
 	if (isLoaded())
 	{
 		m_plugin->setTempo(static_cast<bpm_t>(bpm));
+	}
+}
+
+
+
+
+void Vst2PluginHost::sendParameterEvents(uint32_t id,
+	const std::vector<ParameterEvent>& events)
+{
+	if (!isLoaded() || events.empty())
+	{
+		return;
+	}
+	m_plugin->setParamEvents(static_cast<int>(id), events);
+	noteParameterValue(id, events.back().value);
+}
+
+
+
+
+void Vst2PluginHost::refreshParameterValues()
+{
+	refreshValues();
+}
+
+
+
+
+void Vst2PluginHost::noteParameterValue(uint32_t id, double value)
+{
+	if (id < m_values.size())
+	{
+		m_values[id] = value;
 	}
 }
 
