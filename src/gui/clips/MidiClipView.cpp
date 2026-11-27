@@ -415,7 +415,7 @@ void MidiClipView::mousePressEvent( QMouseEvent * _me )
 
 	bool displayPattern = fixedClips() || (pixelsPerBar() >= 96 && m_legacySEPattern);
 	if (_me->button() == Qt::LeftButton && m_clip->m_clipType == MidiClip::Type::BeatClip && displayPattern
-		&& pos.y() > BeatStepButtonOffset && pos.y() < BeatStepButtonOffset + m_stepBtnOff.height())
+		&& pos.y() > BeatStepButtonOffset && pos.y() < BeatStepButtonOffset + embed::logicalSize(m_stepBtnOff).height())
 
 	// when mouse button is pressed in pattern mode
 
@@ -488,7 +488,7 @@ void MidiClipView::wheelEvent(QWheelEvent * we)
 	const auto pos = we->position().toPoint();
 	if(m_clip->m_clipType == MidiClip::Type::BeatClip &&
 				(fixedClips() || pixelsPerBar() >= 96) &&
-				pos.y() > height() - m_stepBtnOff.height())
+				pos.y() > height() - embed::logicalSize(m_stepBtnOff).height())
 	{
 //	get the step number that was wheeled on and
 //	do calculations in floats to prevent rounding errors...
@@ -542,8 +542,13 @@ static int computeNoteRange(int minKey, int maxKey)
 void MidiClipView::paintEvent( QPaintEvent * )
 {
 	QPainter painter( this );
+	const bool beatClip = m_clip->m_clipType == MidiClip::Type::BeatClip;
+	const auto pixelRatio = beatClip && (fixedClips() || m_legacySEPattern) ? devicePixelRatioF() : 1.0;
+	const auto pixelSize = size() * pixelRatio;
+	const bool cacheMatches = m_paintPixmap.size() == pixelSize
+		&& m_paintPixmap.devicePixelRatio() == pixelRatio;
 
-	if( !needsUpdate() )
+	if (!needsUpdate() && cacheMatches)
 	{
 		painter.drawPixmap( 0, 0, m_paintPixmap );
 		return;
@@ -551,9 +556,10 @@ void MidiClipView::paintEvent( QPaintEvent * )
 
 	setNeedsUpdate( false );
 
-	if (m_paintPixmap.isNull() || m_paintPixmap.size() != size())
+	if (!cacheMatches)
 	{
-		m_paintPixmap = QPixmap(size());
+		m_paintPixmap = QPixmap(pixelSize);
+		m_paintPixmap.setDevicePixelRatio(pixelRatio);
 	}
 
 	QPainter p( &m_paintPixmap );
@@ -561,7 +567,6 @@ void MidiClipView::paintEvent( QPaintEvent * )
 	QColor c;
 	bool const muted = m_clip->getTrack()->isMuted() || m_clip->isMuted();
 	bool current = getGUI()->pianoRoll()->currentMidiClip() == m_clip;
-	bool beatClip = m_clip->m_clipType == MidiClip::Type::BeatClip;
 
 	if( beatClip )
 	{
@@ -624,33 +629,22 @@ void MidiClipView::paintEvent( QPaintEvent * )
 	// Beat clip paint event (on BB Editor)
 	if (beatClip && displayPattern)
 	{
-		QPixmap stepon0;
-		QPixmap stepon200;
-		QPixmap stepoff;
-		QPixmap stepoffl;
-		QPixmap stephighlight;
 		const int steps = std::max(1, m_clip->m_steps);
 		const int w = width() - 2 * BORDER_WIDTH;
 
-		// scale step graphics to fit the beat clip length
-		stepon0
-			= m_stepBtnOn0.scaled(w / steps, m_stepBtnOn0.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-		stepon200 = m_stepBtnOn200.scaled(
-			w / steps, m_stepBtnOn200.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-		stepoff
-			= m_stepBtnOff.scaled(w / steps, m_stepBtnOff.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-		stepoffl = m_stepBtnOffLight.scaled(
-			w / steps, m_stepBtnOffLight.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-		stephighlight = m_stepBtnHighlight.scaled(
-			w / steps, m_stepBtnHighlight.height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-
+		p.save();
+		p.setRenderHint(QPainter::SmoothPixmapTransform);
+		const auto drawStep = [&](int x, const QPixmap& pixmap)
+		{
+			const QRect target{x, BeatStepButtonOffset, w / steps, embed::logicalSize(pixmap).height()};
+			p.drawPixmap(target, pixmap, pixmap.rect());
+		};
 		for (int it = 0; it < steps; it++)	// go through all the steps in the beat clip
 		{
 			Note* n = m_clip->noteAtStep(it);
 
 			// figure out x and y coordinates for step graphic
 			const int x = BORDER_WIDTH + static_cast<int>(it * w / steps);
-			const int y = BeatStepButtonOffset;
 
 			const bool isAtPlayPos = Engine::getSong()->getPlayPos(Song::PlayMode::Pattern) * TimePos::stepsPerBar() / TimePos::ticksPerBar() == it
 				&& Engine::getSong()->playMode() == Song::PlayMode::Pattern;
@@ -658,25 +652,26 @@ void MidiClipView::paintEvent( QPaintEvent * )
 			if (n)
 			{
 				const int vol = n->getVolume();
-				p.drawPixmap(x, y, stepoffl);
-				p.drawPixmap(x, y, stepon0);
+				drawStep(x, m_stepBtnOffLight);
+				drawStep(x, m_stepBtnOn0);
 				p.setOpacity(std::sqrt(vol / 200.0));
-				p.drawPixmap(x, y, stepon200);
+				drawStep(x, m_stepBtnOn200);
 				p.setOpacity(1);
 			}
 			else if ((it / 4) % 2)
 			{
-				p.drawPixmap(x, y, stepoffl);
+				drawStep(x, m_stepBtnOffLight);
 			}
 			else
 			{
-				p.drawPixmap(x, y, stepoff);
+				drawStep(x, m_stepBtnOff);
 			}
 			if (isAtPlayPos)
 			{
-				p.drawPixmap(x, y, stephighlight);
+				drawStep(x, m_stepBtnHighlight);
 			}
 		} // end for loop
+		p.restore();
 
 		// draw a transparent rectangle over muted clips
 		if (muted)

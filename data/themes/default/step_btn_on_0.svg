@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="1.5" x2="0" y2="22.5">
+      <stop offset="0" stop-color="#b6b9bb"/>
+      <stop offset="0.47" stop-color="#8b8f94"/>
+      <stop offset="0.52" stop-color="#697075"/>
+      <stop offset="0.7" stop-color="#5f656b"/>
+      <stop offset="1" stop-color="#507478"/>
+    </linearGradient>
+    <linearGradient id="face" gradientUnits="userSpaceOnUse" x1="0" y1="4.5" x2="0" y2="19.5">
+      <stop offset="0" stop-color="#2f3236"/>
+      <stop offset="0.8" stop-color="#1e2226"/>
+      <stop offset="0.87" stop-color="#222d30"/>
+      <stop offset="1" stop-color="#376263"/>
+    </linearGradient>
+    <linearGradient id="inset" gradientUnits="userSpaceOnUse" x1="0" y1="16.5" x2="0" y2="21.5">
+      <stop offset="0" stop-color="#050506"/>
+      <stop offset="1" stop-color="#0b2f2e"/>
+    </linearGradient>
+    <linearGradient id="bevel" gradientUnits="userSpaceOnUse" x1="0" y1="16.5" x2="0" y2="20.5">
+      <stop offset="0" stop-color="#191d21"/>
+      <stop offset="0.75" stop-color="#266261"/>
+      <stop offset="1" stop-color="#2b7e7b"/>
+    </linearGradient>
+  </defs>
+  <rect width="24" height="24" fill="#000000"/>
+  <rect x="1" y="1" width="22" height="22" fill="url(#rim)"/>
+  <rect x="2" y="2" width="20" height="20" fill="url(#inset)"/>
+  <rect x="3" y="3" width="18" height="18" rx="0.7" fill="url(#bevel)"/>
+  <rect x="4" y="4" width="16" height="16" rx="0.6" fill="url(#face)"/>
+</svg>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="78" height="22" viewBox="0 0 78 22">
+  <defs>
+    <g id="lit">
+      <path d="M1 1h3v1h-3zM0 2h1v7h-1zM4 2h1v7h-1zM1 9h3v1h-3z"/> <!-- 0 -->
+      <path d="M8 1h1v1h-1zM7 2h2v1h-2zM6 3h1v1h-1zM8 3h1v6h-1zM6 9h5v1h-5z"/> <!-- 1 -->
+      <path d="M13 1h3v1h-3zM12 2h1v1h-1zM16 2h1v2h-1zM15 4h1v1h-1zM14 5h1v1h-1zM13 6h1v1h-1zM12 7h1v2h-1zM12 9h5v1h-5z"/> <!-- 2 -->
+      <path d="M19 1h3v1h-3zM18 2h1v1h-1zM22 2h1v3h-1zM20 5h2v1h-2zM18 8h1v1h-1zM22 6h1v3h-1zM19 9h3v1h-3z"/> <!-- 3 -->
+      <path d="M28 1h1v1h-1zM27 2h2v1h-2zM26 3h1v1h-1zM25 4h1v1h-1zM24 5h1v1h-1zM28 3h1v3h-1zM24 6h5v1h-5zM28 7h1v3h-1z"/> <!-- 4 -->
+      <path d="M30 1h5v1h-5zM30 2h1v2h-1zM30 4h4v1h-4zM30 8h1v1h-1zM34 5h1v4h-1zM31 9h3v1h-3z"/> <!-- 5 -->
+      <path d="M38 1h2v1h-2zM37 2h1v1h-1zM36 3h1v2h-1zM36 5h4v1h-4zM36 6h1v3h-1zM40 6h1v3h-1zM37 9h3v1h-3z"/> <!-- 6 -->
+      <path d="M42 1h5v1h-5zM46 2h1v1h-1zM45 3h1v2h-1zM44 5h1v2h-1zM43 7h1v3h-1z"/> <!-- 7 -->
+      <path d="M49 1h3v1h-3zM48 2h1v3h-1zM52 2h1v3h-1zM49 5h3v1h-3zM48 6h1v3h-1zM52 6h1v3h-1zM49 9h3v1h-3z"/> <!-- 8 -->
+      <path d="M55 1h3v1h-3zM54 2h1v3h-1zM58 2h1v3h-1zM55 5h4v1h-4zM58 6h1v2h-1zM57 8h1v1h-1zM55 9h2v1h-2z"/> <!-- 9 -->
+      <path d="M66 5h5v1h-5z"/> <!-- - -->
+    </g>
+  </defs>
+  <path d="M0 0h72v22H0zM74 0h1v22h-1z" fill="#000000"/>
+  <rect x="0" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="6" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="12" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="18" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="24" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="30" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="36" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="42" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="48" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="54" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="60" y="1" width="5" height="9" fill="#02200d"/>
+  <rect x="66" y="1" width="5" height="9" fill="#02200d"/>
+  <use xlink:href="#lit" fill="#0bd556"/>
+  <use xlink:href="#lit" y="11" fill="#02200d"/>
+</svg>

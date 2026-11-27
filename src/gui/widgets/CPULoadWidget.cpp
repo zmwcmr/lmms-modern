@@ -41,16 +41,11 @@ namespace lmms::gui
 CPULoadWidget::CPULoadWidget( QWidget * _parent ) :
 	QWidget( _parent ),
 	m_currentLoad( 0 ),
-	m_temp(),
 	m_background( embed::getIconPixmap( "cpuload_bg" ) ),
 	m_leds( embed::getIconPixmap( "cpuload_leds" ) ),
-	m_changed( true ),
 	m_updateTimer()
 {
-	setFixedSize( m_background.width(), m_background.height() );
-
-	m_temp = QPixmap( width(), height() );
-	
+	setFixedSize(embed::logicalSize(m_background));
 
 	connect( &m_updateTimer, SIGNAL(timeout()),
 					this, SLOT(updateCpuLoad()));
@@ -65,25 +60,19 @@ CPULoadWidget::CPULoadWidget( QWidget * _parent ) :
 
 void CPULoadWidget::paintEvent( QPaintEvent *  )
 {
-	if( m_changed == true )
-	{
-		m_changed = false;
-		
-		m_temp.fill( QColor(0,0,0,0) );
-		QPainter p( &m_temp );
-		p.drawPixmap( 0, 0, m_background );
-
-		// Normally the CPU load indicator moves smoothly, with 1 pixel resolution. However, some themes may want to
-		// draw discrete elements (like LEDs), so the stepSize property can be used to specify a larger step size.
-		int w = (m_leds.width() * std::min(m_currentLoad, 100) / (stepSize() * 100)) * stepSize();
-		if( w > 0 )
-		{
-			p.drawPixmap( 23, 3, m_leds, 0, 0, w,
-							m_leds.height() );
-		}
-	}
 	QPainter p( this );
-	p.drawPixmap( 0, 0, m_temp );
+	p.drawPixmap(0, 0, m_background);
+
+	// Keep the color ramp anchored to the full meter while revealing it in theme-defined steps.
+	const auto ledSize = embed::logicalSize(m_leds);
+	const int litWidth = (ledSize.width() * std::min(m_currentLoad, 100) / 100 / stepSize()) * stepSize();
+	if (litWidth > 0)
+	{
+		p.save();
+		p.setClipRect(23, 3, litWidth, ledSize.height());
+		p.drawPixmap(23, 3, m_leds);
+		p.restore();
+	}
 
 	// The label is drawn as text instead of being baked into the background
 	// bitmap: a 1x raster image gets scaled up on high-DPI screens, which made
@@ -117,7 +106,6 @@ void CPULoadWidget::updateCpuLoad()
 			+ tr(" - Mixing: %1%").arg(engine->detailLoad(AudioEngineProfiler::DetailType::Mixing))
 		);
 		m_currentLoad = new_load;
-		m_changed = true;
 		update();
 	}
 }

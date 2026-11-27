@@ -17,7 +17,7 @@
 | ID | 任务 | 估时 | 风险 | 依赖 |
 | --- | --- | --- | --- | --- |
 | T1-2 | 数值就地编辑 + 手势说明 | 1 d | 中（行为变化） | 评审 |
-| T1-9 | 默认主题 PNG → SVG（已收尾，保留 QSS/精灵图/图标） | 按图标计 | 低 | — |
+| T1-9 | 默认主题素材矢量化（已完成） | 按素材计 | 低至中 | 平台图标生成与 Qt 5 样式验证 |
 | T1-10 | 动画：控件反馈、编辑确认、轻量浮层 | 分项评估 | 低至中 | 按优先级逐项实现 |
 | T2-2 | 控件右键菜单加"在自动化编辑器中显示" | 2–3 d | 中（新建 clip 逻辑） | 评审 |
 | T2-3 | 快捷键映射表（不含 UI） | 2–3 d | 中 | 评审 |
@@ -54,31 +54,29 @@ T1 各项尽量独立提交；T2 需要先讨论。
 - `envelope_graph`：改用 SVG 渐变和字形路径，不依赖系统字体；保留 182×32 的逻辑最小尺寸。
 - `effect_plugin`：改用 214×57 的 SVG 圆角和渐变。经典主题仍优先使用自己的素材。
 
-**未转换（原因）**
-- **必须保留**：`apply_css.png`、`apply-selected_css.png`（QSS 菜单指示图标，见 `74bac7745`）；`closed_branch.png`、`open_branch.png` 仅被 `QTreeView::branch` 的 `border-image` 引用。
-
-**本轮收尾（默认主题）**
+**已迁移的其他默认主题素材**
 - `sin_wave_active.png` → `sin_wave_active.svg`，并把 `sin_wave_inactive.svg` 一起改为**一个完整周期的光滑正弦曲线**（描边路径），不再使用 potrace 的块状轮廓。
 - `white_noise_wave_active.png`、`white_noise_wave_inactive.png` → SVG：改用可缩放的折线路径。
 - `track_op_grip.png` → `track_op_grip.svg`：`TrackGrip` 已使用 `embed::logicalSize()`，尺寸保持 6×25。
 - `led_green/red/yellow/off.png` → SVG：`LedCheckBox` 改用 `embed::logicalSize()` 计算布局和文字偏移，LED 尺寸仍为 16×14。
 - `recording_playpos_marker.png` → SVG：`TimeLineWidget` 改用 `embed::logicalSize()` 定位和绘制，标记尺寸仍为 17×9。
 - 删除未引用资源：`loop_point.png`、`pr_black_key*.png`、`pr_white_key_*.png`（6 个）、`shadow_c.png`、`toolbar_bg.png`、`track_shadow_c.png`、`led_blue.png`。
-- 默认主题的 PNG 数量从 59 降到 39；已用主窗口轨道手柄和 SVG 渲染检查确认加载正常。
-
-**保留分组（39 个，默认主题）**
-
-| 类别 | 文件 | 原因 |
-| --- | --- | --- |
-| QSS 指示/背景 | `apply_css*`、`closed_branch`、`open_branch`、`shadow_p` | Qt 样式表对 SVG 的支持不稳定；菜单、树分支和阴影必须保持位图表现。 |
-| LCD 精灵图 | `lcd_*` | `LcdWidget` 按固定单元格从横向精灵图切片；SVG 的 2× 过采样会改变 `cellSize`，导致数字错位。 |
-| LFO / CPU / 波形底图 | `lfo_*`、`cpuload_*`、`output_graph` | 复杂渐变、位图底纹或插画；矢量化收益低、回归风险高。 |
-| 应用图标 | `icon`、`icon_small`、`splash` | 平台图标和启动画面按像素尺寸使用。 |
-| 钢琴键 / 步进 / 发送按钮 | `white_key*`、`step_btn_*`、`mixer_send_*` | 精灵图/固定尺寸素材，需逐项迁移 `logicalSize()` 后再转换。 |
+- `white_key`、`white_key_pressed`、`white_key_disabled` → SVG，保留 10×57 的琴键尺寸。
+- `step_btn_*` 的五种步进状态 → 24×24 SVG。Pattern 编辑器按逻辑尺寸计算点击和滚轮区域，并按设备像素比缓存绘制结果。
+- `mixer_send_off/on` → SVG，`SEND` 使用内置的 Liberation Sans Bold 字体子集（SIL OFL 1.1），混音器仍以 29×20 的逻辑尺寸显示。
+- LFO 的 ×1、×100、÷100 开关各两态，LFO 面板和图表底图，示波器底图，以及 CPU 电平槽和渐变条，共 11 张改为 SVG。倍率与图表字样使用内置的 Oxanium Bold 字体子集（SIL OFL 1.1）。图表和电平仍按逻辑像素布局；CPU 电平按主题的步长裁切，渐变位置固定。
+- 10 张 LCD 数字与小数点精灵图改为 SVG，保留原数字轮廓、调色和禁用状态。布局使用逻辑单元尺寸，切片使用栅格化后的源像素坐标。
+- 菜单勾选复用 `apply.svg` 和 `apply-selected.svg`，通用树箭头和按钮阴影使用新的 SVG。树箭头保留了 Qt 5 原有的显示尺寸。
+- 应用大图标、小图标和启动画面使用 LMMS 官方美术仓库的矢量源（CC0 1.0）。启动窗口仍为 681×573 个逻辑像素。
+- 默认主题的 PNG 数量从 59 降到 0。Windows 和 macOS 应用图标仍以平台格式随打包分发，可通过 `python3 buildtools/generate-app-icons.py` 从已有的应用图标 SVG 重新生成。该命令需要 Inkscape 和 icotool。
 
 经典主题仍有自己的 PNG 素材；本轮只处理默认主题。
 
-**验收**：转换后资源仍能加载，在对应控件及不同缩放比例下显示正常。
+在 Linux Qt 5 离屏环境的 100%、150%、200% 缩放下，已复测白键三态、步进启停与播放高亮、步进点击和滚轮边界、混音发送开关、LFO 倍率切换与面板底图、图表尺寸以及 CPU 电平裁切。经典主题的同名 PNG 和缺失素材回退也已验证。
+
+LCD 在 Linux Qt 5 离屏环境的 100%、125%、150%、200% 缩放下通过布局、补位、负号、小数点和禁用态检查。10 张素材在 100% 下与原 PNG 的像素和透明度一致。经典主题的 PNG 优先和缺失素材回退也已复测。
+
+菜单勾选、通用树箭头、选中按钮阴影、窗口图标及启动画面均通过同样四档缩放检查。已检查默认主题的暂存安装目录，并在 Linux 上解码验证了 Windows ICO 和 macOS ICNS 的所有尺寸。
 
 ---
 

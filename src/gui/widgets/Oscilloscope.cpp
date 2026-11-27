@@ -49,7 +49,7 @@ Oscilloscope::Oscilloscope( QWidget * _p ) :
 	m_otherChannelsColor(71, 253, 133),
 	m_clippingColor(255, 64, 64)
 {
-	setFixedSize(m_background.width(), 30);
+	setFixedSize(embed::logicalSize(m_background).width(), 30);
 	setActive( ConfigManager::inst()->value( "ui", "displaywaveform").toInt() );
 
 	const f_cnt_t frames = Engine::audioEngine()->framesPerPeriod();

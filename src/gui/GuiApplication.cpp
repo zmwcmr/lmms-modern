@@ -47,6 +47,7 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QEvent>
+#include <QFontDatabase>
 #include <QtGlobal>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -263,6 +264,8 @@ GuiApplication::GuiApplication()
 	createSocketNotifier();
 
 	// Init style and palette
+	QFontDatabase::addApplicationFont(QStringLiteral(":/LMMS-LFO-Display-Bold.ttf"));
+	QFontDatabase::addApplicationFont(QStringLiteral(":/LMMS-Send-Sans-Bold.ttf"));
 	QDir::addSearchPath("artwork", ConfigManager::inst()->themeDir());
 	QDir::addSearchPath("artwork", ConfigManager::inst()->defaultThemeDir());
 	QDir::addSearchPath("artwork", ":/artwork");
@@ -304,7 +307,7 @@ GuiApplication::GuiApplication()
 
 	// Show splash screen
 	QSplashScreen splashScreen( embed::getIconPixmap( "splash" ) );
-	splashScreen.setFixedSize(splashScreen.pixmap().size());
+	splashScreen.setFixedSize(embed::logicalSize(splashScreen.pixmap()));
 	splashScreen.show();
 
 	QHBoxLayout layout;

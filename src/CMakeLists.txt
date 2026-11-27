@@ -65,6 +65,8 @@ INCLUDE(GenQrc)
 ADD_GEN_QRC(LMMS_RCC_OUT lmms.qrc
 	"${CMAKE_SOURCE_DIR}/doc/AUTHORS"
 	"${CMAKE_SOURCE_DIR}/LICENSE.txt"
+	"${CMAKE_SOURCE_DIR}/data/fonts/LMMS-LFO-Display-Bold.ttf"
+	"${CMAKE_SOURCE_DIR}/data/fonts/LMMS-Send-Sans-Bold.ttf"
 	"${CONTRIBUTORS}"
 )
 

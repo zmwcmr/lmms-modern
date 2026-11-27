@@ -29,11 +29,11 @@ QTreeWidget::branch:selected {
 }
 
 QTreeView::branch:has-children:open {
-	image: url("resources:open_branch.png");
+	image: url("resources:open_branch.svg");
 }
 
 QTreeView::branch:has-children:closed {
-	image: url("resources:closed_branch.png");
+	image: url("resources:closed_branch.svg");
 }
 
 lmms--gui--FileBrowserTreeWidget::branch:has-children:open,
@@ -204,11 +204,11 @@ QMenu::indicator {
 }
 
 QMenu::indicator:checked {
-	image: url("resources:apply_css.png");
+	image: url("resources:apply.svg");
 }
 
 QMenu::indicator:selected {
-	image: url("resources:apply-selected_css.png");
+	image: url("resources:apply-selected.svg");
 	border: 1px solid #101213;
 	background-color: #101213;
 }
@@ -292,7 +292,7 @@ lmms--gui--Oscilloscope {
 
 lmms--gui--CPULoadWidget {
 	border: none;
-	background: url("resources:cpuload_bg.png");
+	background: none;
 	qproperty-stepSize: 1;
 	qproperty-labelColor: white;
 }
@@ -718,7 +718,7 @@ QToolButton:checked {
 	border-top: 1px solid #1b1f22;
 	border-bottom: 1px solid #4a515e;
 	background: qlineargradient(spread:reflect, x1:0, y1:0, x2:0, y2:1, stop:0 #1b1f22, stop:1 #13161a);
-	background-image: url("resources:shadow_p.png");
+	background-image: url("resources:shadow_p.svg");
 }
 
 QToolButton:checked:pressed {

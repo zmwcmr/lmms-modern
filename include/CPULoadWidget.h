@@ -62,11 +62,8 @@ private:
 
 	int m_currentLoad;
 
-	QPixmap m_temp;
 	QPixmap m_background;
 	QPixmap m_leds;
-
-	bool m_changed;
 
 	QTimer m_updateTimer;
 

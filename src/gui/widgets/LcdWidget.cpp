@@ -138,9 +138,16 @@ void LcdWidget::paintEvent( QPaintEvent* )
 {
 	QPainter p( this );
 
-	QSize cellSize( m_cellWidth, m_cellHeight );
-
 	QRect cellRect( 0, 0, m_cellWidth, m_cellHeight );
+	const auto spriteSize = embed::logicalSize(m_lcdPixmap);
+	const qreal scaleX = qreal(m_lcdPixmap.width()) / spriteSize.width();
+	const qreal sourceHeight = m_cellHeight * (qreal(m_lcdPixmap.height()) / spriteSize.height());
+	const qreal sourceY = isEnabled() ? 0.0 : sourceHeight;
+	const auto drawCell = [&](const QRect& target, int column, int sourceWidth)
+	{
+		const QRectF source{column * m_cellWidth * scaleX, sourceY, sourceWidth * scaleX, sourceHeight};
+		p.drawPixmap(target, m_lcdPixmap, source);
+	};
 
 	int margin = 1;  // QStyle::PM_DefaultFrameWidth;
 	//int lcdWidth = m_cellWidth * m_numDigits + (margin*m_marginWidth)*2;
@@ -157,8 +164,7 @@ void LcdWidget::paintEvent( QPaintEvent* )
 	{
 		p.translate(margin, margin);
 		// Left Margin
-		p.drawPixmap(cellRect, m_lcdPixmap,
-			QRect(QPoint(charsPerPixmap * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, charsPerPixmap, m_cellWidth);
 
 		p.translate(m_marginWidth, 0);
 	}
@@ -166,7 +172,7 @@ void LcdWidget::paintEvent( QPaintEvent* )
 	// Padding
 	for( int i=0; i < m_numDigits - m_display.length(); i++ ) 
 	{
-		p.drawPixmap(cellRect, m_lcdPixmap, QRect(QPoint(10 * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, 10, m_cellWidth);
 		p.translate( m_cellWidth, 0 );
 	}
 
@@ -180,13 +186,13 @@ void LcdWidget::paintEvent( QPaintEvent* )
 			else
 				val = 10;
 		}
-		p.drawPixmap(cellRect, m_lcdPixmap, QRect(QPoint(val * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, val, m_cellWidth);
 		p.translate( m_cellWidth, 0 );
 	}
 
 	// Right Margin
-	p.drawPixmap(QRect(0, 0, m_seamlessRight ? 0 : m_marginWidth - 1, m_cellHeight), m_lcdPixmap,
-		QRect(charsPerPixmap * m_cellWidth, isEnabled() ? 0 : m_cellHeight, m_cellWidth / 2, m_cellHeight));
+	drawCell(QRect(0, 0, m_seamlessRight ? 0 : m_marginWidth - 1, m_cellHeight),
+		charsPerPixmap, m_cellWidth / 2);
 
 	p.restore();
 
@@ -295,8 +301,9 @@ void LcdWidget::initUi(const QString& name , const QString& style)
 	//m_lcdPixmap = embed::getIconPixmap("lcd_19green"); // TODO!!
 
 	m_lcdPixmap = embed::getIconPixmap(QString("lcd_" + style).toUtf8().constData());
-	m_cellWidth = m_lcdPixmap.size().width() / LcdWidget::charsPerPixmap;
-	m_cellHeight = m_lcdPixmap.size().height() / 2;
+	const auto spriteSize = embed::logicalSize(m_lcdPixmap);
+	m_cellWidth = spriteSize.width() / LcdWidget::charsPerPixmap;
+	m_cellHeight = spriteSize.height() / 2;
 
 	m_marginWidth =  m_cellWidth / 2;
 
