@@ -56,6 +56,7 @@
 #include "StringPairDrag.h"
 #include "TextFloat.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "embed.h"
 
 namespace lmms::gui
@@ -2018,23 +2019,27 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	DropToolBar *editActionsToolBar = addDropToolBarToTop(tr("Edit actions"));
 
 	auto editModeGroup = new ActionGroup(this);
-	m_drawAction = editModeGroup->addAction(embed::getIconPixmap("edit_draw"), tr("Draw mode (Shift+D)"));
+	m_drawAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_draw"), tr("Draw mode (Shift+D)"), editModeGroup));
 
 	m_drawAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_D));
 	m_drawAction->setChecked(true);
 
-	m_eraseAction = editModeGroup->addAction(embed::getIconPixmap("edit_erase"), tr("Erase mode (Shift+E)"));
+	m_eraseAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_erase"), tr("Erase mode (Shift+E)"), editModeGroup));
 	m_eraseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_E));
 
-	m_drawOutAction = editModeGroup->addAction(embed::getIconPixmap("edit_draw_outvalue"), tr("Draw outValues mode (Shift+C)"));
+	m_drawOutAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_draw_outvalue"), tr("Draw outValues mode (Shift+C)"), editModeGroup));
 	m_drawOutAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_C));
 
-	m_editTanAction = editModeGroup->addAction(embed::getIconPixmap("edit_tangent"), tr("Edit tangents mode (Shift+T)"));
+	m_editTanAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_tangent"), tr("Edit tangents mode (Shift+T)"), editModeGroup));
 	m_editTanAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_T));
 	m_editTanAction->setEnabled(false);
 
-	m_flipYAction = new QAction(embed::getIconPixmap("flip_y"), tr("Flip vertically"), this);
-	m_flipXAction = new QAction(embed::getIconPixmap("flip_x"), tr("Flip horizontally"), this);
+	m_flipYAction = new ToolButtonAction(embed::getIconPixmap("flip_y"), tr("Flip vertically"), this);
+	m_flipXAction = new ToolButtonAction(embed::getIconPixmap("flip_x"), tr("Flip horizontally"), this);
 
 	connect(editModeGroup, SIGNAL(triggered(int)), m_editor, SLOT(setEditMode(int)));
 
@@ -2050,14 +2055,14 @@ AutomationEditorWindow::AutomationEditorWindow() :
 
 	auto progression_type_group = new ActionGroup(this);
 
-	m_discreteAction = progression_type_group->addAction(
-				embed::getIconPixmap("progression_discrete"), tr("Discrete progression"));
+	m_discreteAction = progression_type_group->addAction(new ToolButtonAction(
+		embed::getIconPixmap("progression_discrete"), tr("Discrete progression"), progression_type_group));
 	m_discreteAction->setChecked(true);
 
-	m_linearAction = progression_type_group->addAction(
-				embed::getIconPixmap("progression_linear"), tr("Linear progression"));
-	m_cubicHermiteAction = progression_type_group->addAction(
-				embed::getIconPixmap("progression_cubic_hermite"), tr( "Cubic Hermite progression"));
+	m_linearAction = progression_type_group->addAction(new ToolButtonAction(
+		embed::getIconPixmap("progression_linear"), tr("Linear progression"), progression_type_group));
+	m_cubicHermiteAction = progression_type_group->addAction(new ToolButtonAction(
+		embed::getIconPixmap("progression_cubic_hermite"), tr( "Cubic Hermite progression"), progression_type_group));
 
 	connect(progression_type_group, SIGNAL(triggered(int)), this, SLOT(setProgressionType(int)));
 

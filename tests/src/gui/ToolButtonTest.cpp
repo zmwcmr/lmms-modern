@@ -1,5 +1,7 @@
 #include <QEvent>
+#include <QMenu>
 #include <QProxyStyle>
+#include <QToolBar>
 #include <QtTest>
 
 #include "ConfigManager.h"
@@ -26,6 +28,42 @@ class ToolButtonTest : public QObject
 	Q_OBJECT
 
 private slots:
+	void toolbarActionKeepsMenuAndButtonBehavior()
+	{
+		QToolBar toolbar;
+		QMenu menu;
+		QPixmap pixmap(16, 16);
+		pixmap.fill(Qt::red);
+		QIcon icon(pixmap);
+		lmms::gui::ToolButtonAction action(icon, "Draw", &toolbar);
+		action.setCheckable(true);
+		toolbar.addAction(&action);
+
+		auto* button = qobject_cast<lmms::gui::ToolButton*>(toolbar.widgetForAction(&action));
+		QVERIFY(button);
+		QVERIFY(button->findChild<QVariantAnimation*>());
+		QCOMPARE(button->defaultAction(), &action);
+		toolbar.setIconSize(QSize(20, 20));
+		toolbar.setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+		QCOMPARE(button->iconSize(), QSize(20, 20));
+		QCOMPARE(button->toolButtonStyle(), Qt::ToolButtonTextBesideIcon);
+
+		QSignalSpy triggered(&action, &QAction::triggered);
+		QSignalSpy toolbarTriggered(&toolbar, &QToolBar::actionTriggered);
+		button->click();
+		QCOMPARE(triggered.count(), 1);
+		QCOMPARE(toolbarTriggered.count(), 1);
+		QVERIFY(action.isChecked());
+
+		menu.addAction(&action);
+		menu.show();
+		QVERIFY(!menu.findChild<QToolButton*>());
+		menu.setActiveAction(&action);
+		QTest::keyClick(&menu, Qt::Key_Return);
+		QCOMPARE(triggered.count(), 2);
+		QVERIFY(!button->isChecked());
+	}
+
 	void hoverBlendsWithoutDelayingPress()
 	{
 		lmms::gui::ToolButton button(nullptr);

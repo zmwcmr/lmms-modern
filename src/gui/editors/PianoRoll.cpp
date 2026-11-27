@@ -71,6 +71,7 @@
 #include "StepRecorderWidget.h"
 #include "TextFloat.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "FileDialog.h"
 
 
@@ -5186,10 +5187,14 @@ PianoRollWindow::PianoRollWindow() :
 
 	// init edit-buttons at the top
 	auto editModeGroup = new ActionGroup(this);
-	QAction* drawAction = editModeGroup->addAction( embed::getIconPixmap( "edit_draw" ), tr( "Draw mode (Shift+D)" ) );
-	QAction* eraseAction = editModeGroup->addAction( embed::getIconPixmap( "edit_erase" ), tr("Erase mode (Shift+E)" ) );
-	QAction* selectAction = editModeGroup->addAction( embed::getIconPixmap( "edit_select" ), tr( "Select mode (Shift+S)" ) );
-	QAction* pitchBendAction = editModeGroup->addAction( embed::getIconPixmap( "automation" ), tr("Pitch Bend mode (Shift+T)" ) );
+	QAction* drawAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_draw" ), tr( "Draw mode (Shift+D)" ), editModeGroup));
+	QAction* eraseAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_erase" ), tr("Erase mode (Shift+E)" ), editModeGroup));
+	QAction* selectAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_select" ), tr( "Select mode (Shift+S)" ), editModeGroup));
+	QAction* pitchBendAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "automation" ), tr("Pitch Bend mode (Shift+T)" ), editModeGroup));
 
 	drawAction->setChecked( true );
 
@@ -5249,11 +5254,11 @@ PianoRollWindow::PianoRollWindow() :
 	// Copy + paste actions
 	DropToolBar *copyPasteActionsToolBar =  addDropToolBarToTop( tr( "Copy paste controls" ) );
 
-	auto cutAction = new QAction(embed::getIconPixmap("edit_cut"), tr("Cut (%1+X)").arg(UI_CTRL_KEY), this);
+	auto cutAction = new ToolButtonAction(embed::getIconPixmap("edit_cut"), tr("Cut (%1+X)").arg(UI_CTRL_KEY), this);
 
-	auto copyAction = new QAction(embed::getIconPixmap("edit_copy"), tr("Copy (%1+C)").arg(UI_CTRL_KEY), this);
+	auto copyAction = new ToolButtonAction(embed::getIconPixmap("edit_copy"), tr("Copy (%1+C)").arg(UI_CTRL_KEY), this);
 
-	auto pasteAction = new QAction(embed::getIconPixmap("edit_paste"), tr("Paste (%1+V)").arg(UI_CTRL_KEY), this);
+	auto pasteAction = new ToolButtonAction(embed::getIconPixmap("edit_paste"), tr("Paste (%1+V)").arg(UI_CTRL_KEY), this);
 
 	cutAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_X));
 	copyAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_C));

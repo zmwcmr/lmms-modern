@@ -38,6 +38,7 @@
 #include "Song.h"
 #include "StringPairDrag.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "TrackView.h"
 
 #include "MidiClip.h"
@@ -312,14 +313,22 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 	// Track actions
 	DropToolBar *trackAndStepActionsToolBar = addDropToolBarToTop(tr("Track and step actions"));
 
+	auto addTrackAndStepAction = [trackAndStepActionsToolBar](const QIcon& icon, const QString& text,
+		const QObject* receiver, const char* slot)
+	{
+		auto* action = new ToolButtonAction(icon, text, trackAndStepActionsToolBar);
+		connect(action, SIGNAL(triggered()), receiver, slot);
+		trackAndStepActionsToolBar->addAction(action);
+	};
 
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_pattern_track"), tr("New pattern"),
+
+	addTrackAndStepAction(embed::getIconPixmap("add_pattern_track"), tr("New pattern"),
 						Engine::getSong(), SLOT(addPatternTrack()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("clone_pattern_track_clip"), tr("Clone pattern"),
+	addTrackAndStepAction(embed::getIconPixmap("clone_pattern_track_clip"), tr("Clone pattern"),
 						m_editor, SLOT(cloneClip()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_sample_track"),	tr("Add sample-track"),
+	addTrackAndStepAction(embed::getIconPixmap("add_sample_track"),	tr("Add sample-track"),
 						m_editor, SLOT(addSampleTrack()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_automation"), tr("Add automation-track"),
+	addTrackAndStepAction(embed::getIconPixmap("add_automation"), tr("Add automation-track"),
 						m_editor, SLOT(addAutomationTrack()));
 
 	auto stretch = new QWidget(m_toolBar);
@@ -328,11 +337,11 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 
 
 	// Step actions
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("step_btn_remove"), tr("Remove steps"),
+	addTrackAndStepAction(embed::getIconPixmap("step_btn_remove"), tr("Remove steps"),
 						m_editor, SLOT(removeSteps()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("step_btn_add"), tr("Add steps"),
+	addTrackAndStepAction(embed::getIconPixmap("step_btn_add"), tr("Add steps"),
 						m_editor, SLOT(addSteps()));
-	trackAndStepActionsToolBar->addAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone Steps"),
+	addTrackAndStepAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone Steps"),
 						m_editor, SLOT(cloneSteps()));
 
 	connect(&ps->m_patternComboBoxModel, SIGNAL(dataChanged()),

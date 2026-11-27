@@ -63,6 +63,7 @@
 #include "TextFloat.h"
 #include "TimeDisplayWidget.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "TrackView.h"
 
 namespace lmms::gui
@@ -1065,13 +1066,13 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	// Track actions
 	DropToolBar *trackActionsToolBar = songToolBar;
 
-	m_addPatternTrackAction = new QAction(embed::getIconPixmap("add_pattern_track"),
+	m_addPatternTrackAction = new ToolButtonAction(embed::getIconPixmap("add_pattern_track"),
 									 tr("Add pattern-track"), this);
 
-	m_addSampleTrackAction = new QAction(embed::getIconPixmap("add_sample_track"),
+	m_addSampleTrackAction = new ToolButtonAction(embed::getIconPixmap("add_sample_track"),
 										 tr("Add sample-track"), this);
 
-	m_addAutomationTrackAction = new QAction(embed::getIconPixmap("add_automation"),
+	m_addAutomationTrackAction = new ToolButtonAction(embed::getIconPixmap("add_automation"),
 											 tr("Add automation-track"), this);
 
 	connect(m_addPatternTrackAction, SIGNAL(triggered()), m_editor->m_song, SLOT(addPatternTrack()));
@@ -1088,9 +1089,12 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	DropToolBar *editActionsToolBar = songToolBar;
 
 	m_editModeGroup = new ActionGroup(this);
-	m_drawModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_draw"), tr("Draw mode"));
-	m_knifeModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_knife"), tr("Knife mode (split clips)"));
-	m_selectModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_select"), tr("Edit mode (select and move)"));
+	m_drawModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_draw"), tr("Draw mode"), m_editModeGroup));
+	m_knifeModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_knife"), tr("Knife mode (split clips)"), m_editModeGroup));
+	m_selectModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_select"), tr("Edit mode (select and move)"), m_editModeGroup));
 	m_drawModeAction->setChecked(true);
 
 	connect(m_drawModeAction, SIGNAL(triggered()), m_editor, SLOT(setEditModeDraw()));
@@ -1107,8 +1111,8 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	timeLineToolBar->addSeparator();
 
 	DropToolBar *insertActionsToolBar = songToolBar;
-	m_insertBarAction = new QAction(embed::getIconPixmap("insert_bar"), tr("Insert bar"), this);
-	m_removeBarAction = new QAction(embed::getIconPixmap("remove_bar"), tr("Remove bar"), this);
+	m_insertBarAction = new ToolButtonAction(embed::getIconPixmap("insert_bar"), tr("Insert bar"), this);
+	m_removeBarAction = new ToolButtonAction(embed::getIconPixmap("remove_bar"), tr("Remove bar"), this);
 	insertActionsToolBar->addAction( m_insertBarAction );
 	insertActionsToolBar->addAction( m_removeBarAction );
 	connect(m_insertBarAction, SIGNAL(triggered()), song, SLOT(insertBar()));
