@@ -403,8 +403,18 @@ Tasks:
       stereo buses because the bus layout is not yet in its protocol.
 - [x] Report VST2 main input/output bus counts (channels are clamped to
       stereo); VST2 aux inputs are still not exposed.
-- [ ] Add an aux/sidechain bus to the LMMS effect/instrument routing model.
-- [ ] Map one sidechain input to VST2/LV2 plugins where declared.
+- [x] Add an aux/sidechain bus to the LMMS effect routing model:
+      `Effect::setSidechainBuffer()`, `EffectChain` propagation and
+      `HostedEffect` passing a second input bus when the host has one.
+- [x] Map one sidechain input to LV2 plugins: sidechain audio ports are now
+      connected to their buffers and filled from the second input bus.
+- [x] Mixer routing: a channel can select another channel as its effect
+      sidechain, the worker graph tracks the extra dependency, cycles are
+      rejected, and the route is saved as the `sidechain` XML attribute.
+- [ ] Route sidechain audio through VST3 and VST2 (bus info exists; their
+      `process()` still consumes the main bus only).
+- [ ] Add sidechain source selection to the mixer UI and an unsupported-bus
+      warning.
 - [ ] Add multi-output track routing (first step: two stereo pairs).
 - [ ] Extend the mixer UI and project XML.
 - [ ] Define a policy for unsupported bus counts.

@@ -2053,7 +2053,10 @@ struct ConnectPortVisitor : public Lv2Ports::Visitor
 	void visit(Lv2Ports::Control& ctrl) override { connectPort(&ctrl.m_val); }
 	void visit(Lv2Ports::Audio& audio) override
 	{
-		connectPort((audio.mustBeUsed()) ? audio.m_buffer.data() : nullptr);
+		// Sidechain ports are intentionally optional, but they still need a
+		// real buffer when the host routes a sidechain signal to them.
+		connectPort((audio.mustBeUsed() || audio.isSideChain())
+			? audio.m_buffer.data() : nullptr);
 	}
 	void visit(Lv2Ports::Unknown&) override { connectPort(nullptr); }
 	~ConnectPortVisitor() override = default;

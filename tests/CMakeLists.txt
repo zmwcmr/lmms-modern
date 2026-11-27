@@ -11,6 +11,7 @@ set(LMMS_TESTS
 	src/core/Base64Test.cpp
 	src/core/ConfigUpgradeTest.cpp
 	src/core/MathTest.cpp
+	src/core/MixerSidechainTest.cpp
 	src/core/HostedEffectTest.cpp
 	src/core/HostedInstrumentTest.cpp
 	src/core/HostedPluginModelsTest.cpp

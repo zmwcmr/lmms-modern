@@ -448,7 +448,20 @@ bool Lv2PluginHost::process(const PluginProcessBlock& block)
 
 void Lv2PluginHost::copyInput(const PluginProcessBlock& block)
 {
-	if (!m_proc || block.inputChannels <= 0 || block.inputs == nullptr)
+	if (!m_proc)
+	{
+		return;
+	}
+
+	const float* const* mainChannels = block.inputs;
+	int mainChannelCount = block.inputChannels;
+	if (block.inputBusCount > 0 && block.inputBuses != nullptr
+		&& block.inputBuses[0].channels != nullptr)
+	{
+		mainChannels = block.inputBuses[0].channels;
+		mainChannelCount = block.inputBuses[0].channelCount;
+	}
+	if (mainChannelCount <= 0 || mainChannels == nullptr)
 	{
 		return;
 	}
@@ -460,9 +473,9 @@ void Lv2PluginHost::copyInput(const PluginProcessBlock& block)
 		return;
 	}
 
-	if (block.inputs[0] != nullptr)
+	if (mainChannels[0] != nullptr)
 	{
-		std::copy_n(block.inputs[0], frames, in.m_left->data());
+		std::copy_n(mainChannels[0], frames, in.m_left->data());
 	}
 	else
 	{
@@ -471,29 +484,62 @@ void Lv2PluginHost::copyInput(const PluginProcessBlock& block)
 
 	if (in.m_right != nullptr)
 	{
-		if (block.inputChannels >= 2 && block.inputs[1] != nullptr)
+		if (mainChannelCount >= 2 && mainChannels[1] != nullptr)
 		{
-			std::copy_n(block.inputs[1], frames, in.m_right->data());
+			std::copy_n(mainChannels[1], frames, in.m_right->data());
 		}
-		else if (block.inputs[0] != nullptr)
+		else if (mainChannels[0] != nullptr)
 		{
 			// Mono input into a stereo plugin: feed both channels.
-			std::copy_n(block.inputs[0], frames, in.m_right->data());
+			std::copy_n(mainChannels[0], frames, in.m_right->data());
 		}
 		else
 		{
 			std::fill_n(in.m_right->data(), frames, 0.0f);
 		}
 	}
-	else if (block.inputChannels >= 2 && block.inputs[1] != nullptr)
+	else if (mainChannelCount >= 2 && mainChannels[1] != nullptr)
 	{
 		// Stereo input into a mono plugin: average both channels.
 		auto* data = in.m_left->data();
 		for (std::size_t frame = 0; frame < frames; ++frame)
 		{
-			data[frame] = 0.5f * (block.inputs[0][frame]
-				+ block.inputs[1][frame]);
+			data[frame] = 0.5f * (mainChannels[0][frame]
+				+ mainChannels[1][frame]);
 		}
+	}
+
+	if (block.inputBusCount < 2 || block.inputBuses == nullptr)
+	{
+		return;
+	}
+	const auto& sidechainBus = block.inputBuses[1];
+	int sidechainChannel = 0;
+	for (std::size_t index = 0; index < m_proc->portNum(); ++index)
+	{
+		auto* port = m_proc->port(index);
+		if (port == nullptr || port->m_type != Lv2Ports::Type::Audio
+			|| port->m_flow != Lv2Ports::Flow::Input)
+		{
+			continue;
+		}
+		auto* audio = Lv2Ports::dcast<Lv2Ports::Audio>(port);
+		if (audio == nullptr || !audio->isSideChain())
+		{
+			continue;
+		}
+		const float* source = sidechainChannel < sidechainBus.channelCount
+			&& sidechainBus.channels != nullptr
+			? sidechainBus.channels[sidechainChannel] : nullptr;
+		if (source != nullptr)
+		{
+			std::copy_n(source, frames, audio->data());
+		}
+		else
+		{
+			std::fill_n(audio->data(), frames, 0.0f);
+		}
+		++sidechainChannel;
 	}
 }
 

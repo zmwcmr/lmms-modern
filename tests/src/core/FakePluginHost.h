@@ -51,6 +51,10 @@ public:
 		};
 		m_values[7] = 0.5;
 		m_values[9] = 25.0;
+		m_inputBuses = { PluginBusInfo{ QStringLiteral("Main"), 2, true,
+			PluginBusRole::Main, false } };
+		m_outputBuses = { PluginBusInfo{ QStringLiteral("Main"), 2, false,
+			PluginBusRole::Main, false } };
 	}
 
 	PluginFormat format() const override { return PluginFormat::Vst3; }
@@ -71,6 +75,15 @@ public:
 	}
 	void unload() override { m_loaded = false; }
 	bool isLoaded() const override { return m_loaded; }
+
+	std::vector<PluginBusInfo> inputBuses() const override
+	{
+		return m_inputBuses;
+	}
+	std::vector<PluginBusInfo> outputBuses() const override
+	{
+		return m_outputBuses;
+	}
 
 	const std::vector<PluginParameterInfo>& parameters() const override
 	{
@@ -100,6 +113,14 @@ public:
 		if (!block.outputs)
 		{
 			return false;
+		}
+		m_lastInputBusCount = block.inputBusCount;
+		m_lastSidechainSample = 0.0f;
+		if (block.inputBusCount > 1 && block.inputBuses != nullptr
+			&& block.inputBuses[1].channels != nullptr
+			&& block.inputBuses[1].channelCount > 0)
+		{
+			m_lastSidechainSample = block.inputBuses[1].channels[0][0];
 		}
 		for (int channel = 0; channel < block.outputChannels; ++channel)
 		{
@@ -141,6 +162,10 @@ public:
 	double m_tempo = 0.0;
 	bool m_playing = false;
 	bool m_loaded = true;
+	std::vector<PluginBusInfo> m_inputBuses;
+	std::vector<PluginBusInfo> m_outputBuses;
+	int m_lastInputBusCount = 0;
+	float m_lastSidechainSample = 0.0f;
 };
 
 } // namespace lmms

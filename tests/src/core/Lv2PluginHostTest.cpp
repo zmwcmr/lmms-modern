@@ -155,6 +155,42 @@ private slots:
 		QCOMPARE(outputs[0].channels, 2);
 		QCOMPARE(outputs[0].role, PluginBusRole::Main);
 		QVERIFY(!outputs[0].isInput);
+
+		// The isolated host protocol does not carry sidechain audio yet;
+		// layout discovery is still valid there.
+		if (!qEnvironmentVariableIsEmpty("LMMS_LV2_TEST_REMOTE"))
+		{
+			return;
+		}
+
+		const int frames = Engine::audioEngine()->framesPerPeriod();
+		std::vector<float> mainL(frames, 1.0f);
+		std::vector<float> mainR(frames, 1.0f);
+		std::vector<float> sideL(frames, 0.5f);
+		std::vector<float> sideR(frames, 0.5f);
+		std::vector<float> outL(frames, 0.0f);
+		std::vector<float> outR(frames, 0.0f);
+		float* main[2] = { mainL.data(), mainR.data() };
+		float* side[2] = { sideL.data(), sideR.data() };
+		float* output[2] = { outL.data(), outR.data() };
+		PluginBusBlock inputBuses[2] = {
+			PluginBusBlock{ main, 2 },
+			PluginBusBlock{ side, 2 },
+		};
+		PluginProcessBlock block;
+		block.inputs = main;
+		block.outputs = output;
+		block.inputChannels = 2;
+		block.outputChannels = 2;
+		block.frames = frames;
+		block.inputBuses = inputBuses;
+		block.inputBusCount = 2;
+		QVERIFY(host.process(block));
+		for (int frame = 0; frame < frames; ++frame)
+		{
+			QCOMPARE(outL[frame], 1.5f);
+			QCOMPARE(outR[frame], 1.5f);
+		}
 	}
 
 	void stateRoundTrip()
