@@ -235,6 +235,47 @@ bool Vst2HostedInstrument::openFile(const QString& file)
 
 
 
+bool Vst2HostedInstrument::reloadPlugin()
+{
+	QMutexLocker locker(&m_mutex);
+	auto* host = vst2Host();
+	if (host == nullptr || !host->isLoaded() || m_file.isEmpty())
+	{
+		return false;
+	}
+
+	auto* plugin = host->nativePlugin();
+	const int wasVisible = plugin != nullptr ? plugin->isUIVisible() : 0;
+	const auto state = host->saveState();
+	const QString file = m_file;
+	closePlugin();
+	if (!openPlugin(file))
+	{
+		return false;
+	}
+	if (!state.primary.isEmpty())
+	{
+		host->loadState(state);
+	}
+	parameterModels().refreshFromHost();
+	if (wasVisible == 1)
+	{
+		if (auto* newPlugin = nativePlugin()) { newPlugin->showUI(); }
+	}
+	return true;
+}
+
+
+
+
+void Vst2HostedInstrument::requestShowEditor()
+{
+	if (auto* plugin = nativePlugin()) { plugin->showUI(); }
+}
+
+
+
+
 void Vst2HostedInstrument::setProgram(int index)
 {
 	QMutexLocker locker(&m_mutex);

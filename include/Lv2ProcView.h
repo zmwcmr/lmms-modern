@@ -57,6 +57,7 @@ class X11EditorWindow;
 
 namespace gui
 {
+class HostedPluginPanel;
 
 class HelpWindowEventFilter : public QObject
 {
@@ -89,6 +90,7 @@ protected:
 	void toggleUI();
 	void toggleHelp(bool visible);
 	void closeHelpWindow();
+	Lv2Proc* proc() const { return m_proc; }
 
 	// to be called by child virtuals
 	//! Reconnect models if model changed
@@ -164,6 +166,8 @@ private:
 
 	QMdiSubWindow* m_helpWindow = nullptr;
 	HelpWindowEventFilter m_helpWindowEventFilter;
+	HostedPluginPanel* m_panel = nullptr;
+	int m_presetIndex = -1;
 };
 
 

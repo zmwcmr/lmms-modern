@@ -184,6 +184,17 @@ void ControlLayout::removeFocusFromSearchBar()
 	m_searchBar->clearFocus();
 }
 
+
+
+
+void ControlLayout::setControlsVisible(bool visible)
+{
+	if (m_controlsVisible == visible) { return; }
+	m_controlsVisible = visible;
+	invalidate();
+	update();
+}
+
 Qt::Orientations ControlLayout::expandingDirections() const
 {
 	return Qt::Orientations();
@@ -217,8 +228,14 @@ QSize ControlLayout::minimumSize() const
 	// get maximum height and width for all children.
 	// as Qt will later call heightForWidth, only the width here really matters
 	QSize size;
-	for (const QLayoutItem *item : std::as_const(m_itemMap))
+	for (QLayoutItem* item : m_itemMap)
 	{
+		const QWidget* widget = item->widget();
+		if (!m_controlsVisible && widget != nullptr
+			&& !widget->property("lmmsControlLayoutFullWidth").toBool())
+		{
+			continue;
+		}
 		size = size.expandedTo(item->minimumSize());
 	}
 	const QMargins margins = contentsMargins();
@@ -263,6 +280,7 @@ int ControlLayout::doLayout(const QRect &rect, bool testOnly) const
 
 			if (wid->property("lmmsControlLayoutFullWidth").toBool())
 			{
+				if (wid->isHidden()) { continue; }
 				wid->show();
 				if (lineHeight > 0)
 				{
@@ -281,9 +299,9 @@ int ControlLayout::doLayout(const QRect &rect, bool testOnly) const
 				continue;
 			}
 
-			if (	first || // do not filter search bar
+			if (m_controlsVisible && (	first || // do not filter search bar
 				filterText.isEmpty() || // no filter - pass all
-				itr.key().contains(filterText, Qt::CaseInsensitive))
+				itr.key().contains(filterText, Qt::CaseInsensitive)))
 			{
 				if (first)
 				{

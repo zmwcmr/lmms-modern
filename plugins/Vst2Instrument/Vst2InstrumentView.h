@@ -27,19 +27,16 @@
 
 #include "InstrumentView.h"
 
-class QComboBox;
-class QGridLayout;
-class QLabel;
-class QPushButton;
-class QWidget;
-
 namespace lmms
 {
 
 class Vst2HostedInstrument;
+class VstPlugin;
 
 namespace gui
 {
+
+class HostedPluginPanel;
 
 class Vst2InstrumentView : public InstrumentView
 {
@@ -48,28 +45,18 @@ public:
 	Vst2InstrumentView(Instrument* instrument, QWidget* parent);
 	~Vst2InstrumentView() override = default;
 
-	QSize sizeHint() const override { return QSize(380, 600); }
-	QSize minimumSizeHint() const override { return QSize(320, 320); }
+	QSize sizeHint() const override { return QSize(380, 360); }
+	QSize minimumSizeHint() const override { return QSize(320, 240); }
 
 private:
 	void modelChanged() override;
 	bool isResizable() const override { return true; }
 
-	void rebuild();
-	void clearParameters();
-	void rebuildParameters();
-	void openPluginFile();
-	void updateGuiButton();
+	VstPlugin* plugin() const;
+	void openPluginFile(QWidget* parent);
 
 	Vst2HostedInstrument* m_instrument = nullptr;
-	QLabel* m_pluginLabel = nullptr;
-	QLabel* m_vendorLabel = nullptr;
-	QLabel* m_fileLabel = nullptr;
-	QPushButton* m_openButton = nullptr;
-	QPushButton* m_guiButton = nullptr;
-	QComboBox* m_programBox = nullptr;
-	QWidget* m_parameterPanel = nullptr;
-	QGridLayout* m_parameterGrid = nullptr;
+	HostedPluginPanel* m_panel = nullptr;
 };
 
 } // namespace gui

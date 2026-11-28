@@ -168,6 +168,10 @@ public:
 
 	virtual bool isFromTrack( const Track * _track ) const;
 
+	//! Open the plugin's native editor after a user creates/imports the
+	//! instrument. Project loading never calls this.
+	virtual void requestShowEditor() {}
+
 	inline InstrumentTrack * instrumentTrack() const
 	{
 		return m_instrumentTrack;

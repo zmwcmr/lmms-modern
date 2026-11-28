@@ -43,6 +43,8 @@
 #include "Pitch.h"
 #include "Song.h"
 
+#include <QCoreApplication>
+#include <QPointer>
 #include <QTimer>
 
 namespace lmms
@@ -1135,6 +1137,22 @@ Instrument * InstrumentTrack::loadInstrument(const QString & _plugin_name,
 	setName(m_instrument->displayName());
 
 	emit instrumentChanged();
+
+	// Open the native editor once when the user creates/imports an
+	// instrument. Queue it against the instrument object so a loader thread
+	// never touches widgets and a destroyed instrument discards the request.
+	// Project loading instantiates instruments directly and never gets here.
+	if (m_instrument != nullptr && Engine::getSong() != nullptr
+		&& !Engine::getSong()->isLoadingProject())
+	{
+		if (auto* app = QCoreApplication::instance())
+		{
+			QMetaObject::invokeMethod(app,
+				[instrument = QPointer<Instrument>(m_instrument)] {
+					if (instrument != nullptr) { instrument->requestShowEditor(); }
+				}, Qt::QueuedConnection);
+		}
+	}
 
 	return m_instrument;
 }

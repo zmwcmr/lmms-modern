@@ -70,6 +70,8 @@ public:
 
 	const QString& file() const { return m_file; }
 	bool openFile(const QString& file);
+	bool reloadPlugin();
+	void requestShowEditor() override;
 	void setProgram(int index);
 
 private:

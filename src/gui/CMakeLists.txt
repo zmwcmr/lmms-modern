@@ -18,6 +18,7 @@ SET(LMMS_SRCS
 	gui/FileSearchJob.cpp
 	gui/EditorPlatform.cpp
 	gui/GuiApplication.cpp
+	gui/HostedPluginPanel.cpp
 	gui/LadspaControlView.cpp
 	gui/LfoControllerDialog.cpp
 	gui/ModelGroupView.cpp
