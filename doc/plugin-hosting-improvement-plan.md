@@ -411,8 +411,13 @@ Tasks:
 - [x] Mixer routing: a channel can select another channel as its effect
       sidechain, the worker graph tracks the extra dependency, cycles are
       rejected, and the route is saved as the `sidechain` XML attribute.
-- [ ] Route sidechain audio through VST3 and VST2 (bus info exists; their
-      `process()` still consumes the main bus only).
+- [x] Route sidechain audio through VST3: `Vst3HostBase::processBuses()`
+      carries every input/output bus, `Vst3Host` fills aux input buses and
+      copies the output buses, and `Vst3PluginHost` maps the generic bus
+      arrays. The fake VST3 effect now has a main and a sidechain input; the
+      adapter test verifies the sidechain gain change.
+- [ ] Route sidechain audio through VST2 (the current VST2 host exposes only
+      the main stereo input).
 - [ ] Add sidechain source selection to the mixer UI and an unsupported-bus
       warning.
 - [ ] Add multi-output track routing (first step: two stereo pairs).

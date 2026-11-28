@@ -106,13 +106,45 @@ private slots:
 		QString error;
 		QVERIFY2(adapter.load(request, &error), qPrintable(error));
 		const auto inputs = adapter.inputBuses();
-		QCOMPARE(inputs.size(), 1u);
+		QCOMPARE(inputs.size(), 2u);
 		QCOMPARE(inputs[0].channels, 2);
 		QCOMPARE(inputs[0].role, PluginBusRole::Main);
+		QCOMPARE(inputs[1].channels, 2);
+		QCOMPARE(inputs[1].role, PluginBusRole::Sidechain);
 		const auto outputs = adapter.outputBuses();
 		QCOMPARE(outputs.size(), 1u);
 		QCOMPARE(outputs[0].channels, 2);
-		QVERIFY(!adapter.capabilities().multipleBuses);
+		QVERIFY(adapter.capabilities().multipleBuses);
+
+		QVERIFY(adapter.setParameter(1, 1.0));
+		constexpr int frames = 64;
+		std::vector<float> mainL(frames, 1.0f);
+		std::vector<float> mainR(frames, 1.0f);
+		std::vector<float> sideL(frames, 0.5f);
+		std::vector<float> sideR(frames, 0.5f);
+		std::vector<float> outL(frames, 0.0f);
+		std::vector<float> outR(frames, 0.0f);
+		float* main[2] = { mainL.data(), mainR.data() };
+		float* side[2] = { sideL.data(), sideR.data() };
+		float* output[2] = { outL.data(), outR.data() };
+		PluginBusBlock inputBuses[2] = {
+			PluginBusBlock{ main, 2 },
+			PluginBusBlock{ side, 2 },
+		};
+		PluginProcessBlock block;
+		block.inputs = main;
+		block.outputs = output;
+		block.inputChannels = 2;
+		block.outputChannels = 2;
+		block.frames = frames;
+		block.inputBuses = inputBuses;
+		block.inputBusCount = 2;
+		QVERIFY(adapter.process(block));
+		for (int frame = 0; frame < frames; ++frame)
+		{
+			QVERIFY(std::abs(outL[frame] - 1.5f) < 1e-5f);
+			QVERIFY(std::abs(outR[frame] - 1.5f) < 1e-5f);
+		}
 	}
 
 	void stateRoundTrip()

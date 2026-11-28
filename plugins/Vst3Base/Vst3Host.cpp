@@ -902,6 +902,8 @@ struct Vst3Host::Impl
 
 	std::vector<int> inputBusChannels;
 	std::vector<int> outputBusChannels;
+	const std::vector<Vst3HostBase::ProcessInputBus>* externalInputs = nullptr;
+	const std::vector<Vst3HostBase::ProcessOutputBus>* externalOutputs = nullptr;
 	std::vector<Vst3HostBase::BusInfo> inputBusInfos;
 	std::vector<Vst3HostBase::BusInfo> outputBusInfos;
 	int mainInputBus = -1;
@@ -951,6 +953,7 @@ struct Vst3Host::Impl
 	void fillInputBuffer(int bus, int channel, const float* source, int frames);
 	void clearOutputBuffers(int frames);
 	void copyOutput(int frames, float* leftOut, float* rightOut);
+	void copyOutputBuses(int frames);
 
 };
 
@@ -1738,6 +1741,69 @@ void Vst3Host::Impl::copyOutput(int frames, float* leftOut, float* rightOut)
 	std::memcpy(rightOut, right, sizeof(float) * static_cast<size_t>(frames));
 }
 
+void Vst3HostBase::processBuses(const std::vector<ProcessInputBus>& inputs,
+	const std::vector<ProcessOutputBus>& outputs, int frames)
+{
+	const float* leftIn = nullptr;
+	const float* rightIn = nullptr;
+	if (!inputs.empty() && inputs[0].channels != nullptr
+		&& inputs[0].channelCount > 0)
+	{
+		leftIn = inputs[0].channels[0];
+		rightIn = inputs[0].channelCount > 1 ? inputs[0].channels[1] : leftIn;
+	}
+	float* leftOut = nullptr;
+	float* rightOut = nullptr;
+	if (!outputs.empty() && outputs[0].channels != nullptr
+		&& outputs[0].channelCount > 0)
+	{
+		leftOut = outputs[0].channels[0];
+		rightOut = outputs[0].channelCount > 1 ? outputs[0].channels[1] : leftOut;
+	}
+	process(leftIn, rightIn, leftOut, rightOut, frames);
+}
+
+
+
+
+void Vst3Host::Impl::copyOutputBuses(int frames)
+{
+	if (externalOutputs == nullptr || frames <= 0)
+	{
+		return;
+	}
+	const auto stride = static_cast<size_t>(allocatedFrames);
+	for (size_t bus = 0; bus < outputChannelData.size()
+		&& bus < externalOutputs->size(); ++bus)
+	{
+		const auto& output = (*externalOutputs)[bus];
+		const auto availableChannels = stride > 0
+			? outputChannelData[bus].size() / stride : 0;
+		for (int channel = 0; channel < output.channelCount; ++channel)
+		{
+			if (output.channels[channel] == nullptr)
+			{
+				continue;
+			}
+			if (static_cast<size_t>(channel) < availableChannels)
+			{
+				std::memcpy(output.channels[channel],
+					outputChannelData[bus].data()
+						+ static_cast<size_t>(channel) * stride,
+					sizeof(float) * static_cast<size_t>(frames));
+			}
+			else
+			{
+				std::memset(output.channels[channel], 0,
+					sizeof(float) * static_cast<size_t>(frames));
+			}
+		}
+	}
+}
+
+
+
+
 Vst3Host::Vst3Host() :
 	m_impl(std::make_unique<Impl>())
 {
@@ -2094,7 +2160,22 @@ void Vst3Host::process(const float* leftIn,
 			std::memset(target, 0, sizeof(float) * static_cast<size_t>(frames));
 		}
 	}
-	if (m_impl->mainInputBus >= 0)
+	if (m_impl->externalInputs != nullptr)
+	{
+		const auto& inputs = *m_impl->externalInputs;
+		for (size_t bus = 0; bus < m_impl->inputChannelData.size()
+			&& bus < inputs.size(); ++bus)
+		{
+			for (int channel = 0; channel < inputs[bus].channelCount; ++channel)
+			{
+				m_impl->fillInputBuffer(static_cast<int>(bus), channel,
+					inputs[bus].channels != nullptr
+						? inputs[bus].channels[channel] : nullptr,
+					frames);
+			}
+		}
+	}
+	else if (m_impl->mainInputBus >= 0)
 	{
 		m_impl->fillInputBuffer(m_impl->mainInputBus, 0, leftIn, frames);
 		m_impl->fillInputBuffer(m_impl->mainInputBus, 1,
@@ -2147,11 +2228,43 @@ void Vst3Host::process(const float* leftIn,
 
 	v3_cpp_obj(m_impl->processor)->process(m_impl->processor, &processData);
 
-	m_impl->copyOutput(frames, leftOut, rightOut);
+	if (m_impl->externalOutputs != nullptr)
+	{
+		m_impl->copyOutputBuses(frames);
+	}
+	else
+	{
+		m_impl->copyOutput(frames, leftOut, rightOut);
+	}
 	m_impl->projectTime += frames;
 	m_impl->pendingMidi.clear();
 	m_impl->queuedParameters.clear();
 }
+
+void Vst3Host::processBuses(const std::vector<ProcessInputBus>& inputs,
+	const std::vector<ProcessOutputBus>& outputs, int frames)
+{
+	std::lock_guard<std::recursive_mutex> lock(m_impl->hostMutex);
+	for (const auto& output : outputs)
+	{
+		for (int channel = 0; channel < output.channelCount; ++channel)
+		{
+			if (output.channels[channel] != nullptr)
+			{
+				std::memset(output.channels[channel], 0,
+					sizeof(float) * static_cast<size_t>(std::max(0, frames)));
+			}
+		}
+	}
+	m_impl->externalInputs = &inputs;
+	m_impl->externalOutputs = &outputs;
+	process(nullptr, nullptr, nullptr, nullptr, frames);
+	m_impl->externalInputs = nullptr;
+	m_impl->externalOutputs = nullptr;
+}
+
+
+
 
 int Vst3Host::latencySamples() const
 {

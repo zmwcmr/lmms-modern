@@ -205,8 +205,16 @@ private:
 			{
 				const float left = hasInput ? data->inputs[0].channel_buffers_32[0][frame] : 0.0f;
 				const float right = hasInput ? data->inputs[0].channel_buffers_32[1][frame] : 0.0f;
-				output.channel_buffers_32[0][frame] = left * gain;
-				output.channel_buffers_32[1][frame] = right * gain;
+				float sidechain = 0.0f;
+				if (data->num_input_buses > 1 && data->inputs != nullptr
+					&& data->inputs[1].num_channels > 0
+					&& data->inputs[1].channel_buffers_32 != nullptr)
+				{
+					sidechain = data->inputs[1].channel_buffers_32[0][frame];
+				}
+				const float sideGain = 1.0f + sidechain;
+				output.channel_buffers_32[0][frame] = left * gain * sideGain;
+				output.channel_buffers_32[1][frame] = right * gain * sideGain;
 			}
 		}
 		return V3_OK;
@@ -464,7 +472,8 @@ private:
 			{
 				return direction == V3_OUTPUT ? 1 : 0;
 			}
-			return 1;
+			// Effect: main input plus one aux/sidechain input.
+			return direction == V3_INPUT ? 2 : 1;
 		}
 		if (media == V3_EVENT)
 		{
@@ -473,18 +482,32 @@ private:
 		return 0;
 	}
 
-	static v3_result V3_API getBusInfo(void*, int32_t media, int32_t direction,
-		int32_t index, v3_bus_info* info)
+	static v3_result V3_API getBusInfo(void* self, int32_t media,
+		int32_t direction, int32_t index, v3_bus_info* info)
 	{
-		if (info == nullptr || index != 0)
+		if (info == nullptr || index < 0)
+		{
+			return V3_INVALID_ARG;
+		}
+		const bool isAuxAudio = media == V3_AUDIO && direction == V3_INPUT
+			&& !component(self)->state.instrument && index == 1;
+		if (index != 0 && !isAuxAudio)
 		{
 			return V3_INVALID_ARG;
 		}
 		std::memset(info, 0, sizeof(*info));
 		info->media_type = media;
 		info->direction = direction;
-		info->bus_type = V3_MAIN;
+		info->bus_type = isAuxAudio ? V3_AUX : V3_MAIN;
 		info->flags = V3_DEFAULT_ACTIVE;
+		if (isAuxAudio)
+		{
+			const char* name = "Sidechain";
+			for (int i = 0; name[i] != 0 && i < 128; ++i)
+			{
+				info->bus_name[i] = static_cast<int16_t>(name[i]);
+			}
+		}
 		if (media == V3_AUDIO)
 		{
 			info->channel_count = 2;
