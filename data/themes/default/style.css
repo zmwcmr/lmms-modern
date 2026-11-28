@@ -604,11 +604,11 @@ QPushButton#btn-solo:checked {
 
 lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
 lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
-	font-size: 10px;
+	font-size: 8px;
 }
 
 lmms--gui--Sf2InstrumentView > QLabel {
-	font-size:10px;
+	font-size:8px;
 }
 
 /* main toolbar sliders (master vol, master pitch) */
@@ -711,7 +711,7 @@ QToolButton, QToolButton::menu-button {
 	border-bottom: 1px solid #1e2226;
 	border-radius: 2px;
 	background: qlineargradient(spread:reflect, x1:0, y1:0, x2:0, y2:1 stop:0 #636c7a, stop:1 #343840);
-	font-size:12px;
+	font-size:10px;
 	color: #fff;
 }
 
@@ -813,13 +813,13 @@ lmms--gui--SideBar {
 lmms--gui--SideBar QToolButton {
 	background: none;
 	border: none;
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--SideBar QToolButton:hover {
 	background: #353c44;
 	border: none;
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--SideBar QToolButton:pressed {
@@ -827,13 +827,13 @@ lmms--gui--SideBar QToolButton:pressed {
 	padding: 2px 3px 2px 1px;
 	background: #262b30;
 	border: none;
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--SideBar QToolButton:checked {
 	background: qlineargradient(spread:reflect, x1:0, y1:0, x2:0, y2:1, stop:0 #4b525b, stop:1 #2f333a);
 	border: none;
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--SideBar QToolButton:hover:checked {
@@ -875,7 +875,7 @@ lmms--gui--PianoView {
 lmms--gui--MixerView QPushButton,
 lmms--gui--EffectRackView QPushButton,
 lmms--gui--ControllerRackView QPushButton {
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--MixerChannelView {
@@ -895,7 +895,7 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 10px;
+	font-size: 8px;
 }
 
 /* Meter colors and fader ticks */
@@ -909,7 +909,7 @@ lmms--gui--Fader {
 
 lmms--gui--TimeLineWidget {
 	/* font-size only supports px and pt. */
-	font-size: 10px;
+	font-size: 8px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
@@ -964,7 +964,7 @@ lmms--gui--ClipView   {
 	qproperty-textShadowColor: rgba(0,0,0,200);
 	qproperty-gradient: false; /* boolean property, set true to have a gradient */
 	qproperty-markerColor: rgb(0, 0, 0);
-	font-size: 12px;
+	font-size: 10px;
 }
 
 /* MIDI (instrument) clip */
@@ -1011,7 +1011,7 @@ lmms--gui--SubWindow {
 /* Subwindow title text */
 lmms--gui--SubWindow > QLabel {
 	color: #d1d8e4;
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 600;
 	font-style: normal;
 }

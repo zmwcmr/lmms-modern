@@ -63,8 +63,9 @@ private slots:
 
 		LmmsStyle style;
 		const auto css = qApp->styleSheet();
-		QVERIFY2(css.contains(QStringLiteral("font-size: 24px")), "12px design tier was not scaled to 24px");
 		QVERIFY2(css.contains(QStringLiteral("font-size: 20px")), "10px design tier was not scaled to 20px");
+		QVERIFY2(css.contains(QStringLiteral("font-size: 26px")), "13px title tier was not scaled to 26px");
+		QVERIFY2(css.contains(QStringLiteral("font-size: 16px")), "8px design tier was not scaled to 16px");
 		LmmsPalette palette(nullptr, &style);
 		QCOMPARE(palette.palette().color(QPalette::Link), QColor(QStringLiteral("#8cfab6")));
 		const auto originalPalette = QApplication::palette();

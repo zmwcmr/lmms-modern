@@ -66,7 +66,7 @@
 - `can not` → `cannot`，`Project NOT saved.` → `Project not saved.`，
   `Cycle Detected.` → `Cycle detected.`，`NOT FOUND` → `Not found`。
 - `1/%1 Bar`、`%1 Bars` 改为 `1/%1 bar`、`%1 bars`。
-- 字号收敛为三档：标题 14 DemiBold、正文 12 Regular、辅助 10 Regular；
+- 字号收敛为三档：标题 13 DemiBold、正文 10 Regular、辅助 8 Regular；
   主题 QSS 的 `font-size` 在加载时按系统字体缩放，标签页和分组标题改用字重/选中态区分。
 - 插件里硬编码的 `Slew Distortion Help`、`Granular Pitch Shifter Help` 和
   `THE PLUGIN'S CPU USAGE...` 改为可翻译的 sentence case。
@@ -351,13 +351,13 @@
 
 ### 6.1 设计基准
 
-正文以 **12** 为设计基准，所有档位按应用字体整体缩放，不再各写一套固定像素：
+正文以 **10** 为设计基准，所有档位按应用字体整体缩放，不再各写一套固定像素：
 
 | 层级 | 设计字号 | 字重 | 用途 |
 | --- | ---: | --- | --- |
-| 标题 | 14 | DemiBold（600） | 窗口标题、对话框内主标题、页面标题 |
-| 正文 | 12 | Regular | 按钮、下拉框、设置项、轨道名、片段名 |
-| 辅助 | 10 | Regular | 旋钮短标签、单位、次要提示 |
+| 标题 | 13 | DemiBold（600） | 窗口标题、对话框内主标题、页面标题 |
+| 正文 | 10 | Regular | 按钮、下拉框、设置项、轨道名、片段名 |
+| 辅助 | 8 | Regular | 旋钮短标签、单位、次要提示 |
 
 三类来源现在使用同一个比例：
 
@@ -367,12 +367,12 @@
 
 ### 6.2 层级区分
 
-- **标签页**：正文 12；选中项用 DemiBold 和选中底色区分，不再单独设一档字号；标签栏高度跟随字体。
-- **分组框标题**：正文 12 + DemiBold，和正文同字号，只靠字重区分。
-- **窗口标题、对话框内主标题/页面标题**：标题 14 + DemiBold。
-- **按钮、下拉框、设置项、轨道名、片段名**：正文 12。
-- **旋钮标签、单位、次要提示**：辅助 10。
-- **LCD 标注**（`TEMPO`、`TIME SIG`、`MIN`、`SEC`、`MSEC` 等）：使用辅助 10，随应用字体缩放。
+- **标签页**：正文 10；选中项用 DemiBold 和选中底色区分，不再单独设一档字号；标签栏高度跟随字体。
+- **分组框标题**：正文 10 + DemiBold，和正文同字号，只靠字重区分。
+- **窗口标题、对话框内主标题/页面标题**：标题 13 + DemiBold。
+- **按钮、下拉框、设置项、轨道名、片段名**：正文 10。
+- **旋钮标签、单位、次要提示**：辅助 8。
+- **LCD 标注**（`TEMPO`、`TIME SIG`、`MIN`、`SEC`、`MSEC` 等）：使用辅助 8，随应用字体缩放。
 - **缩放例外**：LCD 数字、钢琴键标记、时间线刻度保留自己的设计尺寸。
 
 ### 6.3 实现位置
@@ -382,10 +382,10 @@
 | `include/FontHelper.h` | 三档常量、`TextRole`、`titleFont()` / `bodyFont()` / `auxiliaryFont()` / `groupTitleFont()`；缩放上限 2.0 |
 | `src/gui/LmmsStyle.cpp` | 加载和重载主题时，把 `font-size: Npx` 统一替换为 `scaledFontSize(N)px` |
 | `src/gui/widgets/GroupBox.cpp` | 分组标题使用 `groupTitleFont()` |
-| `src/gui/widgets/TabWidget.cpp` | 标签页使用正文 12，选中项 DemiBold，标签栏高度随字体 |
+| `src/gui/widgets/TabWidget.cpp` | 标签页使用正文 10，选中项 DemiBold，标签栏高度随字体 |
 | `src/gui/modals/AboutDialog.cpp` | 主标题使用 `titleFont()`，移除 `.ui` 里的 12pt 固定字号 |
 | `src/gui/widgets/LcdWidget.cpp` | LCD 标注使用辅助字号，按字体度量预留宽高 |
-| `data/themes/*/style.css` | 正文 12px、辅助 10px；10px 同时用于时间线刻度等例外 |
+| `data/themes/*/style.css` | 正文 10px、辅助 8px；时间线刻度等例外也归入辅助档 |
 
 ### 6.4 截图
 
@@ -399,9 +399,9 @@
 - QSS 在启动时缩放；运行中修改系统字体通常需要重启应用才能重新加载主题字号。
 - LCD 数字使用固定尺寸素材。
 - 示波器提示和 CPU 标注使用辅助字号，并按实际字宽和字高调整显示空间。
-- 效果选择对话框的插件分类按钮使用标准对话框按钮样式和正文 12px，宽度按最宽标签统一计算；`Rescan` 是次级动作，放在插件列表右下方，右边缘对齐列表内容区（不含滚动条），不与分类按钮并列。`QDialogButtonBox` 的 OK/Cancel 统一使用 `apply`/`cancel` SVG 图标。
+- 效果选择对话框的插件分类按钮使用标准对话框按钮样式和正文 10px，宽度按最宽标签统一计算；`Rescan` 是次级动作，放在插件列表右下方，右边缘对齐列表内容区（不含滚动条），不与分类按钮并列。`QDialogButtonBox` 的 OK/Cancel 统一使用 `apply`/`cancel` SVG 图标。
 - 缩放上限为 200%；超过 200% 仍需要进一步的弹性布局工作。
-- 插件自绘控件中由几何尺寸推导出的字号（如钢琴键、LCD 数字）属于缩放例外；LCD 标注本身仍归辅助 10。
+- 插件自绘控件中由几何尺寸推导出的字号（如钢琴键、LCD 数字）属于缩放例外；LCD 标注本身仍归辅助 8。
 
 ---
 

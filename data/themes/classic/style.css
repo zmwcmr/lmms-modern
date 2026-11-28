@@ -519,11 +519,11 @@ QPushButton#btn-solo:checked {
 
 lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
 lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
-	font-size: 10px;
+	font-size: 8px;
 }
 
 lmms--gui--Sf2InstrumentView > QLabel {
-	font-size:10px;
+	font-size:8px;
 }
 
 /* main toolbar sliders (master vol, master pitch) */
@@ -638,7 +638,7 @@ QToolButton, QToolButton::menu-button {
 	border-radius: 5px;
 	border: 1px solid rgba(63, 63, 63, 128);
 	background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #98a2a7, stop:1 #5b646f);
-	font-size:12px;
+	font-size:10px;
 	color: black;
 }
 
@@ -731,7 +731,7 @@ lmms--gui--SideBar {
 }
 
 lmms--gui--SideBar QToolButton {
-	font-size: 12px;
+	font-size: 10px;
 }
 
 /* Instrument plugin list */
@@ -758,7 +758,7 @@ lmms--gui--PianoView {
 lmms--gui--MixerView QPushButton,
 lmms--gui--EffectRackView QPushButton,
 lmms--gui--ControllerRackView QPushButton {
-	font-size: 12px;
+	font-size: 10px;
 }
 
 lmms--gui--MixerChannelView {
@@ -778,7 +778,7 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 10px;
+	font-size: 8px;
 }
 
 /* Meter colors and fader ticks */
@@ -792,7 +792,7 @@ lmms--gui--Fader {
 
 lmms--gui--TimeLineWidget {
         /* font-size only supports px and pt. */
-	font-size: 10px;
+	font-size: 8px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
@@ -853,7 +853,7 @@ lmms--gui--ClipView   {
 	qproperty-textShadowColor: rgb( 0, 0, 0 );
 	qproperty-gradient: true; /* boolean property, set true to have a gradient */
 	qproperty-markerColor: rgb(0, 0, 0);
-	font-size: 12px;
+	font-size: 10px;
 }
 
 /* MIDI (instrument) clip */
@@ -900,7 +900,7 @@ lmms--gui--SubWindow {
 /* Subwindow title text */
 lmms--gui--SubWindow > QLabel {
 	color: rgb( 255, 255, 255 );
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 600;
 	font-style: normal;
 }
