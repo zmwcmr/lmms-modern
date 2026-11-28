@@ -67,8 +67,7 @@ Vst2InstrumentView::Vst2InstrumentView(Instrument* instrument, QWidget* parent) 
 	auto* buttonRow = new QHBoxLayout();
 	m_openButton = new QPushButton(tr("Open plugin..."), this);
 	buttonRow->addWidget(m_openButton);
-	m_guiButton = new QPushButton(tr("Show GUI"), this);
-	m_guiButton->setCheckable(true);
+	m_guiButton = new QPushButton(tr("Show/hide GUI"), this);
 	buttonRow->addWidget(m_guiButton);
 	buttonRow->addStretch();
 	layout->addLayout(buttonRow);
@@ -87,15 +86,10 @@ Vst2InstrumentView::Vst2InstrumentView(Instrument* instrument, QWidget* parent) 
 
 	connect(m_openButton, &QPushButton::clicked, this,
 		&Vst2InstrumentView::openPluginFile);
-	connect(m_guiButton, &QPushButton::toggled, this, [this](bool show) {
+	connect(m_guiButton, &QPushButton::clicked, this, [this] {
 		auto* plugin = m_instrument != nullptr
 			? m_instrument->nativePlugin() : nullptr;
-		if (plugin == nullptr)
-		{
-			return;
-		}
-		if (show) { plugin->showUI(); }
-		else { plugin->hideUI(); }
+		if (plugin != nullptr) { plugin->toggleUI(); }
 	});
 	connect(m_programBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		this, [this](int index) {
@@ -172,7 +166,6 @@ void Vst2InstrumentView::updateGuiButton()
 {
 	auto* plugin = m_instrument != nullptr
 		? m_instrument->nativePlugin() : nullptr;
-	const bool hasEditor = plugin != nullptr && plugin->hasEditor();
 
 	bool displayAvailable = true;
 #if defined(LMMS_BUILD_LINUX)
@@ -180,21 +173,19 @@ void Vst2InstrumentView::updateGuiButton()
 		== EditorPresentation::X11Window;
 #endif
 
-	QSignalBlocker blocker(m_guiButton);
-	m_guiButton->setEnabled(hasEditor && displayAvailable);
-	if (!hasEditor)
+	m_guiButton->setEnabled(plugin != nullptr && displayAvailable);
+	if (!displayAvailable)
 	{
-		m_guiButton->setChecked(false);
-		m_guiButton->setToolTip(tr("This VST2 plugin has no editor."));
-	}
-	else if (!displayAvailable)
-	{
-		m_guiButton->setChecked(false);
 #if defined(LMMS_BUILD_LINUX)
 		m_guiButton->setToolTip(EditorPlatform::unavailableReason());
 #else
 		m_guiButton->setToolTip(tr("No display available."));
 #endif
+	}
+	else if (plugin != nullptr && !plugin->hasEditorSupport())
+	{
+		m_guiButton->setToolTip(tr(
+			"This VST2 plugin reports no editor; Show/hide GUI may do nothing."));
 	}
 	else
 	{

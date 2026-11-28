@@ -156,6 +156,9 @@ bool Vst2HostedInstrument::openPlugin(const QString& file)
 			? QFileInfo(file).completeBaseName() : plugin->name();
 		if (!name.isEmpty()) { setDisplayName(name); }
 		connectPluginSignals(plugin);
+		// The remote host maps the editor while initialising. Start hidden so
+		// the view's Show GUI button and the actual window state agree.
+		plugin->hideUI();
 	}
 	m_file = file;
 	setKeyAttribute(QStringLiteral("file"), file);

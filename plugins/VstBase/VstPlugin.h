@@ -62,6 +62,14 @@ public:
 		return m_pluginWindowID != 0;
 	}
 
+	//! True when the plugin has an editor, including a child-owned window.
+	//! hasEditor() additionally means the window can be embedded.
+	inline bool hasEditorSupport() const
+	{
+		return m_pluginWindowID != 0
+			|| (m_pluginGeometry.width() > 0 && m_pluginGeometry.height() > 0);
+	}
+
 	/// Same as pluginWidget(), but can be overwritten in sub-classes to modify
 	/// behavior the UI. This is used in VstInstrumentPlugin to wrap the VST UI
 	/// in a QMdiSubWindow

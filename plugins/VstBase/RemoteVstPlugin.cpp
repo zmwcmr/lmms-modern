@@ -996,9 +996,12 @@ void RemoteVstPlugin::showEditor() {
 		if (!m_x11WindowVisible)
 		{
 			XMapWindow(m_display, m_window);
-			XFlush(m_display);
 			m_x11WindowVisible = true;
 		}
+		// A second Show GUI request must bring an already mapped window to
+		// the front instead of doing nothing.
+		XRaiseWindow(m_display, m_window);
+		XFlush(m_display);
 #endif
 	}
 }
