@@ -28,6 +28,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -51,15 +53,17 @@ public:
 
 	EqBand * setBand( EqControls * controls );
 
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
 private:
 	EqControls * m_controls;
 	EqParameterWidget * m_parameterWidget;
 
-	void mouseDoubleClickEvent(QMouseEvent *event) override;
+	void updateBackground();
 
 	EqBand *setBand( int index, BoolModel *active, FloatModel *freq, FloatModel *res, FloatModel *gain, QColor color, QString name, float *peakL, float *peakR, BoolModel *hp12, BoolModel *hp24, BoolModel *hp48, BoolModel *lp12, BoolModel *lp24, BoolModel *lp48 );
 
-	int m_originalHeight;
 };
 
 

@@ -25,6 +25,9 @@
 
 #include "EqControlsDialog.h"
 
+#include <QHBoxLayout>
+#include <QResizeEvent>
+#include <QVBoxLayout>
 #include <QWidget>
 
 #include "AutomatableButton.h"
@@ -47,21 +50,20 @@ EqControlsDialog::EqControlsDialog( EqControls *controls ) :
 	m_controls( controls )
 {
 	setAutoFillBackground( true );
-	QPalette pal;
-	pal.setBrush( backgroundRole(), PLUGIN_NAME::getIconPixmap( "artwork" ) );
-	setPalette( pal );
-	setFixedSize( 500, 500 );
 
-	auto inSpec = new EqSpectrumView(&controls->m_inFftBands, this);
-	inSpec->move( 26, 17 );
+	auto* spectrumContainer = new QWidget(this);
+	spectrumContainer->setFixedSize(450, 200);
+
+	auto inSpec = new EqSpectrumView(&controls->m_inFftBands, spectrumContainer);
+	inSpec->move(0, 0);
 	inSpec->setColor( QColor( 77, 101, 242, 150 ) );
 
-	auto outSpec = new EqSpectrumView(&controls->m_outFftBands, this);
+	auto outSpec = new EqSpectrumView(&controls->m_outFftBands, spectrumContainer);
 	outSpec->setColor( QColor( 0, 255, 239, 150 ) );
-	outSpec->move( 26, 17 );
+	outSpec->move(0, 0);
 
-	m_parameterWidget = new EqParameterWidget( this , controls );
-	m_parameterWidget->move( 26, 17 );
+	m_parameterWidget = new EqParameterWidget(spectrumContainer, controls);
+	m_parameterWidget->move(0, 0);
 
 	setBand( 0, &controls->m_hpActiveModel, &controls->m_hpFeqModel, &controls->m_hpResModel, 0, QColor(255 ,255, 255), tr( "HP" ) ,0,0, &controls->m_hp12Model, &controls->m_hp24Model, &controls->m_hp48Model,0,0,0);
 	setBand( 1, &controls->m_lowShelfActiveModel, &controls->m_lowShelfFreqModel, &controls->m_lowShelfResModel, &controls->m_lowShelfGainModel, QColor(255 ,255, 255), tr( "Low-shelf" ), &controls->m_lowShelfPeakL , &controls->m_lowShelfPeakR,0,0,0,0,0,0 );
@@ -73,50 +75,52 @@ EqControlsDialog::EqControlsDialog( EqControls *controls ) :
 	setBand( 7, &controls->m_lpActiveModel, &controls->m_lpFreqModel, &controls->m_lpResModel, 0, QColor(255 ,255, 255), tr( "LP" ) ,0,0,0,0,0, &controls->m_lp12Model, &controls->m_lp24Model, &controls->m_lp48Model);
 
 	QSize const faderSize(23, 80);
+	auto* fadersLayout = new QHBoxLayout;
+	fadersLayout->setSpacing(22);
+	fadersLayout->addStretch();
 
 	auto GainFaderIn = new EqFader(&controls->m_inGainModel, tr("Input gain"), this, &controls->m_inPeakL, &controls->m_inPeakR);
 	GainFaderIn->setFixedSize(faderSize);
-	GainFaderIn->move( 23, 295 );
 	GainFaderIn->setDisplayConversion( false );
 	GainFaderIn->setHintText( tr( "Gain" ), "dBv");
+	fadersLayout->addWidget(GainFaderIn, 0, Qt::AlignHCenter);
 
-	auto GainFaderOut = new EqFader(&controls->m_outGainModel, tr("Output gain"), this, &controls->m_outPeakL, &controls->m_outPeakR);
-	GainFaderOut->setFixedSize(faderSize);
-	GainFaderOut->move( 453, 295);
-	GainFaderOut->setDisplayConversion( false );
-	GainFaderOut->setHintText( tr( "Gain" ), "dBv" );
-
-	// Gain Fader for each Filter exepts the pass filter
-	int distance = 126;
+	QList<EqFader*> bandFaders;
 	for( int i = 1; i < m_parameterWidget->bandCount() - 1; i++ )
 	{
 		auto gainFader = new EqFader(m_parameterWidget->getBandModels(i)->gain, tr(""), this,
 			m_parameterWidget->getBandModels(i)->peakL, m_parameterWidget->getBandModels(i)->peakR);
 		gainFader->setFixedSize(faderSize);
-		gainFader->move( distance, 295 );
-		distance += 44;
 		gainFader->setMinimumHeight(80);
-		gainFader->resize(gainFader->width() , 80);
 		gainFader->setDisplayConversion( false );
 		gainFader->setHintText( tr( "Gain") , "dB");
+		bandFaders.append(gainFader);
+		fadersLayout->addWidget(gainFader, 0, Qt::AlignHCenter);
 	}
 
-	//Control Button and Knobs for each Band
-	distance = 81;
+	auto GainFaderOut = new EqFader(&controls->m_outGainModel, tr("Output gain"), this, &controls->m_outPeakL, &controls->m_outPeakR);
+	GainFaderOut->setFixedSize(faderSize);
+	GainFaderOut->setDisplayConversion( false );
+	GainFaderOut->setHintText( tr( "Gain" ), "dBv" );
+	fadersLayout->addWidget(GainFaderOut, 0, Qt::AlignHCenter);
+	fadersLayout->addStretch();
+
+	auto* bandsLayout = new QHBoxLayout;
+	bandsLayout->setSpacing(4);
 	for( int i = 0; i < m_parameterWidget->bandCount() ; i++ )
 	{
+		auto* bandLayout = new QVBoxLayout;
+		bandLayout->setSpacing(2);
+
 		auto resKnob = new Knob(KnobType::Bright26, this);
-		resKnob->move( distance, 440 );
 		resKnob->setModel( m_parameterWidget->getBandModels( i )->res );
 		if(i > 1 && i < 6) { resKnob->setHintText( tr( "Bandwidth: " ) , tr( " Octave" ) ); }
 		else { resKnob->setHintText(tr("Resonance: "), ""); }
 
 		auto freqKnob = new Knob(KnobType::Bright26, this);
-		freqKnob->move( distance, 396 );
 		freqKnob->setModel( m_parameterWidget->getBandModels( i )->freq );
 		freqKnob->setHintText( tr( "Frequency:" ), "Hz" );
 
-		// adds the Number Active buttons
 		auto activeButton = new PixmapButton(this, nullptr);
 		activeButton->setCheckable(true);
 		activeButton->setModel( m_parameterWidget->getBandModels( i )->active );
@@ -125,8 +129,11 @@ EqControlsDialog::EqControlsDialog( EqControls *controls ) :
 		const auto iconInactiveFileName = iconActiveFileName + "off";
 		activeButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap(iconActiveFileName));
 		activeButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap(iconInactiveFileName));
-		activeButton->move( distance - 2, 276 );
-		activeButton->setModel( m_parameterWidget->getBandModels( i )->active );
+
+		bandLayout->addWidget(activeButton, 0, Qt::AlignHCenter);
+		bandLayout->addWidget(freqKnob, 0, Qt::AlignHCenter);
+		bandLayout->addWidget(resKnob, 0, Qt::AlignHCenter);
+		bandsLayout->addLayout(bandLayout, 1);
 
 		// Connects the knobs, Faders and buttons with the curve graphic
 		QObject::connect( m_parameterWidget->getBandModels( i )->freq , SIGNAL( dataChanged() ), m_parameterWidget, SLOT ( updateHandle() ) );
@@ -135,58 +142,63 @@ EqControlsDialog::EqControlsDialog( EqControls *controls ) :
 		QObject::connect( m_parameterWidget->getBandModels( i )->active, SIGNAL( dataChanged() ), m_parameterWidget , SLOT ( updateHandle() ) );
 
 		m_parameterWidget->changeHandle( i );
-		distance += 44;
 	}
-
 
 	// adds the buttons for Spectrum analyser on/off
 	auto inSpecButton = new LedCheckBox(this);
 	inSpecButton->setCheckable(true);
 	inSpecButton->setModel( &controls->m_analyseInModel );
-	inSpecButton->move( 172, 240 );
 	auto outSpecButton = new LedCheckBox(this);
 	outSpecButton->setCheckable(true);
 	outSpecButton->setModel( &controls->m_analyseOutModel );
-	outSpecButton->move( 302, 240 );
+	auto* specToggleLayout = new QHBoxLayout;
+	specToggleLayout->addStretch();
+	specToggleLayout->addWidget(inSpecButton);
+	specToggleLayout->addWidget(outSpecButton);
+	specToggleLayout->addStretch();
 
 	//hp filter type
 	auto hp12Button = new PixmapButton(this, nullptr);
 	hp12Button->setModel( m_parameterWidget->getBandModels( 0 )->hp12 );
 	hp12Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "12dB" ) );
 	hp12Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "12dBoff" ) );
-	hp12Button->move( 79, 298 );
 	auto hp24Button = new PixmapButton(this, nullptr);
 	hp24Button->setModel(m_parameterWidget->getBandModels( 0 )->hp24 );
 	hp24Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "24dB" ) );
 	hp24Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "24dBoff" ) );
-
-	hp24Button->move( 79 , 328 );
 	auto hp48Button = new PixmapButton(this, nullptr);
 	hp48Button->setModel( m_parameterWidget->getBandModels(0)->hp48 );
 	hp48Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "48dB" ) );
 	hp48Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "48dBoff" ) );
-
-	hp48Button->move( 79, 358 );
 	//LP filter type
 	auto lp12Button = new PixmapButton(this, nullptr);
 	lp12Button->setModel( m_parameterWidget->getBandModels( 7 )->lp12 );
 	lp12Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "12dB" ) );
 	lp12Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "12dBoff" ) );
-
-	lp12Button->move( 387, 298 );
 	auto lp24Button = new PixmapButton(this, nullptr);
 	lp24Button->setModel( m_parameterWidget->getBandModels( 7 )->lp24 );
 	lp24Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "24dB" ) );
 	lp24Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "24dBoff" ) );
-
-	lp24Button->move( 387, 328 );
-
 	auto lp48Button = new PixmapButton(this, nullptr);
 	lp48Button->setModel( m_parameterWidget->getBandModels( 7 )->lp48 );
 	lp48Button->setActiveGraphic( PLUGIN_NAME::getIconPixmap( "48dB" ) );
 	lp48Button->setInactiveGraphic(  PLUGIN_NAME::getIconPixmap( "48dBoff" ) );
 
-	lp48Button->move( 387, 358 );
+	auto* hpLayout = new QVBoxLayout;
+	hpLayout->setSpacing(2);
+	hpLayout->addWidget(hp12Button);
+	hpLayout->addWidget(hp24Button);
+	hpLayout->addWidget(hp48Button);
+	auto* lpLayout = new QVBoxLayout;
+	lpLayout->setSpacing(2);
+	lpLayout->addWidget(lp12Button);
+	lpLayout->addWidget(lp24Button);
+	lpLayout->addWidget(lp48Button);
+	auto* filterLayout = new QHBoxLayout;
+	filterLayout->addLayout(hpLayout);
+	filterLayout->addStretch();
+	filterLayout->addLayout(lpLayout);
+
 	// the curve has to change its appearance
 	QObject::connect( m_parameterWidget->getBandModels( 0 )->hp12 , SIGNAL ( dataChanged() ), m_parameterWidget, SLOT( updateHandle()));
 	QObject::connect( m_parameterWidget->getBandModels( 0 )->hp24 , SIGNAL ( dataChanged() ), m_parameterWidget, SLOT( updateHandle()));
@@ -207,17 +219,41 @@ EqControlsDialog::EqControlsDialog( EqControls *controls ) :
 	hpBtnGrp->addButton( hp24Button );
 	hpBtnGrp->addButton( hp48Button );
 	hpBtnGrp->setModel(&m_controls->m_hpTypeModel);
+
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(12, 10, 12, 10);
+	mainLayout->setSpacing(4);
+	mainLayout->addWidget(spectrumContainer, 0, Qt::AlignHCenter);
+	mainLayout->addLayout(specToggleLayout);
+	mainLayout->addLayout(fadersLayout);
+	mainLayout->addLayout(bandsLayout);
+	mainLayout->addLayout(filterLayout);
+
+	setMinimumSize(500, 500);
+	adjustSize();
+	updateBackground();
 }
 
 
-
-
-void EqControlsDialog::mouseDoubleClickEvent(QMouseEvent *event)
+void EqControlsDialog::resizeEvent(QResizeEvent* event)
 {
-	m_originalHeight = parentWidget()->height() == 283 ? m_originalHeight : parentWidget()->height() ;
-	parentWidget()->setFixedHeight( parentWidget()->height() == m_originalHeight ? 283 : m_originalHeight  );
-	update();
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
 }
+
+
+void EqControlsDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
+}
+
 
 EqBand* EqControlsDialog::setBand(int index, BoolModel* active, FloatModel* freq, FloatModel* res, FloatModel* gain, QColor color, QString name, float* peakL, float* peakR, BoolModel* hp12, BoolModel* hp24, BoolModel* hp48, BoolModel* lp12, BoolModel* lp24, BoolModel* lp48)
 {
