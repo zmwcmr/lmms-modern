@@ -24,7 +24,6 @@
 
 #include "TrackContainerView.h"
 
-
 #include <algorithm>
 
 #include <QLayout>
@@ -36,6 +35,7 @@
 #include "DataFile.h"
 #include "MainWindow.h"
 #include "FileBrowser.h"
+#include "FontHelper.h"
 #include "ImportFilter.h"
 #include "Instrument.h"
 #include "InstrumentTrack.h"
@@ -86,7 +86,8 @@ TrackContainerView::TrackContainerView( TrackContainer * _tc ) :
 	m_trackViews(),
 	m_scrollArea( new scrollArea( this ) ),
 	m_ppb( DEFAULT_PIXELS_PER_BAR ),
-	m_trackHeadWidth(ConfigManager::inst()->value("ui", "compacttrackbuttons").toInt() ? COMPACT_TRACK_WIDTH : DEFAULT_TRACK_WIDTH),
+	m_trackHeadWidth(scaledTrackHeadWidth(ConfigManager::inst()->value("ui", "compacttrackbuttons").toInt()
+		? COMPACT_TRACK_WIDTH : DEFAULT_TRACK_WIDTH)),
 	m_rubberBand( new RubberBand( m_scrollArea ) )
 {
 	m_tc->setHook( this );
@@ -352,17 +353,53 @@ void TrackContainerView::setPixelsPerBar( int ppb )
 
 
 
+namespace
+{
+
+// Scale the space needed for an ordinary track name and keep the rest
+// available for the timeline in narrow Song Editor windows.
+constexpr int scalableTrackNameWidth = 80;
+constexpr int fixedTrackHeadWidth = DEFAULT_TRACK_WIDTH - scalableTrackNameWidth;
+
+int extraTrackControlWidth()
+{
+	// Reserve room for the two growing track knob labels. The grip, buttons and LCD
+	// keep their existing sizes.
+	constexpr int knobColumnWidth = 22;
+	return 2 * (scaledFontSize(knobColumnWidth) - knobColumnWidth);
+}
+
+} // namespace
+
+
+int TrackContainerView::scaledTrackHeadWidth(int width)
+{
+	const int nameWidth = std::max(0, width - fixedTrackHeadWidth);
+	return width + extraTrackControlWidth() + scaledFontSize(nameWidth) - nameWidth;
+}
+
+
+int TrackContainerView::trackHeadWidthForStorage() const
+{
+	// Project widths are stored at the base font size, including in older files.
+	const int width = m_trackHeadWidth - extraTrackControlWidth();
+	const int nameWidth = std::max(0, width - fixedTrackHeadWidth);
+	return width - nameWidth + qRound(nameWidth / fontScaleFactor());
+}
+
+
 void TrackContainerView::setTrackHeadWidth(int width)
 {
+	const int minimumWidth = scaledTrackHeadWidth(MINIMUM_TRACK_WIDTH);
 	m_trackHeadWidth = m_maxTrackHeadWidth > 0
-		? std::clamp(width, MINIMUM_TRACK_WIDTH, m_maxTrackHeadWidth)
-		: std::max(width, MINIMUM_TRACK_WIDTH);
+		? std::clamp(width, minimumWidth, m_maxTrackHeadWidth)
+		: std::max(width, minimumWidth);
 	emit trackHeadWidthChanged(m_trackHeadWidth);
 }
 
 void TrackContainerView::setMaxTrackHeadWidth(int maxWidth)
 {
-	m_maxTrackHeadWidth = std::max(maxWidth, MINIMUM_TRACK_WIDTH);
+	m_maxTrackHeadWidth = std::max(maxWidth, scaledTrackHeadWidth(MINIMUM_TRACK_WIDTH));
 	// Update width
 	setTrackHeadWidth(m_trackHeadWidth);
 }

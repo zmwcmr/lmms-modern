@@ -33,6 +33,7 @@
 #include <QKeyEvent>
 #include <QStackedLayout>
 #include <QStackedWidget>
+#include <QSplitter>
 
 #include "EffectRackView.h"
 #include "Engine.h"
@@ -72,8 +73,14 @@ MixerView::MixerView(Mixer* mixer) :
 	setWindowTitle(tr("Mixer"));
 	setWindowIcon(embed::getIconPixmap("mixer"));
 
-	// main-layout
-	auto ml = new QHBoxLayout{this};
+	// Let the user allocate more width to the effect names when needed.
+	auto* outerLayout = new QHBoxLayout(this);
+	outerLayout->setContentsMargins(0, 0, 0, 0);
+	auto* splitter = new QSplitter(Qt::Horizontal, this);
+	splitter->setChildrenCollapsible(false);
+	outerLayout->addWidget(splitter);
+	auto* channelPanel = new QWidget(splitter);
+	auto ml = new QHBoxLayout{channelPanel};
 
 	// Set margins
 	ml->setContentsMargins(0, 4, 0, 0);
@@ -151,7 +158,10 @@ MixerView::MixerView(Mixer* mixer) :
 
 
 	// add the stacked layout for the effect racks of mixer channels
-	ml->addWidget(m_racksWidget);
+	splitter->addWidget(channelPanel);
+	splitter->addWidget(m_racksWidget);
+	splitter->setStretchFactor(0, 1);
+	splitter->setStretchFactor(1, 0);
 
 	setCurrentMixerChannel(m_mixerChannelViews[0]);
 

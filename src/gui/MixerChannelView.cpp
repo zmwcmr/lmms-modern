@@ -101,8 +101,8 @@ MixerChannelView::MixerChannelView(QWidget* parent, MixerView* mixerView, int ch
 	setToolTip(mixerName);
 
 	m_renameLineEdit = new QLineEdit{mixerName, nullptr};
-	m_renameLineEdit->setFixedWidth(65);
-	m_renameLineEdit->setFont(adjustedToPixelSize(font(), LARGE_FONT_SIZE));
+	m_renameLineEdit->setFixedWidth(scaledFontSize(65));
+	m_renameLineEdit->setFont(bodyFont(font()));
 	m_renameLineEdit->setReadOnly(true);
 	m_renameLineEdit->installEventFilter(this);
 
@@ -141,7 +141,7 @@ MixerChannelView::MixerChannelView(QWidget* parent, MixerView* mixerView, int ch
 	connect(m_fader, &Fader::peakChanged, m_peakIndicator, &PeakIndicator::updatePeak);
 
 	m_effectRackView = new EffectRackView{&mixerChannel->m_fxChain, mixerView->m_racksWidget};
-	m_effectRackView->setFixedWidth(EffectRackView::DEFAULT_WIDTH);
+	m_effectRackView->setMinimumWidth(EffectRackView::DEFAULT_WIDTH);
 
 	auto mainLayout = new QVBoxLayout{this};
 	mainLayout->setContentsMargins(4, 4, 4, 4);
@@ -260,7 +260,6 @@ void MixerChannelView::renameChannel()
 	m_renameLineEdit->setReadOnly(false);
 
 	m_channelNumberLcd->hide();
-	m_renameLineEdit->setFixedWidth(m_renameLineEdit->width());
 	m_renameLineEdit->setText(mixerChannel()->m_name);
 
 	m_renameLineEditView->setFocus();
@@ -270,11 +269,11 @@ void MixerChannelView::renameChannel()
 
 void MixerChannelView::renameFinished()
 {
+	if (!m_inRename) { return; }
 	m_inRename = false;
 
 	m_renameLineEdit->deselect();
 	m_renameLineEdit->setReadOnly(true);
-	m_renameLineEdit->setFixedWidth(m_renameLineEdit->width());
 	m_channelNumberLcd->show();
 
 	auto newName = m_renameLineEdit->text();
@@ -284,10 +283,10 @@ void MixerChannelView::renameFinished()
 	if (!newName.isEmpty() && mc->m_name != newName)
 	{
 		mc->m_name = newName;
-		m_renameLineEdit->setText(elideName(newName));
 		Engine::getSong()->setModified();
 	}
 
+	m_renameLineEdit->setText(elideName(mc->m_name));
 	setToolTip(mc->m_name);
 }
 
@@ -331,9 +330,9 @@ bool MixerChannelView::confirmRemoval(int index)
 	// is the channel is not in use, there is no need for user confirmation
 	if (!getGUI()->mixerView()->getMixer()->isChannelInUse(index)) { return true; }
 
-	QString messageRemoveTrack = tr("This Mixer Channel is being used.\n"
+	QString messageRemoveTrack = tr("This mixer channel is being used.\n"
 									"Are you sure you want to remove this channel?\n\n"
-									"Warning: This operation can not be undone.");
+									"Warning: This operation cannot be undone.");
 
 	QString messageTitleRemoveTrack = tr("Confirm removal");
 	QString askAgainText = tr("Don't ask again");
@@ -390,10 +389,10 @@ void MixerChannelView::moveChannelRight()
 
 QString MixerChannelView::elideName(const QString& name)
 {
-	const auto maxTextHeight = m_renameLineEdit->width();
+	// QLineEdit has two pixels of internal text padding on each end.
+	const int textWidth = m_renameLineEdit->contentsRect().width() - 4;
 	const auto metrics = QFontMetrics{m_renameLineEdit->font()};
-	const auto elidedName = metrics.elidedText(name, Qt::ElideRight, maxTextHeight);
-	return elidedName;
+	return metrics.elidedText(name, Qt::ElideRight, textWidth);
 }
 
 MixerChannel* MixerChannelView::mixerChannel() const

@@ -33,6 +33,7 @@
 #include "DeprecationHelper.h"
 #include "embed.h"
 #include "Instrument.h"
+#include "FontHelper.h"
 #include "InstrumentTrack.h"
 #include "RenameDialog.h"
 #include "TrackRenameLineEdit.h"
@@ -55,7 +56,7 @@ TrackLabelButton::TrackLabelButton( TrackView * _tv, QWidget * _parent ) :
 	m_renameLineEdit = new TrackRenameLineEdit( this );
 	m_renameLineEdit->hide();
 	
-	setFixedHeight(29);
+	setFixedHeight(std::max(29, QFontMetrics(bodyFont(font())).height() + 4));
 	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	
 	setIconSize( QSize( 24, 24 ) );
