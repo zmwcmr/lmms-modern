@@ -202,6 +202,8 @@
 - 已完成 `Eq`：移除 500×500 固定尺寸；保留 450×200 频谱/参数叠层，推子、8 段频率/共振/启用列和 HP/LP 按钮改为布局，背景随窗口缩放。
 - 已完成 `DualFilter`：移除 373×109 固定尺寸，两段滤波器改为左右布局，启用 LED、旋钮和下拉框随字体排布。
 - 已完成 `FrequencyShifter`：移除 288×360 固定尺寸和绝对坐标，按顶部/波形/LFO/延迟四段改为布局，背景随窗口缩放。
+- 已完成 `MultitapEcho`：移除 245×300 固定尺寸，双图形和底部控制改为布局。
+- 已完成 `DynamicsProcessor`：移除 224×319 固定尺寸，图形、旋钮、按钮和立体声模式改为布局。
 - 中等：DualFilter、DynamicsProcessor、FrequencyShifter、MultitapEcho、LOMM、CrossoverEQ。
 - 复杂/自绘画布：GranularPitchShifter、SlicerT、AudioFileProcessor、Sf2Player、GigPlayer、Vestige。
 - 典型风险：`Sf2Player`/`GigPlayer` 文件名标签固定 11/14px 高、宽 156px；`Vestige` 文本按钮固定 200×24px；多个插件的下拉框使用固定坐标/高度。
@@ -369,5 +371,6 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`Eq` 改为布局驱动，保留频谱叠层并移除固定尺寸。
 - 2026-11-28：`DualFilter` 改为左右两段布局，移除固定尺寸。
 - 2026-11-28：`FrequencyShifter` 改为四段布局，移除固定尺寸和绝对坐标。
+- 2026-11-28：`MultitapEcho` 和 `DynamicsProcessor` 改为布局驱动，移除固定尺寸。
 - 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。

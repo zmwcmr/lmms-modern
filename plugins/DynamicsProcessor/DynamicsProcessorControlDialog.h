@@ -28,6 +28,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -45,8 +47,11 @@ public:
 	DynProcControlDialog( DynProcControls * _controls );
 	~DynProcControlDialog() override = default;
 
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
 
 private:
+	void updateBackground();
 
 } ;
 

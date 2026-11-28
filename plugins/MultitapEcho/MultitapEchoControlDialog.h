@@ -29,6 +29,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -45,6 +47,12 @@ class MultitapEchoControlDialog : public EffectControlDialog
 public:
 	MultitapEchoControlDialog( MultitapEchoControls * controls );
 	~MultitapEchoControlDialog() override = default;
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 };
 
 
