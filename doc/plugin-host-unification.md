@@ -371,10 +371,10 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       crash isolation). The shared window behavior itself is covered by
       `X11EditorWindowTest`.
 - [x] Shared instrument page: `HostedPluginPanel` provides the same plugin
-      name/vendor line, toolbar (GUI toggle, Hide, Parameters, Reload, Preset,
-      Open plugin, Help) and searchable parameter drawer for VST2, VST3 and
-      LV2. The GUI toggle reflects whether the editor is open; clicking it
-      raises an existing window instead of closing it, and Hide closes it.
+      name/vendor line, toolbar (Plugin GUI checkbox, Parameters, Reload,
+      Preset, Open plugin, Help) and searchable parameter drawer for VST2,
+      VST3 and LV2. The green Plugin GUI checkbox reflects whether the editor
+      is open and opens/closes it on toggle.
       The parameter drawer is collapsed by default; the plugin's own GUI is
       the primary editor. The old giant knob grids are no longer the default.
 - [x] All hosted instrument views are resizable: VST3 no longer forces

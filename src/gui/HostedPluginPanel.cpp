@@ -13,6 +13,8 @@
 
 #include "HostedPluginPanel.h"
 
+#include "LedCheckBox.h"
+
 #include <algorithm>
 
 #include <QCheckBox>
@@ -60,14 +62,11 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	layout->addLayout(infoRow);
 
 	auto* toolbar = new QHBoxLayout();
-	m_guiButton = new QPushButton(tr("GUI"), this);
-	m_guiButton->setCheckable(true);
+	m_guiButton = new LedCheckBox(tr("Plugin GUI"), this, QString(),
+		LedCheckBox::LedColor::Green);
 	m_guiButton->setToolTip(tr(
-		"Open the plugin GUI, or raise it when it is already open."));
+		"Open or close the plugin's own window."));
 	toolbar->addWidget(m_guiButton);
-	m_hideButton = new QPushButton(tr("Hide"), this);
-	m_hideButton->setToolTip(tr("Hide the plugin GUI."));
-	toolbar->addWidget(m_hideButton);
 	m_parametersButton = new QPushButton(tr("Parameters"), this);
 	m_parametersButton->setCheckable(true);
 	m_parametersButton->setToolTip(tr("Show or hide the automation parameters"));
@@ -117,14 +116,15 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	m_parametersWidget->setVisible(false);
 	layout->addWidget(m_parametersWidget, 1);
 
-	connect(m_guiButton, &QPushButton::clicked, this, [this] {
-		if (m_actions.showEditor) { m_actions.showEditor(); }
-		m_guiButton->setChecked(true);
-		updateInfo();
-	});
-	connect(m_hideButton, &QPushButton::clicked, this, [this] {
-		if (m_actions.hideEditor) { m_actions.hideEditor(); }
-		m_guiButton->setChecked(false);
+	connect(m_guiButton, &LedCheckBox::toggled, this, [this](bool open) {
+		if (open)
+		{
+			if (m_actions.showEditor) { m_actions.showEditor(); }
+		}
+		else if (m_actions.hideEditor)
+		{
+			m_actions.hideEditor();
+		}
 		updateInfo();
 	});
 	connect(m_parametersButton, &QPushButton::toggled, this,
@@ -186,11 +186,13 @@ void HostedPluginPanel::updateInfo()
 	const bool editorVisible = hasEditor && m_actions.isEditorVisible
 		&& m_actions.isEditorVisible();
 	m_guiButton->setEnabled(hasEditor);
-	m_hideButton->setVisible(editorVisible);
 	m_guiButton->setToolTip(hasEditor
-		? tr("Open the plugin GUI, or raise it when it is already open.")
+		? tr("Open or close the plugin's own window.")
 		: tr("This plugin has no editor."));
-	m_guiButton->setChecked(editorVisible);
+	{
+		QSignalBlocker blocker(m_guiButton);
+		m_guiButton->setChecked(editorVisible);
+	}
 
 	const bool canReload = m_actions.canReload && m_actions.canReload();
 	m_reloadButton->setVisible(canReload);

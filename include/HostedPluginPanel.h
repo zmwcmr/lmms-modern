@@ -38,6 +38,7 @@ namespace gui
 {
 
 class Control;
+class LedCheckBox;
 
 //! One parameter exposed by a hosted plugin for the shared parameter drawer.
 struct HostedParameterEntry
@@ -111,8 +112,7 @@ private:
 
 	QLabel* m_title = nullptr;
 	QLabel* m_vendor = nullptr;
-	QPushButton* m_guiButton = nullptr;
-	QPushButton* m_hideButton = nullptr;
+	LedCheckBox* m_guiButton = nullptr;
 	QPushButton* m_parametersButton = nullptr;
 	QPushButton* m_reloadButton = nullptr;
 	QPushButton* m_openButton = nullptr;
