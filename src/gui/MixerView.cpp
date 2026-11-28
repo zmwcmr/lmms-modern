@@ -78,6 +78,7 @@ MixerView::MixerView(Mixer* mixer) :
 	outerLayout->setContentsMargins(0, 0, 0, 0);
 	auto* splitter = new QSplitter(Qt::Horizontal, this);
 	splitter->setChildrenCollapsible(false);
+	splitter->setHandleWidth(6);
 	outerLayout->addWidget(splitter);
 	auto* channelPanel = new QWidget(splitter);
 	auto ml = new QHBoxLayout{channelPanel};
@@ -139,8 +140,9 @@ MixerView::MixerView(Mixer* mixer) :
 	channelArea->setWidget(m_channelAreaWidget);
 	channelArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	channelArea->setFrameStyle(QFrame::NoFrame);
-	channelArea->setMinimumWidth(mixerChannelSize.width() * 6);
 	channelArea->setWidgetResizable(true);
+	m_channelAreaWidget->adjustSize();
+	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
 
 	int const scrollBarExtent = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
 	channelArea->setMinimumHeight(mixerChannelSize.height() + scrollBarExtent);
@@ -160,8 +162,8 @@ MixerView::MixerView(Mixer* mixer) :
 	// add the stacked layout for the effect racks of mixer channels
 	splitter->addWidget(channelPanel);
 	splitter->addWidget(m_racksWidget);
-	splitter->setStretchFactor(0, 1);
-	splitter->setStretchFactor(1, 0);
+	splitter->setStretchFactor(0, 0);
+	splitter->setStretchFactor(1, 1);
 
 	setCurrentMixerChannel(m_mixerChannelViews[0]);
 
@@ -197,6 +199,8 @@ int MixerView::addNewChannel()
 	connectToSoloAndMute(newChannelIndex);
 	chLayout->addWidget(m_mixerChannelViews[newChannelIndex]);
 	m_racksLayout->addWidget(m_mixerChannelViews[newChannelIndex]->m_effectRackView);
+	m_channelAreaWidget->adjustSize();
+	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
 
 	updateMixerChannel(newChannelIndex);
 
@@ -221,6 +225,7 @@ void MixerView::refreshDisplay()
 		delete mixerChannelView;
 	}
 	m_channelAreaWidget->adjustSize();
+	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
 
 	// re-add the views
 	m_mixerChannelViews.resize(getMixer()->numChannels());
