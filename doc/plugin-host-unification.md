@@ -302,8 +302,18 @@ path.
 
 ### Stage 4 — scanner unification
 
-- Move VST2 probing and LV2 metadata behind the scanner protocol.
-- Keep the existing cache files readable during the transition.
+- [x] Define the shared `PluginScanResult` schema (format, path, class,
+      unique ID, name, vendor, version, mtime/size/hash, classes,
+      parameters, error).
+- [x] Add `PluginScanCache`: one versioned JSON file per format, atomic
+      `QSaveFile` writes, upsert/find/remove and mtime/size freshness checks.
+      `PluginScanCacheTest` covers round-trip, wrong format/version,
+      replacement and removal.
+- [ ] Move VST2, VST3 and LV2 list classes onto the shared cache. The existing
+      `vst-list.json` and `vst3-list.json` files must stay readable during
+      the migration; the plan is to import them once and rewrite the shared
+      per-format cache.
+- [ ] Move VST2 probing and LV2 metadata behind the scanner protocol.
 - Acceptance: same plugin lists, rescan behavior and startup time.
 
 ### Stage 5 — editor host unification

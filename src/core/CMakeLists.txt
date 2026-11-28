@@ -63,6 +63,8 @@ set(LMMS_SRCS
 	core/HostedInstrument.cpp
 	core/HostedPluginModels.cpp
 	core/PluginProcessSupervisor.cpp
+	core/PluginScanCache.cpp
+	core/PluginScanResult.cpp
 	core/PluginFactory.cpp
 	core/PresetPreviewPlayHandle.cpp
 	core/ProjectJournal.cpp
