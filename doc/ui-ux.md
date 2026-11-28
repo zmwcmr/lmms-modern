@@ -297,7 +297,8 @@
 - 已完成第六批：`Lb302` 的 VCF/Slide/Filter 标签与提示改为 sentence case；`Monstro` 修正 Osc 3 Stereo/Sync 两处大小写。
 - 已完成第七批：`LadspaBrowser` 的 Available/Unavailable/Analysis 标签、`LadspaEffect` 的 Link Channels、`LadspaPortDialog` 的 SR Dependent 改为 sentence case。
 - 已完成第八批：`MidiImport` 的 MIDI file/time signature 文案、`Vibed` 的 Impulse Editor、`VstBase` 的 Open/Save Preset、`Sid` 的 Pulse Width 改为 sentence case。
-- 用 `lupdate-qt5` 重新生成 `data/locale/en.ts`，同步 Transifex 术语表。
+- 已完成第九批：`TempoSyncKnob` 与 `TempoSyncBarModelEditor` 的 "8th/16th/32nd Note" 改为 "note"。
+- `data/locale/en.ts` 由 Transifex 整体同步，本地不重新生成，避免一次上万行无意义 diff；新增/修改字符串随下次翻译同步进入。
 - 处理 `(s)` 复数、单位空格、组标题冒号等剩余文案问题。
 - 更新三档缩放截图和文案检查记录。
 

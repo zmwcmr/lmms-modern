@@ -251,13 +251,13 @@ void TempoSyncBarModelEditor::updateTextDescription()
 			m_tempoSyncDescription = tr("Synced to quarter note");
 			break;
 		case TempoSyncKnobModel::SyncMode::EighthNote:
-			m_tempoSyncDescription = tr("Synced to 8th Note");
+			m_tempoSyncDescription = tr("Synced to 8th note");
 			break;
 		case TempoSyncKnobModel::SyncMode::SixteenthNote:
-			m_tempoSyncDescription = tr("Synced to 16th Note");
+			m_tempoSyncDescription = tr("Synced to 16th note");
 			break;
 		case TempoSyncKnobModel::SyncMode::ThirtysecondNote:
-			m_tempoSyncDescription = tr("Synced to 32nd Note");
+			m_tempoSyncDescription = tr("Synced to 32nd note");
 			break;
 		default: ;
 	}

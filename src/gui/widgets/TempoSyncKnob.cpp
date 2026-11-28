@@ -211,15 +211,15 @@ void TempoSyncKnob::updateDescAndIcon()
 				break;
 			case TempoSyncKnobModel::SyncMode::EighthNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 8th Note" );
+							"Synced to 8th note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::SixteenthNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 16th Note" );
+							"Synced to 16th note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::ThirtysecondNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 32nd Note" );
+							"Synced to 32nd note" );
 				break;
 			default: ;
 		}
