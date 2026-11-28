@@ -27,8 +27,10 @@
 #include <QLabel>
 #include <QPainter>
 #include <QIcon>
+#include <QVBoxLayout>
 
 #include "embed.h"
+#include "FontHelper.h"
 
 #include "PeakController.h"
 
@@ -41,13 +43,16 @@ PeakControllerDialog::PeakControllerDialog( Controller * _model, QWidget * _pare
 {
 	setWindowTitle( tr( "PEAK" ) );
 	setWindowIcon( embed::getIconPixmap( "controller" ) );
-	setFixedSize( 256, 64 );
-	
-	setToolTip(tr("LFO Controller"));
+	setToolTip(tr("Peak controller"));
 
-	auto l = new QLabel(this);
-	l->setText( "Use FX's controls" );
-	l->move(10, 10);
+	auto* label = new QLabel(tr("Use FX's controls"), this);
+	label->setFont(bodyFont(label->font()));
+
+	auto* layout = new QVBoxLayout(this);
+	layout->setContentsMargins(10, 10, 10, 10);
+	layout->addWidget(label);
+	layout->addStretch();
+	resize(256, 64);
 
 	setModel( _model );
 }
