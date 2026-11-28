@@ -107,7 +107,7 @@ FreeBoyInstrument::FreeBoyInstrument( InstrumentTrack * _instrument_track ) :
 	m_ch4SweepStepLengthModel( 0.0f, 0.0f, 7.0f, 1.0f, this,
 						tr( "Length of each step in sweep" ) ),
 	m_ch4ShiftRegWidthModel( false, this,
-						tr( "Shift Register width" ) ),
+						tr( "Shift register width" ) ),
 
 	m_so1VolumeModel( 7.0f, 0.0f, 7.0f, 1.0f, this, tr( "Right output level") ),
 	m_so2VolumeModel( 7.0f, 0.0f, 7.0f, 1.0f, this, tr( "Left output level" ) ),
