@@ -230,6 +230,7 @@ void PluginBrowser::addPlugins()
 	{
 		const auto root = new QTreeWidgetItem();
 		root->setText(0, label);
+		root->setIcon(0, embed::getIconPixmap("folder"));
 		m_descTree->addTopLevelItem(root);
 		return root;
 	};

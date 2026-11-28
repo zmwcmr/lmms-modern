@@ -77,6 +77,7 @@
 #include "ThreadPool.h"
 #include "Track.h"
 #include "embed.h"
+#include "FontHelper.h"
 
 namespace lmms::gui
 {
@@ -113,6 +114,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	searchWidgetLayout->setSpacing( 0 );
 
 	m_filterEdit = new QLineEdit(searchWidget);
+	m_filterEdit->setFont(bodyFont(m_filterEdit->font()));
 	m_filterEdit->setPlaceholderText(tr("Search"));
 	m_filterEdit->setToolTip(tr("Search (%1)").arg(searchShortcut.toString(QKeySequence::NativeText)));
 	m_filterEdit->setClearButtonEnabled(true);
@@ -482,6 +484,7 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 	header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 
 	setColumnCount( 1 );
+	setFont(bodyFont(font()));
 	headerItem()->setHidden( true );
 	setSortingEnabled( false );
 
@@ -743,7 +746,7 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 
 	auto contextMenu = QMenu{this};
 
-	const auto fontMetrics = QFontMetrics{qApp->font()};
+	const auto fontMetrics = QFontMetrics{font()};
 	const auto maxHeaderWidth = 50 * fontMetrics.averageCharWidth();
 	const auto elidedPath = fontMetrics.elidedText(PathUtil::toShortestRelative(item->fullName()), Qt::TextElideMode::ElideMiddle, maxHeaderWidth);
 
