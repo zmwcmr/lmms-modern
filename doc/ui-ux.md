@@ -273,6 +273,17 @@
 
 验收：插件面板在 200% 下不重叠、不裁切；宿主仍能正常加载/保存。
 
+### UI-3b：自绘面板专用重写（待开始）
+
+以下面板不是“删掉 setFixedSize 再套布局”就能解决，必须先把自绘坐标改成相对布局：
+
+- `SlewDistortion`：曲线、输入/输出电平表、拖拽手柄都使用固定坐标。
+- `LOMM`：大量 LCD、按钮、旋钮围绕 artwork 绝对定位。
+- `SlicerT`、`AudioFileProcessor`：波形/切片自绘。
+- `Sf2Player`、`GigPlayer`、`Vestige`：固定尺寸文件/音色控件和嵌入窗口。
+
+验收：先把自绘区域拆成独立 widget 或相对坐标，再补 100%/200% 目视；不与普通布局批次混在一起。
+
 ### UI-4：排版与文案收尾（待开始）
 
 - 清理剩余固定字号和硬编码 `font-size`；确认三档标准在所有核心界面生效。
@@ -374,5 +385,6 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`FrequencyShifter` 改为四段布局，移除固定尺寸和绝对坐标。
 - 2026-11-28：`MultitapEcho` 和 `DynamicsProcessor` 改为布局驱动，移除固定尺寸。
 - 2026-11-28：`GranularPitchShifter` 改为网格布局，移除固定尺寸和绝对坐标。
+- 2026-11-28：UI-3 的普通布局面板完成；Slew/LOMM/SlicerT/AFP/Sf2/Gig/Vestige 归入 UI-3b 自绘重写。
 - 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。
