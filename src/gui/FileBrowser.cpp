@@ -1075,6 +1075,27 @@ void FileBrowserTreeWidget::mouseMoveEvent( QMouseEvent * me )
 
 
 
+void FileBrowserTreeWidget::mouseDoubleClickEvent(QMouseEvent* me)
+{
+	if (me->button() == Qt::LeftButton)
+	{
+		const QModelIndex index = indexAt(QPoint(viewport()->width() - 1, me->pos().y()));
+		if (index.isValid() && model()->hasChildren(index))
+		{
+			const QRect itemRect = visualRect(index);
+			const QPointF arrowCenter(itemRect.left() - indentation() / 2.0, itemRect.center().y());
+			if (QRectF(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0).contains(QPointF(me->pos())))
+			{
+				setExpanded(index, !isExpanded(index));
+				me->accept();
+				return;
+			}
+		}
+	}
+	QTreeWidget::mouseDoubleClickEvent(me);
+}
+
+
 void FileBrowserTreeWidget::mouseReleaseEvent(QMouseEvent * me )
 {
 	m_mousePressed = false;

@@ -149,6 +149,26 @@ protected:
 		QTreeWidget::mouseMoveEvent(event);
 	}
 
+	void mouseDoubleClickEvent(QMouseEvent* event) override
+	{
+		if (event->button() == Qt::LeftButton)
+		{
+			const QModelIndex index = indexAt(QPoint(viewport()->width() - 1, event->pos().y()));
+			if (index.isValid() && model()->hasChildren(index))
+			{
+				const QRect itemRect = visualRect(index);
+				const QPointF arrowCenter(itemRect.left() - indentation() / 2.0, itemRect.center().y());
+				if (QRectF(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0).contains(QPointF(event->pos())))
+				{
+					setExpanded(index, !isExpanded(index));
+					event->accept();
+					return;
+				}
+			}
+		}
+		QTreeWidget::mouseDoubleClickEvent(event);
+	}
+
 	void mouseReleaseEvent(QMouseEvent* event) override
 	{
 		m_pressItem = nullptr;
@@ -239,13 +259,6 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 			});
 		}
 		menu.exec(m_descTree->viewport()->mapToGlobal(pos));
-	});
-
-	connect( m_descTree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item, int) {
-		if (auto* pluginItem = dynamic_cast<PluginItem*>(item))
-		{
-			openInNewInstrumentTrack(pluginItem->pluginKey());
-		}
 	});
 
 	view_layout->addWidget( hint );
