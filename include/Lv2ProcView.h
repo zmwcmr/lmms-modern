@@ -53,6 +53,7 @@ namespace lmms
 {
 
 class Lv2Proc;
+class X11EditorWindow;
 
 namespace gui
 {
@@ -113,7 +114,7 @@ private:
 	void applyUiResize(int width, int height);
 	void updateToggleButton();
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
-	void processX11Events();
+	void onWindowResized(int width, int height);
 	void resizePluginChild(int width, int height);
 #endif
 	void touchPort(uint32_t portIndex, bool grabbed);
@@ -157,10 +158,8 @@ private:
 #endif
 
 #if defined(LMMS_BUILD_LINUX)
-	//! Standalone X11 window used when Qt runs on Wayland
-	void* m_x11Display = nullptr;
-	unsigned long m_x11Window = 0;
-	unsigned long m_x11WmDelete = 0;
+	//! Floating X11 window used when Qt runs on Wayland
+	X11EditorWindow* m_x11Window = nullptr;
 #endif
 
 	QMdiSubWindow* m_helpWindow = nullptr;
