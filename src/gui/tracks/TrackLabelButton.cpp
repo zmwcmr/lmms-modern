@@ -49,6 +49,7 @@ TrackLabelButton::TrackLabelButton( TrackView * _tv, QWidget * _parent ) :
 	m_iconName()
 {
 	setAcceptDrops( true );
+	setFont(bodyFont(font()));
 	setFocusPolicy(Qt::NoFocus);
 	setCursor(Qt::PointingHandCursor);
 	setToolButtonStyle( Qt::ToolButtonTextBesideIcon );

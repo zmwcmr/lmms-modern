@@ -671,7 +671,6 @@ QToolButton::menu-button {
 lmms--gui--TrackLabelButton {
 	background-color: #5b6571;
 	color: #c9c9c9;
-	font-size: 12px;
 	font-weight: normal;
 	border-radius: 1px;
 	border: none;
