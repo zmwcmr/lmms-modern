@@ -25,6 +25,7 @@
 #include "ModelGroupView.h"
 
 #include <QPushButton>
+#include <QVariant>
 
 #include "ControlLayout.h"
 #include "Controls.h"
@@ -105,6 +106,24 @@ void ModelGroupView::removeControl(const QString& key)
 void ModelGroupView::removeFocusFromSearchBar()
 {
 	m_layout->removeFocusFromSearchBar();
+}
+
+
+
+
+void ModelGroupView::addFullWidthWidget(QWidget* widget)
+{
+	if (widget == nullptr) { return; }
+	widget->setProperty("lmmsControlLayoutFullWidth", QVariant(true));
+	m_layout->addWidget(widget);
+}
+
+
+
+
+void ModelGroupView::setControlsVisible(bool visible)
+{
+	m_layout->setControlsVisible(visible);
 }
 
 } // namespace lmms::gui

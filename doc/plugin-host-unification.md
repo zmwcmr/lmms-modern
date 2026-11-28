@@ -370,13 +370,39 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       and LV2 editors (size, fractional scale, focus, close/reopen, editor
       crash isolation). The shared window behavior itself is covered by
       `X11EditorWindowTest`.
+- [x] Shared instrument page: `HostedPluginPanel` provides the same plugin
+      name/vendor line, toolbar (Plugin GUI checkbox, Parameters, Reload,
+      Preset, Open plugin, Help) and searchable parameter drawer for VST2,
+      VST3 and LV2. The green Plugin GUI checkbox reflects whether the editor
+      is open and opens/closes it on toggle.
+      The parameter drawer is collapsed by default; the plugin's own GUI is
+      the primary editor. The old giant knob grids are no longer the default.
+- [x] All hosted instrument views are resizable: VST3 no longer forces
+      `QLayout::SetFixedSize`, LV2 returns `isResizable() == true`, and the
+      common panel has a usable minimum width.
+- [x] A user-created/imported instrument opens both its LMMS instrument page
+      and its native editor once. The page request is a queued
+      `InstrumentTrack` signal handled by `InstrumentTrackView`; the editor is
+      requested from the GUI thread. Project loading instantiates instruments
+      directly and never auto-opens. VST2 creates its editor hidden and maps it
+      on the first Show request, so import no longer flashes and closes the
+      window.
+- [x] LV2 host threading: `lmms-lv2-host` runs DSP on a dedicated audio
+      thread, the suil UI and X11 event loop on a separate UI thread, and the
+      main thread only pumps the host socket. A slow editor such as Pianoteq
+      can no longer delay `lilv_instance_run()` or the next block. Control
+      values and MIDI are copied at block boundaries; state save/restore is
+      serialised against the audio thread.
+      Measured with the ZynAddSubFX and Pianoteq LV2 UIs: block time stayed at
+      about 1.0–1.2 ms with the editor open.
 
 ### Stage 6 — Vestige compatibility
 
 - Decision: do not delete VeSTige. It is a compatibility implementation for
   old `<vestige>` / `<vstplugin>` projects and for the 32-bit/Wine paths.
-- New projects use `<vst2instrument>`; VeSTige's browser entry is labelled
-  legacy and is not the default VST2 path.
+- New projects use `<vst2instrument>`; VeSTige is hidden from the plugin
+  browser and is not the default VST2 path. It remains loadable by name for
+  old `<vestige>` projects.
 - Keep the project loader accepting old nodes unchanged.
 - Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged,
   and a new VST2 instrument round-trips without touching Vestige code.

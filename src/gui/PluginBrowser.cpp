@@ -91,6 +91,10 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	bool canRescan = false;
 	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Instrument))
 	{
+		if (desc->hidden)
+		{
+			continue;
+		}
 		if (desc->subPluginFeatures && desc->subPluginFeatures->canRescan())
 		{
 			canRescan = true;
@@ -141,6 +145,10 @@ void PluginBrowser::rescanPlugins()
 	QApplication::setOverrideCursor(Qt::WaitCursor);
 	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Instrument))
 	{
+		if (desc->hidden)
+		{
+			continue;
+		}
 		if (auto* features = desc->subPluginFeatures;
 			features && features->canRescan())
 		{
@@ -227,6 +235,10 @@ void PluginBrowser::addPlugins()
 	// Add all of the descriptors to the tree
 	for (const auto desc : descs)
 	{
+		if (desc->hidden)
+		{
+			continue;
+		}
 		if (desc->subPluginFeatures)
 		{
 			// Fetch and sort all subplugins for this plugin descriptor

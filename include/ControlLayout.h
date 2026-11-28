@@ -119,6 +119,9 @@ public:
 	//! remove focus from QLineEdit search bar
 	//! this may be useful if the mouse is outside the layout
 	void removeFocusFromSearchBar();
+	//! Hide/show all regular controls (full-width widgets such as the hosted
+	//! plugin toolbar stay visible).
+	void setControlsVisible(bool visible);
 
 private slots:
 	void onTextChanged(const QString&);
@@ -135,6 +138,7 @@ private:
 	// 400 looks good and is ~4 knobs in a row
 	constexpr const static int m_minWidth = 400;
 	QLineEdit* m_searchBar;
+	bool m_controlsVisible = true;
 	//! name of search bar, must be ASCII sorted before any alpha numerics
 	static constexpr const char* s_searchBarName = "!!searchBar!!";
 };

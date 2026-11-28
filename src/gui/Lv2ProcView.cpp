@@ -62,6 +62,7 @@
 #endif
 
 #include "AudioEngine.h"
+#include "AutomatableModel.h"
 #include "ControlLayout.h"
 #include "ConfigManager.h"
 #include "Controls.h"
@@ -69,6 +70,7 @@
 #include "EditorPlatform.h"
 #include "Engine.h"
 #include "GuiApplication.h"
+#include "HostedPluginPanel.h"
 #include "lmms_math.h"
 #include "Lv2Manager.h"
 #include "Lv2Ports.h"
@@ -277,6 +279,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		buttonBar->setObjectName("!lv2ButtonBar");
 		buttonBar->setProperty("lmmsControlLayoutFullWidth", true);
 		buttonBar->setLayout(btnBox);
+		buttonBar->hide();
 		if (auto* layout = meAsWidget->layout())
 		{
 			layout->addWidget(buttonBar);
@@ -358,6 +361,99 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 				}
 			}
 		});
+
+	HostedPluginActions actions;
+	actions.name = [this] {
+		if (m_proc == nullptr || m_proc->getPlugin() == nullptr)
+		{
+			return QString();
+		}
+		return qStringFromPluginNode(m_proc->getPlugin(),
+			lilv_plugin_get_name);
+	};
+	actions.vendor = [this] {
+		if (m_proc == nullptr || m_proc->getPlugin() == nullptr)
+		{
+			return QString();
+		}
+		return qStringFromPluginNode(m_proc->getPlugin(),
+			lilv_plugin_get_author_name);
+	};
+	actions.location = [this] {
+		return m_proc != nullptr ? m_proc->pluginUri() : QString();
+	};
+	actions.hasEditor = [this] { return hasPluginUi(); };
+	actions.showEditor = [this] { setUiVisible(true); };
+	actions.hideEditor = [this] { setUiVisible(false); };
+	actions.isEditorVisible = [this] { return m_uiVisible; };
+	actions.canReload = [] { return true; };
+	actions.reload = [this] {
+		if (m_panel != nullptr) { m_panel->clearParameters(); }
+		reloadPlugin();
+	};
+	actions.presetCount = [this] {
+		return m_proc != nullptr
+			? static_cast<int>(m_proc->presets().size()) : 0;
+	};
+	actions.presetName = [this](int index) {
+		if (m_proc == nullptr || index < 0
+			|| static_cast<std::size_t>(index) >= m_proc->presets().size())
+		{
+			return QString();
+		}
+		return m_proc->presets()[static_cast<std::size_t>(index)].label;
+	};
+	actions.currentPreset = [this] { return m_presetIndex; };
+	actions.selectPreset = [this](int index) {
+		if (m_proc == nullptr || index < 0)
+		{
+			return;
+		}
+		if (m_proc->loadPreset(static_cast<std::size_t>(index)))
+		{
+			m_presetIndex = index;
+		}
+		if (m_panel != nullptr) { m_panel->refresh(); }
+	};
+	actions.canOpenPlugin = [] { return false; };
+	actions.hasHelp = [this] { return m_helpWindow != nullptr; };
+	actions.showHelp = [this](bool show) { toggleHelp(show); };
+
+	m_panel = new HostedPluginPanel(actions, [this] {
+		std::vector<HostedParameterEntry> entries;
+		if (m_proc == nullptr)
+		{
+			return entries;
+		}
+		m_proc->foreach_port([&entries](const Lv2Ports::PortBase* port) {
+			if (port->m_flow != Lv2Ports::Flow::Input)
+			{
+				return;
+			}
+			const auto* control = Lv2Ports::dcast<Lv2Ports::Control>(port);
+			if (control == nullptr || !control->m_connectedModel)
+			{
+				return;
+			}
+			QString name = port->name();
+			if (name.isEmpty() && port->m_port != nullptr)
+			{
+				const LilvNode* symbol =
+					lilv_port_get_symbol(port->m_plugin, port->m_port);
+				if (symbol != nullptr)
+				{
+					name = QString::fromUtf8(lilv_node_as_string(symbol));
+				}
+			}
+			entries.push_back({name, QString(),
+				control->m_connectedModel.get(),
+				control->m_connectedModel->isAutomatedOrControlled()});
+		});
+		return entries;
+	}, meAsWidget);
+	addFullWidthWidget(m_panel);
+	setControlsVisible(false);
+	m_panel->refresh();
 }
 
 
@@ -762,6 +858,7 @@ void Lv2ProcView::reloadPlugin()
 		createUi();
 	}
 	updateToggleButton();
+	if (m_panel != nullptr) { m_panel->refresh(); }
 }
 
 

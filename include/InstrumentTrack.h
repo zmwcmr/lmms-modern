@@ -266,6 +266,8 @@ signals:
 	//! Emitted before the current instrument is deleted, so views can detach
 	void instrumentAboutToBeReplaced();
 	void instrumentChanged();
+	//! A user-created/imported instrument wants its track page opened.
+	void requestInstrumentWindow();
 	void midiNoteOn( const lmms::Note& );
 	void midiNoteOff( const lmms::Note& );
 	void newNote();

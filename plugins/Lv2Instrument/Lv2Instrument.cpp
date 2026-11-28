@@ -24,6 +24,7 @@
 
 #include "Lv2Instrument.h"
 
+#include "Lv2HostClient.h"
 #include "Lv2PluginHost.h"
 
 #include <QDebug>
@@ -216,6 +217,17 @@ void Lv2Instrument::play(SampleFrame* buf)
 		}
 	}
 	clearMidiOutEvents();
+}
+
+
+
+
+void Lv2Instrument::requestShowEditor()
+{
+	if (auto* client = remoteClient())
+	{
+		client->showUi(1.0f);
+	}
 }
 
 

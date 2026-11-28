@@ -156,6 +156,10 @@ bool Vst2HostedInstrument::openPlugin(const QString& file)
 			? QFileInfo(file).completeBaseName() : plugin->name();
 		if (!name.isEmpty()) { setDisplayName(name); }
 		connectPluginSignals(plugin);
+		// The remote host maps the editor while initialising. Start hidden so
+		// the view's GUI toggle and the actual window state agree.
+		plugin->hideUI();
+		m_editorVisible = false;
 	}
 	m_file = file;
 	setKeyAttribute(QStringLiteral("file"), file);
@@ -207,6 +211,7 @@ void Vst2HostedInstrument::connectPluginSignals(VstPlugin* plugin)
 
 void Vst2HostedInstrument::closePlugin()
 {
+	m_editorVisible = false;
 	parameterModels().clear();
 	if (auto* host = vst2Host())
 	{
@@ -227,6 +232,64 @@ bool Vst2HostedInstrument::openFile(const QString& file)
 	QMutexLocker locker(&m_mutex);
 	closePlugin();
 	return openPlugin(file);
+}
+
+
+
+
+bool Vst2HostedInstrument::reloadPlugin()
+{
+	QMutexLocker locker(&m_mutex);
+	auto* host = vst2Host();
+	if (host == nullptr || !host->isLoaded() || m_file.isEmpty())
+	{
+		return false;
+	}
+
+	const bool wasVisible = m_editorVisible;
+	const auto state = host->saveState();
+	const QString file = m_file;
+	closePlugin();
+	if (!openPlugin(file))
+	{
+		return false;
+	}
+	if (!state.primary.isEmpty())
+	{
+		host->loadState(state);
+	}
+	parameterModels().refreshFromHost();
+	if (wasVisible)
+	{
+		showEditor();
+	}
+	return true;
+}
+
+
+
+
+void Vst2HostedInstrument::requestShowEditor()
+{
+	showEditor();
+}
+
+
+
+
+void Vst2HostedInstrument::showEditor()
+{
+	m_editorVisible = true;
+	if (auto* plugin = nativePlugin()) { plugin->showUI(); }
+}
+
+
+
+
+void Vst2HostedInstrument::hideEditor()
+{
+	m_editorVisible = false;
+	if (auto* plugin = nativePlugin()) { plugin->hideUI(); }
 }
 
 
