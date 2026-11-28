@@ -47,6 +47,8 @@ struct PluginScanClass
 	QString id;
 	QString name;
 	bool isInstrument = false;
+	//! Format-specific fields that do not fit the common schema.
+	QJsonObject extra;
 };
 
 /*! Parameter metadata discovered while scanning, when the format exposes it. */
@@ -74,15 +76,19 @@ struct PluginScanEntry
 	QString uniqueId;
 	QString name;
 	QString vendor;
+	QString product;
 	QString version;
 	qint64 mtimeMs = 0;
 	qint64 size = 0;
 	QString hash;
 	bool isInstrument = false;
+	bool isEffect = false;
 	std::vector<PluginScanClass> classes;
 	std::vector<PluginScanParameter> parameters;
 	//! Empty on success; otherwise the scan/load failure reason.
 	QString error;
+	//! Format-specific fields that do not fit the common schema.
+	QJsonObject extra;
 
 	QJsonObject toJson() const;
 	static PluginScanEntry fromJson(const QJsonObject& object);

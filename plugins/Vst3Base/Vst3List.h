@@ -35,6 +35,7 @@
 #include <QString>
 #include <QtGlobal>
 
+#include "PluginScanCache.h"
 #include "Vst3Scanner.h"
 #include "vst3base_export.h"
 
@@ -111,6 +112,7 @@ private:
 	std::map<std::string, Vst3BundleInfo> m_cache;
 	//! Bundle stamp belonging to each cache entry.
 	std::map<std::string, BundleStamp> m_cacheStamps;
+	PluginScanCache m_scanCache{PluginScanFormat::Vst3};
 	//! Visible classes, keyed by canonical bundle path + class ID.
 	std::map<std::string, Metadata> m_plugins;
 	//! Bundle hash -> canonical path, used for deduplication.
