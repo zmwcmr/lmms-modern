@@ -66,6 +66,7 @@
 #include "ConfigManager.h"
 #include "Controls.h"
 #include "embed.h"
+#include "EditorPlatform.h"
 #include "Engine.h"
 #include "GuiApplication.h"
 #include "lmms_math.h"
@@ -389,14 +390,8 @@ bool Lv2ProcView::hasPluginUi() const
 		return false;
 	}
 
-	const QString platform = QGuiApplication::platformName();
-	if (platform != "xcb" && platform != "wayland")
+	if (EditorPlatform::preferredPresentation() != EditorPresentation::X11Window)
 	{
-		return false;
-	}
-	if (platform == "wayland" && !qEnvironmentVariableIsSet("DISPLAY"))
-	{
-		// Wayland without XWayland cannot host X11 plugin UIs.
 		return false;
 	}
 

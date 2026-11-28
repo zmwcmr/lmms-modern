@@ -334,9 +334,25 @@ path.
 
 ### Stage 5 — editor host unification
 
-- One editor backend with the three modes above.
-- Migrate Vestige's MDI subwindow, LV2's floating window and VST3's editor host.
-- Acceptance: the UI audit matrix (sizes, crash isolation, Wayland fallback).
+Wayland policy: a host cannot reparent another client's Wayland surface, and
+`xdg-foreign` support is not available from the plugin toolkits used here.
+Every external plugin UI therefore opens as a floating X11/XWayland window on
+Wayland; only a genuine in-process Qt widget may be embedded.
+
+- [x] Add `EditorPlatform` with `isWayland()`, `hasXWayland()`,
+      `preferredPresentation()` and `scaleFactor()`. Wayland without
+      `DISPLAY` returns `Unavailable` with an explicit reason.
+- [x] VST2: force `embedMethod=none` on Wayland even if the saved config asks
+      for `qt`/`xembed`; the editor is a floating X11 window.
+- [x] LV2: use the same platform policy instead of its own platform-name
+      checks.
+- [ ] Extract the shared X11 editor window controller and migrate the VST3
+      editor host and LV2 suil window onto it.
+- [ ] VST2/Vestige: replace the MDI subwindow path with the common X11/floating
+      backend.
+- Acceptance: LV2/VST2/VST3 editors open as floating XWayland windows on
+      Wayland, keep correct sizes/scale/focus/close/reopen, and X11 behavior
+      is unchanged. Native Wayland embedding is explicitly out of scope.
 
 ### Stage 6 — remove Vestige code
 
