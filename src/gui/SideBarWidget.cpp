@@ -38,7 +38,7 @@ namespace
 {
 int titleBarHeight(const QFont& font)
 {
-	return qMax(27, QFontMetrics(groupTitleFont(font)).height() + 6);
+	return qMax(27, QFontMetrics(titleFont(font)).height() + 6);
 }
 }
 
@@ -69,18 +69,19 @@ SideBarWidget::SideBarWidget( const QString & _title, const QPixmap & _icon,
 void SideBarWidget::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
-	const auto titleFont = groupTitleFont(font());
-	const QFontMetrics metrics(titleFont);
+	const auto barFont = titleFont(font());
+	const QFontMetrics metrics(barFont);
 	const int barHeight = titleBarHeight(font());
 	p.fillRect( 0, 0, width(), barHeight, palette().highlight().color() );
 
-	p.setFont(titleFont);
+	p.setFont(barFont);
 	p.setPen( palette().highlightedText().color() );
 
 	const auto iconSize = embed::logicalSize(m_icon);
 	const int tx = iconSize.width() + 8;
 	const int ty = (barHeight - metrics.height()) / 2 + metrics.ascent();
-	p.drawText( tx, ty, m_title );
+	const int titleWidth = qMax(0, width() - tx - m_buttonSize.width() - 12);
+	p.drawText( tx, ty, metrics.elidedText(m_title, Qt::ElideRight, titleWidth) );
 
 	const int iconTop = (barHeight - iconSize.height()) / 2;
 	p.drawPixmap( 2, iconTop, m_icon.transformed( QTransform().rotate( -90 ) ) );
