@@ -49,13 +49,21 @@ public:
 		return QSize(base.width(), qMax(20, QFontMetrics(option.font).height() + 4));
 	}
 
-	void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+	struct Layout
+	{
+		QRect pillRect;
+		QRect iconRect;
+		QRect textRect;
+		QString text;
+	};
+
+	//! Computes the pill, icon and text rectangles. Exposed so the layout
+	//! regression tests can verify that the last glyph still fits.
+	Layout layoutFor(const QStyleOptionViewItem& option, const QModelIndex& index) const
 	{
 		QStyleOptionViewItem opt = option;
 		initStyleOption(&opt, index);
 
-		const bool selected = opt.state & QStyle::State_Selected;
-		const bool hovered = opt.state & QStyle::State_MouseOver;
 		const auto metrics = QFontMetrics(opt.font);
 		const int iconSize = opt.decorationSize.isValid() ? opt.decorationSize.width() : 16;
 		const int margin = 4;
@@ -75,35 +83,52 @@ public:
 		const int pillWidth = qMin(maxPillWidth, iconWidth + textWidth + 2 * margin + 2);
 		const QRect pillRect(opt.rect.left() + 2, opt.rect.top() + 1, pillWidth, opt.rect.height() - 2);
 
+		QRect iconRect;
+		int textLeft = pillRect.left() + margin;
+		if (!opt.icon.isNull())
+		{
+			iconRect = QRect(textLeft, opt.rect.center().y() - iconSize / 2, iconSize, iconSize);
+			textLeft = iconRect.right() + gap;
+		}
+
+		const QRect textRect(textLeft, opt.rect.top(),
+			qMax(0, pillWidth - 2 * margin - iconWidth), opt.rect.height());
+		return {pillRect, iconRect, textRect, text};
+	}
+
+	void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
+	{
+		QStyleOptionViewItem opt = option;
+		initStyleOption(&opt, index);
+		const auto layout = layoutFor(option, index);
+
+		const bool selected = opt.state & QStyle::State_Selected;
+		const bool hovered = opt.state & QStyle::State_MouseOver;
+
 		painter->save();
 		painter->setRenderHint(QPainter::Antialiasing);
 		if (selected || hovered)
 		{
 			painter->setPen(Qt::NoPen);
 			painter->setBrush(selected ? QColor(15, 92, 44) : QColor(60, 68, 78));
-			painter->drawRoundedRect(pillRect, 3, 3);
+			painter->drawRoundedRect(layout.pillRect, 3, 3);
 		}
 		if (selected && opt.widget && opt.widget->hasFocus())
 		{
 			painter->setBrush(Qt::NoBrush);
 			painter->setPen(QPen(QColor(11, 213, 86), 1));
-			painter->drawRoundedRect(pillRect.adjusted(0, 0, -1, -1), 3, 3);
+			painter->drawRoundedRect(layout.pillRect.adjusted(0, 0, -1, -1), 3, 3);
 		}
 
-		int textLeft = pillRect.left() + margin;
 		if (!opt.icon.isNull())
 		{
-			const QRect iconRect(textLeft, opt.rect.center().y() - iconSize / 2, iconSize, iconSize);
-			opt.icon.paint(painter, iconRect, Qt::AlignCenter,
+			opt.icon.paint(painter, layout.iconRect, Qt::AlignCenter,
 				selected ? QIcon::Selected : QIcon::Normal);
-			textLeft = iconRect.right() + gap;
 		}
 
-		const QRect textRect(textLeft, opt.rect.top(),
-			qMax(0, pillWidth - 2 * margin - iconWidth), opt.rect.height());
 		painter->setFont(opt.font);
 		painter->setPen(opt.palette.color(selected ? QPalette::HighlightedText : QPalette::Text));
-		painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, text);
+		painter->drawText(layout.textRect, Qt::AlignVCenter | Qt::AlignLeft, layout.text);
 		painter->restore();
 	}
 };

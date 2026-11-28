@@ -160,6 +160,36 @@ private slots:
 		QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("new.wav"));
 	}
 
+	void arrowDoubleClickToggles()
+	{
+		QWidget host;
+		lmms::gui::FileBrowserTreeWidget tree(&host);
+		tree.resize(300, 200);
+		tree.show();
+		QCoreApplication::processEvents();
+
+		auto* root = new QTreeWidgetItem(&tree);
+		root->setText(0, QStringLiteral("folder"));
+		root->setChildIndicatorPolicy(QTreeWidgetItem::ShowIndicator);
+		new QTreeWidgetItem(root);
+		tree.expandItem(root);
+		QCoreApplication::processEvents();
+
+		const QModelIndex index = tree.model()->index(tree.indexOfTopLevelItem(root), 0);
+		QVERIFY(index.isValid());
+		const QRect itemRect = tree.visualRect(index);
+		QVERIFY(itemRect.isValid());
+		const QPoint arrow(itemRect.left() - tree.indentation() / 2, itemRect.center().y());
+
+		QTest::mouseClick(tree.viewport(), Qt::LeftButton, Qt::NoModifier, arrow);
+		QVERIFY(!tree.isExpanded(index));
+
+		QMouseEvent doubleClick(QEvent::MouseButtonDblClick, arrow,
+			Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+		QApplication::sendEvent(tree.viewport(), &doubleClick);
+		QVERIFY(tree.isExpanded(index));
+	}
+
 	void animatesExpansion()
 	{
 		QWidget host;

@@ -23,7 +23,7 @@
 
 | 编号 | 目标 | 状态 | 风险 |
 | --- | --- | --- | --- |
-| `UI-1` | 侧栏与列表收尾 | 进行中 | 低 |
+| `UI-1` | 侧栏与列表收尾 | 完成 | 低 |
 | `UI-2` | 核心固定尺寸对话框 | 待开始 | 中 |
 | `UI-3` | 插件固定尺寸对话框 | 待开始 | 中至高，多 PR |
 | `UI-4` | 排版与文案收尾 | 待开始 | 低至中 |
@@ -216,14 +216,15 @@
 
 ## 6. UI 路线图
 
-### UI-1：侧栏与列表收尾（进行中）
+### UI-1：侧栏与列表收尾（完成）
 
 目标：把最近的列表统一工作收尾，避免回归。
 
 - 确认 My projects / My samples / My presets 等 `FileBrowser` 页面都使用 `CompactItemDelegate` 和统一的箭头行为。
 - 补搜索无结果状态；确认长名称、长翻译、窄侧栏下省略和 tooltip 正常。
-- 增加/补充 QtTest：内容胶囊宽度、最后一个字符不裁切、快速双击箭头连续切换。
-- 重新生成 100%/150%/200% 截图，更新本文件引用的截图。
+- 已增加 `CompactItemDelegateTest`：内容胶囊宽度、最后一个字符不裁切。
+- 已增加 `FileBrowserTest::arrowDoubleClickToggles`：快速双击箭头连续切换。
+- 截图沿用现有版本，最终统一重做放在 UI-4。
 - 运行 `FileBrowserTest`、`SideBarWorkspaceTest`、`FontScaleTest`、`InstrumentTrackTest`。
 
 验收：默认/经典主题，100%/125%/150%/200%，en/zh_CN/de_DE，窄侧栏；无整行色块、无文字裁切、无箭头误触发。
@@ -290,6 +291,7 @@ QT_QPA_PLATFORM=offscreen ./CaptionWidgetsTest
 QT_QPA_PLATFORM=offscreen ./SubWindowTest
 QT_QPA_PLATFORM=offscreen ./SideBarWorkspaceTest
 QT_QPA_PLATFORM=offscreen ./FileBrowserTest
+QT_QPA_PLATFORM=offscreen ./CompactItemDelegateTest
 QT_QPA_PLATFORM=offscreen ./InstrumentTrackTest
 ```
 
@@ -343,4 +345,5 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 
 - 2026-11-28：合并旧的 UI 任务、审计、文案、手势、颜色/布局文档为本文件；删除 VST/LV2/PDC 等非 UI 设计文档（代码保留）。
 - 2026-11-28：三档字号调整为 13/10/8；侧栏列表统一为 `CompactItemDelegate`，加入内容选中胶囊、箭头 hover 和快速双击箭头切换。
+- 2026-11-28：完成 UI-1 验收，新增 `CompactItemDelegateTest` 和箭头双击回归测试。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。
