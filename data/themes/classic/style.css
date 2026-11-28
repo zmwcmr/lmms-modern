@@ -102,6 +102,21 @@ lmms--gui--ProjectNotes QTextEdit {
 	background-color: #404040;
 }
 
+/* Keyboard focus indication. Draw only an outline so focus never changes
+   layout, and match the classic theme's green accent. */
+QToolButton:focus,
+QPushButton:focus {
+	outline: 1px solid #4afd85;
+	outline-offset: -2px;
+}
+
+QTreeView:focus,
+QListView:focus,
+QTableView:focus {
+	outline: 1px solid #4afd85;
+	outline-offset: -1px;
+}
+
 QToolTip {
 	border-radius: 4px;
 	background: qlineargradient(spread:reflect, x1:0.5, y1:0.5, x2:0.5, y2:0,

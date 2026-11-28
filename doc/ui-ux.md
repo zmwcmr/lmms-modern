@@ -207,6 +207,7 @@
 - 按真实背景检查链接/正文/禁用/选中对比度，尤其是 About、Project Notes、侧栏。
 - 补测 165 Hz/Wayland 下侧栏滑动和按钮反馈动画。
 - 检查键盘焦点、Tab 顺序、可访问名称；列表行的 tooltip 和省略文本要能访问完整内容。
+- 经典主题补齐按钮、树/列表/表格视图的键盘焦点轮廓（`#4afd85`，仅 outline，不改变布局）；默认主题已有对应规则。
 - 已完成键盘焦点第一批：`EffectSelectDialog` 的 Tab 顺序改为搜索框 → 插件列表 → 分类按钮 → Rescan → OK/Cancel；列表和分类按钮恢复键盘焦点，列表补可访问名称/描述，Enter 直接确认；新增 `EffectSelectDialogTest` 覆盖 Tab/Shift+Tab 与可访问名称。
 
 验收：`default` 主题 100%–200%；40 个基础图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
