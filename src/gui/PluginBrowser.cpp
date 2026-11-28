@@ -117,7 +117,7 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	m_descTree->setColumnCount( 1 );
 	m_descTree->header()->setVisible( false );
 	m_descTree->setIndentation(20);
-	m_descTree->setSelectionMode( QAbstractItemView::NoSelection );
+	m_descTree->setSelectionMode( QAbstractItemView::SingleSelection );
 
 	connect( m_searchBar, SIGNAL( textEdited( const QString& ) ),
 			this, SLOT( onFilterChanged( const QString& ) ) );

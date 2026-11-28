@@ -45,7 +45,8 @@ QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 	image: none;
 }
 
-lmms--gui--FileBrowserTreeWidget {
+lmms--gui--FileBrowserTreeWidget,
+QTreeWidget#pluginBrowserTree {
 	show-decoration-selected: 1;
 }
 
