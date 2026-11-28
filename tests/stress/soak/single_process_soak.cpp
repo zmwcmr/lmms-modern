@@ -91,7 +91,7 @@ int main(int argc, char** argv)
 	}
 
 	Engine::init(true);
-	Engine::audioEngine()->stopProcessing();
+	Engine::audioEngine()->audioDev()->stopProcessing();
 	auto* song = Engine::getSong();
 
 	unsigned long long iterations = 0;

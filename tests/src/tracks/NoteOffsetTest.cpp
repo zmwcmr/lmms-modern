@@ -47,7 +47,7 @@ private slots:
 		Engine::init(true);
 		// The dummy device otherwise processes notes concurrently with the
 		// assertions below.
-		Engine::audioEngine()->stopProcessing();
+		Engine::audioEngine()->audioDev()->stopProcessing();
 		NotePlayHandleManager::init();
 		m_track = new InstrumentTrack(Engine::getSong());
 	}
