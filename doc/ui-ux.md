@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | `UI-1` | 侧栏与列表收尾 | 完成 | 低 |
 | `UI-2` | 核心固定尺寸对话框 | 完成（视觉抽查） | 中 |
-| `UI-3` | 插件固定尺寸对话框 | 完成（布局子集，UI-3b 不重写） | 中至高，多 PR |
+| `UI-3` | 插件固定尺寸对话框 | 完成（布局子集，18pt 抽查） | 中至高，多 PR |
 | `UI-4` | 排版与文案收尾 | 完成（截图随 UI-5） | 低至中 |
 | `UI-5` | 主题、动画与无障碍 | 进行中 | 低 |
 
@@ -134,7 +134,7 @@
 
 验收：100%–200% 无文字裁切/重叠；对话框可调整大小；不改变工程行为和快捷键绑定。
 
-### UI-3：插件固定尺寸对话框（布局子集完成，多 PR）
+### UI-3：插件固定尺寸对话框（布局子集完成，18pt 抽查通过）
 
 目标：处理约 50 处固定尺寸插件面板。
 
@@ -296,7 +296,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 主窗口从 1600×1000 缩小到 1000×700、再放大到 1500×950：工具栏、MDI 区和混音器没有出现控件重叠；窗口变窄时右侧 MDI 子窗口会被主窗口裁剪，这是 Qt MDI 自身的布局行为。
 - Song Editor 子窗口移动后，轨道头、时间线和工具栏仍保持对齐；子窗口不会随主窗口自动缩放。
 - LFO 控制器在 100% 和 200% 字体下已打开检查，布局无裁切。
-- 其余已改为布局驱动的插件面板目前只有构建验证，尚未逐个拖动缩放并做 100%/200% 目视。
+- 已改为布局驱动的插件面板已完成 18pt 抽查；Delay 的 18pt 检查发现并修复了插件无法加载的问题。
 
 #### 逐插件代码审计
 
@@ -307,7 +307,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 | PeakControllerDialog | 无 | 无 | 布局 + 拉伸 |
 | LfoControllerDialog | 无 | 无 | 100%/200% 已目视 |
 | LadspaBrowser | 无 | 无 | 标签栏 72px 图标列固定 |
-| StereoMatrix | 无 | 无 | 4 旋钮布局；待目视 |
+| StereoMatrix | 无 | 无 | 4 旋钮布局；已抽查 |
 | Bitcrush | 无 | 无 | IN/中心/OUT 三段 |
 | CrossoverEQ | 无 | 无 | 旋钮/推子布局 |
 | Delay | 无 | 无 | 左旋钮 / 中 XyPad / 右推子 |
@@ -325,7 +325,16 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - `Bitcrush`：9pt 初始 200×128，18pt 212×148，标签和旋钮没有重叠。
 - `CrossoverEQ`：9pt 167×225，18pt 167×236，标签仍能放下。
 
-其余布局驱动面板的逐项 18pt 截图因临时 offscreen harness 在 Delay 处挂起，未完成；当前只覆盖代码审计和上述抽查。
+其余布局驱动面板的 18pt 抽查（默认窗口 + 放大窗口）：
+
+- `Delay`：9pt/18pt 均为 300×208；标签随字体放大且可读，拉伸到 480×268 后布局跟随。18pt 下 "RATE" 标签会压住背景 artwork 的 "LFO" 字样，9pt 也有同样遮挡，属于固定背景遗留，不影响操作。
+- `DualFilter`：18pt 标签完整；下拉框会自动缩小字号适配高度，无裁切。
+- `FrequencyShifter`：面板文字全部在 artwork 中，9pt/18pt 截图一致；没有新增裁切，但 artwork 文字不随字体放大。
+- `GranularPitchShifter`：同上，4×4 网格和 artwork 标签不随字体缩放，无裁切。
+- `DynamicsProcessor`：18pt 的 INPUT/OUTPUT/ATTACK/RELEASE 与右侧三档按钮均完整，无重叠。
+- `MultitapEcho`：18pt 的 Length/Dry/Stages 与 Swap inputs 都在固定面板内，无重叠。
+
+Delay 回归：布局化提交只声明了 `resizeEvent()`/`updateBackground()` 却没有定义，导致 `libdelay.so` 因未解析符号无法加载；已补上实现，并通过插件加载路径确认。
 
 已知边界：
 
@@ -369,3 +378,4 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：UI-5 可访问性批次：`EffectSelectDialog` 键盘 Tab/Enter、经典主题焦点轮廓、旋钮/按钮可访问名称；新增 `EffectSelectDialogTest`。
 - 2026-11-28：UI-5 对比度批次：两主题禁用菜单文字提升到 3:1 以上并记录抽查值。
 - 2026-11-28：UI-3b 决策：自绘面板不整体重写，只对 SlicerT 底部标签、Sf2/Gig 标签做按需最小修复。
+- 2026-11-28：完成 UI-3 六个布局面板的 18pt 抽查；修复 Delay 因缺少 `resizeEvent()`/`updateBackground()` 定义而无法加载的问题。

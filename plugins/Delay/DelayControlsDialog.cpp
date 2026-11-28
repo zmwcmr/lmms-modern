@@ -95,6 +95,26 @@ DelayControlsDialog::DelayControlsDialog( DelayControls *controls ) :
 }
 
 
+void DelayControlsDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void DelayControlsDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
+}
+
+
 
 
 XyPad::XyPad(QWidget *parent, FloatModel *xModel, FloatModel *yModel) :
