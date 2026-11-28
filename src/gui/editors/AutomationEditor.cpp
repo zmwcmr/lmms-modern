@@ -345,7 +345,7 @@ bool AutomationEditor::fineTuneValue(timeMap::iterator node, bool editingOutValu
 	bool ok;
 	double value = QInputDialog::getDouble(
 		this,
-		tr("Edit Value"),
+		tr("Edit value"),
 		editingOutValue
 			? tr("New outValue")
 			: tr("New inValue"),
@@ -2095,7 +2095,6 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	zoom_x_label->setToolTip( tr( "Horizontal zooming" ) );
 
 	m_zoomingXComboBox = new ComboBox( zoomToolBar );
-	m_zoomingXComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingXComboBox->setToolTip( tr( "Horizontal zooming" ) );
 
 	for( float const & zoomLevel : m_editor->m_zoomXLevels )
@@ -2115,7 +2114,6 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	zoom_y_label->setToolTip( tr( "Vertical zooming" ) );
 
 	m_zoomingYComboBox = new ComboBox( zoomToolBar );
-	m_zoomingYComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingYComboBox->setToolTip( tr( "Vertical zooming" ) );
 
 	m_editor->m_zoomingYModel.addItem( "Auto" );
@@ -2145,7 +2143,6 @@ AutomationEditorWindow::AutomationEditorWindow() :
 	quantize_lbl->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
-	m_quantizeComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_quantizeComboBox->setToolTip( tr( "Quantization" ) );
 
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );

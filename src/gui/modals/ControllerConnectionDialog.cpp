@@ -138,7 +138,7 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 	m_midiController( nullptr )
 {
 	setWindowIcon( embed::getIconPixmap( "setup_audio" ) );
-	setWindowTitle( tr( "Connection Settings" ) );
+	setWindowTitle( tr( "Connection settings" ) );
 	setModal( true );
 
 	auto* dialogLayout = new QVBoxLayout(this);
@@ -153,7 +153,7 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 	};
 
 	// Midi stuff
-	m_midiGroupBox = addSection(tr("MIDI CONTROLLER"));
+	m_midiGroupBox = addSection(tr("MIDI controller"));
 	connect( m_midiGroupBox->model(), SIGNAL(dataChanged()),
 			this, SLOT(midiToggled()));
 	
@@ -178,12 +178,12 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 		column->addWidget(label, 0, Qt::AlignHCenter);
 		midiControls->addLayout(column);
 	};
-	addMidiField(m_midiChannelSpinBox, tr("CHANNEL"));
-	addMidiField(m_midiControllerSpinBox, tr("CONTROLLER"));
+	addMidiField(m_midiChannelSpinBox, tr("Channel"));
+	addMidiField(m_midiControllerSpinBox, tr("Controller"));
 
 	m_midiAutoDetectCheckBox =
-			new LedCheckBox( tr("Auto Detect"),
-				m_midiGroupBox, tr("Auto Detect"), LedCheckBox::LedColor::Yellow, false );
+			new LedCheckBox( tr("Auto detect"),
+				m_midiGroupBox, tr("Auto detect"), LedCheckBox::LedColor::Yellow, false );
 	m_midiAutoDetectCheckBox->setModel( &m_midiAutoDetect );
 	m_midiGroupBox->layout()->addWidget(m_midiAutoDetectCheckBox);
 	connect( &m_midiAutoDetect, SIGNAL(dataChanged()),
@@ -209,12 +209,11 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 
 
 	// User stuff
-	m_userGroupBox = addSection(tr("USER CONTROLLER"));
+	m_userGroupBox = addSection(tr("User controller"));
 	connect( m_userGroupBox->model(), SIGNAL(dataChanged()),
 			this, SLOT(userToggled()));
 
 	m_userController = new ComboBox( m_userGroupBox, "Controller" );
-	m_userController->setFixedHeight(qMax(ComboBox::DEFAULT_HEIGHT, m_userController->fontMetrics().height() + 6));
 	m_userGroupBox->layout()->addWidget(m_userController);
 	for (Controller * c : Engine::getSong()->controllers())
 	{
@@ -227,7 +226,7 @@ ControllerConnectionDialog::ControllerConnectionDialog( QWidget * _parent,
 
 
 	// Mapping functions
-	auto* mappingBox = addSection(tr("MAPPING FUNCTION"), false);
+	auto* mappingBox = addSection(tr("Mapping function"), false);
 	auto* mappingFunction = new QLineEdit(QStringLiteral("input"), mappingBox);
 	mappingFunction->setReadOnly(true);
 	mappingBox->layout()->addWidget(mappingFunction);
@@ -346,7 +345,7 @@ void ControllerConnectionDialog::selectController()
 
 		if( m_controller && m_controller->hasModel( m_targetModel ) )
 		{
-			QMessageBox::warning(this, tr("LMMS"), tr("Cycle Detected."));
+			QMessageBox::warning(this, tr("LMMS"), tr("Cycle detected."));
 			return;
 		}
 	

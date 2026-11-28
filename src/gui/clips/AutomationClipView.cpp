@@ -160,7 +160,7 @@ void AutomationClipView::flipX()
 
 void AutomationClipView::constructContextMenu( QMenu * _cm )
 {
-	auto a = new QAction(embed::getIconPixmap("automation"), tr("Open in Automation editor"), _cm);
+	auto a = new QAction(embed::getIconPixmap("automation"), tr("Open in Automation Editor"), _cm);
 	_cm->insertAction( _cm->actions()[0], a );
 	connect(a, SIGNAL(triggered()), this, SLOT(openInAutomationEditor()));
 	_cm->insertSeparator( _cm->actions()[1] );
@@ -180,10 +180,10 @@ void AutomationClipView::constructContextMenu( QMenu * _cm )
 						tr( "Set/clear record" ),
 						this, SLOT(toggleRecording()));
 	_cm->addAction( embed::getIconPixmap( "flip_y" ),
-						tr( "Flip Vertically (Visible)" ),
+						tr( "Flip vertically (visible)" ),
 						this, SLOT(flipY()));
 	_cm->addAction( embed::getIconPixmap( "flip_x" ),
-						tr( "Flip Horizontally (Visible)" ),
+						tr( "Flip horizontally (visible)" ),
 						this, SLOT(flipX()));
 	
 	if (!m_clip->m_objects.empty())

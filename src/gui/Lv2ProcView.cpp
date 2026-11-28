@@ -179,7 +179,7 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 	auto btnBox = new QHBoxLayout();
 	if (/* DISABLES CODE */ (false))
 	{
-		m_reloadPluginButton = new QPushButton(QObject::tr("Reload Plugin"),
+		m_reloadPluginButton = new QPushButton(QObject::tr("Reload plugin"),
 			meAsWidget);
 		m_reloadPluginButton->setObjectName("btn");
 		btnBox->addWidget(m_reloadPluginButton, 0);

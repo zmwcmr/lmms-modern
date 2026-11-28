@@ -196,18 +196,18 @@ void MidiClipView::constructContextMenu( QMenu * _cm )
 {
 	bool isBeat = m_clip->type() == MidiClip::Type::BeatClip;
 
-	auto a = new QAction(embed::getIconPixmap("piano"), tr("Open in piano-roll"), _cm);
+	auto a = new QAction(embed::getIconPixmap("piano"), tr("Open in Piano Roll"), _cm);
 	_cm->insertAction( _cm->actions()[0], a );
 	connect( a, SIGNAL(triggered(bool)),
 					this, SLOT(openInPianoRoll()));
 
-	auto b = new QAction(embed::getIconPixmap("ghost_note"), tr("Set as ghost in piano-roll"), _cm);
+	auto b = new QAction(embed::getIconPixmap("ghost_note"), tr("Set as ghost in Piano Roll"), _cm);
 	if( m_clip->empty() ) { b->setEnabled( false ); }
 	_cm->insertAction( _cm->actions()[1], b );
 	connect( b, SIGNAL(triggered(bool)),
 					this, SLOT(setGhostInPianoRoll()));
 
-	auto c = new QAction(embed::getIconPixmap("automation_ghost_note"), tr("Set as ghost in automation editor"), _cm);
+	auto c = new QAction(embed::getIconPixmap("automation_ghost_note"), tr("Set as ghost in Automation Editor"), _cm);
 	if (m_clip->empty()) { c->setEnabled(false); }
 	_cm->insertAction(_cm->actions()[2], c);
 	connect(c, &QAction::triggered, this, &MidiClipView::setGhostInAutomationEditor);
@@ -222,7 +222,7 @@ void MidiClipView::constructContextMenu( QMenu * _cm )
 	{
 		_cm->addAction(
 			embed::getIconPixmap("edit_merge"),
-			tr("Merge Selection"),
+			tr("Merge selection"),
 			[this]() { mergeClips(getClickedClips()); }
 		);
 	}
@@ -250,7 +250,7 @@ void MidiClipView::constructContextMenu( QMenu * _cm )
 		_cm->addAction( embed::getIconPixmap( "step_btn_remove" ),
 			tr( "Remove steps" ), m_clip, SLOT(removeSteps()));
 		_cm->addAction( embed::getIconPixmap( "step_btn_duplicate" ),
-			tr( "Clone Steps" ), m_clip, SLOT(cloneSteps()));
+			tr( "Clone steps" ), m_clip, SLOT(cloneSteps()));
 	}
 }
 

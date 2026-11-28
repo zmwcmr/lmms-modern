@@ -148,7 +148,7 @@ void SampleClipView::constructContextMenu(QMenu* cm)
 
 	cm->addAction(
 		embed::getIconPixmap("automation_ghost_note"),
-		tr("Set as ghost in automation editor"),
+		tr("Set as ghost in Automation Editor"),
 		this,
 		SLOT(setAutomationGhost())
 	);

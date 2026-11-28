@@ -47,6 +47,7 @@
 #include "FileDialog.h"
 #include "Metronome.h"
 #include "MixerView.h"
+#include "FontHelper.h"
 #include "GuiApplication.h"
 #include "ImportFilter.h"
 #include "InstrumentTrackView.h"
@@ -135,36 +136,36 @@ MainWindow::MainWindow() :
 	sideBar->appendTab( new PluginBrowser( splitter ) );
 	emit initProgress(tr("Preparing file browsers"));
 
-	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Favorites, ConfigManager::inst()->favoriteItems().join("*"), FileItem::defaultFilters(), "My Favorites",
+	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Favorites, ConfigManager::inst()->favoriteItems().join("*"), FileItem::defaultFilters(), tr("My favorites"),
 		embed::getIconPixmap("star").transformed(QTransform().rotate(90)), splitter, false, "", ""));
 
 	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Normal,
 		confMgr->userProjectsDir() + "*" + confMgr->factoryProjectsDir(), "*.mmp *.mmpz *.xml *.mid *.mpt",
-		tr("My Projects"), embed::getIconPixmap("project_file").transformed(QTransform().rotate(90)), splitter, false,
+		tr("My projects"), embed::getIconPixmap("project_file").transformed(QTransform().rotate(90)), splitter, false,
 		confMgr->userProjectsDir(), confMgr->factoryProjectsDir()));
 
 	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Normal,
-		confMgr->userSamplesDir() + "*" + confMgr->factorySamplesDir(), FileItem::defaultFilters(), tr("My Samples"),
+		confMgr->userSamplesDir() + "*" + confMgr->factorySamplesDir(), FileItem::defaultFilters(), tr("My samples"),
 		embed::getIconPixmap("sample_file").transformed(QTransform().rotate(90)), splitter, false,
 		confMgr->userSamplesDir(), confMgr->factorySamplesDir()));
 
 	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Normal,
-		confMgr->userPresetsDir() + "*" + confMgr->factoryPresetsDir(), "*.xpf *.cs.xml *.xiz *.lv2", tr("My Presets"),
+		confMgr->userPresetsDir() + "*" + confMgr->factoryPresetsDir(), "*.xpf *.cs.xml *.xiz *.lv2", tr("My presets"),
 		embed::getIconPixmap("preset_file").transformed(QTransform().rotate(90)), splitter, false,
 		confMgr->userPresetsDir(), confMgr->factoryPresetsDir()));
 
 	sideBar->appendTab(new FileBrowser(FileBrowser::Type::Normal, QDir::homePath(), FileItem::defaultFilters(),
-		tr("My Home"), embed::getIconPixmap("home").transformed(QTransform().rotate(90)), splitter, false));
+		tr("My home"), embed::getIconPixmap("home").transformed(QTransform().rotate(90)), splitter, false));
 
 	QStringList root_paths;
-	QString title = tr("Root Directory");
+	QString title = tr("Root directory");
 	bool dirs_as_items = false;
 
 #ifdef LMMS_BUILD_APPLE
 	title = tr( "Volumes" );
 	root_paths += "/Volumes";
 #elif defined(LMMS_BUILD_WIN32)
-	title = tr( "My Computer" );
+	title = tr( "My computer" );
 	dirs_as_items = true;
 #endif
 
@@ -312,6 +313,7 @@ void MainWindow::finalize()
 
 	// project-popup-menu
 	auto project_menu = new QMenu(this);
+	menuBar()->setFont(bodyFont(menuBar()->font()));
 	menuBar()->addMenu( project_menu )->setText( tr( "&File" ) );
 
 	addAction(project_menu, "project_new", tr("&New"),
@@ -328,10 +330,10 @@ void MainWindow::finalize()
 	addAction(project_menu, "project_save", tr("&Save"),
 		QStringLiteral("file_save"), &MainWindow::saveProject);
 
-	addAction(project_menu, "project_save", tr("Save &As..."),
+	addAction(project_menu, "project_save", tr("Save &as..."),
 		QStringLiteral("file_save_as"), &MainWindow::saveProjectAs);
 
-	addAction(project_menu, "project_save", tr("Save as New &Version"),
+	addAction(project_menu, "project_save", tr("Save as new &version"),
 		QStringLiteral("file_save_new_version"), &MainWindow::saveProjectAsNewVersion);
 
 	auto* saveTemplateAction = project_menu->addAction(embed::getIconPixmap("project_save"),
@@ -347,7 +349,7 @@ void MainWindow::finalize()
 	addAction(project_menu, "project_export", tr("E&xport..."),
 		QStringLiteral("file_export"), &MainWindow::onExportProject);
 
-	addAction(project_menu, "project_export", tr("Export &Tracks..."),
+	addAction(project_menu, "project_export", tr("Export &tracks..."),
 		QStringLiteral("file_export_tracks"), &MainWindow::onExportProjectTracks);
 
 	addAction(project_menu, "midi_file", tr("Export &MIDI..."),
@@ -416,7 +418,7 @@ void MainWindow::finalize()
 	if( true )
 	{
 		helpAction = help_menu->addAction( embed::getIconPixmap( "help" ),
-						tr( "Online Help" ),
+						tr( "Online help" ),
 						this, SLOT(browseHelp()));
 	}
 	else
@@ -481,9 +483,9 @@ void MainWindow::finalize()
 		SLOT(toggleAutomationEditorWin()), QStringLiteral("window_automation_editor"));
 	auto* mixer_window = windowButton("mixer", tr("Mixer"),
 		SLOT(toggleMixerWin()), QStringLiteral("window_mixer"));
-	auto* controllers_window = windowButton("controller", tr("Show/hide controller rack"),
+	auto* controllers_window = windowButton("controller", tr("Show/hide Controller Rack"),
 		SLOT(toggleControllerRack()), QStringLiteral("window_controller_rack"));
-	auto* project_notes_window = windowButton("project_notes", tr("Show/hide project notes"),
+	auto* project_notes_window = windowButton("project_notes", tr("Show/hide Project Notes"),
 		SLOT(toggleProjectNotesWin()), QStringLiteral("window_project_notes"));
 
 	int buttonIndex = 0;
@@ -799,7 +801,7 @@ void MainWindow::openProject()
 {
 	if( mayChangeProject(false) )
 	{
-		FileDialog ofd( this, tr( "Open Project" ), "", tr( "LMMS (*.mmp *.mmpz)" ) );
+		FileDialog ofd( this, tr( "Open project" ), "", tr( "LMMS (*.mmp *.mmpz)" ) );
 
 		ofd.setDirectory( ConfigManager::inst()->userProjectsDir() );
 		ofd.setFileMode( FileDialog::ExistingFiles );
@@ -854,9 +856,9 @@ bool MainWindow::saveProject()
 bool MainWindow::saveProjectAs()
 {
 	auto optionsWidget = new SaveOptionsWidget(Engine::getSong()->getSaveOptions());
-	VersionedSaveDialog sfd( this, optionsWidget, tr( "Save Project" ), "",
-			tr( "LMMS Project" ) + " (*.mmpz *.mmp);;" +
-				tr( "LMMS Project Template" ) + " (*.mpt)" );
+	VersionedSaveDialog sfd( this, optionsWidget, tr( "Save project" ), "",
+			tr( "LMMS project" ) + " (*.mmpz *.mmp);;" +
+				tr( "LMMS project template" ) + " (*.mpt)" );
 	QString f = Engine::getSong()->projectFileName();
 	if( f != "" )
 	{
@@ -1142,12 +1144,12 @@ void MainWindow::updateViewMenu()
 				      windowLabel(tr("Controller Rack"), QStringLiteral("window_controller_rack")),
 			      this, SLOT(toggleControllerRack())
 		);
-	controllerRackAction->setStatusTip(tr("Show or hide the controller rack"));
+	controllerRackAction->setStatusTip(tr("Show or hide the Controller Rack"));
 	auto* projectNotesAction = m_viewMenu->addAction(embed::getIconPixmap( "project_notes" ),
 				      windowLabel(tr("Project Notes"), QStringLiteral("window_project_notes")),
 			      this, SLOT(toggleProjectNotesWin())
 		);
-	projectNotesAction->setStatusTip(tr("Show or hide the project notes"));
+	projectNotesAction->setStatusTip(tr("Show or hide the Project Notes"));
 
 	m_viewMenu->addSeparator();
 
@@ -1160,12 +1162,12 @@ void MainWindow::updateViewMenu()
 	m_viewMenu->addSeparator();
 
 	auto detachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
-		tr("Detach all subwindows"),
+		tr("Detach all editor windows"),
 		this, [this](){ setAllSubWindowsDetached(true); },
 		layoutShortcuts.value(QStringLiteral("layout_detach_all"))
 	);
 	auto attachAllAction = m_viewMenu->addAction(embed::getIconPixmap("detach"),
-		tr("Attach all subwindows"),
+		tr("Attach all editor windows"),
 		this, [this](){ setAllSubWindowsDetached(false); },
 		layoutShortcuts.value(QStringLiteral("layout_attach_all"))
 	);
@@ -1195,11 +1197,11 @@ void MainWindow::updateViewMenu()
 	m_viewMenu->addAction(qa);
 	*/
 
-	qa = new QAction(tr( "Enable note labels in piano roll" ), this);
+	qa = new QAction(tr( "Enable note labels in Piano Roll" ), this);
 	qa->setData("printnotelabels");
 	qa->setCheckable( true );
 	qa->setChecked( ConfigManager::inst()->value( "ui", "printnotelabels" ).toInt() );
-	qa->setStatusTip(tr("Show note names on the piano roll notes"));
+	qa->setStatusTip(tr("Show note names on the Piano Roll notes"));
 	m_viewMenu->addAction(qa);
 
 }
@@ -1497,7 +1499,7 @@ void MainWindow::onExportProjectMidi()
 	efd.setFileMode( FileDialog::AnyFile );
 
 	QStringList types;
-	types << tr("MIDI File (*.mid)");
+	types << tr("MIDI file (*.mid)");
 	efd.setNameFilters( types );
 	QString base_filename;
 	QString const & projectFileName = Engine::getSong()->projectFileName();
@@ -1640,7 +1642,7 @@ void MainWindow::handleSaveResult(QString const & filename, bool songSavedSucces
 	else
 	{
 		statusBar()->showMessage(tr("Not saved: %1").arg(filename), 4000);
-		TextFloat::displayMessage( tr( "Project NOT saved." ), tr( "The project %1 was not saved!" ).arg(filename),
+		TextFloat::displayMessage( tr( "Project not saved." ), tr( "The project %1 was not saved!" ).arg(filename),
 				embed::getIconPixmap( "error" ), 4000 );
 	}
 }

@@ -126,7 +126,7 @@ bool TrackOperationsWidget::confirmRemoval()
 	bool needConfirm = ConfigManager::inst()->value("ui", "trackdeletionwarning", "1").toInt();
 	if (!needConfirm){ return true; }
 	
-	QString messageRemoveTrack = tr("After removing a track, it can not "
+	QString messageRemoveTrack = tr("After removing a track, it cannot "
 					"be recovered. Are you sure you want to remove track \"%1\"?")
 					.arg(m_trackView->getTrack()->name());
 	QString messageTitleRemoveTrack = tr("Confirm removal");
@@ -255,7 +255,7 @@ void TrackOperationsWidget::updateMenu()
 	{
 		toMenu->addAction( tr( "Clear this track" ), this, SLOT(clearTrack()));
 	}
-	if (QMenu *mixerMenu = m_trackView->createMixerMenu(tr("Channel %1: %2"), tr("Assign to new Mixer Channel")))
+	if (QMenu *mixerMenu = m_trackView->createMixerMenu(tr("Channel %1: %2"), tr("Assign to new mixer channel")))
 	{
 		toMenu->addMenu(mixerMenu);
 	}

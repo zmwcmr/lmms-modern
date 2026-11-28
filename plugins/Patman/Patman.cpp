@@ -494,7 +494,7 @@ void PatmanView::openFile()
 	ofd.setFileMode( FileDialog::ExistingFiles );
 
 	QStringList types;
-	types << tr( "Patch-Files (*.pat)" );
+	types << tr( "Patch files (*.pat)" );
 	ofd.setNameFilters( types );
 
 	if( m_pi->m_patchFile == "" )

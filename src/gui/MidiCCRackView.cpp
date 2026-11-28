@@ -66,7 +66,7 @@ MidiCCRackView::MidiCCRackView(InstrumentTrack * track) :
 	auto mainLayout = new QVBoxLayout(this);
 
 	// Knobs GroupBox - Here we have the MIDI CC controller knobs for the selected track
-	m_midiCCGroupBox = new GroupBox(tr("MIDI CC Knobs:"));
+	m_midiCCGroupBox = new GroupBox(tr("MIDI CC knobs"));
 
 	// Layout to keep scrollable area under the GroupBox header
 	auto knobsGroupBoxLayout = new QVBoxLayout();

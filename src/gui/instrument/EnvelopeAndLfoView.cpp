@@ -182,7 +182,7 @@ EnvelopeAndLfoView::EnvelopeAndLfoView(QWidget * parent) :
 	m_x100Cb->setToolTip(tr("Multiply LFO frequency by 100"));
 	checkBoxesLayout->addWidget(m_x100Cb);
 
-	m_controlEnvAmountCb = new LedCheckBox(tr("MOD ENV AMOUNT"), this);
+	m_controlEnvAmountCb = new LedCheckBox(tr("Mod env amount"), this);
 	m_controlEnvAmountCb->setToolTip(tr("Control envelope amount by this LFO"));
 	checkBoxesLayout->addWidget(m_controlEnvAmountCb);
 

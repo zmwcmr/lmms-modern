@@ -48,20 +48,20 @@ InstrumentSoundShapingView::InstrumentSoundShapingView(QWidget* parent) :
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(5, 5, 5, 5);
 
-	m_targetsTabWidget = new TabWidget(tr("TARGET"), this);
+	m_targetsTabWidget = new TabWidget(tr("Target"), this);
 
 	m_volumeView = new EnvelopeAndLfoView(m_targetsTabWidget);
 	m_cutoffView = new EnvelopeAndLfoView(m_targetsTabWidget);
 	m_resonanceView = new EnvelopeAndLfoView(m_targetsTabWidget);
 
-	m_targetsTabWidget->addTab(m_volumeView, tr("VOLUME"), nullptr);
-	m_targetsTabWidget->addTab(m_cutoffView, tr("CUTOFF"), nullptr);
-	m_targetsTabWidget->addTab(m_resonanceView, tr("RESO"), nullptr);
+	m_targetsTabWidget->addTab(m_volumeView, tr("Volume"), nullptr);
+	m_targetsTabWidget->addTab(m_cutoffView, tr("Cutoff"), nullptr);
+	m_targetsTabWidget->addTab(m_resonanceView, tr("Resonance"), nullptr);
 
 	mainLayout->addWidget(m_targetsTabWidget, 1);
 
 
-	m_filterGroupBox = new GroupBox(tr("FILTER"), this);
+	m_filterGroupBox = new GroupBox(tr("Filter"), this);
 	QHBoxLayout* filterLayout = new QHBoxLayout(m_filterGroupBox);
 	QMargins filterMargins = filterLayout->contentsMargins();
 	filterMargins.setTop(m_filterGroupBox->titleBarHeight() + 7);
@@ -75,7 +75,7 @@ InstrumentSoundShapingView::InstrumentSoundShapingView(QWidget* parent) :
 	filterLayout->addWidget(m_filterCutKnob);
 
 	m_filterResKnob = new Knob(KnobType::Bright26, tr("Q/RESO"), m_filterGroupBox, Knob::LabelRendering::LegacyFixedFontSize);
-	m_filterResKnob->setHintText(tr("Q/Resonance:"), "");
+	m_filterResKnob->setHintText(tr("Q/resonance:"), "");
 	filterLayout->addWidget(m_filterResKnob);
 
 	mainLayout->addWidget(m_filterGroupBox);

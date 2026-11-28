@@ -139,7 +139,7 @@ QString GranularPitchShifterHelpView::s_helpText=
 
 GranularPitchShifterHelpView::GranularPitchShifterHelpView():QTextEdit(s_helpText)
 {
-	setWindowTitle("Granular Pitch Shifter Help");
+	setWindowTitle(tr("Granular Pitch Shifter help"));
 	setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	getGUI()->mainWindow()->addWindowedWidget(this);
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);

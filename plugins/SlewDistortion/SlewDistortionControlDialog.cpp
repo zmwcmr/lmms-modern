@@ -466,7 +466,7 @@ QString SlewDistortionHelpView::s_helpText = tr(
 "Those higher frequencies are then filtered out before decreasing the sample rate back to its original value so they don't alias.<br><br>"
 "This plugin supports up to five stages of oversampling.<br>"
 "Each stage provides an extra 2 octaves of headroom before frequencies alias far enough to become audible.<br>"
-"The number on the button is how much the sample rate is increased by. THE PLUGIN'S CPU USAGE WILL BE INCREASED BY APPROXIMATELY THE SAME AMOUNT.<br>"
+"The number on the button is how much the sample rate is increased by. The plugin's CPU usage will be increased by approximately the same amount.<br>"
 "Even just 2x oversampling can make a massive difference and is oftentimes all you need, but up to 32x oversampling is supported.<br>"
 );
 
@@ -474,7 +474,7 @@ QString SlewDistortionHelpView::s_helpText = tr(
 
 SlewDistortionHelpView::SlewDistortionHelpView() : QTextEdit(s_helpText)
 {
-	setWindowTitle("Slew Distortion Help");
+	setWindowTitle(tr("Slew Distortion help"));
 	setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	getGUI()->mainWindow()->addWindowedWidget(this);
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);

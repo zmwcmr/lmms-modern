@@ -123,9 +123,10 @@ void ControllerRackView::deleteController( ControllerView * _view )
 	{
 		QMessageBox msgBox;
 		msgBox.setIcon( QMessageBox::Question );
-		msgBox.setWindowTitle( tr("Confirm Delete") );
-		msgBox.setText( tr("Confirm delete? There are existing connection(s) "
-				"associated with this controller. There is no way to undo.") );
+		msgBox.setWindowTitle( tr("Confirm delete") );
+		msgBox.setText( tr("Confirm delete? There are existing %n connection(s) "
+				"associated with this controller. There is no way to undo.",
+				nullptr, c->connectionCount()) );
 		msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
 		if( msgBox.exec() != QMessageBox::Ok )
 		{

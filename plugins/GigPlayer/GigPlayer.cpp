@@ -1039,7 +1039,7 @@ void GigInstrumentView::showFileDialog()
 	ofd.setFileMode( FileDialog::ExistingFiles );
 
 	QStringList types;
-	types << tr( "GIG Files (*.gig)" );
+	types << tr( "GIG files (*.gig)" );
 	ofd.setNameFilters( types );
 
 	if( k->m_filename != "" )

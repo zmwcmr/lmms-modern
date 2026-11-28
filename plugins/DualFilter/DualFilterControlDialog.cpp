@@ -73,12 +73,13 @@ DualFilterControlDialog::DualFilterControlDialog( DualFilterControls* controls )
 	enabled2Toggle->setToolTip(tr("Enable/disable filter 2"));
 
 	auto m_filter1ComboBox = new ComboBox(this);
-	m_filter1ComboBox->setGeometry( 19, 70, 137, ComboBox::DEFAULT_HEIGHT );
+	m_filter1ComboBox->setGeometry(19, 70, 137, m_filter1ComboBox->sizeHint().height());
 	m_filter1ComboBox->setModel( &controls->m_filter1Model );
 
 	auto m_filter2ComboBox = new ComboBox(this);
-	m_filter2ComboBox->setGeometry( 217, 70, 137, ComboBox::DEFAULT_HEIGHT );
+	m_filter2ComboBox->setGeometry(217, 70, 137, m_filter2ComboBox->sizeHint().height());
 	m_filter2ComboBox->setModel( &controls->m_filter2Model );
+	setFixedHeight(qMax(height(), 70 + m_filter2ComboBox->height() + 4));
 }
 
 

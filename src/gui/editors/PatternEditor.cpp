@@ -33,6 +33,7 @@
 #include "DataFile.h"
 #include "EditorShortcuts.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "MainWindow.h"
 #include "PatternStore.h"
 #include "PatternTrack.h"
@@ -137,13 +138,16 @@ void PatternEditor::removeViewsForPattern(int pattern)
 void PatternEditor::saveSettings(QDomDocument& doc, QDomElement& element)
 {
 	MainWindow::saveWidgetState( parentWidget(), element );
-	element.setAttribute("trackheadwidth", trackHeadWidth());
+	element.setAttribute("trackheadwidth", trackHeadWidthForStorage());
 }
 
 void PatternEditor::loadSettings(const QDomElement& element)
 {
 	MainWindow::restoreWidgetState(parentWidget(), element);
-	setTrackHeadWidth(element.attribute("trackheadwidth", QString::number(trackHeadWidth())).toInt());
+	if (element.hasAttribute("trackheadwidth"))
+	{
+		setTrackHeadWidth(scaledTrackHeadWidth(element.attribute("trackheadwidth").toInt()));
+	}
 	updateMaxSteps();
 }
 
@@ -295,7 +299,8 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 	connect(m_toolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
 	connect(m_toolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
 
-	setMinimumWidth(MINIMUM_TRACK_WIDTH + 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels);
+	setMinimumWidth(TrackContainerView::scaledTrackHeadWidth(MINIMUM_TRACK_WIDTH)
+		+ 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels);
 
 	setTransportToolTips(tr("Play current pattern"), tr("Stop playback of current pattern"));
 
@@ -304,7 +309,7 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 	DropToolBar* patternSelectionToolBar = addDropToolBarToTop(tr("Pattern selector"));
 
 	m_patternComboBox = new ComboBox(m_toolBar);
-	m_patternComboBox->setFixedSize(200, ComboBox::DEFAULT_HEIGHT);
+	m_patternComboBox->setFixedWidth(scaledFontSize(200));
 	m_patternComboBox->setModel(&ps->m_patternComboBoxModel);
 
 	patternSelectionToolBar->addWidget(m_patternComboBox);
@@ -341,7 +346,7 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 						m_editor, SLOT(removeSteps()));
 	addTrackAndStepAction(embed::getIconPixmap("step_btn_add"), tr("Add steps"),
 						m_editor, SLOT(addSteps()));
-	addTrackAndStepAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone Steps"),
+	addTrackAndStepAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone steps"),
 						m_editor, SLOT(cloneSteps()));
 
 	connect(&ps->m_patternComboBoxModel, SIGNAL(dataChanged()),

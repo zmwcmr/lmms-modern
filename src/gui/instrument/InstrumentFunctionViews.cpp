@@ -42,7 +42,7 @@ InstrumentFunctionNoteStackingView::InstrumentFunctionNoteStackingView( Instrume
 	QWidget( parent ),
 	ModelView( nullptr, this ),
 	m_cc( cc ),
-	m_chordsGroupBox( new GroupBox( tr( "STACKING" ) ) ),
+	m_chordsGroupBox( new GroupBox( tr( "Stacking" ) ) ),
 	m_chordsComboBox( new ComboBox() ),
 	m_chordRangeKnob(new Knob(KnobType::Bright26, tr("RANGE"), this, Knob::LabelRendering::LegacyFixedFontSize))
 {
@@ -59,7 +59,7 @@ InstrumentFunctionNoteStackingView::InstrumentFunctionNoteStackingView( Instrume
 	auto chordLabel = new QLabel(tr("Chord:"));
 	chordLabel->setFont(adjustedToPixelSize(chordLabel->font(), DEFAULT_FONT_SIZE));
 
-	m_chordRangeKnob->setHintText( tr( "Chord range:" ), " " + tr( "octave(s)" ) );
+	m_chordRangeKnob->setHintText( tr( "Chord range:" ), " " + tr( "oct" ) );
 
 	mainLayout->addWidget( chordLabel, 0, 0 );
 	mainLayout->addWidget( m_chordsComboBox, 1, 0 );
@@ -95,7 +95,7 @@ InstrumentFunctionArpeggioView::InstrumentFunctionArpeggioView( InstrumentFuncti
 	QWidget( parent ),
 	ModelView( nullptr, this ),
 	m_a( arp ),
-	m_arpGroupBox( new GroupBox( tr( "ARPEGGIO" ) ) ),
+	m_arpGroupBox( new GroupBox( tr( "Arpeggio" ) ) ),
 	m_arpComboBox( new ComboBox() ),
 	m_arpRangeKnob(new Knob(KnobType::Bright26, tr("RANGE"), this, Knob::LabelRendering::LegacyFixedFontSize)),
 	m_arpRepeatsKnob(new Knob(KnobType::Bright26, tr("REP"), this, Knob::LabelRendering::LegacyFixedFontSize)),
@@ -117,9 +117,9 @@ InstrumentFunctionArpeggioView::InstrumentFunctionArpeggioView( InstrumentFuncti
 	mainLayout->setHorizontalSpacing( 20 );
 	mainLayout->setVerticalSpacing( 1 );
 
-	m_arpRangeKnob->setHintText( tr( "Arpeggio range:" ), " " + tr( "octave(s)" ) );
-	m_arpRepeatsKnob->setHintText( tr( "Note repeats:" ) + " ", " " + tr( "time(s)" ) );
-	m_arpCycleKnob->setHintText( tr( "Cycle notes:" ) + " ", " " + tr( "note(s)" ) );
+	m_arpRangeKnob->setHintText( tr( "Arpeggio range:" ), " " + tr( "oct" ) );
+	m_arpRepeatsKnob->setHintText( tr( "Note repeats:" ), "" );
+	m_arpCycleKnob->setHintText( tr( "Cycle notes:" ), "" );
 	m_arpSkipKnob->setHintText( tr( "Skip rate:" ), tr( "%" ) );
 	m_arpMissKnob->setHintText( tr( "Miss rate:" ), tr( "%" ) );
 	m_arpTimeKnob->setHintText( tr( "Arpeggio time:" ), " " + tr( "ms" ) );

@@ -39,6 +39,7 @@
 #include <QTimeLine>
 #include <QTimer>
 #include <QToolButton>
+#include <QTransform>
 
 #include <algorithm>
 
@@ -216,7 +217,7 @@ SongEditor::SongEditor( Song * song ) :
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
 	auto master_vol_lbl = new QLabel(tb);
-	master_vol_lbl->setPixmap( embed::getIconPixmap( "master_volume" ) );
+	master_vol_lbl->setPixmap(embed::getIconPixmap("master_volume").transformed(QTransform().rotate(90)));
 
 	m_masterVolumeSlider = new AutomatableSlider( tb,
 							tr( "Master volume" ) );
@@ -249,7 +250,7 @@ SongEditor::SongEditor( Song * song ) :
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
 	auto master_pitch_lbl = new QLabel(tb);
-	master_pitch_lbl->setPixmap( embed::getIconPixmap( "master_pitch" ) );
+	master_pitch_lbl->setPixmap(embed::getIconPixmap("master_pitch").transformed(QTransform().rotate(90)));
 
 	m_masterPitchSlider = new AutomatableSlider( tb, tr( "Global transposition" ) );
 	m_masterPitchSlider->setModel( &m_song->m_masterPitchModel );
@@ -280,6 +281,7 @@ SongEditor::SongEditor( Song * song ) :
 
 	// create widget for oscilloscope- and cpu-load-widget
 	auto vc_w = new QWidget(tb);
+	vc_w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 	auto vcw_layout = new QVBoxLayout(vc_w);
 	vcw_layout->setContentsMargins(0, 0, 0, 0);
 	vcw_layout->setSpacing( 0 );
@@ -330,7 +332,7 @@ SongEditor::SongEditor( Song * song ) :
 	{
 		if (bars > 1.0f)
 		{
-			m_snappingModel->addItem(QString("%1 Bars").arg(bars));
+			m_snappingModel->addItem(QString("%1 bars").arg(bars));
 		}
 		else if (bars == 1.0f)
 		{
@@ -338,10 +340,10 @@ SongEditor::SongEditor( Song * song ) :
 		}
 		else
 		{
-			m_snappingModel->addItem(QString("1/%1 Bar").arg(1 / bars));
+			m_snappingModel->addItem(QString("1/%1 bar").arg(1 / bars));
 		}
 	}
-	m_snappingModel->setInitValue(ConfigManager::inst()->value("ui", "songeditorsnap", QString::number(m_snappingModel->findText( "1/4 Bar" ))).toInt());
+	m_snappingModel->setInitValue(ConfigManager::inst()->value("ui", "songeditorsnap", QString::number(m_snappingModel->findText( "1/4 bar" ))).toInt());
 
 	setFocusPolicy( Qt::StrongFocus );
 	setFocus();
@@ -357,13 +359,16 @@ SongEditor::~SongEditor()
 void SongEditor::saveSettings( QDomDocument& doc, QDomElement& element )
 {
 	MainWindow::saveWidgetState( parentWidget(), element );
-	element.setAttribute("trackheadwidth", trackHeadWidth());
+	element.setAttribute("trackheadwidth", trackHeadWidthForStorage());
 }
 
 void SongEditor::loadSettings( const QDomElement& element )
 {
 	MainWindow::restoreWidgetState(parentWidget(), element);
-	setTrackHeadWidth(element.attribute("trackheadwidth", QString::number(trackHeadWidth())).toInt());
+	if (element.hasAttribute("trackheadwidth"))
+	{
+		setTrackHeadWidth(scaledTrackHeadWidth(element.attribute("trackheadwidth").toInt()));
+	}
 }
 
 
@@ -391,11 +396,11 @@ QString SongEditor::getSnapSizeString() const
 
 	if (bars < 1)
 	{
-		return QString(tr("1/%1 Bar")).arg(round(1 / bars));
+		return QString(tr("1/%1 bar")).arg(round(1 / bars));
 	}
 	else if (bars >= 2)
 	{
-		return QString(tr("%1 Bars")).arg(bars);
+		return QString(tr("%1 bars")).arg(bars);
 	}
 	else
 	{
@@ -1042,7 +1047,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	m_crtlAction( nullptr ),
 	m_snapSizeLabel( new QLabel( m_toolBar ) )
 {
-	setWindowTitle( tr( "Song-Editor" ) );
+	setWindowTitle( tr( "Song Editor" ) );
 	setWindowIcon( embed::getIconPixmap( "songeditor" ) );
 
 	setCentralWidget(m_editor);
@@ -1053,7 +1058,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	removeToolBar(m_toolBar);
 	m_toolBar->hide();
 
-	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song editor"));
+	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song Editor"));
 	songToolBar->setProperty("lmmsWideOverflowButton", true);
 	songToolBar->setAcceptDrops(true);
 	connect(songToolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));

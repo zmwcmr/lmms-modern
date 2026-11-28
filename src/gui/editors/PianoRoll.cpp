@@ -229,8 +229,8 @@ PianoRoll::PianoRoll() :
 	m_blackKeyWidth(BLACK_KEY_WIDTH)
 {
 	// gui names of edit modes
-	m_nemStr.push_back( tr( "Note Velocity" ) );
-	m_nemStr.push_back( tr( "Note Panning" ) );
+	m_nemStr.push_back( tr( "Note velocity" ) );
+	m_nemStr.push_back( tr( "Note panning" ) );
 
 	m_noteEditMenu = new QMenu( this );
 	m_noteEditMenu->clear();
@@ -2237,7 +2237,7 @@ void PianoRoll::setKnifeAction()
 		setCursor(Qt::ArrowCursor);
 		update();
 
-		TextFloat::displayMessage(tr("Knife Tool"),
+		TextFloat::displayMessage(tr("Knife tool"),
 			tr("Click and drag over notes to cut along a line\nHold Shift to automatically remove short ends"),
 			embed::getIconPixmap("edit_knife"), 4000);
 	}
@@ -4538,7 +4538,7 @@ void PianoRoll::setEditMode(int mode)
 {
 	if (static_cast<EditMode>(mode) == EditMode::Detuning)
 	{
-		TextFloat::displayMessage(tr("Pitch Bending"),
+		TextFloat::displayMessage(tr("Pitch bending"),
 			tr("Click and drag on a note or selection to edit its detuning curve\nShift-click to open the note in Automation Editor"),
 			embed::getIconPixmap("automation"), 4000);
 	}
@@ -5194,7 +5194,7 @@ PianoRollWindow::PianoRollWindow() :
 	QAction* selectAction = editModeGroup->addAction(new ToolButtonAction(
 		embed::getIconPixmap( "edit_select" ), tr( "Select mode" ), editModeGroup));
 	QAction* pitchBendAction = editModeGroup->addAction(new ToolButtonAction(
-		embed::getIconPixmap( "automation" ), tr("Pitch Bend mode" ), editModeGroup));
+		embed::getIconPixmap( "automation" ), tr("Pitch bend mode" ), editModeGroup));
 
 	drawAction->setChecked( true );
 
@@ -5293,7 +5293,7 @@ PianoRollWindow::PianoRollWindow() :
 	auto maxLengthAction = new QAction(embed::getIconPixmap("max_length"), tr("Max length as last"), noteToolsButton);
 	connect(maxLengthAction, &QAction::triggered, [this](){ m_editor->constrainNoteLengths(true); });
 
-	auto reverseAction = new QAction(embed::getIconPixmap("flip_x"), tr("Reverse Notes"), noteToolsButton);
+	auto reverseAction = new QAction(embed::getIconPixmap("flip_x"), tr("Reverse notes"), noteToolsButton);
 	connect(reverseAction, &QAction::triggered, [this](){ m_editor->reverseNotes(); });
 
 	noteToolsButton->addAction(glueAction);
@@ -5334,7 +5334,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingComboBox = new ComboBox( m_toolBar );
 	m_zoomingComboBox->setModel( &m_editor->m_zoomingModel );
-	m_zoomingComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingComboBox->setMinimumContentWidth(64);
 	m_zoomingComboBox->setToolTip( tr( "Horizontal zooming") );
 
@@ -5344,7 +5343,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingYComboBox = new ComboBox(m_toolBar);
 	m_zoomingYComboBox->setModel(&m_editor->m_zoomingYModel);
-	m_zoomingYComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingYComboBox->setMinimumContentWidth(64);
 	m_zoomingYComboBox->setToolTip(tr("Vertical zooming"));
 
@@ -5355,7 +5353,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );
-	m_quantizeComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_quantizeComboBox->setMinimumContentWidth(85);
 	m_quantizeComboBox->setToolTip( tr( "Quantization") );
 
@@ -5365,14 +5362,12 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_noteLenComboBox = new ComboBox( m_toolBar );
 	m_noteLenComboBox->setModel( &m_editor->m_noteLenModel );
-	m_noteLenComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_noteLenComboBox->setMinimumContentWidth(105);
 	m_noteLenComboBox->setToolTip( tr( "Note length") );
 
 	// setup key-stuff
 	m_keyComboBox = new ComboBox(m_toolBar);
 	m_keyComboBox->setModel(&m_editor->m_keyModel);
-	m_keyComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_keyComboBox->setMinimumContentWidth(72);
 	m_keyComboBox->setToolTip(tr("Key"));
 
@@ -5382,7 +5377,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_scaleComboBox = new ComboBox( m_toolBar );
 	m_scaleComboBox->setModel( &m_editor->m_scaleModel );
-	m_scaleComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_scaleComboBox->setMinimumContentWidth(155);
 	m_scaleComboBox->setToolTip( tr( "Scale") );
 
@@ -5392,7 +5386,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_chordComboBox = new ComboBox( m_toolBar );
 	m_chordComboBox->setModel( &m_editor->m_chordModel );
-	m_chordComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_chordComboBox->setMinimumContentWidth(125);
 	m_chordComboBox->setToolTip( tr( "Chord" ) );
 
@@ -5402,7 +5395,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_snapComboBox = new ComboBox(m_toolBar);
 	m_snapComboBox->setModel(&m_editor->m_snapModel);
-	m_snapComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_snapComboBox->setMinimumContentWidth(96);
 	m_snapComboBox->setToolTip(tr("Snap mode"));
 
@@ -5518,14 +5510,14 @@ void PianoRollWindow::setCurrentMidiClip( MidiClip* clip )
 
 	if ( clip )
 	{
-		setWindowTitle( tr( "Piano-Roll - %1" ).arg( clip->name() ) );
+		setWindowTitle( tr( "Piano Roll - %1" ).arg( clip->name() ) );
 		m_fileToolsButton->setEnabled(true);
 		connect( clip->instrumentTrack(), SIGNAL(nameChanged()), this, SLOT(updateAfterMidiClipChange()));
 		connect( clip, SIGNAL(dataChanged()), this, SLOT(updateAfterMidiClipChange()));
 	}
 	else
 	{
-		setWindowTitle( tr( "Piano-Roll - no clip" ) );
+		setWindowTitle( tr( "Piano Roll - no clip" ) );
 		m_fileToolsButton->setEnabled(false);
 	}
 }
@@ -5762,12 +5754,12 @@ void PianoRollWindow::clipRenamed()
 {
 	if ( currentMidiClip() )
 	{
-		setWindowTitle( tr( "Piano-Roll - %1" ).arg( currentMidiClip()->name() ) );
+		setWindowTitle( tr( "Piano Roll - %1" ).arg( currentMidiClip()->name() ) );
 		m_fileToolsButton->setEnabled(true);
 	}
 	else
 	{
-		setWindowTitle( tr( "Piano-Roll - no clip" ) );
+		setWindowTitle( tr( "Piano Roll - no clip" ) );
 		m_fileToolsButton->setEnabled(false);
 	}
 }

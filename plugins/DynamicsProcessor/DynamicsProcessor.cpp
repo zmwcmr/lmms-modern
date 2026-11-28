@@ -46,7 +46,7 @@ Plugin::Descriptor PLUGIN_EXPORT dynamicsprocessor_plugin_descriptor =
 	LMMS_STRINGIFY( PLUGIN_NAME ),
 	"Dynamics Processor",
 	QT_TRANSLATE_NOOP( "PluginBrowser",
-				"plugin for processing dynamics in a flexible way" ),
+				"Plugin for processing dynamics in a flexible way" ),
 	"Vesa Kivimäki <contact/dot/diizy/at/nbl/dot/fi>",
 	0x0100,
 	Plugin::Type::Effect,
