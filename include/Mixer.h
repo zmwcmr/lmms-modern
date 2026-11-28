@@ -86,6 +86,9 @@ public:
 	//! Sum of the effect-chain latencies on this channel, in samples
 	f_cnt_t latency() const { return m_fxChain.latency(); }
 
+	//! True when an effect in this channel can consume a sidechain bus.
+	bool hasSidechainInput() const { return m_fxChain.hasSidechainInput(); }
+
 	bool isMaster() { return m_channelIndex == 0; }
 
 	bool requiresProcessing() const override { return true; }

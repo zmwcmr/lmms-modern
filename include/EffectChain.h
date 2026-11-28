@@ -77,6 +77,8 @@ public:
 
 	//! Sum of the processing latencies of all effects, in samples
 	f_cnt_t latency() const;
+	//! True when at least one effect reports a sidechain input bus.
+	bool hasSidechainInput() const;
 
 	void clear();
 

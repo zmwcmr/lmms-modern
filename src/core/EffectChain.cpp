@@ -206,6 +206,21 @@ bool EffectChain::processAudioBuffer(AudioBuffer& buffer)
 
 
 
+bool EffectChain::hasSidechainInput() const
+{
+	for (const Effect* effect : m_effects)
+	{
+		if (effect->supportsSidechain())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
+
+
 f_cnt_t EffectChain::latency() const
 {
 	if (!m_enabledModel.value())

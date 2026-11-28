@@ -84,6 +84,10 @@ public:
 
 	EffectControls* controls() override { return &m_controls; }
 	f_cnt_t latency() const override;
+	bool supportsSidechain() const override
+	{
+		return m_host != nullptr && m_host->inputBuses().size() > 1;
+	}
 
 	void initializeModels();
 
