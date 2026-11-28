@@ -352,11 +352,18 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       VST3's `Vst3X11Editor` and LV2's suil window both use it now, so
       lifecycle and event handling exist once. `X11EditorWindowTest` covers
       open/resize/hide/show/close and repeated WM_DELETE delivery.
-- [ ] VST2/Vestige: replace the MDI subwindow path with the common X11/floating
-      backend.
+- [x] VST2/Vestige on Wayland: `embedMethod` is forced to `none`, the plugin
+      child owns a floating X11/XWayland window, and `createUI()` no longer
+      logs an unknown-embed-method error for that path. The X11 MDI subwindow
+      remains the X11 UX until Stage 6 removes Vestige; it is not used on
+      Wayland.
 - Acceptance: LV2/VST2/VST3 editors open as floating XWayland windows on
       Wayland, keep correct sizes/scale/focus/close/reopen, and X11 behavior
       is unchanged. Native Wayland embedding is explicitly out of scope.
+- Remaining verification: run the manual Wayland matrix with real VST2, VST3
+      and LV2 editors (size, fractional scale, focus, close/reopen, editor
+      crash isolation). The shared window behavior itself is covered by
+      `X11EditorWindowTest`.
 
 ### Stage 6 — remove Vestige code
 
