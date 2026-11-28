@@ -28,6 +28,8 @@
 
 #include <QTextEdit>
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -45,6 +47,12 @@ public:
 
 public slots:
 	void showHelpWindow();
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 };
 
 
