@@ -89,5 +89,10 @@ navigation. Presets are `.fxp`/`.fxb` files handled by the plugin.
   embedding` when an embedded mode is requested.
 - A remote host crash loses the plugin's current unsaved state. The parameters
   stored in the project are restored the next time it is loaded.
+  `Vst2CrashTest` verifies that a plugin abort in `processReplacing()` kills
+  only the child and leaves LMMS alive.
+- The VST2 ABI has no portable sidechain/aux bus. Only the main stereo
+  input/output pair is exposed; the mixer UI marks such channels as having no
+  sidechain input. Multi-output (`numOutputs` > 2) is not routed either.
 - Scanning starts every candidate plugin once. A large collection can make
   the first scan slow; subsequent starts use the cache.

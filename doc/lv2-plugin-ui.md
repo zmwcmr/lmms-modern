@@ -94,9 +94,10 @@ window decorations are additional.
 
 ## Known limitations
 
-- Plugins with more than two audio inputs or outputs are loaded, but LMMS
-  only uses the first stereo pair. Extra ports are connected and ignored,
-  matching the VST2 host.
+- LV2 main audio and sidechain ports are reported as separate buses. Up to
+  two stereo output pairs are routed through the mixer; further output ports
+  are connected and ignored. The sidechain input is routed from the mixer's
+  sidechain source.
 - Qt5/GTK-only UIs are not supported by the current host.
 - Atom events are queued with a mutex; the audio-thread path is not fully
   real-time safe yet.

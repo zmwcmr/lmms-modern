@@ -193,6 +193,65 @@ private slots:
 		}
 	}
 
+	void reportsMultiOutputBuses()
+	{
+		Model parent(nullptr);
+		Lv2PluginHost host(&parent);
+
+		PluginLoadRequest request;
+		request.pluginUri = QStringLiteral(
+			"http://lmms.io/lv2/fake-multiout");
+		request.sampleRate = 44100.0;
+		request.maxBlockSize = 256;
+
+		QString error;
+		QVERIFY2(host.load(request, &error), qPrintable(error));
+
+		const auto inputs = host.inputBuses();
+		QCOMPARE(inputs.size(), 1u);
+		QCOMPARE(inputs[0].channels, 2);
+		const auto outputs = host.outputBuses();
+		QCOMPARE(outputs.size(), 2u);
+		QCOMPARE(outputs[0].channels, 2);
+		QCOMPARE(outputs[0].role, PluginBusRole::Main);
+		QCOMPARE(outputs[1].channels, 2);
+		QCOMPARE(outputs[1].role, PluginBusRole::Auxiliary);
+
+		if (!qEnvironmentVariableIsEmpty("LMMS_LV2_TEST_REMOTE"))
+		{
+			return;
+		}
+
+		const int frames = Engine::audioEngine()->framesPerPeriod();
+		std::vector<float> inL(frames, 1.0f);
+		std::vector<float> inR(frames, 1.0f);
+		std::vector<float> out1L(frames, 0.0f);
+		std::vector<float> out1R(frames, 0.0f);
+		std::vector<float> out2L(frames, 0.0f);
+		std::vector<float> out2R(frames, 0.0f);
+		float* input[2] = { inL.data(), inR.data() };
+		float* output1[2] = { out1L.data(), out1R.data() };
+		float* output2[2] = { out2L.data(), out2R.data() };
+		PluginBusBlock outputBuses[2] = {
+			PluginBusBlock{ output1, 2 },
+			PluginBusBlock{ output2, 2 },
+		};
+		PluginProcessBlock block;
+		block.inputs = input;
+		block.outputs = output1;
+		block.inputChannels = 2;
+		block.outputChannels = 2;
+		block.frames = frames;
+		block.outputBuses = outputBuses;
+		block.outputBusCount = 2;
+		QVERIFY(host.process(block));
+		for (int frame = 0; frame < frames; ++frame)
+		{
+			QCOMPARE(out1L[frame], 1.0f);
+			QCOMPARE(out2L[frame], 0.5f);
+		}
+	}
+
 	void stateRoundTrip()
 	{
 		Model parent(nullptr);
