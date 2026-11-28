@@ -82,7 +82,6 @@
 
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 #include <X11/Xlib.h>
-#include "X11LoadingPlaceholder.h"
 #include <X11/Xutil.h>
 #include <suil/suil.h>
 #endif
@@ -1560,10 +1559,6 @@ bool Lv2HostProcess::showUiNow(float scale)
 	m_uiWindow = XCreateSimpleWindow(m_uiDisplay, RootWindow(m_uiDisplay, screen),
 		100, 100, 900, 700, 1,
 		BlackPixel(m_uiDisplay, screen), WhitePixel(m_uiDisplay, screen));
-	if (m_uiWindow != 0)
-	{
-		paintLoadingPlaceholder(m_uiDisplay, m_uiWindow);
-	}
 	if (m_uiWindow == 0)
 	{
 		sendToHost(message(lv2host::IdUiClosed).addString("could not create a window"));
@@ -1719,16 +1714,6 @@ bool Lv2HostProcess::showUiNow(float scale)
 				static_cast<unsigned>(uiWidth), static_cast<unsigned>(uiHeight));
 		}
 		XFlush(m_uiDisplay);
-	}
-
-	if (m_uiWindow != 0 && m_uiDisplay != nullptr)
-	{
-		XWindowAttributes current{};
-		if (XGetWindowAttributes(m_uiDisplay,
-				static_cast<Window>(m_uiWindow), &current))
-		{
-			paintLoadingPlaceholder(m_uiDisplay, m_uiWindow);
-		}
 	}
 
 	const auto* show = static_cast<const LV2UI_Show_Interface*>(

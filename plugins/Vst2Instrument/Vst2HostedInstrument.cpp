@@ -29,11 +29,13 @@
 
 #include <QDomElement>
 #include <QFileInfo>
+#include <QTimer>
 
 #include "AudioEngine.h"
 #include "Engine.h"
 #include "InstrumentPlayHandle.h"
 #include "InstrumentTrack.h"
+#include "PluginLoadingWindow.h"
 #include "PlayHandle.h"
 #include "Song.h"
 #include "Vst2PluginHost.h"
@@ -279,8 +281,19 @@ void Vst2HostedInstrument::requestShowEditor()
 
 void Vst2HostedInstrument::showEditor()
 {
+	const bool wasVisible = m_editorVisible;
+	auto* plugin = nativePlugin();
+	if (!wasVisible)
+	{
+		gui::PluginLoadingWindow::showFor(plugin != nullptr
+			? plugin->name() : displayName());
+	}
 	m_editorVisible = true;
-	if (auto* plugin = nativePlugin()) { plugin->showUI(); }
+	if (plugin != nullptr) { plugin->showUI(); }
+	if (!wasVisible)
+	{
+		QTimer::singleShot(600, this, [] { gui::PluginLoadingWindow::hide(); });
+	}
 }
 
 
@@ -289,6 +302,7 @@ void Vst2HostedInstrument::showEditor()
 void Vst2HostedInstrument::hideEditor()
 {
 	m_editorVisible = false;
+	gui::PluginLoadingWindow::hide();
 	if (auto* plugin = nativePlugin()) { plugin->hideUI(); }
 }
 

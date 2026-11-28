@@ -25,11 +25,13 @@
 #include "Lv2Instrument.h"
 
 #include "Lv2HostClient.h"
+#include "PluginLoadingWindow.h"
 #include "Lv2PluginHost.h"
 
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QPushButton>
+#include <QTimer>
 
 #include "AudioEngine.h"
 #include "Engine.h"
@@ -226,6 +228,11 @@ void Lv2Instrument::requestShowEditor()
 {
 	if (auto* client = remoteClient())
 	{
+		if (!client->isUiOpen())
+		{
+			gui::PluginLoadingWindow::showFor(displayName());
+			QTimer::singleShot(600, this, [] { gui::PluginLoadingWindow::hide(); });
+		}
 		client->showUi(1.0f);
 	}
 }
