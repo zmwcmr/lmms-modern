@@ -38,7 +38,7 @@ public:
 	static void hide();
 
 private:
-	explicit PluginLoadingWindow(const QString& pluginName);
+	explicit PluginLoadingWindow(const QString& pluginName, QWidget* parent);
 	~PluginLoadingWindow() override;
 
 	QTimer* m_raiseTimer = nullptr;

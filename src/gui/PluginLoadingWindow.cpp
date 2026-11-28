@@ -14,6 +14,7 @@
 #include "PluginLoadingWindow.h"
 
 #include "GuiApplication.h"
+#include "MainWindow.h"
 
 #include <QApplication>
 #include <QByteArray>
@@ -52,10 +53,11 @@ const char* const kLogoSvg = R"SVG(<?xml version="1.0" encoding="UTF-8" standalo
 QPointer<PluginLoadingWindow> s_instance;
 }
 
-PluginLoadingWindow::PluginLoadingWindow(const QString& pluginName) :
-	QWidget(nullptr)
+PluginLoadingWindow::PluginLoadingWindow(const QString& pluginName,
+	QWidget* parent) :
+	QWidget(parent)
 {
-	setWindowFlags(Qt::Tool | Qt::FramelessWindowHint
+	setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint
 		| Qt::WindowStaysOnTopHint);
 	setAttribute(Qt::WA_ShowWithoutActivating);
 	setAttribute(Qt::WA_DeleteOnClose);
@@ -90,12 +92,17 @@ PluginLoadingWindow::PluginLoadingWindow(const QString& pluginName) :
 		move(screen->availableGeometry().center() - rect().center());
 	}
 
-	// A native plugin window can be mapped after this window. Keep the
-	// placeholder above it until the editor is ready.
-	m_raiseTimer = new QTimer(this);
-	m_raiseTimer->setInterval(100);
-	connect(m_raiseTimer, &QTimer::timeout, this, [this] { raise(); });
-	m_raiseTimer->start();
+	// A native plugin window can be mapped after this window. On X11 keep the
+	// placeholder above it; Wayland does not support activation/raise for
+	// ordinary clients and repeated requests can kill the connection.
+	if (!QGuiApplication::platformName().contains(
+			QStringLiteral("wayland"), Qt::CaseInsensitive))
+	{
+		m_raiseTimer = new QTimer(this);
+		m_raiseTimer->setInterval(100);
+		connect(m_raiseTimer, &QTimer::timeout, this, [this] { raise(); });
+		m_raiseTimer->start();
+	}
 }
 
 PluginLoadingWindow::~PluginLoadingWindow() = default;
@@ -106,15 +113,24 @@ void PluginLoadingWindow::showFor(const QString& pluginName)
 	{
 		return;
 	}
+	QWidget* parent = QApplication::activeWindow();
+	if (parent == nullptr)
+	{
+		parent = gui::getGUI()->mainWindow();
+	}
 	if (!s_instance.isNull())
 	{
 		s_instance->close();
 		s_instance = nullptr;
 	}
-	auto* window = new PluginLoadingWindow(pluginName);
+	auto* window = new PluginLoadingWindow(pluginName, parent);
 	s_instance = window;
 	window->show();
-	window->raise();
+	if (!QGuiApplication::platformName().contains(
+			QStringLiteral("wayland"), Qt::CaseInsensitive))
+	{
+		window->raise();
+	}
 }
 
 void PluginLoadingWindow::hide()
