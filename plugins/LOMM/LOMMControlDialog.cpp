@@ -49,61 +49,61 @@ LOMMControlDialog::LOMMControlDialog(LOMMControls* controls) :
 
 	createKnob(KnobType::Bright26, this, 10, 4, &controls->m_depthModel, tr("Depth:"), "", tr("Compression amount for all bands"));
 	createKnob(KnobType::Bright26, this, 10, 41, &controls->m_timeModel, tr("Time:"), "", tr("Attack/release scaling for all bands"));
-	createKnob(KnobType::Bright26, this, 10, 220, &controls->m_inVolModel, tr("Input Volume:"), " dB", tr("Input volume"));
-	createKnob(KnobType::Bright26, this, 363, 220, &controls->m_outVolModel, tr("Output Volume:"), " dB", tr("Output volume"));
-	createKnob(KnobType::Bright26, this, 10, 179, &controls->m_upwardModel, tr("Upward Depth:"), "", tr("Upward compression amount for all bands"));
-	createKnob(KnobType::Bright26, this, 363, 179, &controls->m_downwardModel, tr("Downward Depth:"), "", tr("Downward compression amount for all bands"));
+	createKnob(KnobType::Bright26, this, 10, 220, &controls->m_inVolModel, tr("Input volume:"), " dB", tr("Input volume"));
+	createKnob(KnobType::Bright26, this, 363, 220, &controls->m_outVolModel, tr("Output volume:"), " dB", tr("Output volume"));
+	createKnob(KnobType::Bright26, this, 10, 179, &controls->m_upwardModel, tr("Upward depth:"), "", tr("Upward compression amount for all bands"));
+	createKnob(KnobType::Bright26, this, 363, 179, &controls->m_downwardModel, tr("Downward depth:"), "", tr("Downward compression amount for all bands"));
 
-	createLcdFloatSpinBox(5, 2, "11green", tr("High/Mid Crossover"), this, 352, 76, &controls->m_split1Model, tr("High/Mid Crossover"));
-	createLcdFloatSpinBox(5, 2, "11green", tr("Mid/Low Crossover"), this, 352, 156, &controls->m_split2Model, tr("Mid/Low Crossover"));
+	createLcdFloatSpinBox(5, 2, "11green", tr("High/mid crossover"), this, 352, 76, &controls->m_split1Model, tr("High/mid crossover"));
+	createLcdFloatSpinBox(5, 2, "11green", tr("Mid/low crossover"), this, 352, 156, &controls->m_split2Model, tr("Mid/low crossover"));
 
 	createPixmapButton(tr("High/mid band split"), this, 369, 104, &controls->m_split1EnabledModel, "crossover_led_green", "crossover_led_off", tr("High/mid band split"));
 	createPixmapButton(tr("Mid/low band split"), this, 369, 126, &controls->m_split2EnabledModel, "crossover_led_green", "crossover_led_off", tr("Mid/low band split"));
 
-	createPixmapButton(tr("Enable High Band"), this, 143, 66, &controls->m_band1EnabledModel, "high_band_active", "high_band_inactive", tr("Enable High Band"));
-	createPixmapButton(tr("Enable Mid Band"), this, 143, 146, &controls->m_band2EnabledModel, "mid_band_active", "mid_band_inactive", tr("Enable Mid Band"));
-	createPixmapButton(tr("Enable Low Band"), this, 143, 226, &controls->m_band3EnabledModel, "low_band_active", "low_band_inactive", tr("Enable Low Band"));
+	createPixmapButton(tr("Enable high band"), this, 143, 66, &controls->m_band1EnabledModel, "high_band_active", "high_band_inactive", tr("Enable high band"));
+	createPixmapButton(tr("Enable mid band"), this, 143, 146, &controls->m_band2EnabledModel, "mid_band_active", "mid_band_inactive", tr("Enable mid band"));
+	createPixmapButton(tr("Enable low band"), this, 143, 226, &controls->m_band3EnabledModel, "low_band_active", "low_band_inactive", tr("Enable low band"));
 
-	createKnob(KnobType::Bright26, this, 53, 43, &controls->m_inHighModel, tr("High Input Volume:"), " dB", tr("Input volume for high band"));
-	createKnob(KnobType::Bright26, this, 53, 123, &controls->m_inMidModel, tr("Mid Input Volume:"), " dB", tr("Input volume for mid band"));
-	createKnob(KnobType::Bright26, this, 53, 203, &controls->m_inLowModel, tr("Low Input Volume:"), " dB", tr("Input volume for low band"));
-	createKnob(KnobType::Bright26, this, 320, 43, &controls->m_outHighModel, tr("High Output Volume:"), " dB", tr("Output volume for high band"));
-	createKnob(KnobType::Bright26, this, 320, 123, &controls->m_outMidModel, tr("Mid Output Volume:"), " dB", tr("Output volume for mid band"));
-	createKnob(KnobType::Bright26, this, 320, 203, &controls->m_outLowModel, tr("Low Output Volume:"), " dB", tr("Output volume for low band"));
+	createKnob(KnobType::Bright26, this, 53, 43, &controls->m_inHighModel, tr("High input volume:"), " dB", tr("Input volume for high band"));
+	createKnob(KnobType::Bright26, this, 53, 123, &controls->m_inMidModel, tr("Mid input volume:"), " dB", tr("Input volume for mid band"));
+	createKnob(KnobType::Bright26, this, 53, 203, &controls->m_inLowModel, tr("Low input volume:"), " dB", tr("Input volume for low band"));
+	createKnob(KnobType::Bright26, this, 320, 43, &controls->m_outHighModel, tr("High output volume:"), " dB", tr("Output volume for high band"));
+	createKnob(KnobType::Bright26, this, 320, 123, &controls->m_outMidModel, tr("Mid output volume:"), " dB", tr("Output volume for mid band"));
+	createKnob(KnobType::Bright26, this, 320, 203, &controls->m_outLowModel, tr("Low output volume:"), " dB", tr("Output volume for low band"));
 
-	createLcdFloatSpinBox(3, 3, "11green", tr("Above Threshold High"), this, 300, 13, &controls->m_aThreshHModel, tr("Downward compression threshold for high band"));
-	createLcdFloatSpinBox(3, 3, "11green", tr("Above Threshold Mid"), this, 300, 93, &controls->m_aThreshMModel, tr("Downward compression threshold for mid band"));
-	createLcdFloatSpinBox(3, 3, "11green", tr("Above Threshold Low"), this, 300, 173, &controls->m_aThreshLModel, tr("Downward compression threshold for low band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Above Ratio High"), this, 284, 44, &controls->m_aRatioHModel, tr("Downward compression ratio for high band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Above Ratio Mid"), this, 284, 124, &controls->m_aRatioMModel, tr("Downward compression ratio for mid band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Above Ratio Low"), this, 284, 204, &controls->m_aRatioLModel, tr("Downward compression ratio for low band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Above threshold high"), this, 300, 13, &controls->m_aThreshHModel, tr("Downward compression threshold for high band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Above threshold mid"), this, 300, 93, &controls->m_aThreshMModel, tr("Downward compression threshold for mid band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Above threshold low"), this, 300, 173, &controls->m_aThreshLModel, tr("Downward compression threshold for low band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Above ratio high"), this, 284, 44, &controls->m_aRatioHModel, tr("Downward compression ratio for high band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Above ratio mid"), this, 284, 124, &controls->m_aRatioMModel, tr("Downward compression ratio for mid band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Above ratio low"), this, 284, 204, &controls->m_aRatioLModel, tr("Downward compression ratio for low band"));
 
-	createLcdFloatSpinBox(3, 3, "11green", tr("Below Threshold High"), this, 59, 13, &controls->m_bThreshHModel, tr("Upward compression threshold for high band"));
-	createLcdFloatSpinBox(3, 3, "11green", tr("Below Threshold Mid"), this, 59, 93, &controls->m_bThreshMModel, tr("Upward compression threshold for mid band"));
-	createLcdFloatSpinBox(3, 3, "11green", tr("Below Threshold Low"), this, 59, 173, &controls->m_bThreshLModel, tr("Upward compression threshold for low band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Below Ratio High"), this, 87, 44, &controls->m_bRatioHModel, tr("Upward compression ratio for high band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Below Ratio Mid"), this, 87, 124, &controls->m_bRatioMModel, tr("Upward compression ratio for mid band"));
-	createLcdFloatSpinBox(2, 2, "11green", tr("Below Ratio Low"), this, 87, 204, &controls->m_bRatioLModel, tr("Upward compression ratio for low band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Below threshold high"), this, 59, 13, &controls->m_bThreshHModel, tr("Upward compression threshold for high band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Below threshold mid"), this, 59, 93, &controls->m_bThreshMModel, tr("Upward compression threshold for mid band"));
+	createLcdFloatSpinBox(3, 3, "11green", tr("Below threshold low"), this, 59, 173, &controls->m_bThreshLModel, tr("Upward compression threshold for low band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Below ratio high"), this, 87, 44, &controls->m_bRatioHModel, tr("Upward compression ratio for high band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Below ratio mid"), this, 87, 124, &controls->m_bRatioMModel, tr("Upward compression ratio for mid band"));
+	createLcdFloatSpinBox(2, 2, "11green", tr("Below ratio low"), this, 87, 204, &controls->m_bRatioLModel, tr("Upward compression ratio for low band"));
 
-	createKnob(KnobType::Small17, this, 120, 61, &controls->m_atkHModel, tr("Attack High:"), " ms", tr("Attack time for high band"));
-	createKnob(KnobType::Small17, this, 120, 141, &controls->m_atkMModel, tr("Attack Mid:"), " ms", tr("Attack time for mid band"));
-	createKnob(KnobType::Small17, this, 120, 221, &controls->m_atkLModel, tr("Attack Low:"), " ms", tr("Attack time for low band"));
-	createKnob(KnobType::Small17, this, 261, 61, &controls->m_relHModel, tr("Release High:"), " ms", tr("Release time for high band"));
-	createKnob(KnobType::Small17, this, 261, 141, &controls->m_relMModel, tr("Release Mid:"), " ms", tr("Release time for mid band"));
-	createKnob(KnobType::Small17, this, 261, 221, &controls->m_relLModel, tr("Release Low:"), " ms", tr("Release time for low band"));
+	createKnob(KnobType::Small17, this, 120, 61, &controls->m_atkHModel, tr("Attack high:"), " ms", tr("Attack time for high band"));
+	createKnob(KnobType::Small17, this, 120, 141, &controls->m_atkMModel, tr("Attack mid:"), " ms", tr("Attack time for mid band"));
+	createKnob(KnobType::Small17, this, 120, 221, &controls->m_atkLModel, tr("Attack low:"), " ms", tr("Attack time for low band"));
+	createKnob(KnobType::Small17, this, 261, 61, &controls->m_relHModel, tr("Release high:"), " ms", tr("Release time for high band"));
+	createKnob(KnobType::Small17, this, 261, 141, &controls->m_relMModel, tr("Release mid:"), " ms", tr("Release time for mid band"));
+	createKnob(KnobType::Small17, this, 261, 221, &controls->m_relLModel, tr("Release low:"), " ms", tr("Release time for low band"));
 
-	createKnob(KnobType::Small17, this, 380, 42, &controls->m_rmsTimeModel, tr("RMS Time:"), " ms", tr("RMS size for sidechain signal (set to 0 for Peak mode)"));
+	createKnob(KnobType::Small17, this, 380, 42, &controls->m_rmsTimeModel, tr("RMS time:"), " ms", tr("RMS size for sidechain signal (set to 0 for peak mode)"));
 	createKnob(KnobType::Small17, this, 356, 42, &controls->m_kneeModel, tr("Knee:"), " dB", tr("Knee size for all compressors"));
 	createKnob(KnobType::Small17, this, 24, 146, &controls->m_rangeModel, tr("Range:"), " dB", tr("Maximum gain increase for all bands"));
 	createKnob(KnobType::Small17, this, 13, 114, &controls->m_balanceModel, tr("Balance:"), " dB", tr("Bias input volume towards one channel"));
 
-	createPixmapButton(tr("Scale output volume with Depth"), this, 51, 0, &controls->m_depthScalingModel, "depthScaling_active", "depthScaling_inactive",
-						tr("Scale output volume with Depth parameter"));
-	createPixmapButton(tr("Stereo Link"), this, 52, 237, &controls->m_stereoLinkModel, "stereoLink_active", "stereoLink_inactive",
+	createPixmapButton(tr("Scale output volume with depth"), this, 51, 0, &controls->m_depthScalingModel, "depthScaling_active", "depthScaling_inactive",
+						tr("Scale output volume with depth parameter"));
+	createPixmapButton(tr("Stereo link"), this, 52, 237, &controls->m_stereoLinkModel, "stereoLink_active", "stereoLink_inactive",
 						tr("Apply same gain change to both channels"));
 
-	createKnob(KnobType::Small17, this, 24, 80, &controls->m_autoTimeModel, tr("Auto Time:"), "", tr("Speed up attack and release times when transients occur"));
-	createKnob(KnobType::Bright26, this, 363, 4, &controls->m_mixModel, tr("Mix:"), "", tr("Wet/Dry of all bands"));
+	createKnob(KnobType::Small17, this, 24, 80, &controls->m_autoTimeModel, tr("Auto time:"), "", tr("Speed up attack and release times when transients occur"));
+	createKnob(KnobType::Bright26, this, 363, 4, &controls->m_mixModel, tr("Mix:"), "", tr("Wet/dry of all bands"));
 
 	m_feedbackButton = createPixmapButton(tr("Feedback"), this, 317, 238, &controls->m_feedbackModel, "feedback_active", "feedback_inactive",
 										tr("Use output as sidechain signal instead of input"));

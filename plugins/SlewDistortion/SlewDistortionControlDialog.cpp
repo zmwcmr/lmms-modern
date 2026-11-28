@@ -111,11 +111,11 @@ SlewDistortionControlDialog::SlewDistortionControlDialog(SlewDistortionControls*
 	bias2Draggable->move(416, bias2Draggable->y());
 	bias2Draggable->setDefaultValPixmap(PLUGIN_NAME::getIconPixmap("handle_zero"));
 	
-	m_slewUp1Knob = makeKnob(96, 65, tr("Slew Up 1:"), "", &controls->m_slewUp1Model);
-	m_slewUp2Knob = makeKnob(96, 186, tr("Slew Up 2:"), "", &controls->m_slewUp2Model);
-	m_slewDown1Knob = makeKnob(163, 65, tr("Slew Down 1:"), "",
+	m_slewUp1Knob = makeKnob(96, 65, tr("Slew up 1:"), "", &controls->m_slewUp1Model);
+	m_slewUp2Knob = makeKnob(96, 186, tr("Slew up 2:"), "", &controls->m_slewUp2Model);
+	m_slewDown1Knob = makeKnob(163, 65, tr("Slew down 1:"), "",
 		controls->m_slewLink1Model.value() ? &controls->m_slewUp1Model : &controls->m_slewDown1Model);
-	m_slewDown2Knob = makeKnob(163, 186, tr("Slew Down 2:"), "",
+	m_slewDown2Knob = makeKnob(163, 186, tr("Slew down 2:"), "",
 		controls->m_slewLink2Model.value() ? &controls->m_slewUp2Model : &controls->m_slewDown2Model);
 	makeKnob(329, 26, tr("Warp 1:"), "", &controls->m_warp1Model);
 	makeKnob(329, 147, tr("Warp 2:"), "", &controls->m_warp2Model);
@@ -127,8 +127,8 @@ SlewDistortionControlDialog::SlewDistortionControlDialog(SlewDistortionControls*
 	makeKnob(267, 186, tr("Release 2:"), "", &controls->m_release2Model);
 	makeKnob(225, 26, tr("Dynamics 1:"), "", &controls->m_dynamics1Model);
 	makeKnob(225, 147, tr("Dynamics 2:"), "", &controls->m_dynamics2Model);
-	makeKnob(267, 26, tr("Dynamic Slew 1:"), "", &controls->m_dynamicSlew1Model);
-	makeKnob(267, 147, tr("Dynamic Slew 2:"), "", &controls->m_dynamicSlew2Model);
+	makeKnob(267, 26, tr("Dynamic slew 1:"), "", &controls->m_dynamicSlew1Model);
+	makeKnob(267, 147, tr("Dynamic slew 2:"), "", &controls->m_dynamicSlew2Model);
 	
 	Draggable* outVol1Draggable = new Draggable(DirectionOfManipulation::Vertical,
 		&controls->m_outVol1Model, PLUGIN_NAME::getIconPixmap("handle"), 108, 34, this);
@@ -139,7 +139,7 @@ SlewDistortionControlDialog::SlewDistortionControlDialog(SlewDistortionControls*
 	outVol2Draggable->move(594, outVol2Draggable->y());
 	outVol2Draggable->setDefaultValPixmap(PLUGIN_NAME::getIconPixmap("handle_zero"));
 	
-	makeToggleButton(132, 70, tr("Slew Link 1"), "link_on", "link_off", &controls->m_slewLink1Model);
+	makeToggleButton(132, 70, tr("Slew link 1"), "link_on", "link_off", &controls->m_slewLink1Model);
 	connect(&controls->m_slewLink1Model, &BoolModel::dataChanged, this, [this, controls]{
 		if (controls->m_slewLink1Model.value())
 		{
@@ -151,7 +151,7 @@ SlewDistortionControlDialog::SlewDistortionControlDialog(SlewDistortionControls*
 			m_slewDown1Knob->setModel(&controls->m_slewDown1Model);
 		}
 	});
-	makeToggleButton(132, 191, tr("Slew Link 2"), "link_on", "link_off", &controls->m_slewLink2Model);
+	makeToggleButton(132, 191, tr("Slew link 2"), "link_on", "link_off", &controls->m_slewLink2Model);
 	connect(&controls->m_slewLink2Model, &BoolModel::dataChanged, this, [this, controls]{
 		if (controls->m_slewLink2Model.value())
 		{
@@ -164,19 +164,19 @@ SlewDistortionControlDialog::SlewDistortionControlDialog(SlewDistortionControls*
 		}
 	});
 	
-	makeToggleButton(9, 248, tr("DC Offset Removal"), "dc_on", "dc_off", &controls->m_dcRemoveModel);
+	makeToggleButton(9, 248, tr("DC offset removal"), "dc_on", "dc_off", &controls->m_dcRemoveModel);
 	makeToggleButton(99, 248, tr("Multiband"), "mb_on", "mb_off", &controls->m_multibandModel);
 
 	makeKnob(190, 249, tr("Split:"), "", &controls->m_splitModel, true);
 	makeKnob(338, 78, tr("Mix 1:"), "", &controls->m_mix1Model);
 	makeKnob(338, 199, tr("Mix 2:"), "", &controls->m_mix2Model);
 	
-	PixmapButton* oversample1xButton = makeGroupButton(454, 248, tr("Disable Oversampling"), "oversample_1x_on", "oversample_1x_off");
-	PixmapButton* oversample2xButton = makeGroupButton(479, 248, tr("2x Oversampling"), "oversample_2x_on", "oversample_2x_off");
-	PixmapButton* oversample4xButton = makeGroupButton(504, 248, tr("4x Oversampling"), "oversample_4x_on", "oversample_4x_off");
-	PixmapButton* oversample8xButton = makeGroupButton(529, 248, tr("8x Oversampling"), "oversample_8x_on", "oversample_8x_off");
-	PixmapButton* oversample16xButton = makeGroupButton(554, 248, tr("16x Oversampling"), "oversample_16x_on", "oversample_16x_off");
-	PixmapButton* oversample32xButton = makeGroupButton(579, 248, tr("32x Oversampling"), "oversample_32x_on", "oversample_32x_off");
+	PixmapButton* oversample1xButton = makeGroupButton(454, 248, tr("Disable oversampling"), "oversample_1x_on", "oversample_1x_off");
+	PixmapButton* oversample2xButton = makeGroupButton(479, 248, tr("2x oversampling"), "oversample_2x_on", "oversample_2x_off");
+	PixmapButton* oversample4xButton = makeGroupButton(504, 248, tr("4x oversampling"), "oversample_4x_on", "oversample_4x_off");
+	PixmapButton* oversample8xButton = makeGroupButton(529, 248, tr("8x oversampling"), "oversample_8x_on", "oversample_8x_off");
+	PixmapButton* oversample16xButton = makeGroupButton(554, 248, tr("16x oversampling"), "oversample_16x_on", "oversample_16x_off");
+	PixmapButton* oversample32xButton = makeGroupButton(579, 248, tr("32x oversampling"), "oversample_32x_on", "oversample_32x_off");
 
 	AutomatableButtonGroup* oversampleGroup = new AutomatableButtonGroup(this);
 	oversampleGroup->addButton(oversample1xButton);
