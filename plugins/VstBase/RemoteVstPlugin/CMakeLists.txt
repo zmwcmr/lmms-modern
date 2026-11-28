@@ -41,9 +41,14 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/")
 else()
 set(EXE_NAME RemoteVstPlugin${BITNESS})
 endif()
+if(NOT IS_WIN)
+	set(LOADING_PLACEHOLDER_SRC
+		"${LMMS_SOURCE_DIR}/src/gui/X11LoadingPlaceholder.cpp")
+endif()
 add_executable(${EXE_NAME} WIN32
 	../RemoteVstPlugin.cpp
 	${LMMS_COMMON_SRCS}
+	${LOADING_PLACEHOLDER_SRC}
 )
 if(IS_WIN)
 	target_link_libraries(${EXE_NAME} ole32)

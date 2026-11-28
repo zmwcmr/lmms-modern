@@ -377,6 +377,10 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       is open and opens/closes it on toggle.
       The parameter drawer is collapsed by default; the plugin's own GUI is
       the primary editor. The old giant knob grids are no longer the default.
+- [x] X11 plugin windows paint a dark LMMS logo placeholder with a
+      "Loading plugin GUI..." line before the editor is mapped. The shared
+      helper is used by VST2, VST3 and LV2, including the isolated VST2/LV2
+      hosts, so a slow editor shows a loading state instead of a black window.
 - [x] All hosted instrument views are resizable: VST3 no longer forces
       `QLayout::SetFixedSize`, LV2 returns `isResizable() == true`, and the
       common panel has a usable minimum width.

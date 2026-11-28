@@ -6,6 +6,7 @@ ENDIF()
 
 BUILD_PLUGIN(vst3base
 	../vst3_base.cpp
+	${CMAKE_SOURCE_DIR}/src/gui/X11LoadingPlaceholder.cpp
 	${CMAKE_SOURCE_DIR}/src/gui/X11EditorWindow.cpp
 	../Vst3Module.cpp ../Vst3Module.h
 	../Vst3Scanner.cpp ../Vst3Scanner.h

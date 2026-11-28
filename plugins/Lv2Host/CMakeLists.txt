@@ -8,11 +8,17 @@ IF(NOT LMMS_HAVE_LV2)
 	RETURN()
 ENDIF()
 
+SET(LV2_HOST_PLACEHOLDER_SRC)
+IF(LMMS_BUILD_LINUX)
+	SET(LV2_HOST_PLACEHOLDER_SRC
+		"${CMAKE_SOURCE_DIR}/src/gui/X11LoadingPlaceholder.cpp")
+ENDIF()
 ADD_EXECUTABLE(lmms-lv2-host
 	Lv2Host.cpp
 	${CMAKE_SOURCE_DIR}/src/common/RemotePluginBase.cpp
 	${CMAKE_SOURCE_DIR}/src/common/SharedMemory.cpp
 	${CMAKE_SOURCE_DIR}/src/common/SystemSemaphore.cpp
+	${LV2_HOST_PLACEHOLDER_SRC}
 )
 
 TARGET_INCLUDE_DIRECTORIES(lmms-lv2-host PRIVATE

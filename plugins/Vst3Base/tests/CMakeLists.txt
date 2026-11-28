@@ -39,6 +39,7 @@ ADD_EXECUTABLE(vst3-editor-test
 	../Vst3EditorWindow.cpp
 	../Vst3X11Editor.cpp
 	${CMAKE_SOURCE_DIR}/src/gui/X11EditorWindow.cpp
+	${CMAKE_SOURCE_DIR}/src/gui/X11LoadingPlaceholder.cpp
 	../Vst3RemoteEditorClient.cpp
 	../Vst3RemoteEditorWidget.cpp
 	${VST3_REMOTE_HOST_SRC}

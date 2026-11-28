@@ -82,6 +82,7 @@
 
 #if defined(LMMS_BUILD_LINUX)
 #include <X11/Xlib.h>
+#include "X11LoadingPlaceholder.h"
 #include <X11/Xutil.h>
 #endif
 

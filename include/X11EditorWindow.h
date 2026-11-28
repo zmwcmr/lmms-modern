@@ -112,6 +112,7 @@ private:
 	bool m_hasFixedSize = false;
 	//! Size of a resize() call whose ConfigureNotify must be ignored.
 	bool m_expectResize = false;
+	bool m_placeholderPending = true;
 	int m_expectedWidth = 0;
 	int m_expectedHeight = 0;
 };

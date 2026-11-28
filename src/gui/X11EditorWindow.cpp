@@ -22,6 +22,7 @@
 
 #if defined(Q_OS_LINUX)
 #	include <X11/Xlib.h>
+#	include "X11LoadingPlaceholder.h"
 #	include <X11/Xutil.h>
 #endif
 
@@ -87,6 +88,7 @@ bool X11EditorWindow::open(const Options& options)
 
 	m_display = display;
 	m_window = window;
+	paintLoadingPlaceholder(display, window);
 
 	if (!options.title.isEmpty())
 	{
@@ -248,6 +250,11 @@ void X11EditorWindow::resize(int width, int height)
 	if (display == nullptr || m_window == 0 || width <= 0 || height <= 0)
 	{
 		return;
+	}
+	if (m_placeholderPending)
+	{
+		paintLoadingPlaceholder(display, m_window);
+		m_placeholderPending = false;
 	}
 	m_expectResize = true;
 	m_expectedWidth = width;

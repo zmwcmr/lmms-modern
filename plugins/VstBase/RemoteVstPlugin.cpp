@@ -71,6 +71,7 @@
 #include <X11/Xos.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include "X11LoadingPlaceholder.h"
 #include <sstream>
 #include <time.h>
 
@@ -992,6 +993,7 @@ void RemoteVstPlugin::initEditor()
 			| ButtonMotionMask | ExposureMask | KeyPressMask);
 	
 	pluginDispatch(effEditTop);
+	paintLoadingPlaceholder(m_display, m_window);
 #endif // NATIVE_LINUX_VST
 }
 
