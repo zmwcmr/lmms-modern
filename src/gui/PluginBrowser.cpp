@@ -33,11 +33,10 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
-#include <QStyleOption>
-#include <QTimer>
 #include <QTreeWidget>
 
 #include "embed.h"
+#include "CompactItemDelegate.h"
 #include "FontHelper.h"
 #include "Engine.h"
 #include "InstrumentTrack.h"
@@ -51,12 +50,39 @@ namespace lmms::gui
 
 namespace
 {
+class PluginItem : public QTreeWidgetItem
+{
+public:
+	explicit PluginItem(const PluginKey& key) : m_key(key)
+	{
+		setText(0, key.displayName());
+		setIcon(0, key.logo()->pixmap());
+		setToolTip(0, key.desc->subPluginFeatures
+			? key.description()
+			: PluginBrowser::tr(key.desc->description));
+		setFlags(flags() | Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled);
+	}
+
+	const PluginKey& pluginKey() const { return m_key; }
+	PluginKey& pluginKey() { return m_key; }
+
+private:
+	PluginKey m_key;
+};
+
+
 class PluginBrowserTree : public QTreeWidget
 {
 public:
 	explicit PluginBrowserTree(QWidget* parent) : QTreeWidget(parent)
 	{
 		setObjectName(QStringLiteral("pluginBrowserTree"));
+		setMouseTracking(true);
+		setUniformRowHeights(true);
+		setIconSize(QSize(16, 16));
+		setTextElideMode(Qt::ElideMiddle);
+		setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+		setItemDelegate(new CompactItemDelegate(this));
 	}
 
 protected:
@@ -78,9 +104,46 @@ protected:
 		painter->drawPath(arrow);
 		painter->restore();
 	}
+
+	void mousePressEvent(QMouseEvent* event) override
+	{
+		QTreeWidget::mousePressEvent(event);
+		m_pressItem = nullptr;
+		if (event->button() == Qt::LeftButton)
+		{
+			m_pressPos = event->pos();
+			m_pressItem = dynamic_cast<PluginItem*>(itemAt(event->pos()));
+		}
+	}
+
+	void mouseMoveEvent(QMouseEvent* event) override
+	{
+		if (m_pressItem && (event->buttons() & Qt::LeftButton)
+			&& (event->pos() - m_pressPos).manhattanLength() >= QApplication::startDragDistance())
+		{
+			auto* item = m_pressItem;
+			m_pressItem = nullptr;
+			auto& key = item->pluginKey();
+			Engine::setDndPluginKey(&key);
+			new StringPairDrag(QStringLiteral("instrument"),
+				QString::fromUtf8(key.desc->name), key.logo()->pixmap(), this);
+			event->accept();
+			return;
+		}
+		QTreeWidget::mouseMoveEvent(event);
+	}
+
+	void mouseReleaseEvent(QMouseEvent* event) override
+	{
+		m_pressItem = nullptr;
+		QTreeWidget::mouseReleaseEvent(event);
+	}
+
+private:
+	QPoint m_pressPos;
+	PluginItem* m_pressItem = nullptr;
 };
 }
-
 
 PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	SideBarWidget( tr( "Instrument plugins" ),
@@ -118,9 +181,38 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	m_descTree->header()->setVisible( false );
 	m_descTree->setIndentation(20);
 	m_descTree->setSelectionMode( QAbstractItemView::SingleSelection );
+	m_descTree->setSelectionBehavior( QAbstractItemView::SelectRows );
+	m_descTree->setContextMenuPolicy( Qt::CustomContextMenu );
 
 	connect( m_searchBar, SIGNAL( textEdited( const QString& ) ),
 			this, SLOT( onFilterChanged( const QString& ) ) );
+
+	connect( m_descTree, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+		auto* item = dynamic_cast<PluginItem*>(m_descTree->itemAt(pos));
+		if (!item) { return; }
+
+		const auto key = item->pluginKey();
+		QMenu menu(m_descTree);
+		menu.addAction(tr("Send to new instrument track"),
+			[this, key] { openInNewInstrumentTrack(key); });
+		if (auto* features = key.desc->subPluginFeatures; features && features->canRescan())
+		{
+			menu.addAction(tr("Rescan plugins"), [this, features] {
+				QApplication::setOverrideCursor(Qt::WaitCursor);
+				features->rescan();
+				QApplication::restoreOverrideCursor();
+				reloadPlugins();
+			});
+		}
+		menu.exec(m_descTree->viewport()->mapToGlobal(pos));
+	});
+
+	connect( m_descTree, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item, int) {
+		if (auto* pluginItem = dynamic_cast<PluginItem*>(item))
+		{
+			openInNewInstrumentTrack(pluginItem->pluginKey());
+		}
+	});
 
 	view_layout->addWidget( hint );
 	view_layout->addWidget( m_searchBar );
@@ -150,7 +242,8 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	addPlugins();
 
 	// Resize
-	m_descTree->header()->setSectionResizeMode( QHeaderView::ResizeToContents );
+	m_descTree->header()->setStretchLastSection(true);
+	m_descTree->header()->setSectionResizeMode(QHeaderView::Stretch);
 
 	// Hide empty roots
 	updateRootVisibilities();
@@ -160,7 +253,18 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 void PluginBrowser::updateRootVisibility( int rootIndex )
 {
 	QTreeWidgetItem * root = m_descTree->topLevelItem( rootIndex );
-	root->setHidden( !root->childCount() );
+	if (!root) { return; }
+
+	bool hasVisibleChild = false;
+	for (int i = 0; i < root->childCount(); ++i)
+	{
+		if (!root->child(i)->isHidden())
+		{
+			hasVisibleChild = true;
+			break;
+		}
+	}
+	root->setHidden(!hasVisibleChild);
 }
 
 
@@ -209,8 +313,8 @@ void PluginBrowser::onFilterChanged( const QString & filter )
 		for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex)
 		{
 			QTreeWidgetItem * item = root->child( itemIndex );
-			auto descWidget = static_cast<PluginDescWidget*>(m_descTree->itemWidget(item, 0));
-			if (descWidget->name().contains(filter, Qt::CaseInsensitive))
+			auto* pluginItem = dynamic_cast<PluginItem*>(item);
+			if (pluginItem && pluginItem->text(0).contains(filter, Qt::CaseInsensitive))
 			{
 				item->setHidden( false );
 			}
@@ -220,6 +324,16 @@ void PluginBrowser::onFilterChanged( const QString & filter )
 			}
 		}
 	}
+	updateRootVisibilities();
+	if (!filter.isEmpty())
+	{
+		for (int rootIndex = 0; rootIndex < rootCount; ++rootIndex)
+		{
+			auto* root = m_descTree->topLevelItem(rootIndex);
+			if (!root->isHidden()) { root->setExpanded(true); }
+		}
+	}
+	m_descTree->viewport()->update();
 }
 
 
@@ -236,15 +350,9 @@ void PluginBrowser::addPlugins()
 	};
 
 	// Add the plugin identified by `key` to the tree under the root node `root`
-	const auto addPlugin = [this](const auto& key, auto root)
+	const auto addPlugin = [](const auto& key, auto root)
 	{
-		const auto item = new QTreeWidgetItem();
-		root->addChild(item);
-		const auto widget = new PluginDescWidget(key, m_descTree);
-		connect(widget, &PluginDescWidget::rescanRequested, this, [this] {
-			QTimer::singleShot(0, this, &PluginBrowser::reloadPlugins);
-		});
-		m_descTree->setItemWidget(item, 0, widget);
+		root->addChild(new PluginItem(key));
 	};
 
 	// Remove any existing plugins from the tree
@@ -292,131 +400,12 @@ void PluginBrowser::addPlugins()
 
 
 
-PluginDescWidget::PluginDescWidget(const PluginKey &_pk,
-							QWidget * _parent ) :
-	QWidget( _parent ),
-	m_pluginKey( _pk ),
-	m_logo( _pk.logo()->pixmap() ),
-	m_mouseOver( false )
+void PluginBrowser::openInNewInstrumentTrack(const PluginKey& key)
 {
-	setFont(bodyFont(font()));
-	setFixedHeight(qMax(DEFAULT_HEIGHT, QFontMetrics(bodyFont(font())).height() + 6));
-	setMouseTracking( true );
-	setCursor( Qt::PointingHandCursor );
-	setToolTip(_pk.desc->subPluginFeatures
-		? _pk.description()
-		: tr(_pk.desc->description));
+	auto* trackContainer = Engine::getSong();
+	auto* track = dynamic_cast<InstrumentTrack*>(Track::create(Track::Type::Instrument, trackContainer));
+	auto* loader = new InstrumentLoaderThread(this, track, QString::fromUtf8(key.desc->name));
+	loader->start();
 }
-
-
-
-
-QString PluginDescWidget::name() const
-{
-	return m_pluginKey.displayName();
-}
-
-
-
-
-void PluginDescWidget::paintEvent( QPaintEvent * )
-{
-
-	QPainter p( this );
-
-	// Paint everything according to the style sheet
-	QStyleOption o;
-	o.initFrom( this );
-	style()->drawPrimitive( QStyle::PE_Widget, &o, &p, this );
-
-	// Draw the rest
-	const int s = 16 + ( 32 * ( qBound( 24, height(), 60 ) - 24 ) ) /
-								( 60 - 24 );
-	const qreal dpr = m_logo.devicePixelRatio();
-	QPixmap logo = m_logo.scaled( QSize( s, s ) * dpr, Qt::KeepAspectRatio,
-						Qt::SmoothTransformation );
-	logo.setDevicePixelRatio( dpr );
-	p.drawPixmap( 4, 4, logo );
-
-	QFont f = p.font();
-	if ( m_mouseOver )
-	{
-		f.setWeight(QFont::DemiBold);
-	}
-
-	p.setFont( f );
-	const auto metrics = p.fontMetrics();
-	const int baseline = (height() - metrics.height()) / 2 + metrics.ascent();
-	p.drawText(10 + s, baseline, m_pluginKey.displayName());
-}
-
-
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-void PluginDescWidget::enterEvent(QEnterEvent* event)
-#else
-void PluginDescWidget::enterEvent(QEvent* event)
-#endif
-{
-	m_mouseOver = true;
-
-	QWidget::enterEvent(event);
-}
-
-
-
-
-void PluginDescWidget::leaveEvent( QEvent * _e )
-{
-	m_mouseOver = false;
-
-	QWidget::leaveEvent( _e );
-}
-
-
-
-
-void PluginDescWidget::mousePressEvent( QMouseEvent * _me )
-{
-	Engine::setDndPluginKey(&m_pluginKey);
-	if ( _me->button() == Qt::LeftButton )
-	{
-		new StringPairDrag("instrument",
-			QString::fromUtf8(m_pluginKey.desc->name), m_logo, this);
-		leaveEvent( _me );
-	}
-}
-
-
-void PluginDescWidget::contextMenuEvent(QContextMenuEvent* e)
-{
-	QMenu contextMenu(this);
-	contextMenu.addAction(
-		tr("Send to new instrument track"),
-		[=, this]{ openInNewInstrumentTrack(m_pluginKey.desc->name); }
-	);
-
-	if (auto* features = m_pluginKey.desc->subPluginFeatures;
-		features && features->canRescan())
-	{
-		contextMenu.addAction(tr("Rescan plugins"), [this, features] {
-			QApplication::setOverrideCursor(Qt::WaitCursor);
-			features->rescan();
-			QApplication::restoreOverrideCursor();
-			emit rescanRequested();
-		});
-	}
-
-	contextMenu.exec(e->globalPos());
-}
-
-
-void PluginDescWidget::openInNewInstrumentTrack(QString value)
-{
-	TrackContainer* tc = Engine::getSong();
-	auto it = dynamic_cast<InstrumentTrack*>(Track::create(Track::Type::Instrument, tc));
-	auto ilt = new InstrumentLoaderThread(this, it, value);
-	ilt->start();
-}
-
 
 } // namespace lmms::gui

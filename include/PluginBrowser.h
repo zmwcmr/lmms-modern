@@ -25,16 +25,16 @@
 #ifndef LMMS_GUI_PLUGIN_BROWSER_H
 #define LMMS_GUI_PLUGIN_BROWSER_H
 
-#include <QPixmap>
-
 #include "SideBarWidget.h"
 #include "Plugin.h"
 
-class QTreeWidget;
 class QLineEdit;
+class QTreeWidget;
 
 namespace lmms::gui
 {
+
+using PluginKey = Plugin::Descriptor::SubPluginFeatures::Key;
 
 class PluginBrowser : public SideBarWidget
 {
@@ -52,43 +52,11 @@ private:
 	void rescanPlugins();
 	void updateRootVisibility( int index );
 	void updateRootVisibilities();
+	void openInNewInstrumentTrack( const PluginKey & key );
 
 	QWidget * m_view;
 	QTreeWidget * m_descTree;
 	QLineEdit * m_searchBar;
-};
-
-
-class PluginDescWidget : public QWidget
-{
-	Q_OBJECT
-public:
-	using PluginKey = Plugin::Descriptor::SubPluginFeatures::Key;
-	PluginDescWidget( const PluginKey & _pk, QWidget * _parent );
-	QString name() const;
-	void openInNewInstrumentTrack(QString value);
-
-signals:
-	void rescanRequested();
-
-protected:
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-	void enterEvent(QEnterEvent* event) override;
-#else
-	void enterEvent(QEvent* event) override;
-#endif
-	void leaveEvent( QEvent * _e ) override;
-	void mousePressEvent( QMouseEvent * _me ) override;
-	void paintEvent( QPaintEvent * _pe ) override;
-	void contextMenuEvent(QContextMenuEvent* e) override;
-
-private:
-	constexpr static int DEFAULT_HEIGHT{24};
-
-	PluginKey m_pluginKey;
-	QPixmap m_logo;
-
-	bool m_mouseOver;
 };
 
 

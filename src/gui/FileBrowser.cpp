@@ -77,6 +77,7 @@
 #include "ThreadPool.h"
 #include "Track.h"
 #include "embed.h"
+#include "CompactItemDelegate.h"
 #include "FontHelper.h"
 
 namespace lmms::gui
@@ -487,6 +488,7 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 
 	setColumnCount( 1 );
 	setFont(bodyFont(font()));
+	setItemDelegate(new CompactItemDelegate(this));
 	headerItem()->setHidden( true );
 	setSortingEnabled( false );
 

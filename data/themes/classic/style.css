@@ -734,19 +734,6 @@ lmms--gui--SideBar QToolButton {
 	font-size: 10px;
 }
 
-/* Instrument plugin list */
-
-lmms--gui--PluginDescWidget {
-	background-color: #e0e0e0;
-	color: #404040;
-	border: 1px solid rgb(64, 64, 64);
-	margin: 0px;
-}
-
-lmms--gui--PluginDescWidget:hover {
-	background-color: #e0e0e0;
-}
-
 /* piano widget */
 
 lmms--gui--PianoView {
@@ -829,9 +816,14 @@ QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 	image: none;
 }
 
-lmms--gui--FileBrowserTreeWidget,
-QTreeWidget#pluginBrowserTree {
-	show-decoration-selected: 1;
+lmms--gui--FileBrowserTreeWidget::branch:selected,
+QTreeWidget#pluginBrowserTree::branch:selected {
+	background: transparent;
+}
+
+lmms--gui--FileBrowserTreeWidget:focus,
+QTreeWidget#pluginBrowserTree:focus {
+	outline: none;
 }
 
 lmms--gui--TrackContainerView QLabel
