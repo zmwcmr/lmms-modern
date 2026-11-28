@@ -42,7 +42,7 @@
 - 文件浏览器与插件浏览器统一为标准的 `QTreeWidgetItem` 行，不再使用嵌入式 `PluginDescWidget`。
 - 侧栏列表使用内容式选中胶囊；分支/缩进区域保持透明；展开箭头有独立 hover；快速双击箭头可连续展开/收起。
 - 系统字体缩放上限 200%；关键 QtTest 覆盖字体、侧栏、子窗口、文件浏览器、乐器轨道等。
-- 图标语言 A（单色实心）已冻结；40 个基础图标（18 个 pilot + 22 个第二批）已迁入 `default`；改造前的 `default` 已快照为 `data/themes/legacy`。
+- 图标语言 A（单色实心）已冻结；67 个图标（43 个基础/支持 + 24 个文件/设置/页签/状态）已迁入 `default`；改造前的 `default` 已快照为 `data/themes/legacy`。
 
 仍需重点处理的是**插件自绘面板**、**图标迁移**和少量**主题细节**，不是主窗口结构。
 
@@ -194,6 +194,7 @@
 - 按 [`ui-spec.md`](ui-spec.md) §3.2 迁移；`legacy` 冻结，`classic` 本轮不动。
 - 首批 18 个 pilot（已迁入 `default`）：`play`、`pause`、`stop`、`record`、`undo`、`redo`、`add`、`close`、`save`、`open`、`folder`、`project_file`、`sample_file`、`search`、`metronome`、`gear`、`mute`、`solo`。
 - 第二批 22 个基础图标（已迁入 `default`）：`instrument_track`、`sample_track`、`pattern_track`、`automation_track`、`master_volume`、`reload`、`clock`、`tempo_sync`、`edit_draw`、`edit_erase`、`edit_select`、`edit_cut`、`edit_copy`、`edit_paste`、`quantize`、`project_new`、`project_export`、`project_import`、`star`、`home`、`plugins`、`help`。
+- 第三批 24 个（已迁入 `default`）：文件类型 `file`、`midi_file`、`preset_file`、`soundfont_file`、`vst_plugin_file`、`project_open_recent`、`folder_locked`；设置页 `setup_general`、`setup_audio`、`setup_midi`、`setup_directories`、`setup_performance`；乐器页签 `plugin_tab`、`env_lfo_tab`、`func_tab`、`fx_tab`、`midi_tab`、`tuning_tab`；混音/控制器 `mixer`、`new_channel`、`muted`、`controller`；状态 `info`、`error`。
 - 首批验收：16/24/48、深/浅底非空；无灰、无渐变、无文字；除 `gear`（1.5..22.5）外，内容 bbox 在 2..22。
 - `speaker_slash` 作为 mute 的 checked 状态同步迁移，由代码设置并跟随 theme ink。
 - 工具：`buildtools/icon-template.svg`、`buildtools/icon-audit.py`（audit / lint / sheet，已完成）。
@@ -212,7 +213,7 @@
 - 已完成键盘焦点第一批：`EffectSelectDialog` 的 Tab 顺序改为搜索框 → 插件列表 → 分类按钮 → Rescan → OK/Cancel；列表和分类按钮恢复键盘焦点，列表补可访问名称/描述，Enter 直接确认；新增 `EffectSelectDialogTest` 覆盖 Tab/Shift+Tab 与可访问名称。
 - 可访问名称：`FloatModelEditorBase`、`Knob`、`AutomatableButton` 从模型名或标签生成 accessible name；`CaptionWidgetsTest` 覆盖按钮名称。
 
-验收：`default` 主题 100%–200%；40 个基础图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
+验收：`default` 主题 100%–200%；67 个已迁移图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
 
 ---
 
@@ -336,6 +337,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 ## 6. 变更记录
 
 - 2026-11-28：清理重复图标：`recover` 改为盾牌+勾，`progression_linear` 改为直线节点，删除未引用的 `note_eight`。
+- 2026-11-28：第三批 24 个文件/设置/页签/状态图标迁入 `default`；已迁移图标累计 67 个。
 - 2026-11-28：第二批 22 个基础图标迁入 `default`；基础图标累计 40 个。
 - 2026-11-28：track-ops 和 LeftRightNav 图标改由代码设置并跟随 theme ink；菜单勾选改用 base style。
 - 2026-11-28：实现图标 tint（`currentColor` + icon tokens）、尺寸 token 和 `IconTest`；18 个 pilot 图标迁入 `default`。

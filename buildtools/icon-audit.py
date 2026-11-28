@@ -482,6 +482,10 @@ def compare(args):
         "文件与浏览": "Files",
         "轨道与编辑器": "Tracks & editors",
         "侧栏与状态": "Sidebar & state",
+        "设置页": "Setup",
+        "乐器页签": "Instrument tabs",
+        "混音/控制器": "Mixer & controllers",
+        "状态": "Status",
     }
 
     size = args.size

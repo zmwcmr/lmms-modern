@@ -4,7 +4,7 @@
 > 每次改动图标后，在表中追加或更新一行；只记文件名和一句备注，逐行不嵌图，统一用下面的对照图。
 > 规范见 [`ui-spec.md`](ui-spec.md)。
 >
-> 当前覆盖：43 个图标、8 个滚动条箭头、1 个删除（`note_eight`）。最后更新：2026-11-28。
+> 当前覆盖：67 个图标、8 个滚动条箭头、1 个删除（`note_eight`）。最后更新：2026-11-28。
 >
 > 重新生成图片：`buildtools/icon-audit.py compare`（读取本文件表格）。
 
@@ -29,6 +29,13 @@
 | 文件与浏览 | `project_export` | `project_export.svg` | `project_export.svg` | 托盘 + 向上箭头 |
 | 文件与浏览 | `project_import` | `project_import.svg` | `project_import.svg` | 托盘 + 向下箭头 |
 | 文件与浏览 | `zoom` | `zoom.svg` | `zoom.svg` | 搜索/缩放 |
+| 文件与浏览 | `file` | `file.svg` | `file.svg` | 单色页面 |
+| 文件与浏览 | `midi_file` | `midi_file.svg` | `midi_file.svg` | 音符孔 |
+| 文件与浏览 | `preset_file` | `preset_file.svg` | `preset_file.svg` | 书签孔 |
+| 文件与浏览 | `soundfont_file` | `soundfont_file.svg` | `soundfont_file.svg` | 扬声器孔 |
+| 文件与浏览 | `vst_plugin_file` | `vst_plugin_file.svg` | `vst_plugin_file.svg` | 插头孔 |
+| 文件与浏览 | `project_open_recent` | `project_open_recent.svg` | `project_open_recent.svg` | 列表孔 |
+| 文件与浏览 | `folder_locked` | `folder_locked.svg` | `folder_locked.svg` | 文件夹 + 锁 |
 | 轨道与编辑器 | `instrument_track` | `instrument_track.svg` | `instrument_track.svg` | 键盘 |
 | 轨道与编辑器 | `sample_track` | `sample_track.svg` | `sample_track.svg` | 波形 |
 | 轨道与编辑器 | `pattern_track` | `pattern_track.svg` | `pattern_track.svg` | 步进网格 |
@@ -55,6 +62,23 @@
 | 侧栏与状态 | `speaker` | `speaker.svg` | `speaker.svg` | 代码设置并 tint |
 | 侧栏与状态 | `speaker_slash` | `speaker_slash.svg` | `speaker_slash.svg` | mute checked；CrossoverEQ 仍走 QSS |
 | 侧栏与状态 | `headphones` | `headphones.svg` | `headphones.svg` | 代码设置并 tint |
+| 设置页 | `setup_general` | `setup_general.svg` | `setup_general.svg` | 滑杆 |
+| 设置页 | `setup_audio` | `setup_audio.svg` | `setup_audio.svg` | 扬声器 |
+| 设置页 | `setup_midi` | `setup_midi.svg` | `setup_midi.svg` | 5-pin DIN |
+| 设置页 | `setup_directories` | `setup_directories.svg` | `setup_directories.svg` | 文件夹 + 箭头孔 |
+| 设置页 | `setup_performance` | `setup_performance.svg` | `setup_performance.svg` | 仪表 |
+| 乐器页签 | `plugin_tab` | `plugin_tab.svg` | `plugin_tab.svg` | 插头 |
+| 乐器页签 | `env_lfo_tab` | `env_lfo_tab.svg` | `env_lfo_tab.svg` | 包络 |
+| 乐器页签 | `func_tab` | `func_tab.svg` | `func_tab.svg` | 和弦柱 |
+| 乐器页签 | `fx_tab` | `fx_tab.svg` | `fx_tab.svg` | 闪光 |
+| 乐器页签 | `midi_tab` | `midi_tab.svg` | `midi_tab.svg` | 音符 |
+| 乐器页签 | `tuning_tab` | `tuning_tab.svg` | `tuning_tab.svg` | 音叉 |
+| 混音/控制器 | `mixer` | `mixer.svg` | `mixer.svg` | 三推子 |
+| 混音/控制器 | `new_channel` | `new_channel.svg` | `new_channel.svg` | 通道条 + 加号 |
+| 混音/控制器 | `muted` | `muted.svg` | `muted.svg` | 扬声器 + 斜线 |
+| 混音/控制器 | `controller` | `controller.svg` | `controller.svg` | 旋钮 |
+| 状态 | `info` | `info.svg` | `info.svg` | i |
+| 状态 | `error` | `error.svg` | `error.svg` | 三角感叹号 |
 
 ## 已删除
 
