@@ -377,6 +377,27 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - LFO 控制器在 100% 和 200% 字体下已打开检查，布局无裁切。
 - 其余已改为布局驱动的插件面板目前只有构建验证，尚未逐个拖动缩放并做 100%/200% 目视。
 
+### 逐插件代码审计
+
+已改为布局驱动的面板：
+
+| 面板 | 对话框固定尺寸 | 绝对定位 | 备注 |
+| --- | --- | --- | --- |
+| PeakControllerDialog | 无 | 无 | 布局 + 拉伸 |
+| LfoControllerDialog | 无 | 无 | 100%/200% 已目视 |
+| LadspaBrowser | 无 | 无 | 标签栏 72px 图标列固定 |
+| StereoMatrix | 无 | 无 | 4 旋钮布局；待目视 |
+| Bitcrush | 无 | 无 | IN/中心/OUT 三段 |
+| CrossoverEQ | 无 | 无 | 旋钮/推子布局 |
+| Delay | 无 | 无 | 左旋钮 / 中 XyPad / 右推子 |
+| DualFilter | 无 | 无 | 两段滤波器 |
+| FrequencyShifter | 无 | 无 | 四段布局；旋钮自身尺寸固定 |
+| MultitapEcho | 无 | 无 | 双图形 + 底部控制 |
+| DynamicsProcessor | 无 | 无 | 图形 + 控件布局 |
+| GranularPitchShifter | 无 | 无 | 4×4 网格 |
+
+剩余固定尺寸只出现在 Knob、PixmapButton、Ladspa 图标列等非文本控件上，属于预期。`StereoMatrix` 和 `CrossoverEQ` 没有显式 `adjustSize()`，依赖布局最小尺寸；需要视觉复核初始大小。
+
 已知边界：
 
 - MDI 子窗口默认不参与主窗口的自动排列；主窗口变窄时可能被裁剪，需要另行实现自动排列或限制。
