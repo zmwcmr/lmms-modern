@@ -47,9 +47,10 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	m_parameterProvider(std::move(parameters))
 {
 	setMinimumWidth(360);
-	auto* layout = new QVBoxLayout(this);
-	layout->setContentsMargins(0, 0, 0, 0);
-	layout->setSpacing(4);
+	setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+	m_outerLayout = new QVBoxLayout(this);
+	m_outerLayout->setContentsMargins(0, 0, 0, 0);
+	m_outerLayout->setSpacing(4);
 
 	auto* infoRow = new QHBoxLayout();
 	m_title = new QLabel(this);
@@ -59,7 +60,7 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	infoRow->addWidget(m_title, 1);
 	m_vendor = new QLabel(this);
 	infoRow->addWidget(m_vendor);
-	layout->addLayout(infoRow);
+	m_outerLayout->addLayout(infoRow);
 
 	auto* toolbar = new QHBoxLayout();
 	m_guiButton = new LedCheckBox(tr("Plugin GUI"), this, QString(),
@@ -77,7 +78,7 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	m_helpButton->setCheckable(true);
 	toolbar->addWidget(m_helpButton);
 	toolbar->addStretch();
-	layout->addLayout(toolbar);
+	m_outerLayout->addLayout(toolbar);
 
 	auto* presetRow = new QHBoxLayout();
 	m_presetLabel = new QLabel(tr("Preset"), this);
@@ -91,7 +92,7 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	m_openButton = new QPushButton(tr("Open..."), this);
 	m_openButton->setToolTip(tr("Open a plugin file"));
 	presetRow->addWidget(m_openButton);
-	layout->addLayout(presetRow);
+	m_outerLayout->addLayout(presetRow);
 
 	m_parametersWidget = new QWidget(this);
 	auto* parameterLayout = new QVBoxLayout(m_parametersWidget);
@@ -114,7 +115,8 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	scrollArea->setWidget(scrollContent);
 	parameterLayout->addWidget(scrollArea, 1);
 	m_parametersWidget->setVisible(false);
-	layout->addWidget(m_parametersWidget, 1);
+	m_outerLayout->addWidget(m_parametersWidget);
+	m_outerLayout->setStretchFactor(m_parametersWidget, 0);
 
 	connect(m_guiButton, &LedCheckBox::toggled, this, [this](bool open) {
 		if (open)
@@ -236,6 +238,10 @@ void HostedPluginPanel::setParametersVisible(bool visible)
 		m_parametersButton->setChecked(visible);
 	}
 	m_parametersWidget->setVisible(visible);
+	m_outerLayout->setStretchFactor(m_parametersWidget, visible ? 1 : 0);
+	setSizePolicy(QSizePolicy::Preferred,
+		visible ? QSizePolicy::Expanding : QSizePolicy::Fixed);
+	updateGeometry();
 	if (visible) { rebuildParameters(); }
 }
 

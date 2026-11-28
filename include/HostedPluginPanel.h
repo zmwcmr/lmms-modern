@@ -110,6 +110,7 @@ private:
 	HostedPluginActions m_actions;
 	HostedParameterProvider m_parameterProvider;
 
+	QVBoxLayout* m_outerLayout = nullptr;
 	QLabel* m_title = nullptr;
 	QLabel* m_vendor = nullptr;
 	LedCheckBox* m_guiButton = nullptr;
