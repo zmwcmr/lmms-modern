@@ -29,7 +29,7 @@
 | `UI-2` | 核心固定尺寸对话框 | 完成（视觉抽查） | 中 |
 | `UI-3` | 插件固定尺寸对话框 | 完成（布局子集） | 中至高，多 PR |
 | `UI-4` | 排版与文案收尾 | 完成（截图随 UI-5） | 低至中 |
-| `UI-5` | 主题、动画与无障碍 | 待开始 | 低 |
+| `UI-5` | 主题、动画与无障碍 | 进行中 | 低 |
 
 ---
 
@@ -114,7 +114,7 @@
 - 补搜索无结果状态；确认长名称、长翻译、窄侧栏下省略和 tooltip 正常。
 - 已增加 `CompactItemDelegateTest`：内容胶囊宽度、最后一个字符不裁切。
 - 已增加 `FileBrowserTest::arrowDoubleClickToggles`：快速双击箭头连续切换。
-- 截图沿用现有版本，最终统一重做放在 UI-4。
+- 截图沿用现有版本，最终统一重做放在 UI-5。
 - 运行 `FileBrowserTest`、`SideBarWorkspaceTest`、`FontScaleTest`、`InstrumentTrackTest`。
 
 验收：默认/经典主题，100%/125%/150%/200%，en/zh_CN/de_DE，窄侧栏；无整行色块、无文字裁切、无箭头误触发。
@@ -207,6 +207,7 @@
 - 按真实背景检查链接/正文/禁用/选中对比度，尤其是 About、Project Notes、侧栏。
 - 补测 165 Hz/Wayland 下侧栏滑动和按钮反馈动画。
 - 检查键盘焦点、Tab 顺序、可访问名称；列表行的 tooltip 和省略文本要能访问完整内容。
+- 已完成键盘焦点第一批：`EffectSelectDialog` 的 Tab 顺序改为搜索框 → 插件列表 → 分类按钮 → Rescan → OK/Cancel；列表和分类按钮恢复键盘焦点，列表补可访问名称/描述，Enter 直接确认；新增 `EffectSelectDialogTest` 覆盖 Tab/Shift+Tab 与可访问名称。
 
 验收：`default` 主题 100%–200%；40 个基础图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
 

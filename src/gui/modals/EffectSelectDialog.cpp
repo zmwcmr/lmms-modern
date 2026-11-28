@@ -38,6 +38,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QList>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -122,6 +123,7 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 
 	QVBoxLayout* leftSectionLayout = new QVBoxLayout();
 
+	QList<QPushButton*> categoryButtons;
 	QStringList buttonLabels = { tr("All"), "LMMS", "LADSPA", "LV2", "VST" };
 	QStringList buttonSearchString = { "", "LMMS", "LADSPA", "LV2", "VST" };
 
@@ -144,8 +146,8 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 		button->setFont(filterFont);
 		button->setFixedWidth(filterButtonWidth);
 		button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-		button->setFocusPolicy(Qt::NoFocus);
 		leftSectionLayout->addWidget(button, 0, Qt::AlignLeft);
+		categoryButtons << button;
 
 		connect(button, &QPushButton::clicked, this, [this, searchString] {
 			m_model.setEffectTypeFilter(searchString);
@@ -183,7 +185,8 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 	m_pluginList->verticalHeader()->hide();
 	m_pluginList->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
 	m_pluginList->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-	m_pluginList->setFocusPolicy(Qt::NoFocus);
+	m_pluginList->setAccessibleName(tr("Effect list"));
+	m_pluginList->setAccessibleDescription(tr("Use the up and down arrow keys to select an effect, then press Enter."));
 
 	// Scroll Area
 	m_scrollArea->setWidgetResizable(true);
@@ -196,7 +199,6 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 	// Button Box
 	QDialogButtonBox* buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
 	buttonBox->setStandardButtons(QDialogButtonBox::Cancel | QDialogButtonBox::Ok);
-	buttonBox->setFocusPolicy(Qt::NoFocus);
 	connect(buttonBox, &QDialogButtonBox::accepted, this, &EffectSelectDialog::acceptSelection);
 	connect(buttonBox, &QDialogButtonBox::rejected, this, &EffectSelectDialog::reject);
 
@@ -222,17 +224,17 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 			break;
 		}
 	}
+	QPushButton* rescanButton = nullptr;
 	if (canRescan)
 	{
 		auto* rescanLayout = new QHBoxLayout();
 		rescanLayout->setContentsMargins(0, 0, 0, 0);
 		rescanLayout->addStretch();
-		auto* rescanButton = new QPushButton(tr("Rescan"), this);
+		rescanButton = new QPushButton(tr("Rescan"), this);
 		rescanButton->setFont(bodyFont(rescanButton->font()));
 		const int rescanWidth = qMax(50, rescanButton->fontMetrics().horizontalAdvance(tr("Rescan")) + 16);
 		rescanButton->setFixedWidth(rescanWidth);
 		rescanButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-		rescanButton->setFocusPolicy(Qt::NoFocus);
 		rescanButton->setToolTip(tr("Rescan VST plugins"));
 		rescanLayout->addWidget(rescanButton);
 		listLayout->addLayout(rescanLayout);
@@ -275,6 +277,36 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 
 	connect(m_pluginList, &QTableView::doubleClicked,
 			this, &EffectSelectDialog::acceptSelection);
+	connect(m_pluginList, &QTableView::activated,
+			this, &EffectSelectDialog::acceptSelection);
+
+	// Keep the search field first, then move through the list, categories and
+	// dialog buttons in visual order for keyboard users.
+	QWidget* tabPrevious = m_filterEdit;
+	setTabOrder(tabPrevious, m_pluginList);
+	tabPrevious = m_pluginList;
+	for (auto* button : categoryButtons)
+	{
+		setTabOrder(tabPrevious, button);
+		tabPrevious = button;
+	}
+	if (rescanButton)
+	{
+		setTabOrder(tabPrevious, rescanButton);
+		tabPrevious = rescanButton;
+	}
+	auto* okButton = buttonBox->button(QDialogButtonBox::Ok);
+	auto* cancelButton = buttonBox->button(QDialogButtonBox::Cancel);
+	if (okButton)
+	{
+		setTabOrder(tabPrevious, okButton);
+		tabPrevious = okButton;
+	}
+	if (cancelButton)
+	{
+		setTabOrder(tabPrevious, cancelButton);
+		setTabOrder(cancelButton, m_filterEdit);
+	}
 	
 	setModal(true);
 	installEventFilter(this);

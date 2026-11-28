@@ -28,6 +28,7 @@ set(LMMS_TESTS
 	src/gui/SubWindowTest.cpp
 	src/gui/LcdFloatSpinBoxTest.cpp
 	src/gui/DropDownInteractionTest.cpp
+	src/gui/EffectSelectDialogTest.cpp
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp
 	src/tracks/MidiClipTest.cpp
