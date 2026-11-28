@@ -6,6 +6,16 @@
 QLabel, QTreeWidget, QListWidget, QGroupBox, QMenuBar {
 	color: #e0e0e0;
 }
+QSplitter::handle:horizontal {
+	background: #3c444e;
+	border-left: 1px solid #1e2226;
+	border-right: 1px solid #1e2226;
+}
+
+QSplitter::handle:horizontal:hover {
+	background: #5d6b77;
+}
+
 
 QTabBar::tab { color: #e0e0e0; }
 

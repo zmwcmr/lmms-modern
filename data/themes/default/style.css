@@ -53,6 +53,16 @@ QMdiArea {
 	background-color: #111314;
 }
 
+QSplitter::handle:horizontal {
+	background: #3c444e;
+	border-left: 1px solid #1e2226;
+	border-right: 1px solid #1e2226;
+}
+
+QSplitter::handle:horizontal:hover {
+	background: #5d6b77;
+}
+
 /* Group boxes use the body size with semibold weight, like custom GroupBox titles. */
 QGroupBox::title {
 	font-weight: 600;

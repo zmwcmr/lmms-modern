@@ -142,7 +142,8 @@ MixerView::MixerView(Mixer* mixer) :
 	channelArea->setFrameStyle(QFrame::NoFrame);
 	channelArea->setWidgetResizable(true);
 	m_channelAreaWidget->adjustSize();
-	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
+	// Allow the splitter to shrink the channel area down to a single channel.
+	channelArea->setMinimumWidth(mixerChannelSize.width());
 
 	int const scrollBarExtent = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
 	channelArea->setMinimumHeight(mixerChannelSize.height() + scrollBarExtent);
@@ -164,6 +165,12 @@ MixerView::MixerView(Mixer* mixer) :
 	splitter->addWidget(m_racksWidget);
 	splitter->setStretchFactor(0, 0);
 	splitter->setStretchFactor(1, 1);
+
+	// Start with room for a few channels, but keep the splitter free to
+	// shrink the channel area down to a single channel.
+	const int initialChannelAreaWidth = mixerChannelSize.width() * 4;
+	const int initialLeftWidth = masterView->width() + initialChannelAreaWidth + newChannelBtn->width();
+	splitter->setSizes({initialLeftWidth, 1});
 
 	setCurrentMixerChannel(m_mixerChannelViews[0]);
 
@@ -200,7 +207,6 @@ int MixerView::addNewChannel()
 	chLayout->addWidget(m_mixerChannelViews[newChannelIndex]);
 	m_racksLayout->addWidget(m_mixerChannelViews[newChannelIndex]->m_effectRackView);
 	m_channelAreaWidget->adjustSize();
-	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
 
 	updateMixerChannel(newChannelIndex);
 
@@ -225,7 +231,6 @@ void MixerView::refreshDisplay()
 		delete mixerChannelView;
 	}
 	m_channelAreaWidget->adjustSize();
-	channelArea->setMinimumWidth(m_channelAreaWidget->sizeHint().width());
 
 	// re-add the views
 	m_mixerChannelViews.resize(getMixer()->numChannels());
