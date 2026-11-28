@@ -233,6 +233,48 @@ void MixerChannelView::contextMenuEvent(QContextMenuEvent*)
 	}
 	contextMenu->addMenu(sidechainMenu);
 
+	if (!isMasterChannel())
+	{
+		const int currentMultiOutput = mixer->channelMultiOutput(m_channelIndex);
+		auto* multiOutputMenu = new QMenu{tr("Multi-output target"),
+			contextMenu};
+		auto* noneOutput = multiOutputMenu->addAction(tr("None"));
+		noneOutput->setCheckable(true);
+		noneOutput->setChecked(currentMultiOutput < 0);
+		connect(noneOutput, &QAction::triggered, this, [this, mixer] {
+			mixer->setChannelMultiOutput(m_channelIndex, -1);
+			m_mixerView->refreshDisplay();
+		});
+		for (int channel = 0; channel < mixer->numChannels(); ++channel)
+		{
+			if (channel == m_channelIndex)
+			{
+				continue;
+			}
+			auto* action = multiOutputMenu->addAction(
+				mixer->mixerChannel(channel)->m_name);
+			action->setCheckable(true);
+			action->setChecked(currentMultiOutput == channel);
+			connect(action, &QAction::triggered, this,
+				[this, mixer, channel] {
+					if (!mixer->setChannelMultiOutput(m_channelIndex, channel))
+					{
+						QMessageBox::warning(this, tr("Multi-output"),
+							tr("This multi-output route would create a cycle."));
+					}
+					m_mixerView->refreshDisplay();
+				});
+		}
+		multiOutputMenu->addSeparator();
+		if (!mixer->mixerChannel(m_channelIndex)->hasMultiOutput())
+		{
+			auto* unsupported = multiOutputMenu->addAction(
+				tr("No effect on this channel has a second output"));
+			unsupported->setEnabled(false);
+		}
+		contextMenu->addMenu(multiOutputMenu);
+	}
+
 	contextMenu->exec(QCursor::pos());
 	delete contextMenu;
 }

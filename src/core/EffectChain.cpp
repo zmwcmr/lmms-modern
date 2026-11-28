@@ -197,10 +197,26 @@ bool EffectChain::processAudioBuffer(AudioBuffer& buffer)
 	for (Effect* effect : m_effects)
 	{
 		effect->setSidechainBuffer(m_sidechainBuffer);
+		effect->setSecondaryOutputBuffer(m_secondaryOutputBuffer);
 		moreEffects |= effect->processAudioBuffer(buffer);
 	}
 
 	return moreEffects;
+}
+
+
+
+
+bool EffectChain::hasMultiOutput() const
+{
+	for (const Effect* effect : m_effects)
+	{
+		if (effect->supportsMultiOutput())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -246,6 +262,7 @@ f_cnt_t EffectChain::latency() const
 void EffectChain::clear()
 {
 	m_sidechainBuffer = nullptr;
+	m_secondaryOutputBuffer = nullptr;
 	emit aboutToClear();
 
 	Engine::audioEngine()->requestChangeInModel();

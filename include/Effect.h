@@ -99,6 +99,17 @@ public:
 
 	//! Whether any loaded plugin in this effect can consume a sidechain bus.
 	virtual bool supportsSidechain() const { return false; }
+	//! Whether this effect can write a second stereo output bus.
+	virtual bool supportsMultiOutput() const { return false; }
+
+	void setSecondaryOutputBuffer(AudioBuffer* buffer)
+	{
+		m_secondaryOutputBuffer = buffer;
+	}
+	AudioBuffer* secondaryOutputBuffer() const
+	{
+		return m_secondaryOutputBuffer;
+	}
 
 	inline bool isEnabled() const
 	{
@@ -210,6 +221,7 @@ private:
 
 	EffectChain * m_parent;
 	const AudioBuffer* m_sidechainBuffer = nullptr;
+	AudioBuffer* m_secondaryOutputBuffer = nullptr;
 
 	bool m_okay;
 	bool m_noRun;

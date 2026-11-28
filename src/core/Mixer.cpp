@@ -81,6 +81,7 @@ MixerChannel::MixerChannel( int idx, Model * _parent ) :
 	m_peakLeft( 0.0f ),
 	m_peakRight( 0.0f ),
 	m_buffer(Engine::audioEngine()->framesPerPeriod()),
+	m_secondaryOutputBuffer(Engine::audioEngine()->framesPerPeriod()),
 	m_muteBeforeSolo( false ),
 	m_muteModel( false, _parent ),
 	m_soloModel( false, _parent ),
@@ -129,6 +130,41 @@ void MixerChannel::setSidechainSource(MixerChannel* source)
 }
 
 
+
+
+
+void MixerChannel::setMultiOutputTarget(MixerChannel* target)
+{
+	if (m_multiOutputTarget == target)
+	{
+		return;
+	}
+	if (m_multiOutputTarget != nullptr)
+	{
+		auto& sources = m_multiOutputTarget->m_multiOutputSources;
+		sources.erase(std::remove(sources.begin(), sources.end(), this),
+			sources.end());
+		auto& receivers = m_multiOutputReceivers;
+		receivers.erase(std::remove(receivers.begin(), receivers.end(),
+			m_multiOutputTarget), receivers.end());
+	}
+	m_multiOutputTarget = target;
+	if (target != nullptr)
+	{
+		auto& sources = target->m_multiOutputSources;
+		if (std::find(sources.begin(), sources.end(), this) == sources.end())
+		{
+			sources.push_back(this);
+		}
+		auto& receivers = m_multiOutputReceivers;
+		if (std::find(receivers.begin(), receivers.end(), target) == receivers.end())
+		{
+			receivers.push_back(target);
+		}
+	}
+}
+
+
 inline void MixerChannel::processed()
 {
 	for( const MixerRoute * receiverRoute : m_sends )
@@ -139,6 +175,13 @@ inline void MixerChannel::processed()
 		}
 	}
 	for (MixerChannel* receiver : m_sidechainReceivers)
+	{
+		if (!receiver->m_muted)
+		{
+			receiver->incrementDeps();
+		}
+	}
+	for (MixerChannel* receiver : m_multiOutputReceivers)
 	{
 		if (!receiver->m_muted)
 		{
@@ -279,10 +322,32 @@ void MixerChannel::doProcessing()
 		}
 
 
+		m_secondaryOutputBuffer.silenceAllChannels();
+		if (!m_multiOutputSources.empty())
+		{
+			auto dst = m_buffer.groupBuffers(0);
+			for (MixerChannel* source : m_multiOutputSources)
+			{
+				auto src = source->m_secondaryOutputBuffer.groupBuffers(0);
+				const auto channels = std::min(dst.channels(), src.channels());
+				for (ch_cnt_t channel = 0; channel < channels; ++channel)
+				{
+					auto dstBuffer = dst.buffer(channel);
+					auto srcBuffer = src.buffer(channel);
+					for (f_cnt_t frame = 0; frame < fpp; ++frame)
+					{
+						dstBuffer[frame] += srcBuffer[frame];
+					}
+				}
+			}
+			m_buffer.updateAllSilenceFlags();
+		}
+
 		const float v = m_volumeModel.value();
 
 		m_fxChain.setSidechainBuffer(
 			m_sidechainSource != nullptr ? &m_sidechainSource->m_buffer : nullptr);
+		m_fxChain.setSecondaryOutputBuffer(&m_secondaryOutputBuffer);
 		m_stillRunning = m_fxChain.processAudioBuffer(m_buffer);
 
 		const auto peakSamples = SampleFrame{m_buffer.absPeakValue(0), m_buffer.absPeakValue(1)};
@@ -419,6 +484,57 @@ int Mixer::channelSidechain(int channel) const
 
 
 
+
+bool Mixer::setChannelMultiOutput(int channel, int target)
+{
+	if (channel <= 0 || static_cast<std::size_t>(channel) >= m_mixerChannels.size())
+	{
+		return false;
+	}
+	if (target < -1 || (target >= 0
+		&& static_cast<std::size_t>(target) >= m_mixerChannels.size()))
+	{
+		return false;
+	}
+	if (target == channel)
+	{
+		return false;
+	}
+
+	MixerChannel* source = m_mixerChannels[channel];
+	MixerChannel* targetChannel = target >= 0 ? m_mixerChannels[target] : nullptr;
+
+	// Reject cycles through the multi-output graph.
+	for (MixerChannel* current = targetChannel; current != nullptr;
+		current = current->multiOutputTarget())
+	{
+		if (current == source)
+		{
+			return false;
+		}
+	}
+
+	Engine::audioEngine()->requestChangeInModel();
+	source->setMultiOutputTarget(targetChannel);
+	Engine::audioEngine()->doneChangeInModel();
+	return true;
+}
+
+
+
+
+int Mixer::channelMultiOutput(int channel) const
+{
+	if (channel < 0 || static_cast<std::size_t>(channel) >= m_mixerChannels.size())
+	{
+		return -1;
+	}
+	return m_mixerChannels[channel]->multiOutputTargetIndex();
+}
+
+
+
+
 void Mixer::toggledSolo()
 {
 	int soloedChan = -1;
@@ -505,13 +621,18 @@ void Mixer::deleteChannel( int index )
 
 	MixerChannel * ch = m_mixerChannels[index];
 
-	// Remove sidechain edges that reference the channel being deleted.
+	// Remove sidechain/multi-output edges that reference the deleted channel.
 	ch->setSidechainSource(nullptr);
+	ch->setMultiOutputTarget(nullptr);
 	for (MixerChannel* other : m_mixerChannels)
 	{
 		if (other != ch && other->sidechainSource() == ch)
 		{
 			other->setSidechainSource(nullptr);
+		}
+		if (other != ch && other->multiOutputTarget() == ch)
+		{
+			other->setMultiOutputTarget(nullptr);
 		}
 	}
 
@@ -1075,6 +1196,10 @@ void Mixer::saveSettings( QDomDocument & _doc, QDomElement & _this )
 		{
 			mixch.setAttribute("sidechain", ch->sidechainSource()->index());
 		}
+		if (ch->multiOutputTarget() != nullptr)
+		{
+			mixch.setAttribute("multioutput", ch->multiOutputTarget()->index());
+		}
 		if (const auto& color = ch->color()) { mixch.setAttribute("color", color->name()); }
 
 		// add the channel sends
@@ -1116,6 +1241,7 @@ void Mixer::loadSettings( const QDomElement & _this )
 {
 	clear();
 	std::vector<std::pair<int, int>> sidechains;
+	std::vector<std::pair<int, int>> multiOutputs;
 	QDomNode node = _this.firstChild();
 
 	while( ! node.isNull() )
@@ -1158,6 +1284,11 @@ void Mixer::loadSettings( const QDomElement & _this )
 			sidechains.emplace_back(num,
 				mixch.attribute("sidechain").toInt());
 		}
+		if (mixch.hasAttribute("multioutput"))
+		{
+			multiOutputs.emplace_back(num,
+				mixch.attribute("multioutput").toInt());
+		}
 
 		// mixer sends
 		QDomNodeList chData = mixch.childNodes();
@@ -1198,6 +1329,20 @@ void Mixer::loadSettings( const QDomElement & _this )
 		{
 			qWarning() << "Ignoring invalid sidechain route" << channel
 				<< "<-" << source;
+		}
+	}
+
+	for (const auto& [channel, target] : multiOutputs)
+	{
+		if (target < 0)
+		{
+			continue;
+		}
+		allocateChannelsTo(target);
+		if (!setChannelMultiOutput(channel, target))
+		{
+			qWarning() << "Ignoring invalid multi-output route" << channel
+				<< "->" << target;
 		}
 	}
 

@@ -68,12 +68,28 @@ private slots:
 		QCOMPARE(mixer.channelSidechain(first), -1);
 	}
 
+	void routesMultiOutput()
+	{
+		Mixer& mixer = *Engine::mixer();
+		const int first = mixer.createChannel();
+		const int second = mixer.createChannel();
+
+		QVERIFY(mixer.setChannelMultiOutput(first, second));
+		QCOMPARE(mixer.channelMultiOutput(first), second);
+		QVERIFY(!mixer.setChannelMultiOutput(second, first));
+		QVERIFY(!mixer.setChannelMultiOutput(first, first));
+		QVERIFY(!mixer.setChannelMultiOutput(0, second));
+		QVERIFY(mixer.setChannelMultiOutput(first, -1));
+		QCOMPARE(mixer.channelMultiOutput(first), -1);
+	}
+
 	void roundTripsXml()
 	{
 		Mixer& mixer = *Engine::mixer();
 		const int first = mixer.createChannel();
 		const int second = mixer.createChannel();
 		QVERIFY(mixer.setChannelSidechain(first, second));
+		QVERIFY(mixer.setChannelMultiOutput(first, second));
 
 		QDomDocument document;
 		QDomElement root = document.createElement(QStringLiteral("mixer"));
@@ -82,6 +98,7 @@ private slots:
 
 		mixer.loadSettings(root);
 		QCOMPARE(mixer.channelSidechain(first), second);
+		QCOMPARE(mixer.channelMultiOutput(first), second);
 	}
 };
 

@@ -57,6 +57,7 @@ public:
 	float m_peakLeft;
 	float m_peakRight;
 	AudioBuffer m_buffer;
+	AudioBuffer m_secondaryOutputBuffer;
 	bool m_muteBeforeSolo;
 	BoolModel m_muteModel;
 	BoolModel m_soloModel;
@@ -88,6 +89,16 @@ public:
 
 	//! True when an effect in this channel can consume a sidechain bus.
 	bool hasSidechainInput() const { return m_fxChain.hasSidechainInput(); }
+	//! True when an effect in this channel can produce a second output bus.
+	bool hasMultiOutput() const { return m_fxChain.hasMultiOutput(); }
+
+	//! Route this channel's second stereo output into another channel.
+	void setMultiOutputTarget(MixerChannel* target);
+	MixerChannel* multiOutputTarget() const { return m_multiOutputTarget; }
+	int multiOutputTargetIndex() const
+	{
+		return m_multiOutputTarget != nullptr ? m_multiOutputTarget->index() : -1;
+	}
 
 	bool isMaster() { return m_channelIndex == 0; }
 
@@ -106,7 +117,8 @@ public:
 private:
 	std::size_t dependencyCount() const
 	{
-		return m_receives.size() + (m_sidechainSource != nullptr ? 1 : 0);
+		return m_receives.size() + (m_sidechainSource != nullptr ? 1 : 0)
+			+ m_multiOutputSources.size();
 	}
 
 	void doProcessing() override;
@@ -114,6 +126,9 @@ private:
 	std::optional<QColor> m_color;
 	MixerChannel* m_sidechainSource = nullptr;
 	std::vector<MixerChannel*> m_sidechainReceivers;
+	MixerChannel* m_multiOutputTarget = nullptr;
+	std::vector<MixerChannel*> m_multiOutputSources;
+	std::vector<MixerChannel*> m_multiOutputReceivers;
 };
 
 class MixerRoute : public QObject
@@ -233,6 +248,9 @@ public:
 	//! @param source channel index, or -1 to clear
 	bool setChannelSidechain(int channel, int source);
 	int channelSidechain(int channel) const;
+	//! Route one channel's second stereo output into another channel.
+	bool setChannelMultiOutput(int channel, int target);
+	int channelMultiOutput(int channel) const;
 
 	// check if the index channel receives audio from any other channel
 	// or from any instrument or sample track

@@ -420,7 +420,13 @@ Tasks:
       the main stereo input).
 - [ ] Add sidechain source selection to the mixer UI and an unsupported-bus
       warning.
-- [ ] Add multi-output track routing (first step: two stereo pairs).
+- [x] Add multi-output plumbing and routing for two stereo pairs:
+      `Effect`/`EffectChain` carry a secondary output buffer,
+      `HostedEffect` writes output bus 1 into it, `MixerChannel` owns that
+      buffer and can route it into another mixer channel with a worker
+      dependency, cycle checks and the `multioutput` XML attribute. The
+      channel context menu exposes the target selection.
+- [ ] Add the second output pair to VST2 and to the remote VST3 protocol.
 - [ ] Extend the mixer UI and project XML.
 - [ ] Define a policy for unsupported bus counts.
 - [ ] Add tests with a sidechain compressor and a multi-out sampler.

@@ -122,6 +122,26 @@ public:
 		{
 			m_lastSidechainSample = block.inputBuses[1].channels[0][0];
 		}
+		if (block.outputBusCount > 0 && block.outputBuses != nullptr)
+		{
+			for (int bus = 0; bus < block.outputBusCount; ++bus)
+			{
+				const float value = bus == 0 ? m_outputValue : m_secondOutputValue;
+				for (int channel = 0; channel < block.outputBuses[bus].channelCount;
+					++channel)
+				{
+					if (!block.outputBuses[bus].channels[channel])
+					{
+						continue;
+					}
+					for (int frame = 0; frame < block.frames; ++frame)
+					{
+						block.outputBuses[bus].channels[channel][frame] = value;
+					}
+				}
+			}
+			return true;
+		}
 		for (int channel = 0; channel < block.outputChannels; ++channel)
 		{
 			if (!block.outputs[channel])
@@ -159,6 +179,7 @@ public:
 	std::vector<PluginMidiEvent> m_midi;
 	QByteArray m_loadedState;
 	double m_outputValue = 0.5;
+	double m_secondOutputValue = 0.25;
 	double m_tempo = 0.0;
 	bool m_playing = false;
 	bool m_loaded = true;

@@ -144,6 +144,8 @@ Effect::ProcessStatus HostedEffect::processImpl(
 	m_sidechainRight.resize(count);
 	m_outputLeft.resize(count);
 	m_outputRight.resize(count);
+	m_output2Left.resize(count);
+	m_output2Right.resize(count);
 
 	for (std::size_t frame = 0; frame < count; ++frame)
 	{
@@ -153,6 +155,8 @@ Effect::ProcessStatus HostedEffect::processImpl(
 		m_sidechainRight[frame] = 0.0f;
 		m_outputLeft[frame] = 0.0f;
 		m_outputRight[frame] = 0.0f;
+		m_output2Left[frame] = 0.0f;
+		m_output2Right[frame] = 0.0f;
 	}
 
 	if (const auto* sidechain = sidechainBuffer();
@@ -179,9 +183,14 @@ Effect::ProcessStatus HostedEffect::processImpl(
 	float* inputs[2] = { m_inputLeft.data(), m_inputRight.data() };
 	float* sidechain[2] = { m_sidechainLeft.data(), m_sidechainRight.data() };
 	float* outputs[2] = { m_outputLeft.data(), m_outputRight.data() };
+	float* outputs2[2] = { m_output2Left.data(), m_output2Right.data() };
 	PluginBusBlock inputBuses[2] = {
 		PluginBusBlock{ inputs, 2 },
 		PluginBusBlock{ sidechain, 2 },
+	};
+	PluginBusBlock outputBuses[2] = {
+		PluginBusBlock{ outputs, 2 },
+		PluginBusBlock{ outputs2, 2 },
 	};
 	PluginProcessBlock block;
 	block.inputs = inputs;
@@ -194,10 +203,32 @@ Effect::ProcessStatus HostedEffect::processImpl(
 		block.inputBuses = inputBuses;
 		block.inputBusCount = 2;
 	}
+	const bool hasSecondOutput = m_host->outputBuses().size() > 1
+		&& secondaryOutputBuffer() != nullptr;
+	if (hasSecondOutput)
+	{
+		block.outputBuses = outputBuses;
+		block.outputBusCount = 2;
+	}
 
 	if (!m_host->process(block))
 	{
 		return ProcessStatus::Continue;
+	}
+
+	if (hasSecondOutput && secondaryOutputBuffer()->frames() >= frames)
+	{
+		auto group = secondaryOutputBuffer()->groupBuffers(0);
+		if (group.channels() > 0)
+		{
+			std::copy(m_output2Left.begin(), m_output2Left.end(),
+				group.buffer(0).begin());
+		}
+		if (group.channels() > 1)
+		{
+			std::copy(m_output2Right.begin(), m_output2Right.end(),
+				group.buffer(1).begin());
+		}
 	}
 
 	const float dry = dryLevel();
