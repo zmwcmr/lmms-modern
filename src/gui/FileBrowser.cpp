@@ -192,6 +192,7 @@ void FileBrowser::addContentCheckBox()
 
 	auto configCheckBox = [this](QBoxLayout* boxLayout, QCheckBox* box, Qt::CheckState checkState)
 	{
+		box->setFont(bodyFont(box->font()));
 		box->setCheckState(checkState);
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 7, 0))
