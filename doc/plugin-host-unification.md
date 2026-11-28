@@ -32,7 +32,7 @@ format a plugin uses.
 
 | Concern | VST2 today | VST3 today | LV2 today |
 | --- | --- | --- | --- |
-| Model wrapper | `VestigeInstrument`, `VstEffect` | `Vst3Instrument`, `Vst3Effect` | `Lv2Instrument`, `Lv2Effect` |
+| Model wrapper | `Vst2HostedInstrument` (new default), `VestigeInstrument` (legacy), `VstEffect` | `Vst3Instrument`, `Vst3Effect` | `Lv2Instrument`, `Lv2Effect` |
 | Host object | `VstPlugin` (`RemotePlugin`) | `Vst3HostBase` (`Vst3Host` / `Vst3RemoteHostClient`) | `Lv2Proc` + `Lv2HostClient` |
 | Child process | `NativeLinuxRemoteVstPlugin64`, `RemoteVstPlugin64`, `32/RemoteVstPlugin32` | `lmms-vst3-host` (DSP), `lmms-vst3-editor-host` (editor) | `lmms-lv2-host` (DSP + UI) |
 | Transport | shared audio + socket / shmFifo messages, block handshake | `Vst3SharedAudio` + POSIX semaphores, then JSON socket for the editor | shared audio + `RemotePluginBase` socket / shmFifo |
@@ -284,9 +284,15 @@ path.
       non-owning view. The legacy `paramN`, `chunk`, `numparams`,
       `guivisible` and `program` XML is produced by the native
       `VstPlugin::saveSettings`, so old projects stay byte-compatible.
-- [ ] VST2 state still uses the native chunk XML rather than
+- [x] VST2 state still uses the native chunk XML rather than
       `PluginStateBlob`. This is deliberate for compatibility; the adapter
       exposes `saveState()` for new consumers.
+- [x] New `vst2instrument` plugin is the default VST2 entry. It derives from
+      `HostedInstrument`, owns `Vst2PluginHost` directly and saves
+      `<vst2instrument file="...">` plus the generic host state. It forces the
+      child-owned window (`embedMethod=none`), so it never reaches Vestige's
+      MDI/XEmbed code. VeSTige stays registered as the legacy implementation
+      for `<vestige>` projects and is labelled legacy in the browser.
 - [x] LV2: `Lv2Effect` uses `HostedEffect` and `Lv2Instrument` uses
       `HostedInstrument`; both adopt the same `Lv2Proc` for models, views,
       ports and `<lv2state>`. `Lv2PluginHost` gained an owning and an
@@ -365,17 +371,21 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       crash isolation). The shared window behavior itself is covered by
       `X11EditorWindowTest`.
 
-### Stage 6 — remove Vestige code
+### Stage 6 — Vestige compatibility
 
-- After one release with the compatibility alias in place.
-- Keep the project loader mapping old nodes to `HostedInstrument`.
-- Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged.
+- Decision: do not delete VeSTige. It is a compatibility implementation for
+  old `<vestige>` / `<vstplugin>` projects and for the 32-bit/Wine paths.
+- New projects use `<vst2instrument>`; VeSTige's browser entry is labelled
+  legacy and is not the default VST2 path.
+- Keep the project loader accepting old nodes unchanged.
+- Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged,
+  and a new VST2 instrument round-trips without touching Vestige code.
 
 ## Compatibility constraints
 
 - Project XML node names and attributes must not change:
-  `<vestige>`, `<vstplugin>`, `<vst3instrument>`, `<lv2instrument>`,
-  `<lv2effect>`, `<effect name="vst3effect">`.
+  `<vestige>`, `<vstplugin>`, `<vst2instrument>`, `<vst3instrument>`,
+  `<lv2instrument>`, `<lv2effect>`, `<effect name="vst3effect">`.
 - Existing environment switches stay valid: `LMMS_LV2_REMOTE`,
   `LMMS_LV2_INPROCESS`, `LMMS_LV2_UI_SCALE`, `LMMS_VST3_REMOTE_DSP`,
   `LMMS_VST3_EDITOR_LOCAL`, `LMMS_VST3_HOST`, `LMMS_VST3_EDITOR_HOST`,
