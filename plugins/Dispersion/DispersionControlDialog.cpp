@@ -66,11 +66,11 @@ DispersionControlDialog::DispersionControlDialog(DispersionControls* controls) :
 	feedbackKnob->setHintText(tr("Feedback:") , "");
 	layout->addWidget(feedbackKnob);
 	
-	auto dcButton = new AutomatableButton(this, tr("DC Offset Removal"));
+	auto dcButton = new AutomatableButton(this, tr("DC offset removal"));
 	dcButton->setCheckable(true);
 	dcButton->setText(tr("DC"));
 	dcButton->setModel(&controls->m_dcModel);
-	dcButton->setToolTip(tr("Remove DC Offset"));
+	dcButton->setToolTip(tr("Remove DC offset"));
 	dcButton->setObjectName("btn");
 	layout->addWidget(dcButton);
 }

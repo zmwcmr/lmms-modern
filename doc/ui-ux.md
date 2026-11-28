@@ -290,6 +290,7 @@
 - 清理剩余固定字号和硬编码 `font-size`；确认三档标准在所有核心界面生效。
 - 逐插件统一参数名 Title Case，不做全量重命名。
 - 已完成第一批：`Compressor` 参数名改为 sentence case（RMS size、Lookahead length、Input balance 等），并修正 feedback 按钮误用的 "Soft Clip" 可访问名称。
+- 已完成第二批：`Dispersion` 的 "DC Offset Removal"/"Remove DC Offset" 改为 sentence case；`DualFilter` 的 "Q/Resonance" 改为 "Q/resonance"。
 - 用 `lupdate-qt5` 重新生成 `data/locale/en.ts`，同步 Transifex 术语表。
 - 处理 `(s)` 复数、单位空格、组标题冒号等剩余文案问题。
 - 更新三档缩放截图和文案检查记录。
