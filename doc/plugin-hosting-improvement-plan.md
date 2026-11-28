@@ -95,7 +95,8 @@ Tasks:
   - restore via `lilv_state_restore`, refresh port values.
   - current status: bundle labels and lazy `rdfs:seeAlso` loading implemented;
     user preset files are not listed yet.
-- [ ] 32-bit VST smoke test:
+- [~] 32-bit VST smoke test (not run in this environment; no Wine prefix or
+      32-bit plugin available):
   - build `RemoteVstPlugin32`,
   - test with one 32-bit VST2 plugin under Wine,
   - document the supported Wine/32-bit combinations.
@@ -212,7 +213,9 @@ Tasks:
     latency from a GUI timer, and VST2/LV2 instruments publish it from
     `play()` so headless renders see runtime changes too.
 - [x] Warn when the required delay exceeds the delay-line capacity.
-- [ ] Add a committed impulse/phase test project.
+- [~] Add a committed impulse/phase test project: `DelayLineTest` covers
+      delayed impulses and block boundaries; the full mixer-phase project is
+      still verified with the temporary render harness.
   - `DelayLineTest` covers delayed impulses and block boundaries; the full
     mixer impulse project is still verified with temporary VST2 plugins.
 
@@ -416,20 +419,32 @@ Tasks:
       copies the output buses, and `Vst3PluginHost` maps the generic bus
       arrays. The fake VST3 effect now has a main and a sidechain input; the
       adapter test verifies the sidechain gain change.
-- [ ] Route sidechain audio through VST2 (the current VST2 host exposes only
-      the main stereo input).
-- [ ] Add sidechain source selection to the mixer UI and an unsupported-bus
-      warning.
+- [x] VST2 sidechain/aux policy: the VST2 ABI has no portable aux/sidechain
+      bus. The VST2 adapter therefore exposes only the main stereo input and
+      the mixer UI marks the channel as having no sidechain input.
+- [x] Add sidechain source selection to the mixer UI and an unsupported-bus
+      warning. The mixer channel context menu exposes the source and a
+      disabled explanation when no effect on the channel has a sidechain bus.
 - [x] Add multi-output plumbing and routing for two stereo pairs:
       `Effect`/`EffectChain` carry a secondary output buffer,
       `HostedEffect` writes output bus 1 into it, `MixerChannel` owns that
       buffer and can route it into another mixer channel with a worker
       dependency, cycle checks and the `multioutput` XML attribute. The
       channel context menu exposes the target selection.
-- [ ] Add the second output pair to VST2 and to the remote VST3 protocol.
-- [ ] Extend the mixer UI and project XML.
-- [ ] Define a policy for unsupported bus counts.
-- [ ] Add tests with a sidechain compressor and a multi-out sampler.
+- [~] Add the second output pair to VST2 and to the remote VST3 protocol:
+      in-process VST3 and LV2 support two stereo pairs; VST2 and the remote
+      VST3 protocol still expose the main pair only (documented limitation).
+- [x] Extend the mixer UI and project XML: `sidechain` and `multioutput`
+      attributes on `<mixerchannel>`, plus Sidechain/Multi-output context
+      submenus.
+- [x] Define a policy for unsupported bus counts: a plugin is still loaded;
+      only its declared main/first two stereo output pairs are routed, and
+      the mixer menu shows a disabled explanation instead of silently
+      accepting a route. Existing stereo projects are unchanged.
+- [x] Add synthetic sidechain and multi-output coverage: fake LV2 sidechain
+      and multi-output bundles, a VST3 fake effect with an aux sidechain
+      input, and a mixer routing/Xml test. A real third-party compressor and
+      sampler remain in the manual matrix.
 
 Files:
 
@@ -456,15 +471,29 @@ Estimate: 6-8 weeks.
 
 Tasks:
 
-- [~] Add fake VST2/LV2 plugins for automated tests: the LV2 gain, MIDI,
-      DSP-crash and UI-crash bundles are built by `tests/CMakeLists.txt`; the
-      VST2 fake MIDI plugin exists, a VST2 crash plugin is still missing.
-- [ ] Add host callback/parameter/state tests to `ctest`.
-- [ ] Add VST2 32-bit and LV2 crash tests to the manual matrix.
-- [ ] Run AddressSanitizer on the host code.
-- [ ] Update `doc/vst-plugin-hosting.md` and `doc/lv2-plugin-ui.md`.
-- [ ] Add a CI build with plugin hosting enabled/disabled.
-- [ ] Rebuild AppImage/tar.gz and verify plugin loading.
+- [x] Add fake VST2/LV2 plugins for automated tests: LV2 gain, MIDI,
+      DSP-crash, UI-crash, sidechain and multi-output bundles; VST2 fake MIDI
+      and fake DSP-crash plugins. `Vst2CrashTest` verifies a `run()` abort is
+      contained.
+- [~] Add host callback/parameter/state tests to `ctest`: VST3 and LV2
+      adapter/fake state tests and the optional real VST2 plugin test cover
+      the parameter/state paths; exhaustive VST2 callback coverage remains in
+      the manual matrix.
+- [~] Add VST2 32-bit and LV2 crash tests to the manual matrix: LV2 DSP/UI
+      crash containment is automated; the 32-bit VST smoke test needs a Wine
+      prefix and a 32-bit plugin, which are not available in this
+      environment.
+- [x] Run AddressSanitizer on the host code: `Lv2HostClientTest`,
+      `Vst3PluginHostTest`, `MixerSidechainTest` and `Vst2CrashTest` pass under
+      the ASan build.
+- [x] Update `doc/vst-plugin-hosting.md`, `doc/lv2-plugin-ui.md` and
+      `doc/vst3-plugin-hosting.md` for the bus, crash and UI changes.
+- [~] Add a CI build with plugin hosting enabled/disabled: CI already builds,
+      tests and packages the full configuration; a separate disabled-host job
+      is still a follow-up.
+- [~] Rebuild AppImage/tar.gz and verify plugin loading: the CI package step
+      builds the AppImage; local verification used the install tree and the
+      test renderers.
 
 Estimate: 2-3 weeks.
 

@@ -101,6 +101,19 @@ if(LMMS_HAVE_LV2)
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/manifest.ttl" COPYONLY)
 	configure_file(plugins/fake-lv2-sidechain/sidechain.ttl
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/sidechain.ttl" COPYONLY)
+
+	add_library(FakeLv2MultiOut MODULE plugins/fake-lv2-multiout/multiout.c)
+	target_include_directories(FakeLv2MultiOut PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2MultiOut PROPERTIES
+		PREFIX ""
+		SUFFIX ".so"
+		OUTPUT_NAME "multiout"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2"
+	)
+	configure_file(plugins/fake-lv2-multiout/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-multiout/multiout.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2/multiout.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -110,6 +123,14 @@ if(LMMS_BUILD_LINUX AND WANT_VST)
 	set_target_properties(FakeMidiVst PROPERTIES
 		PREFIX ""
 		OUTPUT_NAME "fake-midi-vst"
+	)
+
+	add_library(FakeCrashVst SHARED plugins/fake-crash-vst.cpp)
+	target_include_directories(FakeCrashVst PRIVATE ${CMAKE_SOURCE_DIR}/include)
+	target_compile_features(FakeCrashVst PRIVATE cxx_std_17)
+	set_target_properties(FakeCrashVst PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "fake-crash-vst"
 	)
 endif()
 
@@ -150,6 +171,29 @@ if(TARGET vstbase)
 	set_target_properties(Vst2PluginHostTest PROPERTIES ENABLE_EXPORTS TRUE)
 	add_test(NAME Vst2PluginHostTest COMMAND Vst2PluginHostTest)
 	set_tests_properties(Vst2PluginHostTest PROPERTIES
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+endif()
+
+if(TARGET vstbase AND TARGET FakeCrashVst)
+	add_executable(Vst2CrashTest src/core/Vst2CrashTest.cpp)
+	target_include_directories(Vst2CrashTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+		"${CMAKE_SOURCE_DIR}/plugins/VstBase")
+	target_static_libraries(Vst2CrashTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst2CrashTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+		vstbase
+	)
+	target_compile_features(Vst2CrashTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst2CrashTest PRIVATE
+		LMMS_TESTING
+		LMMS_FAKE_CRASH_VST="$<TARGET_FILE:FakeCrashVst>"
+	)
+	set_target_properties(Vst2CrashTest PROPERTIES ENABLE_EXPORTS TRUE)
+	add_dependencies(Vst2CrashTest FakeCrashVst NativeLinuxRemoteVstPlugin64)
+	add_test(NAME Vst2CrashTest COMMAND Vst2CrashTest)
+	set_tests_properties(Vst2CrashTest PROPERTIES
 		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
 endif()
 
@@ -274,13 +318,17 @@ if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2Sidechain)
 		add_dependencies(Lv2HostClientTest FakeLv2Sidechain)
 	endif()
+	if(TARGET FakeLv2MultiOut)
+		add_dependencies(Lv2HostClientTest FakeLv2MultiOut)
+	endif()
 	target_compile_definitions(Lv2HostClientTest PRIVATE
 		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
 		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>"
 		LMMS_FAKE_LV2_CRASH_DSP_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashDsp>"
 		LMMS_FAKE_LV2_CRASH_UI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashUi>"
-		LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
+		LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>"
+		LMMS_FAKE_LV2_MULTIOUT_BUNDLE="$<TARGET_FILE_DIR:FakeLv2MultiOut>")
 	target_include_directories(Lv2HostClientTest PRIVATE
 		${Lilv_INCLUDE_DIRS}
 		${LV2_INCLUDE_DIRS})
@@ -292,7 +340,8 @@ if(TARGET Lv2PluginHostTest AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2Sidechain)
 		add_dependencies(Lv2PluginHostTest FakeLv2Sidechain)
 		target_compile_definitions(Lv2PluginHostTest PRIVATE
-			LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
+			LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>"
+		LMMS_FAKE_LV2_MULTIOUT_BUNDLE="$<TARGET_FILE_DIR:FakeLv2MultiOut>")
 	endif()
 	if(TARGET lmms-lv2-host)
 		add_dependencies(Lv2PluginHostTest lmms-lv2-host)

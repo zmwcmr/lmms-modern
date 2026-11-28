@@ -163,8 +163,32 @@ std::vector<PluginBusInfo> Lv2PluginHost::busesFor(bool input) const
 
 	if (mainChannels > 0)
 	{
-		buses.push_back(PluginBusInfo{ QStringLiteral("Main"), mainChannels,
-			input, PluginBusRole::Main, mainOptional });
+		if (input)
+		{
+			buses.push_back(PluginBusInfo{ QStringLiteral("Main"),
+				mainChannels, true, PluginBusRole::Main, mainOptional });
+		}
+		else
+		{
+			// LV2 does not expose a portable output-bus grouping. Use stereo
+			// pairs in port order: the first pair is the main output, the
+			// following pairs are auxiliary outputs.
+			int remaining = mainChannels;
+			int busIndex = 0;
+			while (remaining > 0)
+			{
+				const int channels = std::min(2, remaining);
+				buses.push_back(PluginBusInfo{
+					busIndex == 0 ? QStringLiteral("Main")
+						: QStringLiteral("Output %1").arg(busIndex + 1),
+					channels, false,
+					busIndex == 0 ? PluginBusRole::Main
+						: PluginBusRole::Auxiliary,
+					mainOptional });
+				remaining -= channels;
+				++busIndex;
+			}
+		}
 	}
 	if (sidechainChannels > 0)
 	{
@@ -548,7 +572,56 @@ void Lv2PluginHost::copyInput(const PluginProcessBlock& block)
 
 void Lv2PluginHost::copyOutput(const PluginProcessBlock& block) const
 {
-	if (!m_proc || block.outputs == nullptr || block.outputChannels <= 0)
+	if (!m_proc)
+	{
+		return;
+	}
+
+	const auto frames = static_cast<std::size_t>(block.frames);
+	if (block.outputBusCount > 0 && block.outputBuses != nullptr)
+	{
+		std::size_t portIndex = 0;
+		for (int bus = 0; bus < block.outputBusCount; ++bus)
+		{
+			const auto& outputBus = block.outputBuses[bus];
+			for (int channel = 0; channel < outputBus.channelCount; ++channel)
+			{
+				Lv2Ports::Audio* audio = nullptr;
+				while (portIndex < m_proc->portNum())
+				{
+					auto* port = m_proc->port(portIndex++);
+					if (port == nullptr
+						|| port->m_type != Lv2Ports::Type::Audio
+						|| port->m_flow != Lv2Ports::Flow::Output)
+					{
+						continue;
+					}
+					audio = Lv2Ports::dcast<Lv2Ports::Audio>(port);
+					if (audio != nullptr && !audio->isSideChain())
+					{
+						break;
+					}
+					audio = nullptr;
+				}
+				if (outputBus.channels != nullptr
+					&& outputBus.channels[channel] != nullptr)
+				{
+					if (audio != nullptr)
+					{
+						std::copy_n(audio->data(), frames,
+							outputBus.channels[channel]);
+					}
+					else
+					{
+						std::fill_n(outputBus.channels[channel], frames, 0.0f);
+					}
+				}
+			}
+		}
+		return;
+	}
+
+	if (block.outputs == nullptr || block.outputChannels <= 0)
 	{
 		return;
 	}
@@ -559,7 +632,6 @@ void Lv2PluginHost::copyOutput(const PluginProcessBlock& block) const
 		return;
 	}
 
-	const auto frames = static_cast<std::size_t>(block.frames);
 	std::copy_n(out.m_left->data(), frames, block.outputs[0]);
 
 	if (block.outputChannels >= 2 && block.outputs[1] != nullptr)
