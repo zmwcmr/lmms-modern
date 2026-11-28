@@ -199,7 +199,7 @@
 - 已完成 `Bitcrush`：移除 181×128 固定尺寸和绝对坐标，IN/中心/OUT 改为三段布局，LED 和旋钮随字体排布，背景随窗口缩放。
 - 已完成 `CrossoverEQ`：移除 167×218 固定尺寸，保留现有旋钮/推子布局，背景随窗口缩放。
 - 已完成 `Delay`：移除 300×208 固定尺寸，左侧旋钮、中央 XyPad、右侧输出推子改为三栏布局，背景随窗口缩放。
-- 已完成 `Eq`：移除 500×500 固定尺寸；保留 450×200 频谱/参数叠层，推子、8 段频率/共振/启用列和 HP/LP 按钮改为布局，背景随窗口缩放。
+- 已回退 `Eq`：保留 500×500 固定画布；先做 200% 审计，只有实际裁切/重叠时才加滚动或整体缩放，不强制重排。
 - 已完成 `DualFilter`：移除 373×109 固定尺寸，两段滤波器改为左右布局，启用 LED、旋钮和下拉框随字体排布。
 - 已完成 `FrequencyShifter`：移除 288×360 固定尺寸和绝对坐标，按顶部/波形/LFO/延迟四段改为布局，背景随窗口缩放。
 - 已完成 `MultitapEcho`：移除 245×300 固定尺寸，双图形和底部控制改为布局。
@@ -247,7 +247,7 @@
 - 已完成 `PeakControllerDialog`：移除 256×64 固定尺寸，改用 `QVBoxLayout` + `bodyFont()`，修正误用的 "LFO Controller" tooltip。
 - 已完成 `LfoControllerDialog`：移除 240×58 固定尺寸和绝对坐标，波形按钮/旋钮/倍率按钮改为 `QGridLayout` + `QHBoxLayout` + `QVBoxLayout`，背景随对话框尺寸缩放；100% 和 200% 下已目视检查。
 - 已完成 `LadspaBrowser`：移除 500×480/400 固定尺寸，标签页改用 `QVBoxLayout`，插件列表和描述区随窗口伸缩。
-- 已完成 `SampleTrackWindow`：效果架改为最小尺寸 + stretch，移除固定窗口标志和 `SetFixedSize`，窗口可调整大小。
+- 已回退 `SampleTrackWindow`：保留固定窗口和 `SetFixedSize`；如需大字体，只加滚动/整体缩放，不改变窗口行为。
 - `EffectView` 仍是效果架中的固定行高控件，高度按字体度量计算；它不是独立对话框，本轮保留其行高模型。
 - 优先改用布局和字体度量；必要时加滚动区域。
 - 200% 下检查文字边界、按钮/旋钮间距、长翻译和窄窗口。
@@ -260,7 +260,7 @@
 
 建议按复杂度分批，每批独立提交：
 
-1. Bitcrush、Eq、Delay、Compressor、SlewDistortion、StereoMatrix。
+1. Bitcrush、Delay、Compressor、SlewDistortion、StereoMatrix；`Eq` 已回退到固定画布审计。
 2. DualFilter、DynamicsProcessor、FrequencyShifter、MultitapEcho、LOMM、CrossoverEQ。
 3. GranularPitchShifter、SlicerT、AudioFileProcessor、Sf2Player、GigPlayer、Vestige。
 
@@ -277,6 +277,7 @@
 
 以下面板不是“删掉 setFixedSize 再套布局”就能解决，必须先把自绘坐标改成相对布局：
 
+- `Eq`：500×500 频谱/参数叠层，固定画布先审计，不强制重排。
 - `SlewDistortion`：曲线、输入/输出电平表、拖拽手柄都使用固定坐标。
 - `LOMM`：大量 LCD、按钮、旋钮围绕 artwork 绝对定位。
 - `SlicerT`、`AudioFileProcessor`：波形/切片自绘。
@@ -375,12 +376,12 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：UI-2 开始，`PeakControllerDialog` 改为弹性布局。
 - 2026-11-28：`LfoControllerDialog` 改为布局驱动，移除固定尺寸和绝对坐标。
 - 2026-11-28：`LadspaBrowser` 改为可伸缩布局，移除标签页固定尺寸。
-- 2026-11-28：`SampleTrackWindow` 改为可调整大小，效果架随窗口伸缩。
+- 2026-11-28：回退 `SampleTrackWindow` 的可调整大小改动，恢复固定窗口。
 - 2026-11-28：UI-3 开始，`StereoMatrix` 移除固定尺寸并缩放背景。
 - 2026-11-28：`Bitcrush` 改为三段布局，移除固定尺寸和绝对坐标。
 - 2026-11-28：`CrossoverEQ` 移除固定尺寸并缩放背景。
 - 2026-11-28：`Delay` 改为三栏布局，移除固定尺寸和绝对坐标。
-- 2026-11-28：`Eq` 改为布局驱动，保留频谱叠层并移除固定尺寸。
+- 2026-11-28：回退 `Eq` 的布局重写，恢复固定画布，后续按 200% 审计决定是否加滚动/整体缩放。
 - 2026-11-28：`DualFilter` 改为左右两段布局，移除固定尺寸。
 - 2026-11-28：`FrequencyShifter` 改为四段布局，移除固定尺寸和绝对坐标。
 - 2026-11-28：`MultitapEcho` 和 `DynamicsProcessor` 改为布局驱动，移除固定尺寸。

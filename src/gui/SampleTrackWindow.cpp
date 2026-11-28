@@ -147,20 +147,22 @@ SampleTrackWindow::SampleTrackWindow(SampleTrackView* stv)
 	generalSettingsLayout->addLayout(basicControlsLayout);
 
 	m_effectRack = new EffectRackView(stv->model()->audioBusHandle()->effects());
-	m_effectRack->setMinimumSize(EffectRackView::DEFAULT_WIDTH, 242);
+	m_effectRack->setFixedSize(EffectRackView::DEFAULT_WIDTH, 242);
 
 	vlayout->addWidget(generalSettingsWidget);
-	vlayout->addWidget(m_effectRack, 1);
+	vlayout->addWidget(m_effectRack);
 
 
 	setModel(stv->model());
 
 	QMdiSubWindow * subWin = getGUI()->mainWindow()->addWindowedWidget(this);
 	Qt::WindowFlags flags = subWin->windowFlags();
+	flags |= Qt::MSWindowsFixedSizeDialogHint;  // resizing is disabled regardless, this makes SubWindow hide related actions
 	flags &= ~Qt::WindowMaximizeButtonHint;
 	subWin->setWindowFlags(flags);
 
-	resize(260, 420);
+	// better than `setFixedSize` because it still responds to layout changes
+	layout()->setSizeConstraint(QLayout::SetFixedSize);
 
 	setWindowIcon(embed::getIconPixmap("sample_track"));
 	subWin->hide();
