@@ -566,16 +566,8 @@ void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, c
 	int depth = 0;
 	for (auto parent = index.parent(); parent.isValid(); parent = parent.parent()) { ++depth; }
 
-	QVector<QModelIndex> path(depth + 1);
-	QModelIndex current = index;
-	for (int level = depth; level >= 0; --level)
-	{
-		path[level] = current;
-		current = current.parent();
-	}
-
 	const int indent = indentation();
-	if (indent <= 0) { return; }
+	if (indent <= 0 || !model()->hasChildren(index)) { return; }
 
 	const bool selected = selectionModel() && selectionModel()->isSelected(index);
 	QColor color = palette().color(selected ? QPalette::HighlightedText : QPalette::Text);
@@ -586,24 +578,16 @@ void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, c
 	painter->setPen(Qt::NoPen);
 	painter->setBrush(color);
 
-	for (int level = 0; level <= depth; ++level)
-	{
-		const QModelIndex item = path.at(level);
-		if (!model()->hasChildren(item)) { continue; }
-
-		const qreal angle = m_branchAngles.value(QPersistentModelIndex{item},
-			isExpanded(item) ? 90.0 : 0.0);
-		painter->save();
-		painter->translate(level * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
-		painter->rotate(angle);
-		QPainterPath arrow;
-		arrow.moveTo(-2.0, -3.5);
-		arrow.lineTo(2.5, 0.0);
-		arrow.lineTo(-2.0, 3.5);
-		arrow.closeSubpath();
-		painter->drawPath(arrow);
-		painter->restore();
-	}
+	const qreal angle = m_branchAngles.value(QPersistentModelIndex{index},
+		isExpanded(index) ? 90.0 : 0.0);
+	painter->translate(depth * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
+	painter->rotate(angle);
+	QPainterPath arrow;
+	arrow.moveTo(-2.0, -3.5);
+	arrow.lineTo(2.5, 0.0);
+	arrow.lineTo(-2.0, 3.5);
+	arrow.closeSubpath();
+	painter->drawPath(arrow);
 
 	painter->restore();
 }
