@@ -55,6 +55,7 @@
 #include "ConfigManager.h"
 #include "FileDialog.h"
 #include "FontHelper.h"
+#include "EditorPlatform.h"
 #include "GuiApplication.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
@@ -151,7 +152,9 @@ VstPlugin::VstPlugin( const QString & _plugin, bool skipInit ) :
 	m_embedMethod( skipInit
 			? QStringLiteral("headless")
 			: ( (gui::getGUI() != nullptr)
-				? ConfigManager::inst()->vstEmbedMethod()
+				? (EditorPlatform::isWayland()
+					? QStringLiteral("none")
+					: ConfigManager::inst()->vstEmbedMethod())
 				: QStringLiteral("headless") ) ),
 	m_version( 0 ),
 	m_isSynth( false ),
@@ -435,7 +438,7 @@ bool VstPlugin::processMessage( const message & _m )
 	{
 	case IdVstPluginWindowID:
 		m_pluginWindowID = _m.getInt();
-		if (m_embedMethod == "none" && !gui::GuiApplication::isWayland()
+		if (m_embedMethod == "none" && !EditorPlatform::isWayland()
 			&& ConfigManager::inst()->value("ui", "vstalwaysontop").toInt())
 		{
 #ifdef LMMS_BUILD_WIN32
