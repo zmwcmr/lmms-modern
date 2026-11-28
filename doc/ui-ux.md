@@ -236,7 +236,7 @@
 
 - `RenameDialog`、`PeakControllerDialog`、`LfoControllerDialog`、`LadspaBrowser`、`SampleTrackWindow` 效果架、`EffectView`。
 - 已完成 `PeakControllerDialog`：移除 256×64 固定尺寸，改用 `QVBoxLayout` + `bodyFont()`，修正误用的 "LFO Controller" tooltip。
-- 已完成 `LfoControllerDialog`：移除 240×58 固定尺寸和绝对坐标，波形按钮/旋钮/倍率按钮改为 `QGridLayout` + `QHBoxLayout` + `QVBoxLayout`，背景随对话框尺寸缩放；100% 下已目视检查，200% 待验收。
+- 已完成 `LfoControllerDialog`：移除 240×58 固定尺寸和绝对坐标，波形按钮/旋钮/倍率按钮改为 `QGridLayout` + `QHBoxLayout` + `QVBoxLayout`，背景随对话框尺寸缩放；100% 和 200% 下已目视检查。
 - 已完成 `LadspaBrowser`：移除 500×480/400 固定尺寸，标签页改用 `QVBoxLayout`，插件列表和描述区随窗口伸缩。
 - 已完成 `SampleTrackWindow`：效果架改为最小尺寸 + stretch，移除固定窗口标志和 `SetFixedSize`，窗口可调整大小。
 - `EffectView` 仍是效果架中的固定行高控件，高度按字体度量计算；它不是独立对话框，本轮保留其行高模型。
@@ -357,4 +357,5 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`LadspaBrowser` 改为可伸缩布局，移除标签页固定尺寸。
 - 2026-11-28：`SampleTrackWindow` 改为可调整大小，效果架随窗口伸缩。
 - 2026-11-28：UI-3 开始，`StereoMatrix` 移除固定尺寸并缩放背景。
+- 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。
