@@ -32,6 +32,8 @@
 #include "SampleBuffer.h"
 #include "TempoSyncKnobModel.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -108,6 +110,7 @@ public:
 
 protected:
 	void contextMenuEvent( QContextMenuEvent * _me ) override;
+	void resizeEvent( QResizeEvent * event ) override;
 	void modelChanged() override;
 
 	LfoController * m_lfo;
@@ -123,6 +126,9 @@ protected:
 
 private:
 	PixmapButton * m_userWaveBtn;
+
+private:
+	void updateBackground();
 
 private slots:
 	void askUserDefWave();

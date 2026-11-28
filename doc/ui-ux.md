@@ -235,6 +235,7 @@
 
 - `RenameDialog`、`PeakControllerDialog`、`LfoControllerDialog`、`LadspaBrowser`、`SampleTrackWindow` 效果架、`EffectView`。
 - 已完成 `PeakControllerDialog`：移除 256×64 固定尺寸，改用 `QVBoxLayout` + `bodyFont()`，修正误用的 "LFO Controller" tooltip。
+- 已完成 `LfoControllerDialog`：移除 240×58 固定尺寸和绝对坐标，波形按钮/旋钮/倍率按钮改为 `QGridLayout` + `QHBoxLayout` + `QVBoxLayout`，背景随对话框尺寸缩放；100% 下已目视检查，200% 待验收。
 - 优先改用布局和字体度量；必要时加滚动区域。
 - 200% 下检查文字边界、按钮/旋钮间距、长翻译和窄窗口。
 
@@ -348,4 +349,5 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：三档字号调整为 13/10/8；侧栏列表统一为 `CompactItemDelegate`，加入内容选中胶囊、箭头 hover 和快速双击箭头切换。
 - 2026-11-28：完成 UI-1 验收，新增 `CompactItemDelegateTest` 和箭头双击回归测试。
 - 2026-11-28：UI-2 开始，`PeakControllerDialog` 改为弹性布局。
+- 2026-11-28：`LfoControllerDialog` 改为布局驱动，移除固定尺寸和绝对坐标。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。
