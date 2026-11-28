@@ -132,13 +132,15 @@ public:
 		if ( !hasEditor() ) {
 			return;
 		}
-		if ( embedMethod() != "none" ) {
-			m_pluginSubWindow.reset(new gui::vstSubWin( gui::getGUI()->mainWindow()->workspace() ));
-			VstPlugin::createUI( m_pluginSubWindow.get() );
-			m_pluginSubWindow->setWidget(pluginWidget());
-		} else {
-			VstPlugin::createUI( nullptr );
+		// On Wayland embedMethod() is forced to "none": the plugin child owns
+		// a floating X11/XWayland window, so there is no host-side widget and
+		// no MDI subwindow to create.
+		if ( embedMethod() == "none" ) {
+			return;
 		}
+		m_pluginSubWindow.reset(new gui::vstSubWin( gui::getGUI()->mainWindow()->workspace() ));
+		VstPlugin::createUI( m_pluginSubWindow.get() );
+		m_pluginSubWindow->setWidget(pluginWidget());
 	}
 
 	/// Overwrite editor() to return the sub window instead of the embed widget

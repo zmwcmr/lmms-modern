@@ -865,6 +865,13 @@ void VstPlugin::createUI( QWidget * parent )
 		return;
 	}
 
+	// "none" means the plugin child owns a top-level window. There is no host
+	// widget to create; showUI()/hideUI() talk to the child directly.
+	if ( m_embedMethod == "none" )
+	{
+		return;
+	}
+
 	if( m_pluginWindowID == 0 )
 	{
 		return;
