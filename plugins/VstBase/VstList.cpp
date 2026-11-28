@@ -37,7 +37,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSaveFile>
 #include <QStandardPaths>
 #include <QString>
 
@@ -94,23 +93,63 @@ QString cacheFilePath()
 	return dir + QStringLiteral("/vst-list.json");
 }
 
-QString pluginTypeToString(lmms::VstList::PluginType type)
-{
-	using PluginType = lmms::VstList::PluginType;
-	switch (type)
-	{
-	case PluginType::Instrument: return QStringLiteral("instrument");
-	case PluginType::Effect: return QStringLiteral("effect");
-	default: return QStringLiteral("invalid");
-	}
-}
-
 lmms::VstList::PluginType pluginTypeFromString(const QString& type)
 {
 	using PluginType = lmms::VstList::PluginType;
 	if (type == QLatin1String("instrument")) { return PluginType::Instrument; }
 	if (type == QLatin1String("effect")) { return PluginType::Effect; }
 	return PluginType::Invalid;
+}
+
+
+lmms::PluginScanEntry toScanEntry(const lmms::VstList::Metadata& metadata)
+{
+	lmms::PluginScanEntry entry;
+	entry.format = lmms::PluginScanFormat::Vst2;
+	entry.path = fromPath(metadata.path);
+	entry.uniqueId = QString::fromStdString(metadata.uniqueID);
+	entry.name = QString::fromStdString(metadata.name);
+	entry.vendor = QString::fromStdString(metadata.vendor);
+	entry.product = QString::fromStdString(metadata.product);
+	entry.mtimeMs = metadata.mtimeMs;
+	entry.size = metadata.size;
+	entry.hash = QString::fromStdString(metadata.hash);
+	entry.isInstrument = metadata.type == lmms::VstList::PluginType::Instrument;
+	entry.isEffect = metadata.type == lmms::VstList::PluginType::Effect;
+	if (metadata.type == lmms::VstList::PluginType::Invalid)
+	{
+		entry.error = QStringLiteral("not a loadable VST2 plugin");
+	}
+	return entry;
+}
+
+
+
+
+lmms::VstList::Metadata fromScanEntry(const lmms::PluginScanEntry& entry)
+{
+	lmms::VstList::Metadata metadata;
+	metadata.path = toPath(entry.path);
+	metadata.mtimeMs = entry.mtimeMs;
+	metadata.size = entry.size;
+	metadata.hash = entry.hash.toStdString();
+	metadata.uniqueID = entry.uniqueId.toStdString();
+	metadata.name = entry.name.toStdString();
+	metadata.product = entry.product.toStdString();
+	metadata.vendor = entry.vendor.toStdString();
+	if (entry.isInstrument)
+	{
+		metadata.type = lmms::VstList::PluginType::Instrument;
+	}
+	else if (entry.isEffect)
+	{
+		metadata.type = lmms::VstList::PluginType::Effect;
+	}
+	else
+	{
+		metadata.type = lmms::VstList::PluginType::Invalid;
+	}
+	return metadata;
 }
 
 bool hasVstExtension(const fs::path& path)
@@ -430,18 +469,32 @@ void VstList::loadCache()
 	}
 	m_cacheLoaded = true;
 
-	const auto path = cacheFilePath();
-	if (path.isEmpty())
+	const auto sharedPath =
+		PluginScanCache::defaultCachePath(PluginScanFormat::Vst2);
+	if (m_scanCache.load(sharedPath))
 	{
+		for (const auto& entry : m_scanCache.entries())
+		{
+			auto metadata = fromScanEntry(entry);
+			m_cache.insert_or_assign(metadata.path.string(),
+				std::move(metadata));
+		}
+		m_cacheValid = true;
 		return;
 	}
 
-	QFile file(path);
+	// Import the pre-Stage-4 cache once. The next save writes the shared
+	// per-format file and keeps the old file untouched for older builds.
+	const auto legacyPath = cacheFilePath();
+	if (legacyPath.isEmpty())
+	{
+		return;
+	}
+	QFile file(legacyPath);
 	if (!file.open(QFile::ReadOnly))
 	{
 		return;
 	}
-
 	const auto document = QJsonDocument::fromJson(file.readAll());
 	if (!document.isObject())
 	{
@@ -453,7 +506,7 @@ void VstList::loadCache()
 		return;
 	}
 
-	m_cacheValid = true;
+	bool imported = false;
 	for (const auto& value : root.value(QStringLiteral("plugins")).toArray())
 	{
 		const auto object = value.toObject();
@@ -462,21 +515,32 @@ void VstList::loadCache()
 		{
 			continue;
 		}
-
 		Metadata metadata;
 		metadata.path = canonicalPath(toPath(pathString));
-		metadata.mtimeMs = static_cast<qint64>(object.value(QStringLiteral("mtime")).toDouble());
-		metadata.size = static_cast<qint64>(object.value(QStringLiteral("size")).toDouble());
+		metadata.mtimeMs = static_cast<qint64>(
+			object.value(QStringLiteral("mtime")).toDouble());
+		metadata.size = static_cast<qint64>(
+			object.value(QStringLiteral("size")).toDouble());
 		metadata.hash = object.value(QStringLiteral("hash")).toString().toStdString();
-		metadata.type = pluginTypeFromString(object.value(QStringLiteral("type")).toString());
+		metadata.type = pluginTypeFromString(
+			object.value(QStringLiteral("type")).toString());
 		metadata.uniqueID = object.value(QStringLiteral("uniqueID")).toString().toStdString();
 		metadata.name = object.value(QStringLiteral("name")).toString().toStdString();
 		metadata.product = object.value(QStringLiteral("product")).toString().toStdString();
 		metadata.vendor = object.value(QStringLiteral("vendor")).toString().toStdString();
-
 		m_cache.insert_or_assign(metadata.path.string(), std::move(metadata));
+		imported = true;
+	}
+	m_cacheValid = imported;
+	if (imported)
+	{
+		m_cacheChanged = true;
+		saveCache();
 	}
 }
+
+
+
 
 void VstList::saveCache()
 {
@@ -485,43 +549,26 @@ void VstList::saveCache()
 		return;
 	}
 
-	const auto path = cacheFilePath();
+	const auto path =
+		PluginScanCache::defaultCachePath(PluginScanFormat::Vst2);
 	if (path.isEmpty())
 	{
 		return;
 	}
 
-	QJsonArray plugins;
+	m_scanCache.clear();
 	for (const auto& [_, metadata] : m_cache)
 	{
-		QJsonObject object;
-		object.insert(QStringLiteral("path"), fromPath(metadata.path));
-		object.insert(QStringLiteral("mtime"), static_cast<double>(metadata.mtimeMs));
-		object.insert(QStringLiteral("size"), static_cast<double>(metadata.size));
-		object.insert(QStringLiteral("hash"), QString::fromStdString(metadata.hash));
-		object.insert(QStringLiteral("type"), pluginTypeToString(metadata.type));
-		object.insert(QStringLiteral("uniqueID"), QString::fromStdString(metadata.uniqueID));
-		object.insert(QStringLiteral("name"), QString::fromStdString(metadata.name));
-		object.insert(QStringLiteral("product"), QString::fromStdString(metadata.product));
-		object.insert(QStringLiteral("vendor"), QString::fromStdString(metadata.vendor));
-		plugins.append(object);
+		m_scanCache.upsert(toScanEntry(metadata));
 	}
-
-	QJsonObject root;
-	root.insert(QStringLiteral("version"), CACHE_VERSION);
-	root.insert(QStringLiteral("plugins"), plugins);
-
-	QSaveFile file(path);
-	if (!file.open(QFile::WriteOnly))
-	{
-		return;
-	}
-	file.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
-	if (file.commit())
+	if (m_scanCache.save(path))
 	{
 		m_cacheValid = true;
 		m_cacheChanged = false;
 	}
 }
+
+
+
 
 } // namespace lmms

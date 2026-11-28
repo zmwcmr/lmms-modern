@@ -35,6 +35,7 @@
 #include <QString>
 #include <QtGlobal>
 
+#include "PluginScanCache.h"
 #include "vstbase_export.h"
 
 namespace lmms
@@ -110,6 +111,8 @@ private:
 
 	//! Metadata for every file we ever looked at, keyed by canonical path.
 	std::map<std::string, Metadata> m_cache;
+	//! Shared on-disk cache; VstList keeps m_cache for the scanner.
+	PluginScanCache m_scanCache{PluginScanFormat::Vst2};
 	//! Visible plugins (valid instruments/effects), keyed by canonical path.
 	std::map<std::string, Metadata> m_plugins;
 	//! File contents hash -> canonical path, used for deduplication.

@@ -309,10 +309,12 @@ path.
       `QSaveFile` writes, upsert/find/remove and mtime/size freshness checks.
       `PluginScanCacheTest` covers round-trip, wrong format/version,
       replacement and removal.
-- [ ] Move VST2, VST3 and LV2 list classes onto the shared cache. The existing
-      `vst-list.json` and `vst3-list.json` files must stay readable during
-      the migration; the plan is to import them once and rewrite the shared
-      per-format cache.
+- [x] Move VST2 `VstList` onto the shared cache. On first start it imports
+      the legacy `vst-list.json` once, then writes
+      `plugin-scan-vst2.json`; the legacy file is left untouched for older
+      builds.
+- [ ] Move VST3 `Vst3List` and LV2 metadata onto the shared cache. The
+      existing `vst3-list.json` must stay readable during the migration.
 - [ ] Move VST2 probing and LV2 metadata behind the scanner protocol.
 - Acceptance: same plugin lists, rescan behavior and startup time.
 
