@@ -34,6 +34,7 @@
 #include "Fader.h"
 
 #include <QHBoxLayout>
+#include <QResizeEvent>
 #include <QVBoxLayout>
 
 
@@ -45,10 +46,9 @@ CrossoverEQControlDialog::CrossoverEQControlDialog(CrossoverEQControls *controls
 	EffectControlDialog(controls)
 {
 	setAutoFillBackground(true);
-	QPalette pal;
-	pal.setBrush(backgroundRole(), PLUGIN_NAME::getIconPixmap("artwork"));
-	setPalette(pal);
-	setFixedSize(167, 218);
+	setMinimumSize(167, 218);
+	resize(167, 218);
+	updateBackground();
 	auto layout = new QVBoxLayout(this);
 
 	auto knobsLayout = new QHBoxLayout();
@@ -107,6 +107,26 @@ CrossoverEQControlDialog::CrossoverEQControlDialog(CrossoverEQControls *controls
 	makeMuteBtn(&controls->m_mute2, tr("Mute band 2"), 1);
 	makeMuteBtn(&controls->m_mute3, tr("Mute band 3"), 2);
 	makeMuteBtn(&controls->m_mute4, tr("Mute band 4"), 3);
+}
+
+
+void CrossoverEQControlDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void CrossoverEQControlDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
 }
 
 
