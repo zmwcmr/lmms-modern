@@ -17,6 +17,7 @@ set(LMMS_TESTS
 	src/core/HostedPluginModelsTest.cpp
 	src/core/ParameterCurveTest.cpp
 	src/core/PluginProcessSupervisorTest.cpp
+	src/core/PluginScanCacheTest.cpp
 	src/core/ProjectVersionTest.cpp
 	src/core/RelativePathsTest.cpp
 	src/core/SongAutomationTest.cpp
