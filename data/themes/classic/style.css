@@ -817,7 +817,9 @@ QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 }
 
 lmms--gui--FileBrowserTreeWidget::branch:selected,
-QTreeWidget#pluginBrowserTree::branch:selected {
+lmms--gui--FileBrowserTreeWidget::branch:hover,
+QTreeWidget#pluginBrowserTree::branch:selected,
+QTreeWidget#pluginBrowserTree::branch:hover {
 	background: transparent;
 }
 
