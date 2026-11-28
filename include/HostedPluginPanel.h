@@ -55,7 +55,9 @@ struct HostedPluginActions
 	std::function<QString()> vendor;
 	std::function<QString()> location;
 	std::function<bool()> hasEditor;
-	std::function<void()> toggleEditor;
+	std::function<void()> showEditor;
+	std::function<void()> hideEditor;
+	std::function<bool()> isEditorVisible;
 	std::function<bool()> canReload;
 	std::function<void()> reload;
 	std::function<int()> presetCount;
@@ -110,6 +112,7 @@ private:
 	QLabel* m_title = nullptr;
 	QLabel* m_vendor = nullptr;
 	QPushButton* m_guiButton = nullptr;
+	QPushButton* m_hideButton = nullptr;
 	QPushButton* m_parametersButton = nullptr;
 	QPushButton* m_reloadButton = nullptr;
 	QPushButton* m_openButton = nullptr;

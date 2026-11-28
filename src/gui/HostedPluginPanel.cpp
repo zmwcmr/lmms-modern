@@ -60,9 +60,14 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	layout->addLayout(infoRow);
 
 	auto* toolbar = new QHBoxLayout();
-	m_guiButton = new QPushButton(tr("Show GUI"), this);
-	m_guiButton->setToolTip(tr("Open or close the plugin's own window."));
+	m_guiButton = new QPushButton(tr("GUI"), this);
+	m_guiButton->setCheckable(true);
+	m_guiButton->setToolTip(tr(
+		"Open the plugin GUI, or raise it when it is already open."));
 	toolbar->addWidget(m_guiButton);
+	m_hideButton = new QPushButton(tr("Hide"), this);
+	m_hideButton->setToolTip(tr("Hide the plugin GUI."));
+	toolbar->addWidget(m_hideButton);
 	m_parametersButton = new QPushButton(tr("Parameters"), this);
 	m_parametersButton->setCheckable(true);
 	m_parametersButton->setToolTip(tr("Show or hide the automation parameters"));
@@ -113,7 +118,14 @@ HostedPluginPanel::HostedPluginPanel(HostedPluginActions actions,
 	layout->addWidget(m_parametersWidget, 1);
 
 	connect(m_guiButton, &QPushButton::clicked, this, [this] {
-		if (m_actions.toggleEditor) { m_actions.toggleEditor(); }
+		if (m_actions.showEditor) { m_actions.showEditor(); }
+		m_guiButton->setChecked(true);
+		updateInfo();
+	});
+	connect(m_hideButton, &QPushButton::clicked, this, [this] {
+		if (m_actions.hideEditor) { m_actions.hideEditor(); }
+		m_guiButton->setChecked(false);
+		updateInfo();
 	});
 	connect(m_parametersButton, &QPushButton::toggled, this,
 		&HostedPluginPanel::setParametersVisible);
@@ -171,10 +183,14 @@ void HostedPluginPanel::updateInfo()
 	m_vendor->setVisible(!vendor.isEmpty());
 
 	const bool hasEditor = m_actions.hasEditor && m_actions.hasEditor();
+	const bool editorVisible = hasEditor && m_actions.isEditorVisible
+		&& m_actions.isEditorVisible();
 	m_guiButton->setEnabled(hasEditor);
+	m_hideButton->setVisible(editorVisible);
 	m_guiButton->setToolTip(hasEditor
-		? tr("Open or close the plugin's own window.")
+		? tr("Open the plugin GUI, or raise it when it is already open.")
 		: tr("This plugin has no editor."));
+	m_guiButton->setChecked(editorVisible);
 
 	const bool canReload = m_actions.canReload && m_actions.canReload();
 	m_reloadButton->setVisible(canReload);

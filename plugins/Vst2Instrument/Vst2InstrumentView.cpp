@@ -64,8 +64,14 @@ Vst2InstrumentView::Vst2InstrumentView(Instrument* instrument, QWidget* parent) 
 		auto* p = plugin();
 		return p != nullptr && p->hasEditorSupport();
 	};
-	actions.toggleEditor = [this] {
-		if (auto* p = plugin()) { p->toggleUI(); }
+	actions.showEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->showEditor(); }
+	};
+	actions.hideEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->hideEditor(); }
+	};
+	actions.isEditorVisible = [this] {
+		return m_instrument != nullptr && m_instrument->isEditorVisible();
 	};
 	actions.canReload = [this] {
 		return m_instrument != nullptr && !m_instrument->file().isEmpty();
@@ -189,12 +195,12 @@ void Vst2InstrumentView::openPluginFile(QWidget* parent)
 		engine->doneChangeInModel();
 	}
 
-	if (m_panel != nullptr) { m_panel->refresh(); }
 	if (loaded)
 	{
-		if (auto* p = plugin()) { p->showUI(); }
+		if (m_instrument != nullptr) { m_instrument->showEditor(); }
 	}
-	else
+	if (m_panel != nullptr) { m_panel->refresh(); }
+	if (!loaded)
 	{
 		QMessageBox::warning(this, tr("VST2 plugin"),
 			tr("The selected VST2 plugin could not be loaded."));

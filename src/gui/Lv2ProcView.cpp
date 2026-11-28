@@ -383,7 +383,9 @@ Lv2ProcView::Lv2ProcView(QWidget* meAsWidget, Lv2Proc *proc) :
 		return m_proc != nullptr ? m_proc->pluginUri() : QString();
 	};
 	actions.hasEditor = [this] { return hasPluginUi(); };
-	actions.toggleEditor = [this] { toggleUI(); };
+	actions.showEditor = [this] { setUiVisible(true); };
+	actions.hideEditor = [this] { setUiVisible(false); };
+	actions.isEditorVisible = [this] { return m_uiVisible; };
 	actions.canReload = [] { return true; };
 	actions.reload = [this] {
 		if (m_panel != nullptr) { m_panel->clearParameters(); }

@@ -1145,6 +1145,7 @@ Instrument * InstrumentTrack::loadInstrument(const QString & _plugin_name,
 	if (m_instrument != nullptr && Engine::getSong() != nullptr
 		&& !Engine::getSong()->isLoadingProject())
 	{
+		emit requestInstrumentWindow();
 		if (auto* app = QCoreApplication::instance())
 		{
 			QMetaObject::invokeMethod(app,

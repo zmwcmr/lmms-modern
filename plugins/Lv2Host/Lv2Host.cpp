@@ -1525,9 +1525,10 @@ bool Lv2HostProcess::showUiNow(float scale)
 	}
 	if (m_uiInstance != nullptr)
 	{
-		if (!m_uiVisible && m_uiWindow != 0 && m_uiDisplay != nullptr)
+		if (m_uiWindow != 0 && m_uiDisplay != nullptr)
 		{
-			XMapWindow(m_uiDisplay, m_uiWindow);
+			if (!m_uiVisible) { XMapWindow(m_uiDisplay, m_uiWindow); }
+			XRaiseWindow(m_uiDisplay, m_uiWindow);
 			XFlush(m_uiDisplay);
 			m_uiVisible = true;
 		}
@@ -1720,6 +1721,11 @@ bool Lv2HostProcess::showUiNow(float scale)
 	if (show != nullptr && show->show != nullptr)
 	{
 		show->show(suil_instance_get_handle(m_uiInstance));
+	}
+	if (m_uiWindow != 0 && m_uiDisplay != nullptr)
+	{
+		XRaiseWindow(m_uiDisplay, m_uiWindow);
+		XFlush(m_uiDisplay);
 	}
 
 	std::fprintf(stderr, "lv2 host: UI created (window=%lu widget=%p size=%dx%d)\n",

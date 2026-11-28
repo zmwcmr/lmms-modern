@@ -371,18 +371,22 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       crash isolation). The shared window behavior itself is covered by
       `X11EditorWindowTest`.
 - [x] Shared instrument page: `HostedPluginPanel` provides the same plugin
-      name/vendor line, toolbar (Show GUI, Parameters, Reload, Preset, Open
-      plugin, Help) and searchable parameter drawer for VST2, VST3 and LV2.
+      name/vendor line, toolbar (GUI toggle, Hide, Parameters, Reload, Preset,
+      Open plugin, Help) and searchable parameter drawer for VST2, VST3 and
+      LV2. The GUI toggle reflects whether the editor is open; clicking it
+      raises an existing window instead of closing it, and Hide closes it.
       The parameter drawer is collapsed by default; the plugin's own GUI is
       the primary editor. The old giant knob grids are no longer the default.
 - [x] All hosted instrument views are resizable: VST3 no longer forces
       `QLayout::SetFixedSize`, LV2 returns `isResizable() == true`, and the
       common panel has a usable minimum width.
-- [x] A user-created/imported instrument opens its native editor once. The
-      request is queued to the GUI thread from `InstrumentTrack::loadInstrument`;
-      project loading instantiates instruments directly and never auto-opens.
-      VST2 creates its editor hidden and maps it on the first Show request, so
-      import no longer flashes and closes the window.
+- [x] A user-created/imported instrument opens both its LMMS instrument page
+      and its native editor once. The page request is a queued
+      `InstrumentTrack` signal handled by `InstrumentTrackView`; the editor is
+      requested from the GUI thread. Project loading instantiates instruments
+      directly and never auto-opens. VST2 creates its editor hidden and maps it
+      on the first Show request, so import no longer flashes and closes the
+      window.
 - [x] LV2 host threading: `lmms-lv2-host` runs DSP on a dedicated audio
       thread, the suil UI and X11 event loop on a separate UI thread, and the
       main thread only pumps the host socket. A slow editor such as Pianoteq

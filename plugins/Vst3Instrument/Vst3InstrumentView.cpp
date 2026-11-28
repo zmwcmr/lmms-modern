@@ -57,10 +57,14 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 	actions.hasEditor = [this] {
 		return m_instrument != nullptr && m_instrument->hasEditor();
 	};
-	actions.toggleEditor = [this] {
-		if (m_instrument == nullptr) { return; }
-		if (m_instrument->isEditorVisible()) { m_instrument->hideEditor(); }
-		else { m_instrument->showEditor(this); }
+	actions.showEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->showEditor(this); }
+	};
+	actions.hideEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->hideEditor(); }
+	};
+	actions.isEditorVisible = [this] {
+		return m_instrument != nullptr && m_instrument->isEditorVisible();
 	};
 	actions.canReload = [this] {
 		return m_instrument != nullptr && !m_instrument->file().isEmpty();

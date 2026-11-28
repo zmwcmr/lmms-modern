@@ -180,6 +180,7 @@ void Vst3Instrument::showEditor(QWidget* parent)
 	{
 		return;
 	}
+	m_editorRequested = true;
 	if (!m_editorWindow.isNull())
 	{
 		m_editorWindow->raiseEditor();
@@ -197,6 +198,7 @@ void Vst3Instrument::showEditor(QWidget* parent)
 
 void Vst3Instrument::hideEditor()
 {
+	m_editorRequested = false;
 	if (!m_editorWindow.isNull()) { m_editorWindow->close(); }
 }
 
@@ -205,7 +207,7 @@ void Vst3Instrument::hideEditor()
 
 bool Vst3Instrument::isEditorVisible() const
 {
-	return !m_editorWindow.isNull();
+	return m_editorRequested && !m_editorWindow.isNull();
 }
 
 

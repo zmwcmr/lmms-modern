@@ -72,6 +72,9 @@ public:
 	bool openFile(const QString& file);
 	bool reloadPlugin();
 	void requestShowEditor() override;
+	void showEditor();
+	void hideEditor();
+	bool isEditorVisible() const { return m_editorVisible; }
 	void setProgram(int index);
 
 private:
@@ -82,6 +85,7 @@ private:
 	QString m_file;
 	QMutex m_mutex;
 	bool m_updatingFromPlugin = false;
+	bool m_editorVisible = false;
 };
 
 } // namespace lmms

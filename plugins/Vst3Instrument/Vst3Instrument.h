@@ -88,6 +88,7 @@ private:
 	QString m_classId;
 	Vst3ParameterModels m_parameterModels;
 	QPointer<Vst3EditorWindow> m_editorWindow;
+	bool m_editorRequested = false;
 };
 
 } // namespace lmms
