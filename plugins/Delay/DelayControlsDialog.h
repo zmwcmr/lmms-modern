@@ -27,6 +27,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -43,6 +45,12 @@ class DelayControlsDialog : public EffectControlDialog
 public:
 	DelayControlsDialog( DelayControls* controls );
 	~DelayControlsDialog() override = default;
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 };
 
 class XyPad : public QWidget
