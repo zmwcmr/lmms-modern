@@ -82,6 +82,16 @@ private slots:
 			QStringLiteral("project_export"), QStringLiteral("project_import"),
 			QStringLiteral("star"), QStringLiteral("home"), QStringLiteral("plugins"),
 			QStringLiteral("help"),
+			QStringLiteral("file"), QStringLiteral("midi_file"), QStringLiteral("preset_file"),
+			QStringLiteral("soundfont_file"), QStringLiteral("vst_plugin_file"),
+			QStringLiteral("project_open_recent"), QStringLiteral("folder_locked"),
+			QStringLiteral("setup_general"), QStringLiteral("setup_audio"),
+			QStringLiteral("setup_midi"), QStringLiteral("setup_directories"),
+			QStringLiteral("setup_performance"), QStringLiteral("plugin_tab"),
+			QStringLiteral("env_lfo_tab"), QStringLiteral("func_tab"),
+			QStringLiteral("fx_tab"), QStringLiteral("midi_tab"), QStringLiteral("tuning_tab"),
+			QStringLiteral("mixer"), QStringLiteral("new_channel"), QStringLiteral("muted"),
+			QStringLiteral("controller"), QStringLiteral("info"), QStringLiteral("error"),
 		};
 
 		for (const auto& name : names)

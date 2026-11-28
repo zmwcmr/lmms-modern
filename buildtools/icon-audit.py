@@ -438,6 +438,129 @@ def sheet(args):
     return 0
 
 
+def migration_items(path):
+    items = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| "):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 5:
+            continue
+        group, name, _old, _new, _note = cells
+        match = re.fullmatch(r"`([a-z0-9_]+)`", name)
+        if match:
+            items.append((group, match.group(1)))
+    return items
+
+
+def compare(args):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        print("error: the compare command needs Pillow (pip install pillow)", file=sys.stderr)
+        return 2
+    if shutil.which("inkscape") is None:
+        print("error: the compare command needs Inkscape on PATH", file=sys.stderr)
+        return 2
+
+    items = migration_items(args.doc)
+    if not items:
+        print(f"error: no icon rows in {args.doc}", file=sys.stderr)
+        return 1
+
+    old_dir = Path(args.old)
+    new_dir = Path(args.new)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    font_path = find_font()
+    font = ImageFont.truetype(font_path, 12) if font_path else ImageFont.load_default()
+    group_font = ImageFont.truetype(font_path, 14) if font_path else ImageFont.load_default()
+    title_font = ImageFont.truetype(font_path, 18) if font_path else ImageFont.load_default()
+    group_labels = {
+        "传输与常用": "Transport",
+        "文件与浏览": "Files",
+        "轨道与编辑器": "Tracks & editors",
+        "侧栏与状态": "Sidebar & state",
+        "设置页": "Setup",
+        "乐器页签": "Instrument tabs",
+        "混音/控制器": "Mixer & controllers",
+        "状态": "Status",
+    }
+
+    size = args.size
+    icon_px = size * 2
+    columns = 3
+    block_w = 230
+    row_h = 96
+    header_h = 30
+    margin = 22
+    top = 54
+    ink = "#e6e9ef"
+    bg = (16, 18, 19)
+    fg = (230, 233, 239)
+
+    layout = []
+    y = top
+    column = 0
+    last_group = None
+    for group, name in items:
+        if group != last_group:
+            if column:
+                y += row_h
+                column = 0
+            layout.append(("group", group, margin, y))
+            y += header_h
+            last_group = group
+        layout.append(("item", name, margin + column * block_w, y))
+        column += 1
+        if column == columns:
+            column = 0
+            y += row_h
+    if column:
+        y += row_h
+    height = y + margin
+    width = margin * 2 + columns * block_w
+
+    image = Image.new("RGB", (width, height), bg)
+    draw = ImageDraw.Draw(image)
+    draw.text((margin, 16), "Icon migration · legacy (left) -> default (right)", font=title_font, fill=fg)
+
+    with tempfile.TemporaryDirectory() as temporary:
+        temporary = Path(temporary)
+        for kind, value, x, y in layout:
+            if kind == "group":
+                draw.text((x, y + 2), group_labels.get(value, value), font=group_font, fill=(150, 158, 170))
+                continue
+            old_path = old_dir / f"{value}.svg"
+            new_path = new_dir / f"{value}.svg"
+            old_png = temporary / f"{value}-old.png"
+            new_png = temporary / f"{value}-new.png"
+            if old_path.is_file():
+                render_icon(old_path, old_png, icon_px, ink)
+            if new_path.is_file():
+                render_icon(new_path, new_png, icon_px, ink)
+            if old_path.is_file():
+                icon = Image.open(old_png).convert("RGBA").resize((size, size), Image.LANCZOS)
+                image.paste(icon, (x + 20, y + 8), icon)
+            else:
+                draw.text((x + 30, y + 20), "—", font=font, fill=fg)
+            arrow_y = y + 8 + size // 2
+            draw.line([(x + 72, arrow_y), (x + 100, arrow_y)], fill=(120, 128, 140), width=2)
+            draw.polygon([(x + 100, arrow_y - 4), (x + 108, arrow_y), (x + 100, arrow_y + 4)],
+                         fill=(120, 128, 140))
+            if new_path.is_file():
+                icon = Image.open(new_png).convert("RGBA").resize((size, size), Image.LANCZOS)
+                image.paste(icon, (x + 112, y + 8), icon)
+            else:
+                draw.text((x + 122, y + 20), "—", font=font, fill=fg)
+            draw.text((x + 20, y + size + 14), value, font=font, fill=fg)
+
+    image.save(out)
+    print(out)
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -455,6 +578,13 @@ def main():
     sheet_parser.add_argument("--only", default="", help="comma-separated icon names")
     sheet_parser.add_argument("--out", default="build/icon-sheets")
 
+    compare_parser = sub.add_parser("compare", help="render old/new icon comparison (Inkscape + Pillow)")
+    compare_parser.add_argument("--doc", default="doc/icon-migration.md")
+    compare_parser.add_argument("--old", default="data/themes/legacy")
+    compare_parser.add_argument("--new", default="data/themes/default")
+    compare_parser.add_argument("--out", default="doc/ui-ux-shots/icon-migration.png")
+    compare_parser.add_argument("--size", type=int, default=48)
+
     args = parser.parse_args()
     if args.command == "audit":
         return audit(args.theme)
@@ -462,6 +592,8 @@ def main():
         return lint(args.paths, args.baseline)
     if args.command == "sheet":
         return sheet(args)
+    if args.command == "compare":
+        return compare(args)
     return 1
 
 
