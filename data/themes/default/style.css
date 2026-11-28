@@ -215,7 +215,7 @@ QMenu::item:selected {
 }
 
 QMenu::item:disabled {
-	color: #515459;
+	color: #707880;
 	background-color: #262b30;
 	padding: 4px 32px 4px 20px;
 }

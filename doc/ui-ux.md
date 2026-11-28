@@ -205,6 +205,7 @@
 
 - 经典主题 PNG → SVG；默认主题已无 PNG。
 - 按真实背景检查链接/正文/禁用/选中对比度，尤其是 About、Project Notes、侧栏。
+- 对比度抽查：default tooltip 14.2:1、菜单选中 10.5:1；classic 菜单选中 4.7:1、链接 7.7:1；两主题禁用菜单文字由 1.9/2.8:1 提到 3.2/3.5:1。
 - 补测 165 Hz/Wayland 下侧栏滑动和按钮反馈动画。
 - 检查键盘焦点、Tab 顺序、可访问名称；列表行的 tooltip 和省略文本要能访问完整内容。
 - 经典主题补齐按钮、树/列表/表格视图的键盘焦点轮廓（`#4afd85`，仅 outline，不改变布局）；默认主题已有对应规则。
@@ -362,3 +363,4 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：UI-3 的普通布局面板完成；Slew/LOMM/SlicerT/AFP/Sf2/Gig/Vestige 归入 UI-3b 自绘重写。
 - 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
 - 2026-11-28：UI-5 可访问性批次：`EffectSelectDialog` 键盘 Tab/Enter、经典主题焦点轮廓、旋钮/按钮可访问名称；新增 `EffectSelectDialogTest`。
+- 2026-11-28：UI-5 对比度批次：两主题禁用菜单文字提升到 3:1 以上并记录抽查值。
