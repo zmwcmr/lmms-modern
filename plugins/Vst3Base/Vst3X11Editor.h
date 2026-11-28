@@ -26,24 +26,24 @@
 #define LMMS_VST3_X11_EDITOR_H
 
 #include <functional>
+#include <memory>
 
 #include <QObject>
 #include <QString>
 
 #include "vst3base_export.h"
 
-class QSocketNotifier;
-
 namespace lmms
 {
 
 class Vst3HostBase;
 class Vst3RemoteEditorClient;
+class X11EditorWindow;
 
 /**
- * Creates a plain X11 top-level window through XWayland and attaches the
- * plugin view there. This is the fallback for Qt Wayland sessions, where a
- * native Qt widget has no X11 window id to embed into.
+ * Attaches a VST3 editor to the shared X11 editor window. This is the
+ * fallback for Qt Wayland sessions, where a native Qt widget has no X11
+ * window id to embed into.
  */
 class VST3BASE_EXPORT Vst3X11Editor : public QObject
 {
@@ -61,18 +61,12 @@ public:
 
 private:
 	void close();
-	void processEvents();
-	void resizeFromPlugin(int width, int height);
 
 	Vst3HostBase* m_host = nullptr;
-	void* m_display = nullptr;
-	unsigned long m_window = 0;
-	unsigned long m_wmDelete = 0;
-	QSocketNotifier* m_notifier = nullptr;
+	std::unique_ptr<X11EditorWindow> m_window;
 	Vst3RemoteEditorClient* m_remoteClient = nullptr;
 	std::function<void()> m_closed;
 	bool m_open = false;
-	bool m_resizing = false;
 };
 
 } // namespace lmms

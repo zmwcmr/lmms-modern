@@ -346,8 +346,12 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       for `qt`/`xembed`; the editor is a floating X11 window.
 - [x] LV2: use the same platform policy instead of its own platform-name
       checks.
-- [ ] Extract the shared X11 editor window controller and migrate the VST3
-      editor host and LV2 suil window onto it.
+- [x] Add `X11EditorWindow` as the shared floating-window controller: display
+      and window creation, WM_DELETE_WINDOW, the X event pump, resize
+      clamping, fixed-size hints, raise/activate and close/destroy callbacks.
+      VST3's `Vst3X11Editor` and LV2's suil window both use it now, so
+      lifecycle and event handling exist once. `X11EditorWindowTest` covers
+      open/resize/hide/show/close and repeated WM_DELETE delivery.
 - [ ] VST2/Vestige: replace the MDI subwindow path with the common X11/floating
       backend.
 - Acceptance: LV2/VST2/VST3 editors open as floating XWayland windows on
