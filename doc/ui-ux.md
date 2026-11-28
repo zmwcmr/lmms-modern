@@ -396,7 +396,15 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 | DynamicsProcessor | 无 | 无 | 图形 + 控件布局 |
 | GranularPitchShifter | 无 | 无 | 4×4 网格 |
 
-剩余固定尺寸只出现在 Knob、PixmapButton、Ladspa 图标列等非文本控件上，属于预期。`StereoMatrix` 和 `CrossoverEQ` 没有显式 `adjustSize()`，依赖布局最小尺寸；需要视觉复核初始大小。
+剩余固定尺寸只出现在 Knob、PixmapButton、Ladspa 图标列等非文本控件上，属于预期。`StereoMatrix` 和 `CrossoverEQ` 已补 `adjustSize()`。
+
+已目视抽查 9pt/18pt 默认窗口和放大窗口：
+
+- `StereoMatrix`：主要文字在 artwork 里，160×185 保持稳定，没有文字重叠。
+- `Bitcrush`：9pt 初始 200×128，18pt 212×148，标签和旋钮没有重叠。
+- `CrossoverEQ`：9pt 167×225，18pt 167×236，标签仍能放下。
+
+其余布局驱动面板的逐项 18pt 截图因临时 offscreen harness 在 Delay 处挂起，未完成；当前只覆盖代码审计和上述抽查。
 
 已知边界：
 
