@@ -29,6 +29,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -44,6 +46,12 @@ class BitcrushControlDialog : public EffectControlDialog
 public:
 	BitcrushControlDialog( BitcrushControls * controls );
 	~BitcrushControlDialog() override = default;
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 };
 
 
