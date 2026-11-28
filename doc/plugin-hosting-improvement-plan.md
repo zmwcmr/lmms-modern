@@ -431,9 +431,10 @@ Tasks:
       buffer and can route it into another mixer channel with a worker
       dependency, cycle checks and the `multioutput` XML attribute. The
       channel context menu exposes the target selection.
-- [~] Add the second output pair to VST2 and to the remote VST3 protocol:
-      in-process VST3 and LV2 support two stereo pairs; VST2 and the remote
-      VST3 protocol still expose the main pair only (documented limitation).
+- [x] Add the second output pair to the remote VST3 protocol: the shared
+      segment carries up to four buses with two channels each, the child
+      calls `processBuses()`, and `Vst3RemoteHostClient` maps them to
+      `PluginProcessBlock`. VST2 still exposes the main pair only.
 - [x] Extend the mixer UI and project XML: `sidechain` and `multioutput`
       attributes on `<mixerchannel>`, plus Sidechain/Multi-output context
       submenus.

@@ -281,6 +281,30 @@ bool Vst3RemoteHostClient::start(const QString& bundlePath,
 		m_units.push_back(std::move(unit));
 	}
 	m_currentUnit = ready.value(QStringLiteral("currentUnit")).toInt(-1);
+	m_inputBuses.clear();
+	m_outputBuses.clear();
+	if (m_audio != nullptr)
+	{
+		const auto readBus = [](const vst3::SharedBusInfo& source, bool isInput) {
+			BusInfo bus;
+			bus.channels = std::max(0, source.channels);
+			bus.isInput = isInput;
+			bus.isMain = source.isMain != 0;
+			bus.active = true;
+			bus.name = QString::fromUtf8(source.name);
+			return bus;
+		};
+		for (int i = 0; i < std::min(m_audio->inputBusCount,
+			vst3::maxBuses); ++i)
+		{
+			m_inputBuses.push_back(readBus(m_audio->inputBusInfo[i], true));
+		}
+		for (int i = 0; i < std::min(m_audio->outputBusCount,
+			vst3::maxBuses); ++i)
+		{
+			m_outputBuses.push_back(readBus(m_audio->outputBusInfo[i], false));
+		}
+	}
 	m_stateValid = false;
 
 	m_running = true;
@@ -412,11 +436,11 @@ bool Vst3RemoteHostClient::isInstrument() const
 
 std::vector<Vst3RemoteHostClient::BusInfo> Vst3RemoteHostClient::inputBuses() const
 {
-	if (!isLoaded() || m_isInstrument)
+	if (!isLoaded())
 	{
 		return {};
 	}
-	return Vst3HostBase::inputBuses();
+	return m_inputBuses;
 }
 
 
@@ -428,7 +452,7 @@ std::vector<Vst3RemoteHostClient::BusInfo> Vst3RemoteHostClient::outputBuses() c
 	{
 		return {};
 	}
-	return Vst3HostBase::outputBuses();
+	return m_outputBuses;
 }
 
 bool Vst3RemoteHostClient::setParameterNormalised(uint32_t id, double value)
@@ -565,43 +589,19 @@ void Vst3RemoteHostClient::setPlaying(bool playing)
 	m_playing = playing;
 }
 
-void Vst3RemoteHostClient::process(const float* leftIn,
-	const float* rightIn,
-	float* leftOut,
-	float* rightOut,
-	int frames)
+bool Vst3RemoteHostClient::transferBlock(int frames)
 {
-	if (frames <= 0)
+	if (!m_running || m_audio == nullptr || m_request == nullptr
+		|| m_done == nullptr)
 	{
-		return;
+		return false;
 	}
-	if (leftOut != nullptr)
-	{
-		std::memset(leftOut, 0, sizeof(float) * static_cast<size_t>(frames));
-	}
-	if (rightOut != nullptr)
-	{
-		std::memset(rightOut, 0, sizeof(float) * static_cast<size_t>(frames));
-	}
-	std::lock_guard<std::mutex> transportLock(m_transportMutex);
-	if (!m_running || m_audio == nullptr || m_request == nullptr || m_done == nullptr)
-	{
-		return;
-	}
-
 	frames = std::min(frames, vst3::maxBlockSize);
 	{
 		std::lock_guard<std::mutex> lock(m_queueMutex);
 		m_audio->nframes = frames;
 		m_audio->tempo = m_tempo;
 		m_audio->playing = m_playing ? 1 : 0;
-		for (int frame = 0; frame < frames; ++frame)
-		{
-			m_audio->inputLeft[frame] = leftIn != nullptr ? leftIn[frame] : 0.0f;
-			m_audio->inputRight[frame] = rightIn != nullptr ? rightIn[frame] : 0.0f;
-			m_audio->outputLeft[frame] = 0.0f;
-			m_audio->outputRight[frame] = 0.0f;
-		}
 		const int midiCount = std::min(static_cast<int>(m_pendingMidi.size()),
 			vst3::maxMidiEvents);
 		m_audio->midiCount = midiCount;
@@ -641,21 +641,150 @@ void Vst3RemoteHostClient::process(const float* leftIn,
 		if (errno != EINTR)
 		{
 			m_running = false;
-			return;
+			return false;
 		}
 	}
+	return true;
+}
 
+
+
+
+void Vst3RemoteHostClient::process(const float* leftIn,
+	const float* rightIn,
+	float* leftOut,
+	float* rightOut,
+	int frames)
+{
+	if (frames <= 0)
+	{
+		return;
+	}
 	if (leftOut != nullptr)
 	{
-		std::memcpy(leftOut, m_audio->outputLeft,
+		std::memset(leftOut, 0, sizeof(float) * static_cast<size_t>(frames));
+	}
+	if (rightOut != nullptr)
+	{
+		std::memset(rightOut, 0, sizeof(float) * static_cast<size_t>(frames));
+	}
+	std::lock_guard<std::mutex> transportLock(m_transportMutex);
+	if (!m_running || m_audio == nullptr)
+	{
+		return;
+	}
+
+	frames = std::min(frames, vst3::maxBlockSize);
+	for (int bus = 0; bus < vst3::maxBuses; ++bus)
+	{
+		for (int channel = 0; channel < vst3::maxBusChannels; ++channel)
+		{
+			std::memset(m_audio->inputBusData[bus][channel], 0,
+				sizeof(float) * static_cast<size_t>(frames));
+			std::memset(m_audio->outputBusData[bus][channel], 0,
+				sizeof(float) * static_cast<size_t>(frames));
+		}
+	}
+	for (int frame = 0; frame < frames; ++frame)
+	{
+		m_audio->inputBusData[0][0][frame] = leftIn != nullptr
+			? leftIn[frame] : 0.0f;
+		m_audio->inputBusData[0][1][frame] = rightIn != nullptr
+			? rightIn[frame] : m_audio->inputBusData[0][0][frame];
+	}
+	if (!transferBlock(frames))
+	{
+		return;
+	}
+	if (leftOut != nullptr)
+	{
+		std::memcpy(leftOut, m_audio->outputBusData[0][0],
 			sizeof(float) * static_cast<size_t>(frames));
 	}
 	if (rightOut != nullptr)
 	{
-		std::memcpy(rightOut, m_audio->outputRight,
+		std::memcpy(rightOut, m_audio->outputBusData[0][1],
 			sizeof(float) * static_cast<size_t>(frames));
 	}
 }
+
+
+
+
+void Vst3RemoteHostClient::processBuses(
+	const std::vector<ProcessInputBus>& inputs,
+	const std::vector<ProcessOutputBus>& outputs, int frames)
+{
+	if (frames <= 0)
+	{
+		return;
+	}
+	frames = std::min(frames, vst3::maxBlockSize);
+	for (const auto& output : outputs)
+	{
+		for (int channel = 0; channel < output.channelCount; ++channel)
+		{
+			if (output.channels[channel] != nullptr)
+			{
+				std::memset(output.channels[channel], 0,
+					sizeof(float) * static_cast<size_t>(frames));
+			}
+		}
+	}
+	std::lock_guard<std::mutex> transportLock(m_transportMutex);
+	if (!m_running || m_audio == nullptr)
+	{
+		return;
+	}
+
+	for (int bus = 0; bus < vst3::maxBuses; ++bus)
+	{
+		for (int channel = 0; channel < vst3::maxBusChannels; ++channel)
+		{
+			std::memset(m_audio->inputBusData[bus][channel], 0,
+				sizeof(float) * static_cast<size_t>(frames));
+			std::memset(m_audio->outputBusData[bus][channel], 0,
+				sizeof(float) * static_cast<size_t>(frames));
+		}
+	}
+	for (size_t bus = 0; bus < inputs.size()
+		&& bus < static_cast<size_t>(vst3::maxBuses); ++bus)
+	{
+		for (int channel = 0; channel < inputs[bus].channelCount
+			&& channel < vst3::maxBusChannels; ++channel)
+		{
+			if (inputs[bus].channels != nullptr
+				&& inputs[bus].channels[channel] != nullptr)
+			{
+				std::memcpy(m_audio->inputBusData[bus][channel],
+					inputs[bus].channels[channel],
+					sizeof(float) * static_cast<size_t>(frames));
+			}
+		}
+	}
+	if (!transferBlock(frames))
+	{
+		return;
+	}
+	for (size_t bus = 0; bus < outputs.size()
+		&& bus < static_cast<size_t>(vst3::maxBuses); ++bus)
+	{
+		for (int channel = 0; channel < outputs[bus].channelCount
+			&& channel < vst3::maxBusChannels; ++channel)
+		{
+			if (outputs[bus].channels != nullptr
+				&& outputs[bus].channels[channel] != nullptr)
+			{
+				std::memcpy(outputs[bus].channels[channel],
+					m_audio->outputBusData[bus][channel],
+					sizeof(float) * static_cast<size_t>(frames));
+			}
+		}
+	}
+}
+
+
+
 
 qint64 Vst3RemoteHostClient::hostProcessId() const
 {

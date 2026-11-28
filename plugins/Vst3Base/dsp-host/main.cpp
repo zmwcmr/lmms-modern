@@ -23,7 +23,9 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cstdio>
 #include <cmath>
 #include <csignal>
 
@@ -180,6 +182,31 @@ int main(int argc, char* argv[])
 		host.setState(component, controller);
 	}
 
+	const auto writeBusInfo = [](lmms::vst3::SharedBusInfo& target,
+		const lmms::Vst3HostBase::BusInfo& source, bool isInput) {
+		target.channels = std::clamp(source.channels, 0,
+			lmms::vst3::maxBusChannels);
+		target.isMain = source.isMain ? 1 : 0;
+		target.isSidechain = QString(source.name).contains(
+			QStringLiteral("side"), Qt::CaseInsensitive) ? 1 : 0;
+		const auto name = source.name.toUtf8();
+		std::snprintf(target.name, sizeof(target.name), "%s", name.constData());
+	};
+	audio->inputBusCount = std::min(static_cast<int>(host.inputBuses().size()),
+		lmms::vst3::maxBuses);
+	audio->outputBusCount = std::min(static_cast<int>(host.outputBuses().size()),
+		lmms::vst3::maxBuses);
+	for (int i = 0; i < audio->inputBusCount; ++i)
+	{
+		writeBusInfo(audio->inputBusInfo[i],
+			host.inputBuses()[static_cast<size_t>(i)], true);
+	}
+	for (int i = 0; i < audio->outputBusCount; ++i)
+	{
+		writeBusInfo(audio->outputBusInfo[i],
+			host.outputBuses()[static_cast<size_t>(i)], false);
+	}
+
 	QJsonArray parameters;
 	for (const auto& parameter : host.parameters())
 	{
@@ -226,6 +253,19 @@ int main(int argc, char* argv[])
 	signal(SIGINT, stopHandler);
 
 	std::thread audioThread([&host, audio, blockSize] {
+		std::array<std::array<float*, lmms::vst3::maxBusChannels>,
+			lmms::vst3::maxBuses> inputPointers{};
+		std::array<std::array<float*, lmms::vst3::maxBusChannels>,
+			lmms::vst3::maxBuses> outputPointers{};
+		for (int bus = 0; bus < lmms::vst3::maxBuses; ++bus)
+		{
+			for (int channel = 0; channel < lmms::vst3::maxBusChannels;
+				++channel)
+			{
+				inputPointers[bus][channel] = audio->inputBusData[bus][channel];
+				outputPointers[bus][channel] = audio->outputBusData[bus][channel];
+			}
+		}
 		while (!g_stop)
 		{
 			if (sem_wait(g_request) != 0)
@@ -261,8 +301,19 @@ int main(int argc, char* argv[])
 				event.value = source.value;
 				host.queueMidi(event);
 			}
-			host.process(audio->inputLeft, audio->inputRight,
-				audio->outputLeft, audio->outputRight, frames);
+			std::vector<lmms::Vst3HostBase::ProcessInputBus> inputs;
+			std::vector<lmms::Vst3HostBase::ProcessOutputBus> outputs;
+			for (int bus = 0; bus < audio->inputBusCount; ++bus)
+			{
+				inputs.push_back({ inputPointers[bus].data(),
+					audio->inputBusInfo[bus].channels });
+			}
+			for (int bus = 0; bus < audio->outputBusCount; ++bus)
+			{
+				outputs.push_back({ outputPointers[bus].data(),
+					audio->outputBusInfo[bus].channels });
+			}
+			host.processBuses(inputs, outputs, frames);
 			sem_post(g_done);
 		}
 	});
