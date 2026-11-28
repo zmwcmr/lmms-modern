@@ -94,7 +94,7 @@
 - 目前只有深色主题；需要浅色主题时，必须按 `ui-spec.md` §3.1/§3.2 重新设计明度和图标 tint。
 - 剩余 QSS 图标（滚动条、插件 stepper、分支、slider/shadow）在浅色主题下仍需改成 style/delegate 绘制。
 - `default` 已全部 SVG 化，但多数图标只是旧位图的矢量化：44 种标称尺寸、44 个 linearGradient 元素、9 个含文字、22 个自带底板，仍待按 `ui-spec.md` §3.2 迁移。
-- 仍有 4 组完全重复：`apply`/`recover`、`automation`/`progression_linear`、`clock`/`tempo_sync`、`note_eight`/`note_eighth`；迁移时合并或区分。
+- `clock`/`tempo_sync` 仍共用时钟 glyph，作为 tempo 的时间语义 alias 保留；`note_eight` 已删除，`recover`、`progression_linear` 已区分。
 
 ### 3.3 文案待处理
 
@@ -331,6 +331,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 
 ## 6. 变更记录
 
+- 2026-11-28：清理重复图标：`recover` 改为盾牌+勾，`progression_linear` 改为直线节点，删除未引用的 `note_eight`。
 - 2026-11-28：第二批 22 个基础图标迁入 `default`；基础图标累计 40 个。
 - 2026-11-28：track-ops 和 LeftRightNav 图标改由代码设置并跟随 theme ink；菜单勾选改用 base style。
 - 2026-11-28：实现图标 tint（`currentColor` + icon tokens）、尺寸 token 和 `IconTest`；18 个 pilot 图标迁入 `default`。
