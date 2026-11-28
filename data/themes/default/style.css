@@ -234,11 +234,10 @@ QMenu::indicator {
 }
 
 QMenu::indicator:checked {
-	image: url("resources:apply.svg");
+	opacity: 1;
 }
 
 QMenu::indicator:selected {
-	image: url("resources:apply-selected.svg");
 	border: 1px solid #101213;
 	background-color: #101213;
 }
@@ -555,17 +554,9 @@ lmms--gui--TrackOperationsWidget QPushButton::menu-indicator {
 	image: none;
 }
 
-lmms--gui--TrackOperationsWidget QPushButton {
-	image: url("resources:gear.svg");
-}
-
-QPushButton#btn-mute,
-QPushButton#btn-mute-inv:checked {
-	image: url("resources:speaker.svg");
-}
-
-QPushButton#btn-solo {
-	image: url("resources:headphones.svg");
+QPushButton#btn-stepper-left[lmmsThemedIcon="true"],
+QPushButton#btn-stepper-right[lmmsThemedIcon="true"] {
+	image: none;
 }
 
 QPushButton#btn-stepper-left {
@@ -596,9 +587,17 @@ lmms--gui--TrackOperationsWidget QPushButton:pressed {
 	background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0, 0, 0, 25%), stop:0.1 transparent, stop:0.8 rgba(0, 0, 0, 15%), stop:1 rgba(0, 0, 0, 35%));
 }
 
-QPushButton#btn-mute-inv,
-QPushButton#btn-mute:checked {
+QPushButton#btn-mute-inv {
+	image: url("resources:speaker.svg");
+}
+
+QPushButton#btn-mute-inv:checked {
 	image: url("resources:speaker_slash.svg");
+	border: 1 solid #890120;
+	background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e2515b, stop:0.1 #d40237, stop:0.9 #d40237, stop:1 #900122);
+}
+
+QPushButton#btn-mute:checked {
 	border: 1 solid #890120;
 	background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #e2515b, stop:0.1 #d40237, stop:0.9 #d40237, stop:1 #900122);
 }
@@ -1328,4 +1327,11 @@ lmms--gui--LmmsPalette {
 	qproperty-highlight: #262b30;
 	qproperty-highlightedText: #d1d8e4;
 	qproperty-linkColor: #8cfab6;
+	qproperty-iconColor: #d1d8e4;
+	qproperty-iconDisabledColor: rgba(209, 216, 228, 102);
+	qproperty-iconAccentColor: #0bd556;
+	qproperty-iconRecordColor: #ff4757;
+	qproperty-iconWarningColor: #f5a623;
+	qproperty-iconErrorColor: #ff5c5c;
+	qproperty-iconInfoColor: #59b0ff;
 }

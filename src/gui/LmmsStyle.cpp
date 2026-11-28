@@ -31,6 +31,7 @@
 #include <QFileInfo>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
+#include <QPixmapCache>
 #include <QFontMetrics>
 #include <QMdiSubWindow>
 #include <QRegularExpression>
@@ -48,7 +49,6 @@
 
 namespace lmms::gui
 {
-
 
 QPalette * LmmsStyle::s_palette = nullptr;
 
@@ -221,6 +221,9 @@ LmmsStyle::LmmsStyle() :
 				const auto palette = refreshedPalette.palette();
 				if (s_palette) { *s_palette = palette; }
 				qApp->setPalette(palette);
+				// `currentColor` icons are resolved against the palette at
+				// load time, so cached pixmaps belong to the previous theme.
+				QPixmapCache::clear();
 				TextFloat::displayMessage(
 					tr("Theme updated"),
 					tr("LMMS theme file %1 has been reloaded.").arg(file.fileName()),

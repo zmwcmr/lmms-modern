@@ -182,7 +182,7 @@ private:
 	static void setButtonIcon(QAbstractButton* button, const char* icon)
 	{
 		if (button == nullptr) { return; }
-		constexpr int iconSize = 14;
+		constexpr int iconSize = icon::Small;
 		button->setIconSize(QSize(iconSize, iconSize));
 		button->setIcon(QIcon(embed::getIconPixmap(icon, iconSize, iconSize)));
 	}

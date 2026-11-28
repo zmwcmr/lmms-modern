@@ -23,6 +23,7 @@
  */
 
 
+#include "embed.h"
 #include "TabBar.h"
 #include "TabButton.h"
 
@@ -55,7 +56,7 @@ TabButton * TabBar::addTab( QWidget * _w, const QString & _text, int _id,
 	// create tab-button
 	auto b = new TabButton(caption, _id, this);
 	connect( b, SIGNAL(clicked(int)), this, SLOT(tabClicked(int)));
-	b->setIconSize( QSize( 48, 48 ) );
+	b->setIconSize( QSize( icon::Tab, icon::Tab ) );
 	b->setFixedSize( 64, 64 );
 	b->show();
 	if( _text_is_tooltip )

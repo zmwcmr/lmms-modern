@@ -60,7 +60,7 @@ TrackLabelButton::TrackLabelButton( TrackView * _tv, QWidget * _parent ) :
 	setFixedHeight(std::max(29, QFontMetrics(bodyFont(font())).height() + 4));
 	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	
-	setIconSize( QSize( 24, 24 ) );
+	setIconSize( QSize( icon::Medium, icon::Medium ) );
 	connect(m_renameLineEdit, &TrackRenameLineEdit::editingFinished, this, &TrackLabelButton::renameFinished);
 	connect( m_trackView->getTrack(), SIGNAL(dataChanged()), this, SLOT(update()));
 	connect( m_trackView->getTrack(), SIGNAL(nameChanged()), this, SLOT(nameChanged()));

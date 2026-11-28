@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="214" height="57" viewBox="0 0 214 57">
+  <defs>
+    <linearGradient id="panel" x2="0" y2="1">
+      <stop offset="0.01" stop-color="#2f3337"/>
+      <stop offset="0.028" stop-color="#1e2227"/>
+      <stop offset="0.972" stop-color="#14171a"/>
+      <stop offset="0.99" stop-color="#121517"/>
+    </linearGradient>
+  </defs>
+  <rect width="214" height="57" rx="2.5" fill="#09090b"/>
+  <rect x="1" y="1" width="212" height="55" rx="1.5" fill="url(#panel)"/>
+</svg>

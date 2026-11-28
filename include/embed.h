@@ -28,6 +28,7 @@
 #include <string>
 #include <string_view>
 
+#include <QColor>
 #include <QPixmap>
 #include <QString>
 
@@ -38,7 +39,29 @@
 
 namespace lmms {
 
+//! Canonical icon request sizes. See doc/ui-spec.md §3.2.
+namespace icon {
+inline constexpr int Small = 16;
+inline constexpr int Medium = 24;
+inline constexpr int Large = 32;
+inline constexpr int Tab = 48;
+} // namespace icon
+
 namespace embed {
+
+//! Semantic roles for theme-aware icon tinting.
+enum class IconRole {
+	Normal,
+	Disabled,
+	Accent,
+	Record,
+	Warning,
+	Error,
+	Info,
+};
+
+//! @brief Return the theme color for an icon role.
+auto LMMS_EXPORT iconColor(IconRole role) -> QColor;
 
 //! @brief Return an image for the icon pixmap cache.
 //! @param name Identifier for the pixmap. If it is not in the icon pixmap cache, it will be loaded from the artwork
@@ -51,6 +74,16 @@ auto LMMS_EXPORT getIconPixmap(
 	int width = -1,
 	int height = -1,
 	const char* const* xpm = nullptr
+) -> QPixmap;
+
+//! @brief Load an icon and tint it with @p tint.
+//! SVG sources that use `currentColor` are resolved to the theme ink when no
+//! explicit tint is supplied. Raster legacy assets keep their own colors.
+auto LMMS_EXPORT getIconPixmap(
+	std::string_view name,
+	int width,
+	int height,
+	const QColor& tint
 ) -> QPixmap;
 
 auto LMMS_EXPORT getText(std::string_view name) -> QString;

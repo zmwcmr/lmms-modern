@@ -24,6 +24,8 @@
 
 
 #include <QHBoxLayout>
+#include <QIcon>
+#include <QVariant>
 
 #include "LeftRightNav.h"
 #include "embed.h"
@@ -43,6 +45,17 @@ LeftRightNav::LeftRightNav(QWidget *parent)
 
 	m_leftBtn.setObjectName("btn-stepper-left");
 	m_rightBtn.setObjectName("btn-stepper-right");
+
+	// LeftRightNav is themed in code; plugin stepper buttons with the same
+	// object names keep their QSS images.
+	constexpr int navIconSize = 10;
+	const auto ink = embed::iconColor(embed::IconRole::Normal);
+	m_leftBtn.setProperty("lmmsThemedIcon", QVariant(true));
+	m_rightBtn.setProperty("lmmsThemedIcon", QVariant(true));
+	m_leftBtn.setIcon(QIcon(embed::getIconPixmap("arrow-left", navIconSize, navIconSize, ink)));
+	m_rightBtn.setIcon(QIcon(embed::getIconPixmap("arrow-right", navIconSize, navIconSize, ink)));
+	m_leftBtn.setIconSize(QSize(navIconSize, navIconSize));
+	m_rightBtn.setIconSize(QSize(navIconSize, navIconSize));
 
 	m_leftBtn.setCheckable(false);
 	m_rightBtn.setCheckable(false);

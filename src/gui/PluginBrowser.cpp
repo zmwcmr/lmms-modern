@@ -79,7 +79,7 @@ public:
 		setObjectName(QStringLiteral("pluginBrowserTree"));
 		setMouseTracking(true);
 		setUniformRowHeights(true);
-		setIconSize(QSize(16, 16));
+		setIconSize(QSize(icon::Small, icon::Small));
 		setTextElideMode(Qt::ElideMiddle);
 		setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 		setItemDelegate(new CompactItemDelegate(this));

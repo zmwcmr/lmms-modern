@@ -1,6 +1,8 @@
-# LMMS UI/UX 规范与路线图
+# LMMS UI/UX 路线图与任务
 
-> 本文件是本分支 UI/UX 的**唯一文档**。旧的任务清单、审计、文案规范、手势矩阵和颜色/布局审计已合并到这里并从 `doc/` 删除。
+> 本文件是 UI/UX 的**任务与路线图**文档；稳定的设计规范见 [`ui-spec.md`](ui-spec.md)。
+>
+> 本文件记录任务编号、状态、已知问题、验收和变更；规范改动请提交到 `ui-spec.md`，不要在这里改规范。
 >
 > 适用范围：`src/gui`、`include`、`data/themes`、插件界面。
 >
@@ -40,161 +42,32 @@
 - 文件浏览器与插件浏览器统一为标准的 `QTreeWidgetItem` 行，不再使用嵌入式 `PluginDescWidget`。
 - 侧栏列表使用内容式选中胶囊；分支/缩进区域保持透明；展开箭头有独立 hover；快速双击箭头可连续展开/收起。
 - 系统字体缩放上限 200%；关键 QtTest 覆盖字体、侧栏、子窗口、文件浏览器、乐器轨道等。
+- 图标语言 A（单色实心）已冻结；40 个基础图标（18 个 pilot + 22 个第二批）已迁入 `default`；改造前的 `default` 已快照为 `data/themes/legacy`。
 
-仍需重点处理的是**固定尺寸对话框**和少量**文案/主题细节**，不是主窗口结构。
-
----
-
-## 3. 字号与排版
-
-### 3.1 三档设计基准
-
-正文以 10 为设计基准，所有档位按应用字体整体缩放：
-
-| 层级 | 设计字号 | 字重 | 用途 |
-| --- | ---: | --- | --- |
-| 标题 | 13 | DemiBold（600） | 窗口标题、侧栏页面标题、对话框主标题 |
-| 正文 | 10 | Regular | 按钮、下拉框、设置项、轨道名、片段名、插件名 |
-| 辅助 | 8 | Regular | 旋钮短标签、单位、次要提示、LCD 标注 |
-
-缩放公式：
-
-```text
-实际字号 = round(设计字号 × clamp(系统字体 pt / 9, 1.0, 2.0))
-```
-
-实际显示：
-
-| 系统字体 | 标题 | 正文 | 辅助 |
-| ---: | ---: | ---: | ---: |
-| 9pt | 13px | 10px | 8px |
-| 10pt | 14px | 11px | 9px |
-| 11pt | 16px | 12px | 10px |
-| 13.5pt | 20px | 15px | 12px |
-| 18pt | 26px | 20px | 16px |
-
-### 3.2 层级使用规则
-
-- **窗口标题、侧栏页面标题、对话框主标题**：标题 13 + DemiBold。
-- **标签页、分组框标题**：正文 10 + DemiBold；靠字重/选中态区分，不额外加字号。
-- **按钮、下拉框、设置项、轨道名、片段名、插件名**：正文 10。
-- **旋钮标签、单位、次要提示、LCD 标注**：辅助 8。
-- **缩放例外**：LCD 数字、钢琴键标记、时间线刻度按控件几何尺寸绘制，不强行套三档。
-
-### 3.3 实现位置
-
-| 位置 | 作用 |
-| --- | --- |
-| `include/FontHelper.h` | 三档常量、`TextRole`、`titleFont()` / `bodyFont()` / `auxiliaryFont()` / `groupTitleFont()` |
-| `src/gui/LmmsStyle.cpp` | 加载/重载主题时把 QSS 的 `font-size: Npx` 替换为 `scaledFontSize(N)px` |
-| `src/gui/widgets/GroupBox.cpp` | 分组标题使用 `groupTitleFont()` |
-| `src/gui/widgets/TabWidget.cpp` | 标签页使用正文，选中项 DemiBold |
-| `src/gui/modals/AboutDialog.cpp` | 主标题使用 `titleFont()` |
-| `data/themes/*/style.css` | 正文 10px、辅助 8px、标题 13px |
-
-### 3.4 文案规则
-
-默认 **sentence case**；专有名称保持官方拼写；单位按国际符号；只有设备面板最底层的短标签允许 ALL CAPS。
-
-| 界面元素 | 规则 | 示例 |
-| --- | --- | --- |
-| 菜单、右键菜单 | sentence case；不加句号；弹窗命令加 `...` | `Save as new version`、`Export tracks...` |
-| 按钮 | sentence case；系统标准按钮保持原样 | `Rescan plugins`、`OK`、`Cancel` |
-| 窗口/对话框标题 | sentence case；专有窗口名除外 | `Connection settings`、`Piano Roll` |
-| 设备面板标签页、组标题 | sentence case | `Effects`、`Effects chain`、`Filter` |
-| 旋钮/LCD/LED 短标签 | 允许 ALL CAPS，仅限短标签/标准缩写 | `VOL`、`PAN`、`TEMPO` |
-| 工具提示、状态栏 | sentence case；短语不加句号 | `Show or hide the Piano Roll` |
-| 消息框 | sentence case；完整句子加句号 | `The project was not saved.` |
-| 文件过滤器 | `描述 (*.扩展名)` | `LMMS project (*.mmp *.mmpz)` |
-| 单位 | 国际符号，数值与单位间留空格 | `-6 dB`、`440 Hz`、`10 ms` |
-| 缩写 | 全大写 | `MIDI`、`LFO`、`VST3`、`BPM` |
-| 快捷键 | 不放进可翻译文本 | `Ctrl+Z` / `⌘Z` |
-
-固定术语：
-
-| 概念 | 固定写法 | 不要写成 |
-| --- | --- | --- |
-| 主程序 | `LMMS` | `Lmms`、`lmms`（命令名除外） |
-| 歌曲编辑器 | `Song Editor` | `Song-Editor`、`Song editor` |
-| Pattern 编辑器 | `Pattern Editor` | `Pattern editor` |
-| 钢琴卷帘 | `Piano Roll` | `Piano-Roll`、`piano roll` |
-| 自动化编辑器 | `Automation Editor` | `Automation editor` |
-| 混音器 | `Mixer` | `mixer`（作为窗口名时） |
-| 控制器架 | `Controller Rack` | `controller rack` |
-| 工程笔记 | `Project Notes` | `project notes`（作为窗口名时） |
-| 乐器轨道 | `instrument track` | `Instrument Track` |
-| 混音通道 | `mixer channel` | `Mixer Channel` |
-| 自动化片段 | `automation clip` | `Automation Clip` |
-| MIDI | `MIDI` | `Midi`、`midi` |
-
-面板缩写：`AMT`、`ATT`、`DEC`、`REL`、`SUST`、`HOLD`、`CHAN`、`VEL`、`FREQ`、`RESO`、`VOL`、`PAN`、`RATE`、`TIME`、`PHASE`、`WIDTH`、`TRSH`、`FDBK`、`DEL`、`SPD`。同一概念只保留一个缩写；完整单词放得下时优先完整单词。
-
-标点：
-
-- 菜单、按钮、标签、工具提示不加句号。
-- 消息框、错误提示用完整句子并加句号。
-- 只有会打开对话框的命令才加 `...`；统一 ASCII `...`。
-- 标签后接数值用冒号（`Threshold:`）；组标题、按钮、菜单不加冒号。
-- 用 `cannot`，不用 `can not`；复数用 `%n`，不写 `(s)`。
-
-### 3.5 待处理
-
-- 插件参数名里的 Title Case 仍需按插件逐个统一，不做全量重命名。
-- `data/locale/en.ts` 尚未按最新源码重新生成并在 Transifex 同步。
-- `time(s)`、`note(s)`、`octave(s)`、`file(s)` 等 `(s)` 复数仍需改用 Qt 的 `%n`。
+仍需重点处理的是**插件自绘面板**、**图标迁移**和少量**主题细节**，不是主窗口结构。
 
 ---
 
-## 4. 布局与控件
+## 3. 已知问题与风险
 
-### 4.1 弹性布局原则
-
-- 优先使用 `QLayout`、字体度量、内容 `sizeHint` 和最小尺寸，不用固定像素写死文本区域。
-- 对话框至少应在 100%–200% 字体、长翻译和窄窗口下不裁切文字；放不下时使用滚动区域，而不是悄悄缩小常规文字。
-- 文本型控件不要 `setFixedHeight()`；需要固定的是图标/画布等非文本区域。
-- 新增固定尺寸前先确认它是否真的与字体无关；有疑问时按字体度量计算。
-
-### 4.2 侧栏与列表标准
-
-文件浏览器、插件浏览器以及所有 `FileBrowser` 页面共用同一套列表行为：
-
-- 行是标准 `QTreeWidgetItem`，插件行不再嵌入自定义 widget。
-- `CompactItemDelegate` 负责绘制内容：图标 + 文字，选中/悬停只画内容附近的圆角胶囊，不铺满整行。
-- 分支/缩进区域保持透明；箭头只在鼠标直接悬停时显示 16×16 圆角底。
-- 选中胶囊使用主题选择绿，悬停使用灰色；键盘焦点用胶囊外的一圈细绿边。
-- 名称按可用宽度省略，并提供完整名称 tooltip；列宽使用 `Stretch`。
-- 搜索时隐藏没有匹配项的分类，并展开有匹配项的分类。
-- 快速点击箭头必须连续展开/收起；箭头上的双击事件只用于还原第二次点击的切换，不触发其他双击动作。
-- 插件行支持拖拽和右键菜单；插件行双击不执行打开操作。
-
-### 4.3 数值控件手势
-
-| 控件 | 拖动 | 滚轮 | 修饰键 | 中键 | 双击 | 右键 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 旋钮/BarModelEditor | 调整数值 | 全范围 100 步 | Shift 粗调、Ctrl 细调、Alt 更细；Shift/Ctrl+按下可拖放值/链接 | 归位 | 就地输入 | 重置/复制/粘贴/链接/控制器 |
-| 推子 | 跟随鼠标绝对位置 | 1 dB/格 | Shift 3 dB、Ctrl 0.1 dB、Alt 0.05 dB | 归位 | 就地输入 dB | 同上 |
-| 主工具栏滑块 | QSlider 默认 | 一个 singleStep，忽略修饰键 | 无 | 未接入 | 就地输入整数 | 重置/复制/粘贴/控制器 |
-
-已知不一致：主工具栏滑块仍缺少中键归位和修饰键滚轮；统一前先评估行为变化。Ctrl 在拖动上表示“链接”、在滚轮上表示“细调”，不要改行为，只通过状态栏提示说明。
-
-### 4.4 固定尺寸与已知布局风险
+### 3.1 固定尺寸与布局风险
 
 核心窗口：
 
 | 位置 | 现状 / 风险 |
 | --- | --- |
 | `RenameDialog` | 输入框已改为布局管理，仍需大字体视觉验收。 |
-| `PeakControllerDialog` | 256×64，需改为按字体/内容计算。 |
-| `LfoControllerDialog` | 240×58，需检查标签与旋钮在 200% 下的间距。 |
-| `LadspaBrowser` | 500×480/400，需检查窄窗口和长插件名。 |
-| `SampleTrackWindow` 效果架 | 245×242，需随字体/内容调整。 |
-| `EffectView` | 245×60，需检查旋钮、标签和按钮在 200% 下是否重叠。 |
+| `PeakControllerDialog` | 已移除 256×64 固定尺寸和绝对坐标，使用布局 + bodyFont。 |
+| `LfoControllerDialog` | 已移除 240×58 固定尺寸和绝对坐标；100% 和 200% 已目视。 |
+| `LadspaBrowser` | 已改为可伸缩布局；标签页图标列 72px 固定，200% 目视待补。 |
+| `SampleTrackWindow` 效果架 | 已回退为固定窗口；大字体时只考虑滚动/整体缩放。 |
+| `EffectView` | 行高按字体度量计算，保留效果架行高模型。 |
 | `FileBrowser` 搜索栏 | 固定高度已移除；仍需窄侧栏和长翻译验收。 |
 | `EffectSelectDialog` 详情区 | 最大高 180px，长内容依赖滚动；需检查长 URL/翻译。 |
 
 插件界面（排除 vendored 子模块，约 50 处 `setFixedSize`）：
 
-- 简单控制面板：Bitcrush、Eq、Delay、Compressor、SlewDistortion、StereoMatrix。
+- 已完成简单面板：Bitcrush、Delay、StereoMatrix；Compressor、SlewDistortion 仍在 UI-3/3b。
 - 已完成 `StereoMatrix`：移除 160×185 固定尺寸，保留 4 个旋钮布局，背景随窗口缩放。
 - 已完成 `Bitcrush`：移除 181×128 固定尺寸和绝对坐标，IN/中心/OUT 改为三段布局，LED 和旋钮随字体排布，背景随窗口缩放。
 - 已完成 `CrossoverEQ`：移除 167×218 固定尺寸，保留现有旋钮/推子布局，背景随窗口缩放。
@@ -205,26 +78,33 @@
 - 已完成 `MultitapEcho`：移除 245×300 固定尺寸，双图形和底部控制改为布局。
 - 已完成 `DynamicsProcessor`：移除 224×319 固定尺寸，图形、旋钮、按钮和立体声模式改为布局。
 - 已完成 `GranularPitchShifter`：移除 305×180 固定尺寸，旋钮/LCD/按钮改为 4×4 网格布局，背景随窗口缩放。
-- 中等：DualFilter、DynamicsProcessor、FrequencyShifter、MultitapEcho、LOMM、CrossoverEQ。
-- 复杂/自绘画布：GranularPitchShifter、SlicerT、AudioFileProcessor、Sf2Player、GigPlayer、Vestige。
+- 剩余中等：LOMM；DualFilter、DynamicsProcessor、FrequencyShifter、MultitapEcho、CrossoverEQ 已完成。
+- 复杂/自绘：SlicerT、AudioFileProcessor、Sf2Player、GigPlayer、Vestige；GranularPitchShifter 已完成布局。
 - 典型风险：`Sf2Player`/`GigPlayer` 文件名标签固定 11/14px 高、宽 156px；`Vestige` 文本按钮固定 200×24px；多个插件的下拉框使用固定坐标/高度。
 
----
+### 3.2 手势与主题的已知偏差
 
-## 5. 颜色与主题
+| 控件 | 现状 |
+| --- | --- |
+| 主工具栏滑块 | `QSlider` 默认；滚轮一个 `singleStep`，忽略修饰键；中键未接入；双击就地输入整数；右键重置/复制/粘贴/控制器 |
 
-- 普通文字、按钮、菜单和标签页使用主题正文色；标签页用背景、边框和字重表示选中，不用链接绿表示普通/选中状态。
-- 可点击 URL 使用主题 `QPalette::Link`（默认/经典为 `#8cfab6`），保留下划线；已访问链接默认同色。
-- 键盘焦点必须可见；焦点样式只画 outline/胶囊边，不改变布局和 padding。
-- 禁用、选中、警告、错误、录音、波形和音符颜色各自保留语义；用户在 Project Notes 中设置的颜色和第三方插件界面不强制覆盖。
-- 普通文字和链接按实际相邻背景检查对比度，目标至少 4.5:1；链接不能只靠颜色区分。
-- 选择色：默认主题列表选择绿 `#0f5c2c`；悬停灰 `#3C444E`；焦点绿 `#0bd556`。侧栏列表用 `CompactItemDelegate` 绘制，QSS 只负责其他控件。
+- 主工具栏滑块仍缺少中键归位和修饰键滚轮；统一前先评估行为变化。
 - 默认主题 `LmmsPalette::windowText` 仍是绿色 `#1de276`，但标签页已显式使用正文色；需在真实窗口核实所有状态。
-- 默认主题 PNG 已全部迁移为 SVG；经典主题仍有自己的 PNG 素材，亮色主题需要重新设计明度。
+- `classic` 主题仍有 268 个 PNG，无 `@2x`，HiDPI 下会模糊；比 `default` 缺 29 个名字，会回退到 `default` 的 SVG，形成 PNG/SVG 混搭；22 个同名图标的标称尺寸与 `default` 不同。
+- 目前只有深色主题；需要浅色主题时，必须按 `ui-spec.md` §3.1/§3.2 重新设计明度和图标 tint。
+- 剩余 QSS 图标（滚动条、插件 stepper、分支、slider/shadow）在浅色主题下仍需改成 style/delegate 绘制。
+- `default` 已全部 SVG 化，但多数图标只是旧位图的矢量化：44 种标称尺寸、44 个 linearGradient 元素、9 个含文字、22 个自带底板，仍待按 `ui-spec.md` §3.2 迁移。
+- 仍有 4 组完全重复：`apply`/`recover`、`automation`/`progression_linear`、`clock`/`tempo_sync`、`note_eight`/`note_eighth`；迁移时合并或区分。
+
+### 3.3 文案待处理
+
+- `ControllerRackView` 的 `%n connection(s)` 仍等待翻译提供 Qt 复数形式。
+- `data/locale/en.ts` 由 Transifex 整体同步，本地不重新生成，避免一次上万行无意义 diff。
+- 其余 Title Case、`(s)` 复数、单位空格和组标题冒号已在 UI-4 的前十批中处理。
 
 ---
 
-## 6. UI 路线图
+## 4. UI 路线图
 
 ### UI-1：侧栏与列表收尾（完成）
 
@@ -234,7 +114,7 @@
 - 补搜索无结果状态；确认长名称、长翻译、窄侧栏下省略和 tooltip 正常。
 - 已增加 `CompactItemDelegateTest`：内容胶囊宽度、最后一个字符不裁切。
 - 已增加 `FileBrowserTest::arrowDoubleClickToggles`：快速双击箭头连续切换。
-- 截图沿用现有版本，最终统一重做放在 UI-5。
+- 截图沿用现有版本，最终统一重做放在 UI-4。
 - 运行 `FileBrowserTest`、`SideBarWorkspaceTest`、`FontScaleTest`、`InstrumentTrackTest`。
 
 验收：默认/经典主题，100%/125%/150%/200%，en/zh_CN/de_DE，窄侧栏；无整行色块、无文字裁切、无箭头误触发。
@@ -305,25 +185,42 @@
 
 验收：`FontScaleTest`、`CaptionWidgetsTest`、`UiFeedbackTest` 通过；本轮不改字号，100%–200% 无新增断层；`en.ts` 不在本分支产生整体 diff。
 
-### UI-5：主题、动画与无障碍（待开始）
+### UI-5：主题、图标与无障碍（进行中）
+
+目标：把图标语言 A 落到 `default`，补齐主题和可访问性，不改变主窗口结构。
+
+图标迁移：
+
+- 按 [`ui-spec.md`](ui-spec.md) §3.2 迁移；`legacy` 冻结，`classic` 本轮不动。
+- 首批 18 个 pilot（已迁入 `default`）：`play`、`pause`、`stop`、`record`、`undo`、`redo`、`add`、`close`、`save`、`open`、`folder`、`project_file`、`sample_file`、`search`、`metronome`、`gear`、`mute`、`solo`。
+- 第二批 22 个基础图标（已迁入 `default`）：`instrument_track`、`sample_track`、`pattern_track`、`automation_track`、`master_volume`、`reload`、`clock`、`tempo_sync`、`edit_draw`、`edit_erase`、`edit_select`、`edit_cut`、`edit_copy`、`edit_paste`、`quantize`、`project_new`、`project_export`、`project_import`、`star`、`home`、`plugins`、`help`。
+- 首批验收：16/24/48、深/浅底非空；无灰、无渐变、无文字；除 `gear`（1.5..22.5）外，内容 bbox 在 2..22。
+- `speaker_slash` 作为 mute 的 checked 状态同步迁移，由代码设置并跟随 theme ink。
+- 工具：`buildtools/icon-template.svg`、`buildtools/icon-audit.py`（audit / lint / sheet，已完成）。
+- 立即修：`sbarrow_left_d.svg`、`sbarrow_up_d.svg` 空文件；`sbarrow_*` 的 20%/0.01 透明度对比度（已完成）。
+- 运行时：tint + 尺寸 token + `IconTest`（已完成）；track-ops、LeftRightNav 和菜单勾选已改为 code/base style，剩余 QSS 图标（滚动条、插件 stepper、分支、slider/shadow）待处理。
+- 迁移顺序：18 个 pilot → 40 个基础图标（工具栏、侧栏、文件类型、编辑器工具）→ 其余 UI → 皮肤/插件 → `classic`。
+
+主题与无障碍：
 
 - 经典主题 PNG → SVG；默认主题已无 PNG。
 - 按真实背景检查链接/正文/禁用/选中对比度，尤其是 About、Project Notes、侧栏。
 - 补测 165 Hz/Wayland 下侧栏滑动和按钮反馈动画。
 - 检查键盘焦点、Tab 顺序、可访问名称；列表行的 tooltip 和省略文本要能访问完整内容。
 
-验收：默认/经典主题，100%–200%，键盘可完成主要操作；动画可关闭且不阻塞操作。
+验收：`default` 主题 100%–200%；40 个基础图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
 
 ---
 
-## 7. 验收与回归
+## 5. 验收与回归
 
-### 7.1 必跑测试
+### 5.1 必跑测试
 
 ```bash
 cmake --build build-ui -j"$(nproc)"
 cd build-ui/tests
 QT_QPA_PLATFORM=offscreen ./FontScaleTest
+QT_QPA_PLATFORM=offscreen ./IconTest
 QT_QPA_PLATFORM=offscreen ./CaptionWidgetsTest
 QT_QPA_PLATFORM=offscreen ./SubWindowTest
 QT_QPA_PLATFORM=offscreen ./SideBarWorkspaceTest
@@ -332,7 +229,7 @@ QT_QPA_PLATFORM=offscreen ./CompactItemDelegateTest
 QT_QPA_PLATFORM=offscreen ./InstrumentTrackTest
 ```
 
-### 7.2 静态检查
+### 5.2 静态检查
 
 ```bash
 # 不应新增内联固定字号
@@ -347,18 +244,24 @@ grep -rn 'tr([^)]*Ctrl+' src/gui --include='*.cpp'
 
 # 不应新增 (s) 复数
 grep -rnE 'file\(s\)|note\(s\)|octave\(s\)|time\(s\)' src/gui plugins --include='*.cpp'
+
+# 图标：只 lint 本次改动/新增的 24 网格图标
+buildtools/icon-audit.py lint <changed.svg>...
+buildtools/icon-audit.py sheet --theme default --only <names>
 ```
 
-### 7.3 视觉验收
+> 全量 lint `data/themes/default` 会报出历史图标的尺寸、渐变和文字问题；迁移时按改动文件跑，避免把存量问题当成新回归。
 
-- 主题：默认 + 经典。
+### 5.3 视觉验收
+
+- 主题：默认 + 经典；`legacy` 只用于对比，不作为验收主题。
 - 字体/缩放：100%、125%、150%、200%。
 - 语言：en、zh_CN、de_DE；长翻译优先。
 - 窗口：默认宽度 + 窄窗口；侧栏可拖动宽度。
 - 重点界面：主窗口、Song Editor、Mixer、FileBrowser、PluginBrowser、EffectSelectDialog、About、RenameDialog、插件控制面板。
 - 检查：文字/图标不裁切、不重叠；选中/悬停/焦点清晰；滚动条只在需要时出现；键盘可操作。
 
-### 7.4 截图环境
+### 5.4 截图环境
 
 使用 Xephyr + 窗口管理器，不用 Xvfb：
 
@@ -378,7 +281,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 
 ---
 
-## 8. 缩放与窗口审计（2026-11-28）
+### 5.5 缩放与窗口审计（2026-11-28）
 
 已实际检查：
 
@@ -387,7 +290,7 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - LFO 控制器在 100% 和 200% 字体下已打开检查，布局无裁切。
 - 其余已改为布局驱动的插件面板目前只有构建验证，尚未逐个拖动缩放并做 100%/200% 目视。
 
-### 逐插件代码审计
+#### 逐插件代码审计
 
 已改为布局驱动的面板：
 
@@ -424,12 +327,22 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 
 ---
 
-## 9. 变更记录
+---
 
-- 2026-11-28：合并旧的 UI 任务、审计、文案、手势、颜色/布局文档为本文件；删除 VST/LV2/PDC 等非 UI 设计文档（代码保留）。
+## 6. 变更记录
+
+- 2026-11-28：第二批 22 个基础图标迁入 `default`；基础图标累计 40 个。
+- 2026-11-28：track-ops 和 LeftRightNav 图标改由代码设置并跟随 theme ink；菜单勾选改用 base style。
+- 2026-11-28：实现图标 tint（`currentColor` + icon tokens）、尺寸 token 和 `IconTest`；18 个 pilot 图标迁入 `default`。
+- 2026-11-28：新增 `buildtools/icon-template.svg` 和 `buildtools/icon-audit.py`；修复 `sbarrow_*` 的空箭头与低对比度。
+- 2026-11-28：拆分规范与任务；规范移至 `doc/ui-spec.md`，本文只保留路线图、任务状态、已知问题、验收和变更。
+- 2026-11-28：冻结图标设计语言 A（`ui-spec.md` §3.2）；改造前的 `default` 完整快照为 `data/themes/legacy`。
+- 2026-11-28：合并旧的 UI 任务、审计、文案、手势、颜色/布局文档为本分支 UI/UX 文档（现拆分为 `ui-spec.md` 与本文）；删除 VST/LV2/PDC 等非 UI 设计文档（代码保留）。
 - 2026-11-28：三档字号调整为 13/10/8；侧栏列表统一为 `CompactItemDelegate`，加入内容选中胶囊、箭头 hover 和快速双击箭头切换。
 - 2026-11-28：完成 UI-1 验收，新增 `CompactItemDelegateTest` 和箭头双击回归测试。
 - 2026-11-28：UI-2 开始，`PeakControllerDialog` 改为弹性布局。
+- 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。
+- 2026-11-28：合并旧的 UI 任务、审计、文案、手势、颜色/布局文档为本文件；删除 VST/LV2/PDC 等非 UI 设计文档（代码保留）。
 - 2026-11-28：`LfoControllerDialog` 改为布局驱动，移除固定尺寸和绝对坐标。
 - 2026-11-28：`LadspaBrowser` 改为可伸缩布局，移除标签页固定尺寸。
 - 2026-11-28：回退 `SampleTrackWindow` 的可调整大小改动，恢复固定窗口。
@@ -444,4 +357,3 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`GranularPitchShifter` 改为网格布局，移除固定尺寸和绝对坐标。
 - 2026-11-28：UI-3 的普通布局面板完成；Slew/LOMM/SlicerT/AFP/Sf2/Gig/Vestige 归入 UI-3b 自绘重写。
 - 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
-- 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。

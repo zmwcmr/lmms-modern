@@ -36,6 +36,7 @@
 #include <QWindow>
 #include <algorithm>
 
+#include "embed.h"
 #include "LmmsStyle.h"
 #include "SideBar.h"
 #include "SideBarWidget.h"
@@ -539,7 +540,7 @@ SideBar::SideBar( Qt::Orientation _orientation, QWidget * _parent ) :
 	m_slideAnimation(m_frameClock)
 {
 	setOrientation( _orientation );
-	setIconSize( QSize( 16, 16 ) );
+	setIconSize( QSize( icon::Small, icon::Small ) );
 
 	m_btnGroup.setExclusive( false );
 	connect( &m_btnGroup, SIGNAL(buttonClicked(QAbstractButton*)),

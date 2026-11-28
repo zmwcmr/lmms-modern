@@ -1,11 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 6.3499999 6.3499999">
-  <!-- Horseshoe magnet with detached pole tips, rotated 45 degrees like the
-       original icon. The band is kept thin so its weight matches the other
-       monochrome line icons of the theme. -->
-  <g fill="#ffffff" transform="translate(-0.8024,-0.7690) rotate(135,3.175,3.175) translate(3.175,3.175) scale(1.0337) translate(-3.175,-3.175)">
-    <path fill-rule="evenodd" d="M 1.15,1.35 V 3.05 A 2.0,2.0 0 0 0 5.15,3.05 V 1.35 H 4.3 V 3.05 A 1.15,1.15 0 0 1 2.0,3.05 V 1.35 Z"/>
-    <rect x="1.025" y="0.45" width="1.1" height="0.55"/>
-    <rect x="4.175" y="0.45" width="1.1" height="0.55"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 4.4v8.8a5 5 0 0 0 10 0V4.4" fill="none" stroke="currentColor" stroke-width="4.4" stroke-linecap="round"/></svg>

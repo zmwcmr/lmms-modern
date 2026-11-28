@@ -14,3 +14,7 @@ Brewfile.lock.json
 compile_commands.json
 .vscode/
 .vs/
+
+# Python bytecode
+__pycache__/
+*.pyc

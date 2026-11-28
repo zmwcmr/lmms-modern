@@ -52,6 +52,13 @@ class LMMS_EXPORT LmmsPalette : public QWidget
 	Q_PROPERTY(QColor titleText READ titleText WRITE setTitleText)
 	Q_PROPERTY(QColor mdiButton READ mdiButton WRITE setMdiButton)
 	Q_PROPERTY(QColor frameInner READ frameInner WRITE setFrameInner)
+	Q_PROPERTY(QColor iconColor READ iconColor WRITE setIconColor)
+	Q_PROPERTY(QColor iconDisabledColor READ iconDisabledColor WRITE setIconDisabledColor)
+	Q_PROPERTY(QColor iconAccentColor READ iconAccentColor WRITE setIconAccentColor)
+	Q_PROPERTY(QColor iconRecordColor READ iconRecordColor WRITE setIconRecordColor)
+	Q_PROPERTY(QColor iconWarningColor READ iconWarningColor WRITE setIconWarningColor)
+	Q_PROPERTY(QColor iconErrorColor READ iconErrorColor WRITE setIconErrorColor)
+	Q_PROPERTY(QColor iconInfoColor READ iconInfoColor WRITE setIconInfoColor)
 
 public:
 	LmmsPalette( QWidget * parent, QStyle * stylearg  ); 
@@ -78,6 +85,21 @@ public:
 	ACCESSMET( titleText, setTitleText )
 	ACCESSMET( mdiButton, setMdiButton )
 	ACCESSMET( frameInner, setFrameInner )
+
+	QColor iconColor() const;
+	void setIconColor(const QColor& color);
+	QColor iconDisabledColor() const;
+	void setIconDisabledColor(const QColor& color);
+	QColor iconAccentColor() const;
+	void setIconAccentColor(const QColor& color);
+	QColor iconRecordColor() const;
+	void setIconRecordColor(const QColor& color);
+	QColor iconWarningColor() const;
+	void setIconWarningColor(const QColor& color);
+	QColor iconErrorColor() const;
+	void setIconErrorColor(const QColor& color);
+	QColor iconInfoColor() const;
+	void setIconInfoColor(const QColor& color);
 
 #undef ACCESSMET
 
