@@ -97,6 +97,9 @@ public:
 		return m_sidechainBuffer;
 	}
 
+	//! Whether any loaded plugin in this effect can consume a sidechain bus.
+	virtual bool supportsSidechain() const { return false; }
+
 	inline bool isEnabled() const
 	{
 		return m_enabledModel.value();

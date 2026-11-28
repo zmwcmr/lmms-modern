@@ -192,6 +192,47 @@ void MixerChannelView::contextMenuEvent(QContextMenuEvent*)
 	colorMenu.addAction(tr("Pick random"), this, &MixerChannelView::randomizeColor);
 	contextMenu->addMenu(&colorMenu);
 
+	auto* mixer = m_mixerView->getMixer();
+	const int currentSidechain = mixer->channelSidechain(m_channelIndex);
+	auto* sidechainMenu = new QMenu{tr("Sidechain input"), contextMenu};
+
+	auto* noneAction = sidechainMenu->addAction(tr("None"));
+	noneAction->setCheckable(true);
+	noneAction->setChecked(currentSidechain < 0);
+	connect(noneAction, &QAction::triggered, this, [this, mixer] {
+		mixer->setChannelSidechain(m_channelIndex, -1);
+		m_mixerView->refreshDisplay();
+	});
+
+	for (int channel = 1; channel < mixer->numChannels(); ++channel)
+	{
+		if (channel == m_channelIndex)
+		{
+			continue;
+		}
+		auto* action = sidechainMenu->addAction(
+			mixer->mixerChannel(channel)->m_name);
+		action->setCheckable(true);
+		action->setChecked(currentSidechain == channel);
+		connect(action, &QAction::triggered, this, [this, mixer, channel] {
+			if (!mixer->setChannelSidechain(m_channelIndex, channel))
+			{
+				QMessageBox::warning(this, tr("Sidechain input"),
+					tr("This sidechain route would create a cycle."));
+			}
+			m_mixerView->refreshDisplay();
+		});
+	}
+
+	sidechainMenu->addSeparator();
+	if (!mixer->mixerChannel(m_channelIndex)->hasSidechainInput())
+	{
+		auto* unsupported = sidechainMenu->addAction(
+			tr("No effect on this channel has a sidechain input"));
+		unsupported->setEnabled(false);
+	}
+	contextMenu->addMenu(sidechainMenu);
+
 	contextMenu->exec(QCursor::pos());
 	delete contextMenu;
 }
