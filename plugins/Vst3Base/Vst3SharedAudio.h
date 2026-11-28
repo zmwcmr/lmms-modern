@@ -31,10 +31,12 @@ namespace lmms::vst3
 {
 
 inline constexpr uint32_t sharedMagic = 0x56334453; // "V3DS"
-inline constexpr uint32_t sharedVersion = 1;
+inline constexpr uint32_t sharedVersion = 2;
 inline constexpr int maxBlockSize = 4096;
 inline constexpr int maxMidiEvents = 128;
 inline constexpr int maxParameterEvents = 64;
+inline constexpr int maxBuses = 4;
+inline constexpr int maxBusChannels = 2;
 
 struct SharedMidiEvent
 {
@@ -53,6 +55,14 @@ struct SharedParameterEvent
 	double value = 0.0;
 };
 
+struct SharedBusInfo
+{
+	int32_t channels = 0;
+	int32_t isMain = 1;
+	int32_t isSidechain = 0;
+	char name[64] = {};
+};
+
 struct SharedAudio
 {
 	uint32_t magic = sharedMagic;
@@ -67,6 +77,14 @@ struct SharedAudio
 	int32_t parameterCount = 0;
 	SharedParameterEvent parameters[maxParameterEvents] = {};
 
+	int32_t inputBusCount = 0;
+	int32_t outputBusCount = 0;
+	SharedBusInfo inputBusInfo[maxBuses] = {};
+	SharedBusInfo outputBusInfo[maxBuses] = {};
+	float inputBusData[maxBuses][maxBusChannels][maxBlockSize] = {};
+	float outputBusData[maxBuses][maxBusChannels][maxBlockSize] = {};
+
+	// Kept for older transport users; new code uses the bus arrays.
 	float inputLeft[maxBlockSize] = {};
 	float inputRight[maxBlockSize] = {};
 	float outputLeft[maxBlockSize] = {};

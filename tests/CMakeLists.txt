@@ -279,6 +279,34 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	)
 	add_dependencies(Vst3PluginHostTest fake-vst3)
 	add_test(NAME Vst3PluginHostTest COMMAND Vst3PluginHostTest)
+
+	if(TARGET lmms-vst3-host)
+		add_executable(Vst3RemoteBusTest
+			src/core/Vst3RemoteBusTest.cpp
+		)
+		target_include_directories(Vst3RemoteBusTest PRIVATE
+			$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+			"${CMAKE_SOURCE_DIR}/plugins/Vst3Base"
+		)
+		target_static_libraries(Vst3RemoteBusTest PRIVATE lmmsobjs)
+		target_link_libraries(Vst3RemoteBusTest PRIVATE
+			${QT_LIBRARIES}
+			${QT_QTTEST_LIBRARY}
+			vst3base
+		)
+		target_compile_features(Vst3RemoteBusTest PRIVATE cxx_std_20)
+		target_compile_definitions(Vst3RemoteBusTest PRIVATE
+			LMMS_TESTING
+			VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+			VST3_FAKE_EFFECT_CLASS="${FAKE_VST3_EFFECT_ID}"
+			LMMS_VST3_HOST_EXECUTABLE="$<TARGET_FILE:lmms-vst3-host>"
+		)
+		set_target_properties(Vst3RemoteBusTest PROPERTIES ENABLE_EXPORTS TRUE)
+		add_dependencies(Vst3RemoteBusTest fake-vst3 lmms-vst3-host)
+		add_test(NAME Vst3RemoteBusTest COMMAND Vst3RemoteBusTest)
+		set_tests_properties(Vst3RemoteBusTest PROPERTIES
+			ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+	endif()
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument)
