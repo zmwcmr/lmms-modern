@@ -29,7 +29,6 @@
 #include <algorithm>
 
 #include <QDomElement>
-#include <QTimer>
 
 #include "AudioEngine.h"
 #include "Engine.h"
@@ -42,7 +41,6 @@
 #include "Vst3RemoteHostClient.h"
 #include "Vst3SubPluginFeatures.h"
 #include "Vst3EditorWindow.h"
-#include "PluginLoadingWindow.h"
 #include "Vst3InstrumentView.h"
 
 #include "embed.h"
@@ -182,13 +180,7 @@ void Vst3Instrument::showEditor(QWidget* parent)
 	{
 		return;
 	}
-	const bool wasVisible = m_editorRequested;
 	m_editorRequested = true;
-	if (!wasVisible)
-	{
-		gui::PluginLoadingWindow::showFor(displayName());
-		QTimer::singleShot(600, this, [] { gui::PluginLoadingWindow::hide(); });
-	}
 	if (!m_editorWindow.isNull())
 	{
 		m_editorWindow->raiseEditor();
@@ -207,7 +199,6 @@ void Vst3Instrument::showEditor(QWidget* parent)
 void Vst3Instrument::hideEditor()
 {
 	m_editorRequested = false;
-	gui::PluginLoadingWindow::hide();
 	if (!m_editorWindow.isNull()) { m_editorWindow->close(); }
 }
 

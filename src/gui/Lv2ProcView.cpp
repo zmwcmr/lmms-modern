@@ -71,7 +71,6 @@
 #include "Engine.h"
 #include "GuiApplication.h"
 #include "HostedPluginPanel.h"
-#include "PluginLoadingWindow.h"
 #include "lmms_math.h"
 #include "Lv2Manager.h"
 #include "Lv2Ports.h"
@@ -523,12 +522,6 @@ void Lv2ProcView::createUi()
 	{
 		return;
 	}
-
-	PluginLoadingWindow::showFor(qStringFromPluginNode(m_proc->getPlugin(),
-		lilv_plugin_get_name));
-	QTimer::singleShot(600, m_pluginWidget, [] {
-		PluginLoadingWindow::hide();
-	});
 
 	if (m_proc->isRemote())
 	{
