@@ -60,6 +60,7 @@ QJsonObject PluginScanEntry::toJson() const
 	object.insert(QStringLiteral("isInstrument"), isInstrument);
 	object.insert(QStringLiteral("isEffect"), isEffect);
 	object.insert(QStringLiteral("error"), error);
+	object.insert(QStringLiteral("extra"), extra);
 
 	QJsonArray classArray;
 	for (const auto& item : classes)
@@ -68,6 +69,7 @@ QJsonObject PluginScanEntry::toJson() const
 		classObject.insert(QStringLiteral("id"), item.id);
 		classObject.insert(QStringLiteral("name"), item.name);
 		classObject.insert(QStringLiteral("isInstrument"), item.isInstrument);
+		classObject.insert(QStringLiteral("extra"), item.extra);
 		classArray.append(classObject);
 	}
 	object.insert(QStringLiteral("classes"), classArray);
@@ -112,6 +114,7 @@ PluginScanEntry PluginScanEntry::fromJson(const QJsonObject& object)
 	entry.isInstrument = object.value(QStringLiteral("isInstrument")).toBool();
 	entry.isEffect = object.value(QStringLiteral("isEffect")).toBool();
 	entry.error = object.value(QStringLiteral("error")).toString();
+	entry.extra = object.value(QStringLiteral("extra")).toObject();
 
 	for (const auto& value : object.value(QStringLiteral("classes")).toArray())
 	{
@@ -121,6 +124,7 @@ PluginScanEntry PluginScanEntry::fromJson(const QJsonObject& object)
 		itemClass.name = item.value(QStringLiteral("name")).toString();
 		itemClass.isInstrument =
 			item.value(QStringLiteral("isInstrument")).toBool();
+		itemClass.extra = item.value(QStringLiteral("extra")).toObject();
 		entry.classes.push_back(std::move(itemClass));
 	}
 	for (const auto& value : object.value(QStringLiteral("parameters")).toArray())

@@ -178,6 +178,69 @@ lmms::Vst3ClassInfo classFromJson(const QJsonObject& object)
 	return info;
 }
 
+lmms::PluginScanEntry bundleToEntry(const lmms::Vst3BundleInfo& bundle,
+	qint64 mtimeMs, qint64 size)
+{
+	lmms::PluginScanEntry entry;
+	entry.format = lmms::PluginScanFormat::Vst3;
+	entry.path = fromPath(bundle.path);
+	entry.hash = bundle.hash;
+	entry.mtimeMs = mtimeMs;
+	entry.size = size;
+	entry.error = bundle.error;
+	entry.isInstrument = std::any_of(bundle.classes.begin(), bundle.classes.end(),
+		[](const auto& item) { return item.isInstrument; });
+	entry.isEffect = std::any_of(bundle.classes.begin(), bundle.classes.end(),
+		[](const auto& item) { return !item.isInstrument; });
+	if (!bundle.classes.empty())
+	{
+		const auto& first = bundle.classes.front();
+		entry.name = first.name;
+		entry.vendor = first.vendor;
+		entry.version = first.version;
+	}
+	for (const auto& item : bundle.classes)
+	{
+		lmms::PluginScanClass common;
+		common.id = item.classId;
+		common.name = item.name;
+		common.isInstrument = item.isInstrument;
+		common.extra = classToJson(item);
+		entry.classes.push_back(std::move(common));
+	}
+	return entry;
+}
+
+
+
+
+lmms::Vst3BundleInfo entryToBundle(const lmms::PluginScanEntry& entry)
+{
+	lmms::Vst3BundleInfo bundle;
+	bundle.path = canonicalPath(toPath(entry.path));
+	bundle.hash = entry.hash;
+	bundle.error = entry.error;
+	for (const auto& item : entry.classes)
+	{
+		if (!item.extra.isEmpty())
+		{
+			bundle.classes.push_back(classFromJson(item.extra));
+		}
+		else
+		{
+			lmms::Vst3ClassInfo info;
+			info.classId = item.id;
+			info.name = item.name;
+			info.isInstrument = item.isInstrument;
+			bundle.classes.push_back(std::move(info));
+		}
+	}
+	return bundle;
+}
+
+
+
+
 bool hasVst3Extension(const fs::path& path)
 {
 	auto extension = path.extension().string();
@@ -651,18 +714,34 @@ void Vst3List::loadCache()
 	}
 	m_cacheLoaded = true;
 
+	const auto sharedPath =
+		PluginScanCache::defaultCachePath(PluginScanFormat::Vst3);
+	if (m_scanCache.load(sharedPath))
+	{
+		for (const auto& entry : m_scanCache.entries())
+		{
+			auto bundle = entryToBundle(entry);
+			const auto key = bundle.path.string();
+			m_cacheStamps.insert_or_assign(key,
+				BundleStamp{entry.mtimeMs, entry.size});
+			m_cache.insert_or_assign(key, std::move(bundle));
+		}
+		m_cacheValid = true;
+		return;
+	}
+
+	// Import the pre-Stage-4 cache once. The shared file is written on the
+	// next save; the legacy file stays untouched for older builds.
 	const auto path = cacheFilePath();
 	if (path.isEmpty())
 	{
 		return;
 	}
-
 	QFile file(path);
 	if (!file.open(QFile::ReadOnly))
 	{
 		return;
 	}
-
 	const auto document = QJsonDocument::fromJson(file.readAll());
 	if (!document.isObject())
 	{
@@ -670,12 +749,12 @@ void Vst3List::loadCache()
 	}
 	const auto root = document.object();
 	if (root.value(QStringLiteral("version")).toInt() != vst3::cacheVersion
-		|| root.value(QStringLiteral("scanner")).toInt() != vst3::scannerProtocolVersion)
+		|| root.value(QStringLiteral("scanner")).toInt()
+			!= vst3::scannerProtocolVersion)
 	{
 		return;
 	}
 
-	m_cacheValid = true;
 	for (const auto& value : root.value(QStringLiteral("bundles")).toArray())
 	{
 		const auto object = value.toObject();
@@ -684,28 +763,35 @@ void Vst3List::loadCache()
 		{
 			continue;
 		}
-
 		Vst3BundleInfo bundle;
 		bundle.path = canonicalPath(toPath(pathString));
 		bundle.hash = object.value(QStringLiteral("hash")).toString();
 		bundle.error = object.value(QStringLiteral("error")).toString();
-		for (const auto& classValue : object.value(QStringLiteral("classes")).toArray())
+		for (const auto& classValue :
+			object.value(QStringLiteral("classes")).toArray())
 		{
 			bundle.classes.push_back(classFromJson(classValue.toObject()));
 		}
-
 		qint64 mtimeMs = 0;
 		qint64 size = 0;
 		if (!bundleStampFromJson(object, mtimeMs, size))
 		{
 			continue;
 		}
-
 		const auto key = bundle.path.string();
 		m_cacheStamps.insert_or_assign(key, BundleStamp{mtimeMs, size});
 		m_cache.insert_or_assign(key, std::move(bundle));
 	}
+	if (!m_cache.empty())
+	{
+		m_cacheValid = true;
+		m_cacheChanged = true;
+		saveCache();
+	}
 }
+
+
+
 
 void Vst3List::saveCache()
 {
@@ -714,53 +800,34 @@ void Vst3List::saveCache()
 		return;
 	}
 
-	const auto path = cacheFilePath();
+	const auto path =
+		PluginScanCache::defaultCachePath(PluginScanFormat::Vst3);
 	if (path.isEmpty())
 	{
 		return;
 	}
 
-	QJsonArray bundles;
+	m_scanCache.clear();
 	for (const auto& [key, bundle] : m_cache)
 	{
-		QJsonObject object;
-		object.insert(QStringLiteral("path"), fromPath(bundle.path));
+		qint64 mtimeMs = 0;
+		qint64 size = 0;
 		const auto stampIt = m_cacheStamps.find(key);
 		if (stampIt != m_cacheStamps.end())
 		{
-			object.insert(QStringLiteral("mtime"),
-				static_cast<double>(stampIt->second.mtimeMs));
-			object.insert(QStringLiteral("size"),
-				static_cast<double>(stampIt->second.size));
+			mtimeMs = stampIt->second.mtimeMs;
+			size = stampIt->second.size;
 		}
-		object.insert(QStringLiteral("hash"), bundle.hash);
-		object.insert(QStringLiteral("error"), bundle.error);
-
-		QJsonArray classes;
-		for (const auto& classInfo : bundle.classes)
-		{
-			classes.append(classToJson(classInfo));
-		}
-		object.insert(QStringLiteral("classes"), classes);
-		bundles.append(object);
+		m_scanCache.upsert(bundleToEntry(bundle, mtimeMs, size));
 	}
-
-	QJsonObject root;
-	root.insert(QStringLiteral("version"), vst3::cacheVersion);
-	root.insert(QStringLiteral("scanner"), vst3::scannerProtocolVersion);
-	root.insert(QStringLiteral("bundles"), bundles);
-
-	QSaveFile file(path);
-	if (!file.open(QFile::WriteOnly))
-	{
-		return;
-	}
-	file.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
-	if (file.commit())
+	if (m_scanCache.save(path))
 	{
 		m_cacheValid = true;
 		m_cacheChanged = false;
 	}
 }
+
+
+
 
 } // namespace lmms

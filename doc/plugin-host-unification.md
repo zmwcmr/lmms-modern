@@ -313,8 +313,11 @@ path.
       the legacy `vst-list.json` once, then writes
       `plugin-scan-vst2.json`; the legacy file is left untouched for older
       builds.
-- [ ] Move VST3 `Vst3List` and LV2 metadata onto the shared cache. The
-      existing `vst3-list.json` must stay readable during the migration.
+- [x] Move VST3 `Vst3List` onto the shared cache. `plugin-scan-vst3.json`
+      stores one entry per bundle, with the full class metadata in the
+      per-class `extra` object; the legacy `vst3-list.json` is imported once.
+- [ ] Move LV2 metadata onto the shared cache and behind the scanner
+      protocol.
 - [ ] Move VST2 probing and LV2 metadata behind the scanner protocol.
 - Acceptance: same plugin lists, rescan behavior and startup time.
 

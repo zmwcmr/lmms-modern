@@ -4,6 +4,8 @@ ADD_EXECUTABLE(lmms-vst3-scanner
 	../Vst3Scanner.cpp
 	../Vst3List.cpp
 	../Vst3Protocol.h
+	"${CMAKE_SOURCE_DIR}/src/core/PluginScanCache.cpp"
+	"${CMAKE_SOURCE_DIR}/src/core/PluginScanResult.cpp"
 )
 
 TARGET_INCLUDE_DIRECTORIES(lmms-vst3-scanner
@@ -11,6 +13,7 @@ TARGET_INCLUDE_DIRECTORIES(lmms-vst3-scanner
 		../
 		../travesty
 		"${CMAKE_CURRENT_BINARY_DIR}/../vst3base"
+		"${CMAKE_SOURCE_DIR}/include"
 )
 
 # This executable compiles Vst3List.cpp directly instead of linking vst3base,
