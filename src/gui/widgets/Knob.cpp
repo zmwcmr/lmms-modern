@@ -156,6 +156,7 @@ const QString& Knob::getLabel() const
 
 void Knob::setLabel(const QString& txt)
 {
+	if (accessibleName().isEmpty()) { setAccessibleName(txt); }
 	m_label = txt;
 
 	updateFixedSize();

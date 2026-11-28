@@ -44,6 +44,7 @@ AutomatableButton::AutomatableButton( QWidget * _parent,
 	m_group( nullptr )
 {
 	setWindowTitle( _name );
+	setAccessibleName( _name );
 	doConnections();
 	setFocusPolicy( Qt::NoFocus );
 }

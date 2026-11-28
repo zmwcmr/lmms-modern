@@ -209,6 +209,7 @@
 - 检查键盘焦点、Tab 顺序、可访问名称；列表行的 tooltip 和省略文本要能访问完整内容。
 - 经典主题补齐按钮、树/列表/表格视图的键盘焦点轮廓（`#4afd85`，仅 outline，不改变布局）；默认主题已有对应规则。
 - 已完成键盘焦点第一批：`EffectSelectDialog` 的 Tab 顺序改为搜索框 → 插件列表 → 分类按钮 → Rescan → OK/Cancel；列表和分类按钮恢复键盘焦点，列表补可访问名称/描述，Enter 直接确认；新增 `EffectSelectDialogTest` 覆盖 Tab/Shift+Tab 与可访问名称。
+- 可访问名称：`FloatModelEditorBase`、`Knob`、`AutomatableButton` 从模型名或标签生成 accessible name；`CaptionWidgetsTest` 覆盖按钮名称。
 
 验收：`default` 主题 100%–200%；40 个基础图标通过 audit；`IconTest` 通过；键盘可完成主要操作；动画可关闭且不阻塞操作。
 
@@ -360,3 +361,4 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`GranularPitchShifter` 改为网格布局，移除固定尺寸和绝对坐标。
 - 2026-11-28：UI-3 的普通布局面板完成；Slew/LOMM/SlicerT/AFP/Sf2/Gig/Vestige 归入 UI-3b 自绘重写。
 - 2026-11-28：在 18pt 环境下检查主窗口和 LFO 控制器，无裁切/重叠；LadspaBrowser 和 SampleTrackWindow 的 200% 目视仍待补。
+- 2026-11-28：UI-5 可访问性批次：`EffectSelectDialog` 键盘 Tab/Enter、经典主题焦点轮廓、旋钮/按钮可访问名称；新增 `EffectSelectDialogTest`。

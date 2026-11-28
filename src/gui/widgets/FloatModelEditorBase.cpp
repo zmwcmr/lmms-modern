@@ -77,6 +77,7 @@ void FloatModelEditorBase::initUi(const QString & name)
 	}
 
 	setWindowTitle(name);
+	setAccessibleName(name);
 
 	setFocusPolicy(Qt::ClickFocus);
 

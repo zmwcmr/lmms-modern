@@ -8,6 +8,7 @@
 #include "LcdFloatSpinBox.h"
 #include "LcdWidget.h"
 #include "LedCheckBox.h"
+#include "PixmapButton.h"
 
 class CaptionWidgetsTest : public QObject
 {
@@ -139,6 +140,14 @@ private slots:
 		QCOMPARE(legacy->size(), initialLegacySize);
 		QCOMPARE(modern->size(), initialModernSize);
 		QApplication::setFont(originalFont);
+	}
+
+	void namedButtonsExposeAccessibleNames()
+	{
+		using namespace lmms::gui;
+
+		PixmapButton button(nullptr, QStringLiteral("Mute"));
+		QCOMPARE(button.accessibleName(), QStringLiteral("Mute"));
 	}
 };
 
