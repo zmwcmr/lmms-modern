@@ -92,6 +92,14 @@ private slots:
 			QStringLiteral("fx_tab"), QStringLiteral("midi_tab"), QStringLiteral("tuning_tab"),
 			QStringLiteral("mixer"), QStringLiteral("new_channel"), QStringLiteral("muted"),
 			QStringLiteral("controller"), QStringLiteral("info"), QStringLiteral("error"),
+			QStringLiteral("edit_knife"), QStringLiteral("edit_merge"), QStringLiteral("edit_move"),
+			QStringLiteral("edit_rename"), QStringLiteral("edit_unlink"), QStringLiteral("edit_tangent"),
+			QStringLiteral("edit_draw_small"), QStringLiteral("flip_x"), QStringLiteral("flip_y"),
+			QStringLiteral("gridmode"), QStringLiteral("proportional_snap"), QStringLiteral("cut_overlaps"),
+			QStringLiteral("arp_up"), QStringLiteral("arp_down"), QStringLiteral("arp_up_and_down"),
+			QStringLiteral("arp_free"), QStringLiteral("arp_random"), QStringLiteral("arp_sort"),
+			QStringLiteral("arp_sync"), QStringLiteral("cancel"), QStringLiteral("discard"),
+			QStringLiteral("restore"), QStringLiteral("maximize"), QStringLiteral("detach"),
 		};
 
 		for (const auto& name : names)

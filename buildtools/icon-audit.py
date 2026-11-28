@@ -486,6 +486,9 @@ def compare(args):
         "乐器页签": "Instrument tabs",
         "混音/控制器": "Mixer & controllers",
         "状态": "Status",
+        "编辑器工具": "Editor tools",
+        "Arp": "Arp",
+        "窗口/动作": "Window & actions",
     }
 
     size = args.size

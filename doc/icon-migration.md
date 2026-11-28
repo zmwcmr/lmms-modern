@@ -4,7 +4,7 @@
 > 每次改动图标后，在表中追加或更新一行；只记文件名和一句备注，逐行不嵌图，统一用下面的对照图。
 > 规范见 [`ui-spec.md`](ui-spec.md)。
 >
-> 当前覆盖：67 个图标、8 个滚动条箭头、1 个删除（`note_eight`）。最后更新：2026-11-28。
+> 当前覆盖：91 个图标、8 个滚动条箭头、1 个删除（`note_eight`）。最后更新：2026-11-28。
 >
 > 重新生成图片：`buildtools/icon-audit.py compare`（读取本文件表格）。
 
@@ -53,6 +53,30 @@
 | 轨道与编辑器 | `edit_paste` | `edit_paste.svg` | `edit_paste.svg` | 剪贴板 |
 | 轨道与编辑器 | `quantize` | `quantize.svg` | `quantize.svg` | 磁铁 |
 | 轨道与编辑器 | `progression_linear` | `progression_linear.svg` | `progression_linear.svg` | 直线 + 节点 |
+| 编辑器工具 | `edit_knife` | `edit_knife.svg` | `edit_knife.svg` | 刀片 |
+| 编辑器工具 | `edit_merge` | `edit_merge.svg` | `edit_merge.svg` | 两条线合并 |
+| 编辑器工具 | `edit_move` | `edit_move.svg` | `edit_move.svg` | 四向移动 |
+| 编辑器工具 | `edit_rename` | `edit_rename.svg` | `edit_rename.svg` | I-beam |
+| 编辑器工具 | `edit_unlink` | `edit_unlink.svg` | `edit_unlink.svg` | 链 + 斜线 |
+| 编辑器工具 | `edit_tangent` | `edit_tangent.svg` | `edit_tangent.svg` | 曲线 + 切线 |
+| 编辑器工具 | `edit_draw_small` | `edit_draw_small.svg` | `edit_draw_small.svg` | 笔尖 |
+| 编辑器工具 | `flip_x` | `flip_x.svg` | `flip_x.svg` | 水平翻转 |
+| 编辑器工具 | `flip_y` | `flip_y.svg` | `flip_y.svg` | 垂直翻转 |
+| 编辑器工具 | `gridmode` | `gridmode.svg` | `gridmode.svg` | 3×3 网格 |
+| 编辑器工具 | `proportional_snap` | `proportional_snap.svg` | `proportional_snap.svg` | 链环 |
+| 编辑器工具 | `cut_overlaps` | `cut_overlaps.svg` | `cut_overlaps.svg` | 切开的条 |
+| Arp | `arp_up` | `arp_up.svg` | `arp_up.svg` | 上行节点 |
+| Arp | `arp_down` | `arp_down.svg` | `arp_down.svg` | 下行节点 |
+| Arp | `arp_up_and_down` | `arp_up_and_down.svg` | `arp_up_and_down.svg` | V 形节点 |
+| Arp | `arp_free` | `arp_free.svg` | `arp_free.svg` | 自由波形 |
+| Arp | `arp_random` | `arp_random.svg` | `arp_random.svg` | 交叉箭头 |
+| Arp | `arp_sort` | `arp_sort.svg` | `arp_sort.svg` | 递增条 |
+| Arp | `arp_sync` | `arp_sync.svg` | `arp_sync.svg` | 双向环 |
+| 窗口/动作 | `cancel` | `cancel.svg` | `cancel.svg` | 圆 + X |
+| 窗口/动作 | `discard` | `discard.svg` | `discard.svg` | 垃圾桶 |
+| 窗口/动作 | `restore` | `restore.svg` | `restore.svg` | 双窗口 |
+| 窗口/动作 | `maximize` | `maximize.svg` | `maximize.svg` | 方框 + 箭头 |
+| 窗口/动作 | `detach` | `detach.svg` | `detach.svg` | 窗口 + 外箭头 |
 | 侧栏与状态 | `star` | `star.svg` | `star.svg` | 收藏 |
 | 侧栏与状态 | `home` | `home.svg` | `home.svg` | 房子 |
 | 侧栏与状态 | `plugins` | `plugins.svg` | `plugins.svg` | 插头 |
