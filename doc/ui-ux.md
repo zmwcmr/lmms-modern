@@ -25,7 +25,7 @@
 | --- | --- | --- | --- |
 | `UI-1` | 侧栏与列表收尾 | 完成 | 低 |
 | `UI-2` | 核心固定尺寸对话框 | 进行中 | 中 |
-| `UI-3` | 插件固定尺寸对话框 | 待开始 | 中至高，多 PR |
+| `UI-3` | 插件固定尺寸对话框 | 进行中 | 中至高，多 PR |
 | `UI-4` | 排版与文案收尾 | 待开始 | 低至中 |
 | `UI-5` | 主题、动画与无障碍 | 待开始 | 低 |
 
@@ -195,6 +195,7 @@
 插件界面（排除 vendored 子模块，约 50 处 `setFixedSize`）：
 
 - 简单控制面板：Bitcrush、Eq、Delay、Compressor、SlewDistortion、StereoMatrix。
+- 已完成 `StereoMatrix`：移除 160×185 固定尺寸，保留 4 个旋钮布局，背景随窗口缩放。
 - 中等：DualFilter、DynamicsProcessor、FrequencyShifter、MultitapEcho、LOMM、CrossoverEQ。
 - 复杂/自绘画布：GranularPitchShifter、SlicerT、AudioFileProcessor、Sf2Player、GigPlayer、Vestige。
 - 典型风险：`Sf2Player`/`GigPlayer` 文件名标签固定 11/14px 高、宽 156px；`Vestige` 文本按钮固定 200×24px；多个插件的下拉框使用固定坐标/高度。
@@ -244,7 +245,7 @@
 
 验收：100%–200% 无文字裁切/重叠；对话框可调整大小；不改变工程行为和快捷键绑定。
 
-### UI-3：插件固定尺寸对话框（待开始，多 PR）
+### UI-3：插件固定尺寸对话框（进行中，多 PR）
 
 目标：处理约 50 处固定尺寸插件面板。
 
@@ -355,4 +356,5 @@ DISPLAY=:6 QT_QPA_PLATFORM=xcb QT_FONT_DPI=96 \
 - 2026-11-28：`LfoControllerDialog` 改为布局驱动，移除固定尺寸和绝对坐标。
 - 2026-11-28：`LadspaBrowser` 改为可伸缩布局，移除标签页固定尺寸。
 - 2026-11-28：`SampleTrackWindow` 改为可调整大小，效果架随窗口伸缩。
+- 2026-11-28：UI-3 开始，`StereoMatrix` 移除固定尺寸并缩放背景。
 - 2026-11-28：混音器分隔条按实际通道宽度调整；效果器架滚动条按需显示；文件浏览器/插件浏览器选中样式统一。

@@ -27,6 +27,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -42,6 +44,12 @@ class StereoMatrixControlDialog : public EffectControlDialog
 public:
 	StereoMatrixControlDialog( StereoMatrixControls * _controls );
 	~StereoMatrixControlDialog() override = default;
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 
 };
 

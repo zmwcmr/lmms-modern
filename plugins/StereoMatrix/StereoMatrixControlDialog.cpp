@@ -26,6 +26,7 @@
 #include "StereoMatrixControlDialog.h"
 
 #include <QHBoxLayout>
+#include <QResizeEvent>
 #include "embed.h"
 #include "Knob.h"
 #include "StereoMatrixControls.h"
@@ -37,11 +38,10 @@ namespace lmms::gui
 StereoMatrixControlDialog::StereoMatrixControlDialog(StereoMatrixControls* controls) :
 	EffectControlDialog(controls)
 {
-	QPalette pal;
 	setAutoFillBackground(true);
-	setFixedSize(160, 185);
-	pal.setBrush(backgroundRole(), PLUGIN_NAME::getIconPixmap("artwork"));
-	setPalette(pal);
+	setMinimumSize(160, 185);
+	resize(160, 185);
+	updateBackground();
 
 	auto layout = new QHBoxLayout(this);
 
@@ -60,6 +60,26 @@ StereoMatrixControlDialog::StereoMatrixControlDialog(StereoMatrixControls* contr
 	makeKnob(&controls->m_lrModel, tr("Left to Right Vol:"));
 	makeKnob(&controls->m_rlModel, tr("Right to Left Vol:"));
 	makeKnob(&controls->m_rrModel, tr("Right to Right Vol:"));
+}
+
+
+void StereoMatrixControlDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void StereoMatrixControlDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
 }
 
 
