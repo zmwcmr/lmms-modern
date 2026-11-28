@@ -295,6 +295,7 @@
 - 已完成第四批：`GranularPitchShifter` 的 Grain Size、Pitch/Spray Stereo、Fade Length、Minimum Allowed Latency、Ring Buffer Length 及范围预设改为 sentence case。
 - 已完成第五批：`FrequencyShifter`、`Oscilloscope`、`Nes`、`StereoMatrix`、`SlicerT` 中可见的 Title Case 参数/提示改为 sentence case（Frequency shift、Window size、Noise frequency、Left to left vol、Fade out 等）。
 - 已完成第六批：`Lb302` 的 VCF/Slide/Filter 标签与提示改为 sentence case；`Monstro` 修正 Osc 3 Stereo/Sync 两处大小写。
+- 已完成第七批：`LadspaBrowser` 的 Available/Unavailable/Analysis 标签、`LadspaEffect` 的 Link Channels、`LadspaPortDialog` 的 SR Dependent 改为 sentence case。
 - 用 `lupdate-qt5` 重新生成 `data/locale/en.ts`，同步 Transifex 术语表。
 - 处理 `(s)` 复数、单位空格、组标题冒号等剩余文案问题。
 - 更新三档缩放截图和文案检查记录。

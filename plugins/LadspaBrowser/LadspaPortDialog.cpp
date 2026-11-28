@@ -60,7 +60,7 @@ LadspaPortDialog::LadspaPortDialog( const ladspa_key_t & _key )
 	ports.append( tr( "Type" ) );
 	ports.append( tr( "Min < Default < Max" ) );
 	ports.append( tr( "Logarithmic" ) );
-	ports.append( tr( "SR Dependent" ) );
+	ports.append( tr( "SR dependent" ) );
 	settings->setHorizontalHeaderLabels( ports );
 
 	for( int row = 0; row < pc; row++ )

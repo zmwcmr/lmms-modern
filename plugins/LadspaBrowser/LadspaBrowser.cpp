@@ -108,18 +108,18 @@ LadspaBrowserView::LadspaBrowserView( ToolPlugin * _tool ) :
 	wsLayout->setContentsMargins(0, 0, 0, 0);
 	wsLayout->setSpacing(0);
 
-	QWidget * available = createTab( ws, tr( "Available Effects" ), LadspaPluginType::Valid );
-	QWidget * unavailable = createTab( ws, tr( "Unavailable Effects" ),
+	QWidget * available = createTab( ws, tr( "Available effects" ), LadspaPluginType::Valid );
+	QWidget * unavailable = createTab( ws, tr( "Unavailable effects" ),
 								LadspaPluginType::Invalid );
 	QWidget * instruments = createTab( ws, tr( "Instruments" ), LadspaPluginType::Source );
-	QWidget * analysis = createTab( ws, tr( "Analysis Tools" ), LadspaPluginType::Sink );
+	QWidget * analysis = createTab( ws, tr( "Analysis tools" ), LadspaPluginType::Sink );
 	QWidget * other = createTab( ws, tr( "Don't know" ), LadspaPluginType::Other );
 
 
-	m_tabBar->addTab( available, tr( "Available Effects" ),
+	m_tabBar->addTab( available, tr( "Available effects" ),
 				0, false, true, false
 			)->setIcon( embed::getIconPixmap( "setup_audio" ) );
-	m_tabBar->addTab( unavailable, tr( "Unavailable Effects" ),
+	m_tabBar->addTab( unavailable, tr( "Unavailable effects" ),
 				1, false, true, false
 			)->setIcon( embed::getIconPixmap(
 						"unavailable_sound" ) );
@@ -127,7 +127,7 @@ LadspaBrowserView::LadspaBrowserView( ToolPlugin * _tool ) :
 				2, false, true, false
 			)->setIcon( embed::getIconPixmap(
 							"setup_midi" ) );
-	m_tabBar->addTab( analysis, tr( "Analysis Tools" ),
+	m_tabBar->addTab( analysis, tr( "Analysis tools" ),
 				3, false, true, false
 			)->setIcon( embed::getIconPixmap( "analysis" ) );
 	m_tabBar->addTab( other, tr( "Don't know" ),
