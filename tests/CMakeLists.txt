@@ -1,5 +1,7 @@
 include(CTest)
 
+set(LMMS_TEST_CACHE_DIR "${CMAKE_CURRENT_BINARY_DIR}/test-cache")
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 
@@ -141,6 +143,8 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 
 	add_executable(${LMMS_TEST_NAME} ${LMMS_TEST_SRC})
 	add_test(NAME ${LMMS_TEST_NAME} COMMAND ${LMMS_TEST_NAME})
+	set_tests_properties(${LMMS_TEST_NAME} PROPERTIES
+		ENVIRONMENT "XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 
 	# TODO CMake 3.12: Propagate usage requirements by linking to lmmsobjs
 	target_include_directories(${LMMS_TEST_NAME} PRIVATE $<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>)
@@ -172,7 +176,7 @@ if(TARGET vstbase)
 	set_target_properties(Vst2PluginHostTest PROPERTIES ENABLE_EXPORTS TRUE)
 	add_test(NAME Vst2PluginHostTest COMMAND Vst2PluginHostTest)
 	set_tests_properties(Vst2PluginHostTest PROPERTIES
-		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 endif()
 
 if(TARGET vstbase AND TARGET FakeCrashVst)
@@ -195,7 +199,7 @@ if(TARGET vstbase AND TARGET FakeCrashVst)
 	add_dependencies(Vst2CrashTest FakeCrashVst NativeLinuxRemoteVstPlugin64)
 	add_test(NAME Vst2CrashTest COMMAND Vst2CrashTest)
 	set_tests_properties(Vst2CrashTest PROPERTIES
-		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 endif()
 
 # Load/save/load helper used by the local stress harness. Not registered as
@@ -306,7 +310,7 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 		add_dependencies(Vst3RemoteBusTest fake-vst3 lmms-vst3-host)
 		add_test(NAME Vst3RemoteBusTest COMMAND Vst3RemoteBusTest)
 		set_tests_properties(Vst3RemoteBusTest PROPERTIES
-			ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+			ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 	endif()
 endif()
 
@@ -376,7 +380,7 @@ if(TARGET Lv2PluginHostTest AND TARGET FakeLv2Gain)
 		add_dependencies(Lv2PluginHostTest lmms-lv2-host)
 		add_test(NAME Lv2PluginHostTestRemote COMMAND Lv2PluginHostTest)
 		set_tests_properties(Lv2PluginHostTestRemote PROPERTIES
-			ENVIRONMENT "LMMS_LV2_TEST_REMOTE=1;LMMS_LV2_REMOTE=1;LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+			ENVIRONMENT "LMMS_LV2_TEST_REMOTE=1;LMMS_LV2_REMOTE=1;LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 	endif()
 	target_compile_definitions(Lv2PluginHostTest PRIVATE
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>")

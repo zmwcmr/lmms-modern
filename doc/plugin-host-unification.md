@@ -316,10 +316,21 @@ path.
 - [x] Move VST3 `Vst3List` onto the shared cache. `plugin-scan-vst3.json`
       stores one entry per bundle, with the full class metadata in the
       per-class `extra` object; the legacy `vst3-list.json` is imported once.
-- [ ] Move LV2 metadata onto the shared cache and behind the scanner
-      protocol.
-- [ ] Move VST2 probing and LV2 metadata behind the scanner protocol.
-- Acceptance: same plugin lists, rescan behavior and startup time.
+- [x] Move LV2 metadata onto the shared cache. The cache stores the plugin
+      URI, bundle URI, name, type, validity and bundle stamp; on the next
+      start `Lv2Manager` reuses the metadata to avoid repeating
+      `Lv2Proc::check` while still loading the lilv world needed for
+      instantiation.
+- [x] Scanner boundary: VST2 probing already runs through
+      `NativeLinuxRemoteVstPlugin64`, VST3 through `lmms-vst3-scanner`, and
+      LV2 metadata is cached around the in-process lilv scan (lilv is also
+      required later to instantiate the plugin, so a separate LV2 metadata
+      process would not replace that work).
+- Acceptance: same plugin lists, rescan behavior and startup time; the shared
+      caches are covered by `PluginScanCacheTest`, and the existing
+      VST2/VST3/LV2 list and project tests are unchanged.
+- Stage 4 is complete for the unified schema and cache. A future LV2 scanner
+  process can reuse `PluginScanResult` without changing the cache format.
 
 ### Stage 5 — editor host unification
 

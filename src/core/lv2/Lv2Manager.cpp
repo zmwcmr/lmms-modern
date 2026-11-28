@@ -24,6 +24,8 @@
 
 #include "Lv2Manager.h"
 
+#include "PluginScanCache.h"
+
 #ifdef LMMS_HAVE_LV2
 
 #include <algorithm>
@@ -34,6 +36,8 @@
 #include <lv2/state/state.h>
 #include <lv2/worker/worker.h>
 #include <QDebug>
+#include <QFileInfo>
+#include <QUrl>
 #include <QElapsedTimer>
 
 #include "AudioEngine.h"
@@ -254,30 +258,82 @@ void Lv2Manager::initPlugins()
 	QElapsedTimer timer;
 	timer.start();
 
+	const auto cachePath =
+		PluginScanCache::defaultCachePath(PluginScanFormat::Lv2);
+	PluginScanCache cachedEntries(PluginScanFormat::Lv2);
+	std::map<std::string, PluginScanEntry> cached;
+	if (!cachePath.isEmpty() && cachedEntries.load(cachePath))
+	{
+		for (const auto& entry : cachedEntries.entries())
+		{
+			cached.emplace(entry.classId.toStdString(), entry);
+		}
+	}
+	const auto bundleMatches = [](const PluginScanEntry& entry) {
+		if (entry.path.isEmpty())
+		{
+			return false;
+		}
+		const auto local = QUrl(entry.path).toLocalFile();
+		if (local.isEmpty())
+		{
+			return false;
+		}
+		const QFileInfo info(local);
+		return info.exists()
+			&& info.lastModified().toMSecsSinceEpoch() == entry.mtimeMs
+			&& info.size() == entry.size;
+	};
+
 	unsigned blocked = 0;
 	LILV_FOREACH(plugins, itr, plugins)
 	{
 		const LilvPlugin* curPlug = lilv_plugins_get(plugins, itr);
+		const std::string uri = lilv_node_as_uri(lilv_plugin_get_uri(curPlug));
+		QString pluginName = qStringFromPluginNode(curPlug, lilv_plugin_get_name);
+		const auto cachedIt = cached.find(uri);
+		const bool useCache = cachedIt != cached.end()
+			&& (cachedIt->second.isInstrument || cachedIt->second.isEffect)
+			&& bundleMatches(cachedIt->second);
 
 		std::vector<PluginIssue> issues;
-		Plugin::Type type = Lv2Proc::check(curPlug, issues);
-		std::ranges::sort(issues);
-		issues.erase(std::ranges::unique(issues).begin(), issues.end());
-		if (m_debug && issues.size())
+		Plugin::Type type;
+		bool valid = false;
+		QString error;
+		if (useCache)
 		{
-			qDebug() << "Lv2 plugin"
-				<< qStringFromPluginNode(curPlug, lilv_plugin_get_name)
-				<< "(URI:"
-				<< lilv_node_as_uri(lilv_plugin_get_uri(curPlug))
-				<< ") can not be loaded:";
-			for (const PluginIssue& iss : issues) { qDebug() << "  - " << iss; }
+			type = cachedIt->second.isInstrument
+				? Plugin::Type::Instrument : Plugin::Type::Effect;
+			valid = cachedIt->second.error.isEmpty();
+			error = cachedIt->second.error;
+			pluginName = cachedIt->second.name;
+		}
+		else
+		{
+			type = Lv2Proc::check(curPlug, issues);
+			std::ranges::sort(issues);
+			issues.erase(std::ranges::unique(issues).begin(), issues.end());
+			valid = issues.empty();
+			if (!valid)
+			{
+				error = QStringLiteral("invalid LV2 plugin");
+			}
+			if (m_debug && issues.size())
+			{
+				qDebug() << "Lv2 plugin"
+					<< pluginName
+					<< "(URI:" << uri.c_str()
+					<< ") can not be loaded:";
+				for (const PluginIssue& iss : issues) { qDebug() << "  - " << iss; }
+			}
 		}
 
-		Lv2Info info(curPlug, type, issues.empty());
+		Lv2Info info(curPlug, type, valid, pluginName, error);
+		info.setBundleUri(lilv_node_as_string(
+			lilv_plugin_get_bundle_uri(curPlug)));
 
-		m_lv2InfoMap[lilv_node_as_uri(lilv_plugin_get_uri(curPlug))]
-			= std::move(info);
-		if(issues.empty()) { ++pluginsLoaded; }
+		m_lv2InfoMap[uri] = std::move(info);
+		if(valid) { ++pluginsLoaded; }
 		else
 		{
 			if (std::ranges::any_of(issues,
@@ -288,6 +344,31 @@ void Lv2Manager::initPlugins()
 			}
 		}
 		++pluginCount;
+	}
+
+	if (!cachePath.isEmpty())
+	{
+		PluginScanCache output(PluginScanFormat::Lv2);
+		for (const auto& [uri, info] : m_lv2InfoMap)
+		{
+			PluginScanEntry entry;
+			entry.format = PluginScanFormat::Lv2;
+			entry.path = QString::fromStdString(info.bundleUri());
+			entry.classId = QString::fromStdString(uri);
+			entry.name = info.name();
+			entry.isInstrument = info.type() == Plugin::Type::Instrument;
+			entry.isEffect = info.type() == Plugin::Type::Effect;
+			entry.error = info.error();
+			const auto local = QUrl(entry.path).toLocalFile();
+			if (!local.isEmpty())
+			{
+				const QFileInfo fileInfo(local);
+				entry.mtimeMs = fileInfo.lastModified().toMSecsSinceEpoch();
+				entry.size = fileInfo.size();
+			}
+			output.upsert(std::move(entry));
+		}
+		output.save(cachePath);
 	}
 
 	qDebug() << "Lv2 plugin SUMMARY:"

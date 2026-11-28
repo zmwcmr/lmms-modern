@@ -96,17 +96,27 @@ public:
 		//! use only for std::map internals
 		Lv2Info() : m_plugin(nullptr) {}
 		//! ctor used inside Lv2Manager
-		Lv2Info(const LilvPlugin* plug, Plugin::Type type, bool valid) :
-			m_plugin(plug), m_type(type), m_valid(valid) {}
+		Lv2Info(const LilvPlugin* plug, Plugin::Type type, bool valid,
+			QString name = QString(), QString error = QString()) :
+			m_plugin(plug), m_name(std::move(name)), m_error(std::move(error)),
+			m_type(type), m_valid(valid) {}
 		Lv2Info(Lv2Info&& other) = default;
 		Lv2Info& operator=(Lv2Info&& other) = default;
 
 		const LilvPlugin* plugin() const { return m_plugin; }
 		Plugin::Type type() const { return m_type; }
 		bool isValid() const { return m_valid; }
+		const QString& name() const { return m_name; }
+		const QString& error() const { return m_error; }
+		const std::string& bundleUri() const { return m_bundleUri; }
+
+		void setBundleUri(std::string uri) { m_bundleUri = std::move(uri); }
 
 	private:
 		const LilvPlugin* m_plugin;
+		QString m_name;
+		QString m_error;
+		std::string m_bundleUri;
 		Plugin::Type m_type;
 		bool m_valid = false;
 	};
