@@ -90,7 +90,7 @@ SlicerTView::SlicerTView(SlicerT* instrument, QWidget* parent)
 	m_noteThresholdKnob->setModel(&m_slicerTParent->m_noteThreshold);
 
 	m_fadeOutKnob = createStyledKnob();
-	m_fadeOutKnob->setToolTip(tr("Fade Out per note in milliseconds"));
+	m_fadeOutKnob->setToolTip(tr("Fade out per note in milliseconds"));
 	m_fadeOutKnob->setModel(&m_slicerTParent->m_fadeOutFrames);
 
 	m_midiExportButton = new QPushButton(this);
@@ -239,7 +239,7 @@ void SlicerTView::paintEvent(QPaintEvent* pe)
 	// --- left box
 	brush.setPen(QColor(255, 255, 255));
 	brush.drawText(s_x1 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Threshold"));
-	brush.drawText(s_x2 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Fade Out"));
+	brush.drawText(s_x2 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Fade out"));
 	brush.drawText(s_x3 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Reset"));
 	brush.drawText(s_x4 - 8, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("MIDI"));
 	brush.drawText(s_x5 - 16, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("BPM"));

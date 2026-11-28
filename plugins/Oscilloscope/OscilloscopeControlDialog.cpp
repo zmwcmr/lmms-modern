@@ -65,7 +65,7 @@ OscilloscopeControlDialog::OscilloscopeControlDialog(OscilloscopeControls* contr
 	stereoCheck->setModel(&controls->m_stereoModel);
 	controlsLayout->addWidget(stereoCheck);
 
-	Knob* lengthKnob = new Knob(KnobType::Bright26, tr("Window Size"), this);
+	Knob* lengthKnob = new Knob(KnobType::Bright26, tr("Window size"), this);
 	lengthKnob->setModel(&controls->m_lengthModel);
 	lengthKnob->setUnit(" ms");
 	controlsLayout->addWidget(lengthKnob);

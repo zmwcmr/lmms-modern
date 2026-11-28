@@ -88,12 +88,12 @@ FrequencyShifterControlDialog::FrequencyShifterControlDialog(FrequencyShifterCon
 	topLayout->setSpacing(4);
 	topLayout->addWidget(mk("Mix", &c->m_mix, "", "fs_mix", K60));
 
-	auto shiftSpin = new LcdFloatSpinBox(6, 3, "19red", tr("Frequency Shift"), this);
+	auto shiftSpin = new LcdFloatSpinBox(6, 3, "19red", tr("Frequency shift"), this);
 	shiftSpin->setModel(&c->m_freqShift);
 	shiftSpin->setSeamless(true, true);
 	topLayout->addWidget(shiftSpin);
 
-	auto resetShifterBtn = new PixmapButton(this, tr("Reset Shifter"));
+	auto resetShifterBtn = new PixmapButton(this, tr("Reset shifter"));
 	resetShifterBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_on"));
 	resetShifterBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_off"));
 	resetShifterBtn->setToolTip(tr("Reset the shifter's oscillator phases to 0 (automatable)"));
@@ -139,17 +139,17 @@ FrequencyShifterControlDialog::FrequencyShifterControlDialog(FrequencyShifterCon
 	auto routeSend = new PixmapButton(this, tr("Send"));
 	routeSend->setActiveGraphic(PLUGIN_NAME::getIconPixmap("send_on"));
 	routeSend->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("send_off"));
-	routeSend->setToolTip(tr("Route: Send"));
+	routeSend->setToolTip(tr("Route: send"));
 	routeSend->setCheckable(true);
 	auto routePass = new PixmapButton(this, tr("Pass"));
 	routePass->setActiveGraphic(PLUGIN_NAME::getIconPixmap("pass_on"));
 	routePass->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("pass_off"));
-	routePass->setToolTip(tr("Route: Pass"));
+	routePass->setToolTip(tr("Route: pass"));
 	routePass->setCheckable(true);
 	auto routeMute = new PixmapButton(this, tr("Mute"));
 	routeMute->setActiveGraphic(PLUGIN_NAME::getIconPixmap("mute_on"));
 	routeMute->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("mute_off"));
-	routeMute->setToolTip(tr("Route: Mute"));
+	routeMute->setToolTip(tr("Route: mute"));
 	routeMute->setCheckable(true);
 	routeLayout->addWidget(routeSend);
 	routeLayout->addWidget(routePass);
@@ -288,7 +288,7 @@ FrequencyShifterHelpView::FrequencyShifterHelpView() :
 	// Bug workaround: https://codereview.qt-project.org/c/qt/qtbase/+/225348
 	using ::operator|;
 #endif
-	setWindowTitle(tr("Frequency Shifter Help"));
+	setWindowTitle(tr("Frequency shifter help"));
 	setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	getGUI()->mainWindow()->addWindowedWidget(this);
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);

@@ -56,10 +56,10 @@ StereoMatrixControlDialog::StereoMatrixControlDialog(StereoMatrixControls* contr
 		return k;
 	};
 
-	makeKnob(&controls->m_llModel, tr("Left to Left Vol:"));
-	makeKnob(&controls->m_lrModel, tr("Left to Right Vol:"));
-	makeKnob(&controls->m_rlModel, tr("Right to Left Vol:"));
-	makeKnob(&controls->m_rrModel, tr("Right to Right Vol:"));
+	makeKnob(&controls->m_llModel, tr("Left to left vol:"));
+	makeKnob(&controls->m_lrModel, tr("Left to right vol:"));
+	makeKnob(&controls->m_rlModel, tr("Right to left vol:"));
+	makeKnob(&controls->m_rrModel, tr("Right to right vol:"));
 	adjustSize();
 }
 
