@@ -45,6 +45,10 @@ QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 	image: none;
 }
 
+lmms--gui--FileBrowserTreeWidget {
+	show-decoration-selected: 1;
+}
+
 QMdiArea {
 	background-color: #111314;
 }

@@ -481,8 +481,9 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 {
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	setHorizontalScrollMode(ScrollPerPixel);
-	header()->setStretchLastSection(false);
-	header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	header()->setStretchLastSection(true);
+	header()->setSectionResizeMode(QHeaderView::Stretch);
+	setTextElideMode(Qt::ElideMiddle);
 
 	setColumnCount( 1 );
 	setFont(bodyFont(font()));
@@ -1204,6 +1205,7 @@ void FileBrowserTreeWidget::updateDirectory(QTreeWidgetItem * item )
 FileBrowserWidgetItem::FileBrowserWidgetItem(const QStringList& strings, int type, QTreeWidget* parent)
 	: QTreeWidgetItem(parent, strings, type)
 {
+	setToolTip(0, strings.value(0));
 }
 
 Directory::Directory(const QString& filename, const QString& path, const QString& filter)

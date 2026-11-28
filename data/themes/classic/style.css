@@ -819,6 +819,10 @@ QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 	image: none;
 }
 
+lmms--gui--FileBrowserTreeWidget {
+	show-decoration-selected: 1;
+}
+
 lmms--gui--TrackContainerView QLabel
 {
 	background: none;
