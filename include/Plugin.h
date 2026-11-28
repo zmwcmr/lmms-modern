@@ -318,6 +318,8 @@ protected:
 	//! Create a view for the model
 	virtual gui::PluginView* instantiateView( QWidget * ) = 0;
 	void collectErrorForUI( QString errMsg );
+	//! Update a sub-plugin key attribute after the user changes the selection.
+	void setKeyAttribute( const QString& name, const QString& value );
 
 
 private:

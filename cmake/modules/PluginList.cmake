@@ -71,6 +71,7 @@ SET(LMMS_PLUGIN_LIST
 	Stk
 	TapTempo
 	VstBase
+	Vst2Instrument
 	Vst3Base
 	Vst3Effect
 	Vst3Instrument

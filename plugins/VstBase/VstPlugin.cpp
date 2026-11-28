@@ -146,16 +146,19 @@ enum class ExecutableType
 	Unknown, Win32, Win64, Linux64,
 };
 
-VstPlugin::VstPlugin( const QString & _plugin, bool skipInit ) :
+VstPlugin::VstPlugin( const QString & _plugin, bool skipInit,
+	const QString& embedMethodOverride ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
-	m_embedMethod( skipInit
-			? QStringLiteral("headless")
-			: ( (gui::getGUI() != nullptr)
-				? (EditorPlatform::isWayland()
-					? QStringLiteral("none")
-					: ConfigManager::inst()->vstEmbedMethod())
-				: QStringLiteral("headless") ) ),
+	m_embedMethod( !embedMethodOverride.isEmpty()
+			? embedMethodOverride
+			: ( skipInit
+				? QStringLiteral("headless")
+				: ( (gui::getGUI() != nullptr)
+					? (EditorPlatform::isWayland()
+						? QStringLiteral("none")
+						: ConfigManager::inst()->vstEmbedMethod())
+					: QStringLiteral("headless") ) ) ),
 	m_version( 0 ),
 	m_isSynth( false ),
 	m_currentProgram()

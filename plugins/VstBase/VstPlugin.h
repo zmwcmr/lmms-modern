@@ -49,7 +49,8 @@ class VSTBASE_EXPORT VstPlugin : public RemotePlugin, public JournallingObject
 {
 	Q_OBJECT
 public:
-	VstPlugin( const QString & _plugin, bool skipInit = false );
+	VstPlugin( const QString & _plugin, bool skipInit = false,
+		const QString& embedMethodOverride = QString() );
 	~VstPlugin() override;
 
 	void tryLoad( const QString &remoteVstPluginExecutable, bool skipInit = false );

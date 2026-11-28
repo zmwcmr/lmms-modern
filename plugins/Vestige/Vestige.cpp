@@ -70,9 +70,9 @@ extern "C"
 Plugin::Descriptor Q_DECL_EXPORT  vestige_plugin_descriptor =
 {
 	LMMS_STRINGIFY( PLUGIN_NAME ),
-	"VeSTige",
+	"VeSTige (legacy)",
 	QT_TRANSLATE_NOOP( "PluginBrowser",
-			"VST-host for using VST(i)-plugins within LMMS" ),
+			"Legacy VST2 host kept for older projects; use VST2 for new instruments" ),
 	"Tobias Doerffel <tobydox/at/users.sf.net>",
 	0x0100,
 	Plugin::Type::Instrument,
