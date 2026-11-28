@@ -26,7 +26,7 @@
 | `UI-1` | 侧栏与列表收尾 | 完成 | 低 |
 | `UI-2` | 核心固定尺寸对话框 | 完成（视觉抽查） | 中 |
 | `UI-3` | 插件固定尺寸对话框 | 完成（布局子集） | 中至高，多 PR |
-| `UI-4` | 排版与文案收尾 | 进行中 | 低至中 |
+| `UI-4` | 排版与文案收尾 | 完成（截图随 UI-5） | 低至中 |
 | `UI-5` | 主题、动画与无障碍 | 待开始 | 低 |
 
 ---
@@ -234,7 +234,7 @@
 - 补搜索无结果状态；确认长名称、长翻译、窄侧栏下省略和 tooltip 正常。
 - 已增加 `CompactItemDelegateTest`：内容胶囊宽度、最后一个字符不裁切。
 - 已增加 `FileBrowserTest::arrowDoubleClickToggles`：快速双击箭头连续切换。
-- 截图沿用现有版本，最终统一重做放在 UI-4。
+- 截图沿用现有版本，最终统一重做放在 UI-5。
 - 运行 `FileBrowserTest`、`SideBarWorkspaceTest`、`FontScaleTest`、`InstrumentTrackTest`。
 
 验收：默认/经典主题，100%/125%/150%/200%，en/zh_CN/de_DE，窄侧栏；无整行色块、无文字裁切、无箭头误触发。
@@ -285,7 +285,7 @@
 
 验收：先把自绘区域拆成独立 widget 或相对坐标，再补 100%/200% 目视；不与普通布局批次混在一起。
 
-### UI-4：排版与文案收尾（进行中）
+### UI-4：排版与文案收尾（完成，截图随 UI-5）
 
 - 清理剩余固定字号和硬编码 `font-size`；确认三档标准在所有核心界面生效。
 - 逐插件统一参数名为 sentence case，不做全量重命名。
@@ -300,10 +300,10 @@
 - 已完成第九批：`TempoSyncKnob` 与 `TempoSyncBarModelEditor` 的 "8th/16th/32nd Note" 改为 "note"。
 - 已完成第十批：`FreeBoy` 的 "Shift Register width"、`SpectrumAnalyzer` 窗口选项的 "(Off)/(Default)" 注解改为 sentence case。
 - `data/locale/en.ts` 由 Transifex 整体同步，本地不重新生成，避免一次上万行无意义 diff；新增/修改字符串随下次翻译同步进入。
-- 处理 `(s)` 复数、单位空格、组标题冒号等剩余文案问题。
-- 更新三档缩放截图和文案检查记录。
+- `(s)` 复数与单位空格复查：仅 `ControllerRackView` 的 `%n connection(s)` 保留，等待翻译提供 Qt 复数形式；其余核心界面未发现需批量修改的单位空格或组标题冒号。
+- 三档缩放截图统一重做转到 UI-5。
 
-验收：`FontScaleTest` 通过；100%–200% 无字号断层；`en.ts` diff 可审查。
+验收：`FontScaleTest`、`CaptionWidgetsTest`、`UiFeedbackTest` 通过；本轮不改字号，100%–200% 无新增断层；`en.ts` 不在本分支产生整体 diff。
 
 ### UI-5：主题、动画与无障碍（待开始）
 
