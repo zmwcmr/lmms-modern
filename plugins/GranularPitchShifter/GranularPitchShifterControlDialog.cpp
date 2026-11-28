@@ -57,9 +57,9 @@ GranularPitchShifterControlDialog::GranularPitchShifterControlDialog(GranularPit
 	pitchBox->setToolTip(tr("Pitch"));
 	pitchBox->setSeamless(true, true);
 
-	auto* pitchSpreadBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch Stereo Spread"), this);
+	auto* pitchSpreadBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch stereo spread"), this);
 	pitchSpreadBox->setModel(&controls->m_pitchSpreadModel);
-	pitchSpreadBox->setToolTip(tr("Pitch Stereo Spread"));
+	pitchSpreadBox->setToolTip(tr("Pitch stereo spread"));
 	pitchSpreadBox->setSeamless(true, true);
 
 	auto* m_helpBtn = new PixmapButton(this, nullptr);
@@ -89,15 +89,15 @@ GranularPitchShifterControlDialog::GranularPitchShifterControlDialog(GranularPit
 	grid->addWidget(makeKnob(KnobType::Bright26, tr("Jitter:"), " octaves", &controls->m_jitterModel), 0, 2, Qt::AlignCenter);
 	grid->addWidget(makeKnob(KnobType::Bright26, tr("Twitch:"), " octaves", &controls->m_twitchModel), 0, 3, Qt::AlignCenter);
 
-	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain Size:"), " Hz", &controls->m_sizeModel), 1, 0, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain size:"), " Hz", &controls->m_sizeModel), 1, 0, Qt::AlignCenter);
 	grid->addWidget(pitchSpreadBox, 1, 1, Qt::AlignCenter);
-	grid->addWidget(makeKnob(KnobType::Bright26, tr("Spray Stereo Spread:"), "", &controls->m_spraySpreadModel), 1, 2, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Spray stereo spread:"), "", &controls->m_spraySpreadModel), 1, 2, Qt::AlignCenter);
 	grid->addWidget(makeKnob(KnobType::Bright26, tr("Feedback:"), "", &controls->m_feedbackModel), 1, 3, Qt::AlignCenter);
 
 	grid->addWidget(prefilterButton, 2, 0, Qt::AlignCenter);
-	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain Shape:"), "", &controls->m_shapeModel), 2, 1, Qt::AlignCenter);
-	grid->addWidget(makeKnob(KnobType::Bright26, tr("Fade Length:"), "", &controls->m_fadeLengthModel), 2, 2, Qt::AlignCenter);
-	grid->addWidget(makeKnob(KnobType::Bright26, tr("Minimum Allowed Latency:"), " seconds", &controls->m_minLatencyModel), 2, 3, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain shape:"), "", &controls->m_shapeModel), 2, 1, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Fade length:"), "", &controls->m_fadeLengthModel), 2, 2, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Minimum allowed latency:"), " seconds", &controls->m_minLatencyModel), 2, 3, Qt::AlignCenter);
 
 	grid->addWidget(makeKnob(KnobType::Small17, tr("Glide:"), " seconds", &controls->m_glideModel), 3, 0, Qt::AlignCenter);
 	grid->addWidget(makeKnob(KnobType::Small17, tr("Density:"), "x", &controls->m_densityModel), 3, 1, Qt::AlignCenter);

@@ -33,20 +33,20 @@ GranularPitchShifterControls::GranularPitchShifterControls(GranularPitchShifterE
 	EffectControls(effect),
 	m_effect(effect),
 	m_pitchModel(1.f, -48.f, 24.f, 0.01f, this, tr("Pitch")),
-	m_sizeModel(10.f, 2.f, 1000.f, 0.001f, this, tr("Grain Size")),
+	m_sizeModel(10.f, 2.f, 1000.f, 0.001f, this, tr("Grain size")),
 	m_sprayModel(0.005f, 0.f, 0.5f, 0.0001f, this, tr("Spray")),
 	m_jitterModel(0.f, 0.f, 1.f, 0.0001f, this, tr("Jitter")),
 	m_twitchModel(0.f, 0.f, 1.f, 0.0001f, this, tr("Twitch")),
-	m_pitchSpreadModel(0.f, -24.f, 24.f, 0.01f, this, tr("Pitch Stereo Spread")),
-	m_spraySpreadModel(0.f, 0.f, 1.f, 0.0001f, this, tr("Spray Stereo")),
+	m_pitchSpreadModel(0.f, -24.f, 24.f, 0.01f, this, tr("Pitch stereo spread")),
+	m_spraySpreadModel(0.f, 0.f, 1.f, 0.0001f, this, tr("Spray stereo")),
 	m_shapeModel(2.f, 1.f, 2.f, 0.0001f, this, tr("Shape")),
-	m_fadeLengthModel(1.f, 0.001f, 1.f, 0.00001f, this, tr("Fade Length")),
+	m_fadeLengthModel(1.f, 0.001f, 1.f, 0.00001f, this, tr("Fade length")),
 	m_feedbackModel(0.f, 0.f, 1.f, 0.00001f, this, tr("Feedback")),
-	m_minLatencyModel(0.01f, 0.f, 1.f, 0.00001f, this, tr("Minimum Allowed Latency")),
+	m_minLatencyModel(0.01f, 0.f, 1.f, 0.00001f, this, tr("Minimum allowed latency")),
 	m_prefilterModel(true, this, tr("Prefilter")),
 	m_densityModel(1.f, 1.f, 16.f, 0.0001f, this, tr("Density")),
 	m_glideModel(0.01f, 0.f, 1.f, 0.0001f, this, tr("Glide")),
-	m_rangeModel(this, tr("Ring Buffer Length"))
+	m_rangeModel(this, tr("Ring buffer length"))
 {
 	m_sizeModel.setScaleLogarithmic(true);
 	m_sprayModel.setScaleLogarithmic(true);
@@ -55,11 +55,11 @@ GranularPitchShifterControls::GranularPitchShifterControls(GranularPitchShifterE
 	m_densityModel.setScaleLogarithmic(true);
 	m_glideModel.setScaleLogarithmic(true);
 	
-	m_rangeModel.addItem(tr("5 Seconds"));
-	m_rangeModel.addItem(tr("10 Seconds (Size)"));
-	m_rangeModel.addItem(tr("40 Seconds (Size and Pitch)"));
-	m_rangeModel.addItem(tr("40 Seconds (Size and Spray and Jitter)"));
-	m_rangeModel.addItem(tr("120 Seconds (All of the above)"));
+	m_rangeModel.addItem(tr("5 seconds"));
+	m_rangeModel.addItem(tr("10 seconds (size)"));
+	m_rangeModel.addItem(tr("40 seconds (size and pitch)"));
+	m_rangeModel.addItem(tr("40 seconds (size and spray and jitter)"));
+	m_rangeModel.addItem(tr("120 seconds (all of the above)"));
 	
 	connect(&m_rangeModel, &ComboBoxModel::dataChanged, this, &GranularPitchShifterControls::updateRange);
 }

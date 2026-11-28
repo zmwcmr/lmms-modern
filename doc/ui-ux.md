@@ -292,6 +292,7 @@
 - 已完成第一批：`Compressor` 参数名改为 sentence case（RMS size、Lookahead length、Input balance 等），并修正 feedback 按钮误用的 "Soft Clip" 可访问名称。
 - 已完成第二批：`Dispersion` 的 "DC Offset Removal"/"Remove DC Offset" 改为 sentence case；`DualFilter` 的 "Q/Resonance" 改为 "Q/resonance"。
 - 已完成第三批：`LOMM` 的 Input/Output Volume、Upward/Downward Depth、High/Mid Crossover、Above/Below Threshold/Ratio、Attack/Release High/Mid/Low 等改为 sentence case；`SlewDistortion` 的 Slew Up/Down、Dynamic Slew、DC Offset Remover、Slew Link、Oversampling 标签改为 sentence case。
+- 已完成第四批：`GranularPitchShifter` 的 Grain Size、Pitch/Spray Stereo、Fade Length、Minimum Allowed Latency、Ring Buffer Length 及范围预设改为 sentence case。
 - 用 `lupdate-qt5` 重新生成 `data/locale/en.ts`，同步 Transifex 术语表。
 - 处理 `(s)` 复数、单位空格、组标题冒号等剩余文案问题。
 - 更新三档缩放截图和文案检查记录。
