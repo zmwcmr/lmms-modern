@@ -20,6 +20,7 @@ set(LMMS_TESTS
 	src/gui/ToolButtonTest.cpp
 	src/gui/UiFeedbackTest.cpp
 	src/gui/CaptionWidgetsTest.cpp
+	src/gui/FontScaleTest.cpp
 	src/gui/EditorShortcutsTest.cpp
 	src/gui/FileBrowserTest.cpp
 	src/gui/SubWindowTest.cpp

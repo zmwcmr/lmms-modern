@@ -24,6 +24,7 @@
  */
 
 
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -41,8 +42,8 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 	QWidget( _parent ),
 	ModelView( nullptr, this )
 {
-	m_numerator = new LcdSpinBox(2, this, tr("Meter Numerator"));
-	m_denominator = new LcdSpinBox(2, this, tr("Meter Denominator"));
+	m_numerator = new LcdSpinBox(2, this, tr("Meter numerator"));
+	m_denominator = new LcdSpinBox(2, this, tr("Meter denominator"));
 	m_numerator->setToolTip(tr("Meter numerator"));
 	m_denominator->setToolTip(tr("Meter denominator"));
 
@@ -64,8 +65,7 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 		layout->addLayout(digits);
 
 		m_caption = tr("TIME SIG");
-		setMinimumWidth(QFontMetrics(m_numerator->labelFont()).horizontalAdvance(m_caption) + 1);
-		layout->addSpacing(LcdWidget::LabelHeight);
+		updateCaptionLayout();
 		return;
 	}
 
@@ -82,7 +82,7 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 	num_layout->addWidget( m_numerator );
 
 	num_layout->addSpacing( 5 );
-	num_layout->addWidget(new QLabel(tr("Meter Numerator"), num));
+	num_layout->addWidget(new QLabel(tr("Meter numerator"), num));
 	num_layout->addStretch();
 
 	auto den = new QWidget(this);
@@ -92,7 +92,7 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 
 	den_layout->addWidget( m_denominator );
 	den_layout->addSpacing( 5 );
-	den_layout->addWidget(new QLabel(tr("Meter Denominator"), den));
+	den_layout->addWidget(new QLabel(tr("Meter denominator"), den));
 	den_layout->addStretch();
 
 
@@ -108,6 +108,23 @@ MeterDialog::MeterDialog( QWidget * _parent, bool _simple ) :
 
 
 
+
+void MeterDialog::updateCaptionLayout()
+{
+	const auto captionSize = m_numerator->labelSize(m_caption);
+	setMinimumWidth(captionSize.width());
+	layout()->setContentsMargins(0, 0, 0, captionSize.height());
+	update();
+}
+
+void MeterDialog::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() == QEvent::FontChange && !m_caption.isEmpty())
+	{
+		updateCaptionLayout();
+	}
+}
 
 void MeterDialog::paintEvent(QPaintEvent* event)
 {

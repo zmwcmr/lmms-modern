@@ -1,9 +1,12 @@
 #include <QVBoxLayout>
 #include <QtTest>
 
+#include "ComboBox.h"
 #include "Engine.h"
 #include "FontHelper.h"
 #include "GroupBox.h"
+#include "LcdFloatSpinBox.h"
+#include "LcdWidget.h"
 #include "LedCheckBox.h"
 
 class CaptionWidgetsTest : public QObject
@@ -13,6 +16,80 @@ class CaptionWidgetsTest : public QObject
 private slots:
 	void initTestCase() { lmms::Engine::init(true); }
 	void cleanupTestCase() { lmms::Engine::destroy(); }
+
+	void comboFitsLargerFontWithoutChangingExplicitGeometry()
+	{
+		using namespace lmms::gui;
+
+		const auto originalFont = QApplication::font();
+		auto font = originalFont;
+		font.setPointSize(9);
+		QApplication::setFont(font);
+
+		QWidget host;
+		QVBoxLayout layout(&host);
+		ComboBox combo(&host);
+		ComboBox fixedCombo(&host);
+		const QString option = QStringLiteral("Gypsy tuning with quickly changing pitches");
+		combo.model()->addItem(option);
+		combo.setMinimumContentWidth(80);
+		fixedCombo.setFixedSize(130, ComboBox::DEFAULT_HEIGHT);
+		layout.addWidget(&combo);
+		layout.addWidget(&fixedCombo);
+		host.show();
+		QCoreApplication::processEvents();
+		const auto initialSize = combo.size();
+
+		font.setPointSize(16);
+		QApplication::setFont(font);
+		QCoreApplication::processEvents();
+		layout.activate();
+		const QFontMetrics metrics(adjustedToPixelSize(combo.font(), DEFAULT_FONT_SIZE));
+		QVERIFY(combo.height() > initialSize.height());
+		QVERIFY(combo.width() > initialSize.width());
+		QVERIFY(combo.height() >= metrics.height() + 4);
+		QCOMPARE(combo.model()->currentText(), option);
+		QCOMPARE(fixedCombo.size(), QSize(130, ComboBox::DEFAULT_HEIGHT));
+
+		QApplication::setFont(originalFont);
+	}
+
+	void lcdCaptionsUseScaledAuxiliaryFont()
+	{
+		using namespace lmms::gui;
+		const auto originalFont = QApplication::font();
+		auto font = originalFont;
+		const QString caption = QStringLiteral("Base note frequency");
+		font.setPointSize(9);
+		QApplication::setFont(font);
+
+		LcdWidget integerLcd(3, nullptr);
+		integerLcd.setLabel(caption);
+		LcdFloatSpinBox fractionalLcd(4, 3);
+		fractionalLcd.setLabel(caption);
+		const auto initialIntegerSize = integerLcd.size();
+		const auto initialFractionalSize = fractionalLcd.sizeHint();
+		const auto digitHeight = integerLcd.cellHeight();
+		const auto basePixelSize = integerLcd.labelFont().pixelSize();
+
+		font.setPointSize(18);
+		QApplication::setFont(font);
+		QCoreApplication::processEvents();
+		const auto captionSize = integerLcd.labelSize(caption);
+		const auto pixelSize = integerLcd.labelFont().pixelSize();
+		const auto integerSize = integerLcd.size();
+		const auto fractionalSize = fractionalLcd.sizeHint();
+		const auto scaledDigitHeight = integerLcd.cellHeight();
+		QApplication::setFont(originalFont);
+
+		QCOMPARE(basePixelSize, AUXILIARY_FONT_SIZE);
+		QCOMPARE(pixelSize, 2 * AUXILIARY_FONT_SIZE);
+		QCOMPARE(scaledDigitHeight, digitHeight);
+		QVERIFY(integerSize.height() > initialIntegerSize.height());
+		QVERIFY(fractionalSize.height() > initialFractionalSize.height());
+		QVERIFY(integerSize.width() >= captionSize.width());
+		QVERIFY(fractionalSize.width() >= captionSize.width());
+	}
 
 	void fitsCaptionsWhenApplicationFontChanges()
 	{

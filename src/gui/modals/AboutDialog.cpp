@@ -26,7 +26,9 @@
 #include "lmmsversion.h"
 #include "AboutDialog.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "versioninfo.h"
+#include <QApplication>
 
 
 namespace lmms::gui
@@ -37,7 +39,14 @@ AboutDialog::AboutDialog(QWidget* parent) :
 	Ui::AboutDialog()
 {
 	setupUi( this );
+	const auto updateLinkColor = [this] {
+		label_4->setText(QStringLiteral("<a href=\"https://lmms.io\" style=\"color: %1\">https://lmms.io</a>")
+			.arg(qApp->palette().color(QPalette::Link).name()));
+	};
+	connect(qApp, &QApplication::paletteChanged, this, [updateLinkColor](const QPalette&) { updateLinkColor(); });
+	updateLinkColor();
 
+	label->setFont(titleFont(label->font()));
 
 	iconLabel->setPixmap( embed::getIconPixmap( "icon", 64, 64 ) );
 

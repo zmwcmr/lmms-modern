@@ -23,6 +23,8 @@
  */
 
 
+#include <QEvent>
+#include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
 
@@ -38,6 +40,14 @@
 namespace lmms::gui
 {
 
+namespace
+{
+
+constexpr int hintHorizontalPadding = 6;
+constexpr int hintVerticalPadding = 5;
+
+} // namespace
+
 
 Oscilloscope::Oscilloscope( QWidget * _p ) :
 	QWidget( _p ),
@@ -49,7 +59,7 @@ Oscilloscope::Oscilloscope( QWidget * _p ) :
 	m_otherChannelsColor(71, 253, 133),
 	m_clippingColor(255, 64, 64)
 {
-	setFixedSize(embed::logicalSize(m_background).width(), 30);
+	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	setActive( ConfigManager::inst()->value( "ui", "displaywaveform").toInt() );
 
 	const f_cnt_t frames = Engine::audioEngine()->framesPerPeriod();
@@ -153,6 +163,24 @@ void Oscilloscope::setClippingColor(QColor const & clippingColor)
 }
 
 
+QSize Oscilloscope::sizeHint() const
+{
+	const QFontMetrics metrics(auxiliaryFont(font()));
+	return {qMax(embed::logicalSize(m_background).width(),
+				metrics.horizontalAdvance(tr("Click to enable")) + 2 * hintHorizontalPadding),
+			qMax(30, metrics.height() + 2 * hintVerticalPadding)};
+}
+
+void Oscilloscope::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() == QEvent::FontChange || event->type() == QEvent::LanguageChange)
+	{
+		updateGeometry();
+		update();
+	}
+}
+
 void Oscilloscope::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
@@ -201,10 +229,10 @@ void Oscilloscope::paintEvent( QPaintEvent * )
 	else
 	{
 		p.setPen(m_hintTextColor);
-		QFont hintFont = p.font();
-		hintFont.setPixelSize(DEFAULT_FONT_SIZE);
-		p.setFont(hintFont);
-		p.drawText( 6, height()-5, tr( "Click to enable" ) );
+		p.setFont(auxiliaryFont(font()));
+		const auto hintRect = rect().adjusted(hintHorizontalPadding, hintVerticalPadding,
+			-hintHorizontalPadding, -hintVerticalPadding);
+		p.drawText(hintRect, Qt::AlignLeft | Qt::AlignBottom | Qt::TextSingleLine, tr("Click to enable"));
 	}
 }
 

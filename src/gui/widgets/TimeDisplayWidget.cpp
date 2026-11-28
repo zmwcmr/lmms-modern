@@ -25,6 +25,7 @@
 #include <QMouseEvent>
 
 #include "TimeDisplayWidget.h"
+#include "FontHelper.h"
 #include "GuiApplication.h"
 #include "MainWindow.h"
 #include "Engine.h"
@@ -42,13 +43,11 @@ TimeDisplayWidget::TimeDisplayWidget() :
 	m_minorLCD( 2, this ),
 	m_milliSecondsLCD( 3, this )
 {
-	m_spinBoxesLayout.setSpacing( 0 );
+	m_spinBoxesLayout.setSpacing(scaledFontSize(2));
 	m_spinBoxesLayout.setContentsMargins(0, 0, 0, 0);
 	m_spinBoxesLayout.addWidget( &m_majorLCD );
 	m_spinBoxesLayout.addWidget( &m_minorLCD );
 	m_spinBoxesLayout.addWidget( &m_milliSecondsLCD );
-
-	setMaximumHeight( 32 );
 
 	setCursor(Qt::PointingHandCursor);
 	setToolTip(tr("Click to switch the time display format."));

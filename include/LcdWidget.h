@@ -52,8 +52,9 @@ public:
 	void setLabel(const QString& label);
 	bool hasLabel() const { return !m_label.isEmpty(); }
 	QFont labelFont() const;
+	QSize labelSize(const QString& label) const;
 	void drawLabel(QPainter& painter, const QRect& area, const QString& label) const;
-	static constexpr int LabelHeight = 9;
+	static constexpr int LabelHeight = 9; // Legacy base height for external callers.
 
 	void addTextForValue( int value, const QString& text )
 	{
@@ -86,6 +87,7 @@ public slots:
 
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void paintEvent( QPaintEvent * pe ) override;
 
 	virtual void updateSize();
@@ -113,6 +115,7 @@ private:
 	bool m_seamlessRight;
 	bool m_leadingZero;
 
+	int displayWidth() const;
 	void initUi( const QString& name, const QString &style ); //!< to be called by ctors
 
 };

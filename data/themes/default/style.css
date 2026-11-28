@@ -7,6 +7,8 @@ QLabel, QTreeWidget, QListWidget, QGroupBox, QMenuBar, QCheckBox {
 	color: #d1d8e4;
 }
 
+QTabBar::tab { color: #d1d8e4; }
+
 QTreeView {
 	outline: none;
 	alternate-background-color: #111314;
@@ -37,7 +39,9 @@ QTreeView::branch:has-children:closed {
 }
 
 lmms--gui--FileBrowserTreeWidget::branch:has-children:open,
-lmms--gui--FileBrowserTreeWidget::branch:has-children:closed {
+lmms--gui--FileBrowserTreeWidget::branch:has-children:closed,
+QTreeWidget#pluginBrowserTree::branch:has-children:open,
+QTreeWidget#pluginBrowserTree::branch:has-children:closed {
 	image: none;
 }
 
@@ -45,9 +49,14 @@ QMdiArea {
 	background-color: #111314;
 }
 
+/* Group boxes use the body size with semibold weight, like custom GroupBox titles. */
+QGroupBox::title {
+	font-weight: 600;
+}
+
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 11px;
+	font-size: 12px;
 	color: white;
 }
 
@@ -689,7 +698,7 @@ QToolButton, QToolButton::menu-button {
 	border-bottom: 1px solid #1e2226;
 	border-radius: 2px;
 	background: qlineargradient(spread:reflect, x1:0, y1:0, x2:0, y2:1 stop:0 #636c7a, stop:1 #343840);
-	font-size:10px;
+	font-size:12px;
 	color: #fff;
 }
 
@@ -747,7 +756,7 @@ QToolButton::menu-button {
 lmms--gui--TrackLabelButton {
 	background-color: #3B424A;
 	border: 1px solid #3B424A;
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: normal;
 	padding: 2px 1px;
 }
@@ -779,7 +788,7 @@ lmms--gui--TrackLabelButton:checked:pressed {
 	padding: 3px 1px 1px;
 	border: 1px solid #2f353b;
 	background: #0e1012;
-	font-weight: solid;
+	font-weight: 600;
 }
 
 /* sidebar, sidebar buttons */
@@ -834,7 +843,7 @@ lmms--gui--PluginDescWidget {
 	border-radius: 2px;
 	background-color: qlineargradient(spread:reflect, x1:0, y1:0, x2:0, y2:1, stop:0 #2E343B, stop:1 #1E2326);
 	color: #d1d8e4;
-	font-weight: bold;
+	font-weight: 600;
 	margin: 0px;
 }
 
@@ -854,7 +863,7 @@ lmms--gui--PianoView {
 lmms--gui--MixerView QPushButton,
 lmms--gui--EffectRackView QPushButton,
 lmms--gui--ControllerRackView QPushButton {
-	font-size: 10px;
+	font-size: 12px;
 }
 
 lmms--gui--MixerChannelView {
@@ -943,7 +952,7 @@ lmms--gui--ClipView   {
 	qproperty-textShadowColor: rgba(0,0,0,200);
 	qproperty-gradient: false; /* boolean property, set true to have a gradient */
 	qproperty-markerColor: rgb(0, 0, 0);
-	font-size: 11px;
+	font-size: 12px;
 }
 
 /* MIDI (instrument) clip */
@@ -991,6 +1000,7 @@ lmms--gui--SubWindow {
 lmms--gui--SubWindow > QLabel {
 	color: #d1d8e4;
 	font-size: 12px;
+	font-weight: 600;
 	font-style: normal;
 }
 
@@ -1314,4 +1324,5 @@ lmms--gui--LmmsPalette {
 	qproperty-brightText: #d1d8e4;
 	qproperty-highlight: #262b30;
 	qproperty-highlightedText: #d1d8e4;
+	qproperty-linkColor: #8cfab6;
 }

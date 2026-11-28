@@ -157,7 +157,7 @@ void SubWindow::paintEvent( QPaintEvent * )
 	if( widget() )
 	{
 		QPixmap winicon( widget()->windowIcon().pixmap( m_buttonSize ) );
-		p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), winicon );
+		p.drawPixmap(3, (m_titleBarHeight - m_buttonSize.height()) / 2, m_buttonSize.width(), m_buttonSize.height(), winicon);
 	}
 }
 
@@ -513,7 +513,8 @@ void SubWindow::adjustTitleBar()
 	const int buttonGap = 1;
 	const int menuButtonSpace = 24;
 
-	auto buttonPos = QPoint{width() - rightSpace - m_buttonSize.width(), 3};
+	auto buttonPos = QPoint{width() - rightSpace - m_buttonSize.width(),
+		(m_titleBarHeight - m_buttonSize.height()) / 2};
 	const auto buttonStep = QPoint{m_buttonSize.width() + buttonGap, 0};
 
 	// the buttonBarWidth depends on the number of buttons.

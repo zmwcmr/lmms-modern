@@ -25,17 +25,34 @@
 
 
 #include <algorithm>
-#include <QFont>
+#include <QEvent>
+#include <QFontMetrics>
+#include <QImage>
 #include <QPainter>
 
 #include "AudioEngine.h"
 #include "CPULoadWidget.h"
 #include "embed.h"
 #include "Engine.h"
+#include "FontHelper.h"
 
 
 namespace lmms::gui
 {
+
+namespace
+{
+
+const QString cpuLabel = QStringLiteral("CPU");
+constexpr int meterLeft = 21;
+constexpr int labelGap = 3;
+
+int meterOffset(const QFontMetrics& metrics)
+{
+	return std::max(0, metrics.horizontalAdvance(cpuLabel) + labelGap - meterLeft);
+}
+
+} // namespace
 
 
 CPULoadWidget::CPULoadWidget( QWidget * _parent ) :
@@ -45,7 +62,20 @@ CPULoadWidget::CPULoadWidget( QWidget * _parent ) :
 	m_leds( embed::getIconPixmap( "cpuload_leds" ) ),
 	m_updateTimer()
 {
-	setFixedSize(embed::logicalSize(m_background));
+	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	// Theme artwork may contain transparent padding after the meter.
+	const auto image = m_background.toImage();
+	for (int x = image.width() - 1; x >= 0 && m_backgroundVisibleWidth == 0; --x)
+	{
+		for (int y = 0; y < image.height(); ++y)
+		{
+			if (image.pixelColor(x, y).alpha() > 32)
+			{
+				m_backgroundVisibleWidth = (x + 1) / m_background.devicePixelRatio();
+				break;
+			}
+		}
+	}
 
 	connect( &m_updateTimer, SIGNAL(timeout()),
 					this, SLOT(updateCpuLoad()));
@@ -58,9 +88,32 @@ CPULoadWidget::CPULoadWidget( QWidget * _parent ) :
 
 
 
+QSize CPULoadWidget::sizeHint() const
+{
+	const auto meterSize = embed::logicalSize(m_background);
+	const QFontMetrics metrics(auxiliaryFont(font()));
+	return {meterSize.width() + meterOffset(metrics), std::max(meterSize.height(), metrics.height())};
+}
+
+void CPULoadWidget::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() == QEvent::FontChange) { updateGeometry(); }
+}
+
 void CPULoadWidget::paintEvent( QPaintEvent *  )
 {
 	QPainter p( this );
+	p.setFont(auxiliaryFont(font()));
+	const int offset = meterOffset(p.fontMetrics());
+	const auto backgroundSize = embed::logicalSize(m_background);
+	const int meterTop = (height() - backgroundSize.height()) / 2;
+	// Align the visible end of the themed meter, ignoring transparent padding.
+	const qreal scaleX = qreal(qMax(1, width() - offset)) /
+		qMax<qreal>(1, m_backgroundVisibleWidth > 0 ? m_backgroundVisibleWidth : backgroundSize.width());
+	p.save();
+	p.translate(offset, meterTop);
+	p.scale(scaleX, 1.0);
 	p.drawPixmap(0, 0, m_background);
 
 	// Keep the color ramp anchored to the full meter while revealing it in theme-defined steps.
@@ -69,20 +122,15 @@ void CPULoadWidget::paintEvent( QPaintEvent *  )
 	if (litWidth > 0)
 	{
 		p.save();
-		p.setClipRect(23, 3, litWidth, ledSize.height());
-		p.drawPixmap(23, 3, m_leds);
+		const QPoint ledOrigin(23, 3);
+		p.setClipRect(QRect(ledOrigin, QSize(litWidth, ledSize.height())));
+		p.drawPixmap(ledOrigin, m_leds);
 		p.restore();
 	}
+	p.restore();
 
-	// The label is drawn as text instead of being baked into the background
-	// bitmap: a 1x raster image gets scaled up on high-DPI screens, which made
-	// the text look blurry. Drawing it with QPainter keeps it sharp at any
-	// device pixel ratio.
-	QFont labelFont = font();
-	labelFont.setPixelSize( height() - 2 );
-	p.setFont( labelFont );
-	p.setPen( m_labelColor );
-	p.drawText( 0, height() - 2, QStringLiteral( "CPU" ) );
+	p.setPen(m_labelColor);
+	p.drawText(QRect(0, 0, offset + meterLeft, height()), Qt::AlignLeft | Qt::AlignVCenter, cpuLabel);
 }
 
 

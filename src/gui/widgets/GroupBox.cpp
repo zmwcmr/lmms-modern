@@ -88,7 +88,7 @@ void GroupBox::changeEvent(QEvent* event)
 
 void GroupBox::updateTitleBarGeometry()
 {
-	const QFontMetrics metrics(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	const QFontMetrics metrics(groupTitleFont(font()));
 	const auto previousHeight = m_titleBarHeight;
 	const bool showLed = ledButtonShown();
 	m_titleBarHeight = qMax(metrics.height(), showLed ? m_led->height() : 0) + 4;
@@ -110,7 +110,7 @@ int GroupBox::captionLeft() const
 
 QSize GroupBox::minimumSizeHint() const
 {
-	const QFontMetrics metrics(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	const QFontMetrics metrics(groupTitleFont(font()));
 	const int captionWidth = qMax(metrics.horizontalAdvance(m_caption), metrics.boundingRect(m_caption).right() + 1);
 	return QWidget::minimumSizeHint().expandedTo(QSize(captionLeft() + captionWidth + 6, m_titleBarHeight + 2));
 }
@@ -144,7 +144,7 @@ void GroupBox::paintEvent( QPaintEvent * pe )
 
 	// draw text
 	p.setPen( palette().color( QPalette::Active, QPalette::Text ) );
-	p.setFont(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	p.setFont(groupTitleFont(font()));
 
 	const int baseline = (m_titleBarHeight - p.fontMetrics().height()) / 2 + p.fontMetrics().ascent();
 	p.drawText(captionLeft(), baseline, m_caption);

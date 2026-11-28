@@ -74,7 +74,9 @@ ComboControl::ComboControl(QWidget *parent) :
 	m_combo(new ComboBox(nullptr)),
 	m_label(new QLabel(m_widget))
 {
-	m_combo->setFixedSize(64, ComboBox::DEFAULT_HEIGHT);
+	m_combo->setMinimumWidth(64);
+	m_combo->setMinimumHeight(ComboBox::DEFAULT_HEIGHT);
+	m_combo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	auto vbox = new QVBoxLayout(m_widget);
 	vbox->addWidget(m_combo);
 	vbox->addWidget(m_label);

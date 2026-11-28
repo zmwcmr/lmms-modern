@@ -56,14 +56,12 @@ TabWidget::TabWidget(const QString& caption, QWidget* parent, bool usePixmap,
 	// Create taller tabbar when it's to display artwork tabs
 	m_tabbarHeight = usePixmap ? GRAPHIC_TAB_HEIGHT : TEXT_TAB_HEIGHT;
 
-	m_tabheight = caption.isEmpty() ? m_tabbarHeight - 3 : m_tabbarHeight - 4;
-
-	// Tab bars have fixed heights (and some dialogs position their contents
-	// relative to them), so this is one of the few places that keeps the
-	// design pixel size instead of following the system font.
-	QFont tabFont = font();
-	tabFont.setPixelSize(DEFAULT_FONT_SIZE);
+	// Tabs use the body tier. Selection and weight carry the hierarchy; the
+	// tab bar grows with the font instead of keeping a fixed pixel height.
+	QFont tabFont = bodyFont(font());
 	setFont(tabFont);
+	m_tabbarHeight = qMax<int>(m_tabbarHeight, QFontMetrics(tabFont).height() + 2);
+	m_tabheight = caption.isEmpty() ? m_tabbarHeight - 3 : m_tabbarHeight - 4;
 
 	setAutoFillBackground(true);
 	QColor bg_color = QApplication::palette().color(QPalette::Active, QPalette::Window).darker(132);
@@ -83,8 +81,11 @@ void TabWidget::addTab(QWidget* w, const QString& name, const char* pixmap, int 
 		}
 	}
 
-	// Tab's width when it is a text tab. This isn't correct for artwork tabs, but it's fixed later during the PaintEvent
-	int tab_width = fontMetrics().horizontalAdvance(name) + 10;
+	// Tab's width when it is a text tab. Reserve the semibold width used by
+	// the selected tab so selection does not clip the label.
+	QFont metricsFont = font();
+	metricsFont.setWeight(QFont::DemiBold);
+	int tab_width = QFontMetrics(metricsFont).horizontalAdvance(name) + 10;
 
 	// Register new tab
 	widgetDesc d = {w, pixmap, name, tab_width};
@@ -246,9 +247,10 @@ void TabWidget::resizeEvent(QResizeEvent*)
 void TabWidget::paintEvent(QPaintEvent* pe)
 {
 	QPainter p(this);
-	QFont tabFont = font();
-	tabFont.setPixelSize(DEFAULT_FONT_SIZE);
-	p.setFont(tabFont);
+	const QFont normalTabFont = font();
+	QFont selectedTabFont = normalTabFont;
+	selectedTabFont.setWeight(QFont::DemiBold);
+	p.setFont(normalTabFont);
 
 	// Draw background
 	QBrush bg_color = p.background();
@@ -261,11 +263,15 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 	// Draw tabs' bar background
 	p.fillRect(1, 1, width() - 2, m_tabheight + 2, tabBackground());
 
+	// Text baseline shared by the caption and all tabs.
+	const QFontMetrics normalMetrics(normalTabFont);
+	const int baseline = (m_tabbarHeight - normalMetrics.height()) / 2 + normalMetrics.ascent();
+
 	// Draw title, if any
 	if (!m_caption.isEmpty())
 	{
 		p.setPen(tabTitleText());
-		p.drawText(5, 11, m_caption);
+		p.drawText(5, baseline, m_caption);
 	}
 
 	// Calculate the tabs' x (tabs are painted next to the caption)
@@ -314,13 +320,16 @@ void TabWidget::paintEvent(QPaintEvent* pe)
 			{
 				p.fillRect(tab_x_offset, 2, currentWidgetDesc.nwidth - 6, m_tabbarHeight - 4, tabSelected());
 				p.setPen(tabTextSelected());
-				p.drawText(tab_x_offset + 3, m_tabheight + 1, currentWidgetDesc.name);
+				p.setFont(selectedTabFont);
+				p.drawText(tab_x_offset + 3, baseline, currentWidgetDesc.name);
+				p.setFont(normalTabFont);
 			}
 			else
 			{
 				// Draw text
 				p.setPen(tabText());
-				p.drawText(tab_x_offset + 3, m_tabheight + 1, currentWidgetDesc.name);
+				p.setFont(normalTabFont);
+				p.drawText(tab_x_offset + 3, baseline, currentWidgetDesc.name);
 			}
 		}
 
