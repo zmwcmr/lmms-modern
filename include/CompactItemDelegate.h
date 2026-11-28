@@ -61,18 +61,19 @@ public:
 		const int margin = 4;
 		const int gap = 6;
 
-		const int availableTextWidth = qMax(0, opt.rect.width() - 2 * margin
-			- (opt.icon.isNull() ? 0 : iconSize + gap));
+		const int iconWidth = opt.icon.isNull() ? 0 : iconSize + gap;
+		const int maxPillWidth = opt.rect.width() - 4;
+		const int maxTextWidth = qMax(0, maxPillWidth - 2 * margin - iconWidth - 2);
+
 		QString text = opt.text;
-		if (metrics.horizontalAdvance(text) > availableTextWidth)
+		if (metrics.horizontalAdvance(text) > maxTextWidth)
 		{
-			text = metrics.elidedText(text, opt.textElideMode, availableTextWidth);
+			text = metrics.elidedText(text, opt.textElideMode, maxTextWidth);
 		}
 
 		const int textWidth = metrics.horizontalAdvance(text);
-		const int contentWidth = (opt.icon.isNull() ? 0 : iconSize + gap) + textWidth;
-		const QRect pillRect(opt.rect.left() + 2, opt.rect.top() + 1,
-			qMin(opt.rect.width() - 4, contentWidth + 2 * margin), opt.rect.height() - 2);
+		const int pillWidth = qMin(maxPillWidth, iconWidth + textWidth + 2 * margin + 2);
+		const QRect pillRect(opt.rect.left() + 2, opt.rect.top() + 1, pillWidth, opt.rect.height() - 2);
 
 		painter->save();
 		painter->setRenderHint(QPainter::Antialiasing);
@@ -95,11 +96,11 @@ public:
 			const QRect iconRect(textLeft, opt.rect.center().y() - iconSize / 2, iconSize, iconSize);
 			opt.icon.paint(painter, iconRect, Qt::AlignCenter,
 				selected ? QIcon::Selected : QIcon::Normal);
-			textLeft = iconRect.right() + gap + 1;
+			textLeft = iconRect.right() + gap;
 		}
 
 		const QRect textRect(textLeft, opt.rect.top(),
-			qMax(0, pillRect.right() - textLeft - margin), opt.rect.height());
+			qMax(0, pillWidth - 2 * margin - iconWidth), opt.rect.height());
 		painter->setFont(opt.font);
 		painter->setPen(opt.palette.color(selected ? QPalette::HighlightedText : QPalette::Text));
 		painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, text);
