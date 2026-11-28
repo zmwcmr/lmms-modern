@@ -200,6 +200,7 @@
 - 立即修：`sbarrow_left_d.svg`、`sbarrow_up_d.svg` 空文件；`sbarrow_*` 的 20%/0.01 透明度对比度（已完成）。
 - 运行时：tint + 尺寸 token + `IconTest`（已完成）；track-ops、LeftRightNav 和菜单勾选已改为 code/base style，剩余 QSS 图标（滚动条、插件 stepper、分支、slider/shadow）待处理。
 - 迁移顺序：18 个 pilot → 40 个基础图标（工具栏、侧栏、文件类型、编辑器工具）→ 其余 UI → 皮肤/插件 → `classic`。
+- 新旧图标对照见 [`icon-migration.md`](icon-migration.md)。
 
 主题与无障碍：
 
