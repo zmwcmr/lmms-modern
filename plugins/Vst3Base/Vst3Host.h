@@ -86,6 +86,18 @@ public:
 		ProgramChange,
 	};
 
+	struct ProcessInputBus
+	{
+		const float* const* channels = nullptr;
+		int channelCount = 0;
+	};
+
+	struct ProcessOutputBus
+	{
+		float* const* channels = nullptr;
+		int channelCount = 0;
+	};
+
 	struct MidiEvent
 	{
 		MidiType type = MidiType::NoteOn;
@@ -148,6 +160,11 @@ public:
 		float* leftOut,
 		float* rightOut,
 		int frames) = 0;
+
+	//! Multi-bus process. The default forwards the first input/output bus to
+	//! process(); hosts that understand their component buses override it.
+	virtual void processBuses(const std::vector<ProcessInputBus>& inputs,
+		const std::vector<ProcessOutputBus>& outputs, int frames);
 
 	virtual int latencySamples() const = 0;
 
@@ -234,6 +251,8 @@ public:
 		float* leftOut,
 		float* rightOut,
 		int frames) override;
+	void processBuses(const std::vector<ProcessInputBus>& inputs,
+		const std::vector<ProcessOutputBus>& outputs, int frames) override;
 
 	int latencySamples() const override;
 

@@ -304,22 +304,44 @@ void Vst3PluginHost::sendMidi(const PluginMidiEvent& event)
 
 bool Vst3PluginHost::process(const PluginProcessBlock& block)
 {
+	const bool hasOutputBuses = block.outputBusCount > 0
+		&& block.outputBuses != nullptr;
 	if (m_host == nullptr || !m_host->isLoaded() || block.frames <= 0
-		|| block.outputChannels <= 0 || block.outputs == nullptr
-		|| block.outputs[0] == nullptr)
+		|| (!hasOutputBuses && (block.outputChannels <= 0
+			|| block.outputs == nullptr || block.outputs[0] == nullptr)))
 	{
 		return false;
 	}
 
-	const float* leftIn = block.inputs && block.inputChannels > 0
-		? block.inputs[0] : nullptr;
-	const float* rightIn = block.inputs && block.inputChannels > 1
-		? block.inputs[1] : leftIn;
-	float* leftOut = block.outputs[0];
-	float* rightOut = block.outputChannels > 1 && block.outputs[1]
-		? block.outputs[1] : leftOut;
+	std::vector<Vst3HostBase::ProcessInputBus> inputs;
+	if (block.inputBusCount > 0 && block.inputBuses != nullptr)
+	{
+		for (int bus = 0; bus < block.inputBusCount; ++bus)
+		{
+			inputs.push_back({ block.inputBuses[bus].channels,
+				block.inputBuses[bus].channelCount });
+		}
+	}
+	else if (block.inputChannels > 0 && block.inputs != nullptr)
+	{
+		inputs.push_back({ block.inputs, block.inputChannels });
+	}
 
-	m_host->process(leftIn, rightIn, leftOut, rightOut, block.frames);
+	std::vector<Vst3HostBase::ProcessOutputBus> outputs;
+	if (hasOutputBuses)
+	{
+		for (int bus = 0; bus < block.outputBusCount; ++bus)
+		{
+			outputs.push_back({ block.outputBuses[bus].channels,
+				block.outputBuses[bus].channelCount });
+		}
+	}
+	else
+	{
+		outputs.push_back({ block.outputs, block.outputChannels });
+	}
+
+	m_host->processBuses(inputs, outputs, block.frames);
 	return true;
 }
 
