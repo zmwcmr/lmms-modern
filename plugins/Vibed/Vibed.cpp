@@ -317,7 +317,7 @@ VibedView::VibedView(Instrument* instrument, QWidget* parent) :
 	m_lengthKnob.move(23, 193);
 	m_lengthKnob.setHintText(tr("String length:"), "");
 
-	m_graph.setWindowTitle(tr("Impulse Editor"));
+	m_graph.setWindowTitle(tr("Impulse editor"));
 	m_graph.setForeground(PLUGIN_NAME::getIconPixmap("wavegraph4"));
 	m_graph.move(76, 21);
 	m_graph.resize(132, 104);
