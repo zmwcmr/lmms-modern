@@ -88,6 +88,10 @@ public:
 	{
 		return m_host != nullptr && m_host->inputBuses().size() > 1;
 	}
+	bool supportsMultiOutput() const override
+	{
+		return m_host != nullptr && m_host->outputBuses().size() > 1;
+	}
 
 	void initializeModels();
 
@@ -103,6 +107,8 @@ private:
 	std::vector<float> m_sidechainRight;
 	std::vector<float> m_outputLeft;
 	std::vector<float> m_outputRight;
+	std::vector<float> m_output2Left;
+	std::vector<float> m_output2Right;
 };
 
 } // namespace lmms

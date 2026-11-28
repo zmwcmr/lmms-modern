@@ -153,6 +153,39 @@ private slots:
 		QCOMPARE(hostPtr->m_lastSidechainSample, 0.25f);
 	}
 
+	void passesMultiOutputBus()
+	{
+		static const Plugin::Descriptor descriptor{
+			"hostedeffecttest", "Hosted Effect Test", "test", "LMMS", 1,
+			Plugin::Type::Effect, nullptr, ""
+		};
+
+		auto host = std::make_unique<FakePluginHost>();
+		auto* const hostPtr = host.get();
+		hostPtr->m_outputBuses.push_back(PluginBusInfo{
+			QStringLiteral("Aux 1"), 2, false,
+			PluginBusRole::Auxiliary, false });
+		HostedEffect effect(&descriptor, nullptr, nullptr, std::move(host));
+		effect.initializeModels();
+		QVERIFY(effect.supportsMultiOutput());
+
+		constexpr f_cnt_t frames = 64;
+		AudioBuffer second(frames, 2);
+		effect.setSecondaryOutputBuffer(&second);
+
+		std::vector<SampleFrame> buffer(
+			static_cast<std::size_t>(frames), SampleFrame(1.0f));
+		effect.processImpl(buffer.data(), frames);
+		auto secondView = second.groupBuffers(0);
+		for (ch_cnt_t channel = 0; channel < 2; ++channel)
+		{
+			for (f_cnt_t frame = 0; frame < frames; ++frame)
+			{
+				QCOMPARE(secondView.buffer(channel)[frame], 0.25f);
+			}
+		}
+	}
+
 	void effectChainDeliversSidechain()
 	{
 		EffectChain chain(nullptr);

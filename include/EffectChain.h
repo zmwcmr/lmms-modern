@@ -75,10 +75,22 @@ public:
 		return m_sidechainBuffer;
 	}
 
+	//! Optional second stereo output buffer for multi-output plugins.
+	void setSecondaryOutputBuffer(AudioBuffer* buffer)
+	{
+		m_secondaryOutputBuffer = buffer;
+	}
+	AudioBuffer* secondaryOutputBuffer() const
+	{
+		return m_secondaryOutputBuffer;
+	}
+
 	//! Sum of the processing latencies of all effects, in samples
 	f_cnt_t latency() const;
 	//! True when at least one effect reports a sidechain input bus.
 	bool hasSidechainInput() const;
+	//! True when at least one effect reports a second output bus.
+	bool hasMultiOutput() const;
 
 	void clear();
 
@@ -89,6 +101,7 @@ private:
 
 	BoolModel m_enabledModel;
 	const AudioBuffer* m_sidechainBuffer = nullptr;
+	AudioBuffer* m_secondaryOutputBuffer = nullptr;
 
 
 	friend class gui::EffectRackView;
