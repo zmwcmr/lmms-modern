@@ -23,6 +23,8 @@
  */
 #include "AutomationClipView.h"
 
+#include <algorithm>
+
 #include <QApplication>
 #include <QMouseEvent>
 #include <QPainter>
@@ -265,8 +267,14 @@ void AutomationClipView::paintEvent( QPaintEvent * )
 	// pixels per bar
 	const float ppb = fixedClips() ?
 			( parentWidget()->width() - 2 * BORDER_WIDTH )
-				/ (float) m_clip->length().getBar() :
+				/ static_cast<float>(std::max(1, m_clip->length().getBar())) :
 								pixelsPerBar();
+
+	if (m_clip->firstObject() == nullptr)
+	{
+		// Malformed automation clips may not have a target model.
+		return;
+	}
 
 	const auto min = m_clip->firstObject()->minValue<float>();
 	const auto max = m_clip->firstObject()->maxValue<float>();

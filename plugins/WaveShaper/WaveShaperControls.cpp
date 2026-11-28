@@ -76,8 +76,11 @@ void WaveShaperControls::loadSettings( const QDomElement & _this )
 	int size = 0;
 	char * dst = 0;
 	base64::decode( _this.attribute( "waveShape"), &dst, &size );
-
-	m_wavegraphModel.setSamples( (float*) dst );
+	if( dst != nullptr &&
+			size >= m_wavegraphModel.length() * static_cast<int>( sizeof( float ) ) )
+	{
+		m_wavegraphModel.setSamples( (float*) dst );
+	}
 	delete[] dst;
 
 }

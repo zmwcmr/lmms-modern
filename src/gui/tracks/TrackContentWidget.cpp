@@ -96,11 +96,20 @@ void TrackContentWidget::updateBackground()
 {		
 	// use snapSize to determine number of lines to draw
 	float snapSize = getGUI()->songEditor()->m_editor->getSnapSize();
+	if (!(snapSize > 0.0f))
+	{
+		snapSize = 1.0f;
+	}
 
 	const TrackContainerView * tcv = m_trackView->trackContainerView();
 
 	// Assume even-pixels-per-bar. Makes sense, should be like this anyways
-	int ppb = static_cast<int>( tcv->pixelsPerBar() );
+	const int ppb = static_cast<int>( tcv->pixelsPerBar() );
+	if (ppb <= 0)
+	{
+		// Avoid infinite grid loops if a caller still provides a bad value.
+		return;
+	}
 
 	// Coarse grid appears every bar (less frequently if quantization > 1 bar)
 	float coarseGridResolution = (snapSize >= 1) ? snapSize : 1;

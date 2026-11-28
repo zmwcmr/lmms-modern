@@ -8,6 +8,8 @@ set(LMMS_TESTS
 	src/core/DelayLineTest.cpp
 	src/core/AudioBufferTest.cpp
 	src/core/AutomatableModelTest.cpp
+	src/core/Base64Test.cpp
+	src/core/ConfigUpgradeTest.cpp
 	src/core/MathTest.cpp
 	src/core/ParameterCurveTest.cpp
 	src/core/ProjectVersionTest.cpp
@@ -37,6 +39,35 @@ set(LMMS_TESTS
 if(LMMS_HAVE_LV2)
 	list(APPEND LMMS_TESTS src/core/Lv2PresetTest.cpp)
 	list(APPEND LMMS_TESTS src/core/Lv2PortTest.cpp)
+	list(APPEND LMMS_TESTS src/core/Lv2HostClientTest.cpp)
+
+	add_library(FakeLv2Gain MODULE plugins/fake-lv2-gain/gain.c)
+	target_include_directories(FakeLv2Gain PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Gain PROPERTIES
+		PREFIX ""
+		# The bundle manifests reference "gain.so"; keep that name on every
+		# platform so lilv can open the module (Windows accepts any suffix).
+		SUFFIX ".so"
+		OUTPUT_NAME "gain"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2"
+	)
+	configure_file(plugins/fake-lv2-gain/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-gain/gain.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-gain.lv2/gain.ttl" COPYONLY)
+
+	add_library(FakeLv2Midi MODULE plugins/fake-lv2-midi/midi.c)
+	target_include_directories(FakeLv2Midi PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2Midi PROPERTIES
+		PREFIX ""
+		SUFFIX ".so"
+		OUTPUT_NAME "midi"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2"
+	)
+	configure_file(plugins/fake-lv2-midi/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-midi/midi.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-midi.lv2/midi.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -68,6 +99,15 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_features(${LMMS_TEST_NAME} PRIVATE cxx_std_20)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
+
+# Load/save/load helper used by the local stress harness. Not registered as
+# a ctest because it needs a project file and two output paths.
+add_executable(LmmsRoundTrip stress/roundtrip.cpp)
+target_include_directories(LmmsRoundTrip PRIVATE
+	$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>)
+target_static_libraries(LmmsRoundTrip PRIVATE lmmsobjs)
+target_link_libraries(LmmsRoundTrip PRIVATE ${QT_LIBRARIES})
+target_compile_features(LmmsRoundTrip PRIVATE cxx_std_20)
 
 if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	set(FAKE_VST3_BUNDLE "${CMAKE_BINARY_DIR}/plugins/fake-vst3.vst3")
@@ -114,4 +154,45 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	)
 	add_dependencies(Vst3AutomationTest fake-vst3)
 	add_test(NAME Vst3AutomationTest COMMAND Vst3AutomationTest)
+endif()
+
+if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument)
+	add_executable(Vst3ProjectTest
+		src/core/Vst3ProjectTest.cpp
+	)
+	target_include_directories(Vst3ProjectTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+	)
+	target_static_libraries(Vst3ProjectTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst3ProjectTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+	)
+	target_compile_features(Vst3ProjectTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst3ProjectTest PRIVATE
+		LMMS_TESTING
+		VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+		VST3_FAKE_CLASS="${FAKE_VST3_INSTRUMENT_ID}"
+		VST3_PLUGIN_DIR="${CMAKE_BINARY_DIR}/plugins"
+	)
+	# Plugins resolve LMMS core symbols from the loading executable, as they
+	# do when loaded by the lmms binary.
+	set_target_properties(Vst3ProjectTest PROPERTIES ENABLE_EXPORTS TRUE)
+	add_dependencies(Vst3ProjectTest fake-vst3 vst3instrument)
+	add_test(NAME Vst3ProjectTest COMMAND Vst3ProjectTest)
+endif()
+
+if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
+	add_dependencies(Lv2HostClientTest lmms-lv2-host FakeLv2Gain)
+	if(TARGET FakeLv2Midi)
+		add_dependencies(Lv2HostClientTest FakeLv2Midi)
+	endif()
+	target_compile_definitions(Lv2HostClientTest PRIVATE
+		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
+		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
+		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>")
+	target_include_directories(Lv2HostClientTest PRIVATE
+		${Lilv_INCLUDE_DIRS}
+		${LV2_INCLUDE_DIRS})
+	target_link_libraries(Lv2HostClientTest PRIVATE Lilv::lilv)
 endif()

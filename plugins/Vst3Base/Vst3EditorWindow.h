@@ -49,6 +49,13 @@ public:
 		const QString& title,
 		std::function<void(uint32_t, double)> parameterHandler = {});
 
+	//! Whether any available backend can display this host's editor.
+	//!
+	//! This covers the embedded xcb path, the out-of-process xcb path and the
+	//! floating X11/XWayland window, so the UI must not gate the editor on the
+	//! Qt platform alone.
+	static bool isSupported(Vst3HostBase* host);
+
 	bool isX11Forwarded() const
 	{
 		return m_x11Editor != nullptr;

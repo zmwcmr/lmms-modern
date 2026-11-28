@@ -16,43 +16,7 @@ namespace
 
 audioMasterCallback g_host = nullptr;
 AEffect g_effect{};
-VstTimeInfo g_timeInfo{};
 int g_blocks = 0;
-
-intptr_t VST_CALL_CONV hostCallback(AEffect*, int32_t opcode, int32_t,
-	intptr_t, void* ptr, float)
-{
-	switch (opcode)
-	{
-	case audioMasterVersion:
-		return 2400;
-	case audioMasterGetSampleRate:
-		return 44100;
-	case audioMasterGetBlockSize:
-		return 512;
-	case audioMasterGetCurrentProcessLevel:
-		return 2;
-	case audioMasterGetVendorString:
-		if (ptr) { std::strcpy(static_cast<char*>(ptr), "LMMS tests"); }
-		return 1;
-	case audioMasterGetProductString:
-		if (ptr) { std::strcpy(static_cast<char*>(ptr), "Fake MIDI VST"); }
-		return 1;
-	case audioMasterGetVendorVersion:
-		return 1;
-	case audioMasterCanDo:
-		return 1;
-	case audioMasterGetTime:
-		g_timeInfo.sampleRate = 44100.0;
-		g_timeInfo.tempo = 120.0;
-		g_timeInfo.timeSigNumerator = 4;
-		g_timeInfo.timeSigDenominator = 4;
-		g_timeInfo.flags = kVstTempoValid | kVstTimeSigValid;
-		return reinterpret_cast<intptr_t>(&g_timeInfo);
-	default:
-		return 0;
-	}
-}
 
 void processReplacing(AEffect*, float** /*inputs*/, float** outputs, int32_t frames)
 {

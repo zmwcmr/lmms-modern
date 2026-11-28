@@ -24,7 +24,9 @@
 
 #include "SampleDecoder.h"
 
+#include <QDebug>
 #include <QFile>
+#include <QFileInfo>
 #include <QString>
 #include <algorithm>
 #include <memory>
@@ -222,6 +224,16 @@ auto SampleDecoder::supportedAudioTypes() -> const std::vector<AudioType>&
 
 auto SampleDecoder::decode(const QString& audioFile) -> std::optional<Result>
 {
+	// Opening a FIFO or device node for reading can block indefinitely. A
+	// project is allowed to reference arbitrary paths, so only decode
+	// regular files.
+	const QFileInfo fileInfo(audioFile);
+	if (!fileInfo.exists() || !fileInfo.isFile())
+	{
+		qWarning() << "Sample is not a regular file:" << audioFile;
+		return std::nullopt;
+	}
+
 	auto result = std::optional<Result>{};
 	for (const auto& decoder : decoders)
 	{

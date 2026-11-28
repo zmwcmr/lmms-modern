@@ -209,7 +209,12 @@ void FreeBoyInstrument::loadSettings( const QDomElement & _this )
 	int size = 0;
 	char * dst = 0;
 	base64::decode( _this.attribute( "sampleShape"), &dst, &size );
-	m_graphModel.setSamples( (float*) dst );
+	const int requiredSize = m_graphModel.length() * static_cast<int>( sizeof( float ) );
+	if( dst != nullptr && size >= requiredSize )
+	{
+		m_graphModel.setSamples( reinterpret_cast<float*>( dst ) );
+	}
+	delete[] dst;
 }
 
 QString FreeBoyInstrument::nodeName() const

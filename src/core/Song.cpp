@@ -1534,6 +1534,14 @@ bool Song::isSavingProject() const {
 }
 
 
+// TODO: Use std::atomic<std::shared_ptr<T>> once it is supported by all
+// compilers we build with. Until then, keep the free functions below and
+// silence their C++20 deprecation warning.
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 std::shared_ptr<const Scale> Song::getScale(unsigned int index) const
 {
 	if (index >= MaxScaleCount) {index = 0;}
@@ -1570,4 +1578,8 @@ void Song::setKeymap(unsigned int index, std::shared_ptr<Keymap> newMap)
 	emit keymapListChanged(index);
 	Engine::audioEngine()->doneChangeInModel();
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#	pragma GCC diagnostic pop
+#endif
 } // namespace lmms

@@ -13,6 +13,10 @@ TARGET_INCLUDE_DIRECTORIES(lmms-vst3-scanner
 		"${CMAKE_CURRENT_BINARY_DIR}/../vst3base"
 )
 
+# This executable compiles Vst3List.cpp directly instead of linking vst3base,
+# so it must not see the DLL import declarations from vst3base_export.h.
+TARGET_COMPILE_DEFINITIONS(lmms-vst3-scanner PRIVATE VST3BASE_STATIC_DEFINE)
+
 TARGET_LINK_LIBRARIES(lmms-vst3-scanner Qt${QT_VERSION_MAJOR}::Core)
 
 IF(APPLE)

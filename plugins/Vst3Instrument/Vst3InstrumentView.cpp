@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -36,7 +37,6 @@
 #include "AutomatableModel.h"
 #include "Instrument.h"
 #include "Knob.h"
-#include "Vst3EditorWidget.h"
 #include "Vst3EditorWindow.h"
 #include "Vst3Host.h"
 #include "Vst3Instrument.h"
@@ -45,8 +45,11 @@ namespace lmms::gui
 {
 
 Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) :
-	InstrumentViewFixedSize(instrument, parent)
+	InstrumentView(instrument, parent)
 {
+	setMinimumSize(QSize(320, 320));
+	setMaximumSize(QSize(10000, 10000));
+
 	auto* layout = new QVBoxLayout(this);
 
 	auto* const vst3Instrument = dynamic_cast<Vst3Instrument*>(instrument);
@@ -62,6 +65,54 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 	{
 		layout->addWidget(new QLabel(tr("Vendor: %1").arg(host->vendor()), this));
 	}
+
+	if (host->hasEditor())
+	{
+		m_guiButton = new QPushButton(tr("Show GUI"), this);
+		m_guiButton->setCheckable(true);
+		const bool editorSupported = Vst3EditorWindow::isSupported(host);
+		m_guiButton->setEnabled(editorSupported);
+		if (!editorSupported)
+		{
+			m_guiButton->setToolTip(
+				tr("The VST3 editor requires X11 or an XWayland display."));
+		}
+		connect(m_guiButton, &QPushButton::toggled, this,
+			[this, host, vst3Instrument](bool show) {
+			if (!show)
+			{
+				if (m_editorWindow != nullptr)
+				{
+					m_editorWindow->close();
+				}
+				return;
+			}
+			if (m_editorWindow != nullptr)
+			{
+				m_editorWindow->raiseEditor();
+				m_editorWindow->activateEditor();
+				return;
+			}
+			auto* window = Vst3EditorWindow::open(host, this, host->name(),
+				[vst3Instrument](uint32_t id, double value) {
+					vst3Instrument->setParameterValue(id, value);
+				});
+			m_editorWindow = window;
+			connect(window, &QObject::destroyed, this, [this] {
+				if (m_guiButton != nullptr)
+				{
+					QSignalBlocker blocker(m_guiButton);
+					m_guiButton->setChecked(false);
+				}
+			});
+		});
+		layout->addWidget(m_guiButton);
+	}
+	else
+	{
+		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
+	}
+
 	const auto& models = vst3Instrument->parameterModels();
 	layout->addWidget(new QLabel(tr("Automatable parameters: %1")
 		.arg(models.count()), this));
@@ -84,15 +135,16 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
 			knob->setModel(parameter);
 			knob->setHintText(info.name, info.unit);
-			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
+			constexpr int columns = 2;
+			grid->addWidget(knob, index / columns, index % columns, Qt::AlignHCenter);
 		}
 		if (models.count() > shown)
 		{
 			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
-				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+				.arg(shown), parameterWidget), (shown + 1) / 2, 0, 1, 2);
 		}
 		scrollArea->setWidget(parameterWidget);
-		scrollArea->setMinimumSize(420, 260);
+		scrollArea->setMinimumSize(300, 260);
 		layout->addWidget(scrollArea);
 	}
 
@@ -127,38 +179,19 @@ Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) 
 		layout->addWidget(unitBox);
 	}
 
-	if (host->hasEditor())
-	{
-		auto* editorButton = new QPushButton(tr("Open editor"), this);
-		editorButton->setEnabled(Vst3EditorWidget::isSupported());
-		if (!Vst3EditorWidget::isSupported())
-		{
-			editorButton->setToolTip(
-				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
-		}
-		connect(editorButton, &QPushButton::clicked, this,
-			[this, host, vst3Instrument] {
-			if (m_editorWindow != nullptr)
-			{
-				m_editorWindow->raiseEditor();
-				m_editorWindow->activateEditor();
-				return;
-			}
-			m_editorWindow = Vst3EditorWindow::open(host, this, host->name(),
-				[vst3Instrument](uint32_t id, double value) {
-					vst3Instrument->setParameterValue(id, value);
-				});
-		});
-		layout->addWidget(editorButton);
-	}
-	else
-	{
-		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
-	}
-
 	layout->addWidget(new QLabel(
 		tr("MIDI input is active."), this));
 	layout->setSizeConstraint(QLayout::SetFixedSize);
+}
+
+QSize Vst3InstrumentView::sizeHint() const
+{
+	return QSize(360, 600);
+}
+
+QSize Vst3InstrumentView::minimumSizeHint() const
+{
+	return minimumSize();
 }
 
 void Vst3InstrumentView::modelChanged()

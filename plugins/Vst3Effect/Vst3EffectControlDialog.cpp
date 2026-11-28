@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -36,7 +37,6 @@
 #include "AutomatableModel.h"
 #include "Knob.h"
 #include "Vst3EffectControls.h"
-#include "Vst3EditorWidget.h"
 #include "Vst3EditorWindow.h"
 #include "Vst3Host.h"
 
@@ -46,6 +46,9 @@ namespace lmms::gui
 Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 	EffectControlDialog(controls)
 {
+	setMinimumSize(QSize(480, 360));
+	setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
 	auto* layout = new QVBoxLayout(this);
 
 	const auto name = controls->pluginName().isEmpty()
@@ -56,6 +59,54 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 	if (!controls->pluginVendor().isEmpty())
 	{
 		layout->addWidget(new QLabel(tr("Vendor: %1").arg(controls->pluginVendor()), this));
+	}
+
+	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
+	{
+		m_guiButton = new QPushButton(tr("Show GUI"), this);
+		m_guiButton->setCheckable(true);
+		const bool editorSupported = Vst3EditorWindow::isSupported(host);
+		m_guiButton->setEnabled(editorSupported);
+		if (!editorSupported)
+		{
+			m_guiButton->setToolTip(
+				tr("The VST3 editor requires X11 or an XWayland display."));
+		}
+		connect(m_guiButton, &QPushButton::toggled, this,
+			[this, controls](bool show) {
+			if (!show)
+			{
+				if (m_editorWindow != nullptr)
+				{
+					m_editorWindow->close();
+				}
+				return;
+			}
+			if (m_editorWindow != nullptr)
+			{
+				m_editorWindow->raiseEditor();
+				m_editorWindow->activateEditor();
+				return;
+			}
+			auto* window = Vst3EditorWindow::open(
+				controls->host(), this, controls->pluginName(),
+				[controls](uint32_t id, double value) {
+					controls->setParameterValue(id, value);
+				});
+			m_editorWindow = window;
+			connect(window, &QObject::destroyed, this, [this] {
+				if (m_guiButton != nullptr)
+				{
+					QSignalBlocker blocker(m_guiButton);
+					m_guiButton->setChecked(false);
+				}
+			});
+		});
+		layout->addWidget(m_guiButton);
+	}
+	else
+	{
+		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
 	}
 
 	const auto& models = controls->parameterModels();
@@ -84,12 +135,13 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
 			knob->setModel(parameter);
 			knob->setHintText(info.name, info.unit);
-			grid->addWidget(knob, index / 4, index % 4, Qt::AlignHCenter);
+			constexpr int columns = 3;
+			grid->addWidget(knob, index / columns, index % columns, Qt::AlignHCenter);
 		}
 		if (models.count() > shown)
 		{
 			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
-				.arg(shown), parameterWidget), (shown + 3) / 4, 0, 1, 4);
+				.arg(shown), parameterWidget), (shown + 2) / 3, 0, 1, 3);
 		}
 		scrollArea->setWidget(parameterWidget);
 		scrollArea->setMinimumSize(420, 300);
@@ -127,36 +179,6 @@ Vst3EffectControlDialog::Vst3EffectControlDialog(Vst3EffectControls* controls) :
 		layout->addWidget(unitBox);
 	}
 
-	if (auto* host = controls->host(); host != nullptr && host->hasEditor())
-	{
-		auto* editorButton = new QPushButton(tr("Open editor"), this);
-		editorButton->setEnabled(Vst3EditorWidget::isSupported());
-		if (!Vst3EditorWidget::isSupported())
-		{
-			editorButton->setToolTip(
-				tr("The VST3 editor requires the X11 (xcb) Qt platform."));
-		}
-		connect(editorButton, &QPushButton::clicked, this, [this, controls] {
-			if (m_editorWindow != nullptr)
-			{
-				m_editorWindow->raiseEditor();
-				m_editorWindow->activateEditor();
-				return;
-			}
-			m_editorWindow = Vst3EditorWindow::open(
-				controls->host(), this, controls->pluginName(),
-				[controls](uint32_t id, double value) {
-					controls->setParameterValue(id, value);
-				});
-		});
-		layout->addWidget(editorButton);
-	}
-	else
-	{
-		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
-	}
-
-	layout->setSizeConstraint(QLayout::SetFixedSize);
 }
 
 } // namespace lmms::gui

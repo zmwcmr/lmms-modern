@@ -24,6 +24,8 @@
  
 #include "SampleClipView.h"
 
+#include <algorithm>
+
 #include <QApplication>
 #include <QMenu>
 #include <QPainter>
@@ -341,7 +343,7 @@ void SampleClipView::paintEvent( QPaintEvent * pe )
 	const int spacing = BORDER_WIDTH + 1;
 	const float ppb = fixedClips() ?
 			( parentWidget()->width() - 2 * BORDER_WIDTH )
-					/ (float) m_clip->length().getBar() :
+					/ static_cast<float>(std::max(1, m_clip->length().getBar())) :
 								pixelsPerBar();
 
 	float nom = Engine::getSong()->getTimeSigModel().getNumerator();

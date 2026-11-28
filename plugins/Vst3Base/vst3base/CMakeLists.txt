@@ -42,3 +42,11 @@ IF(APPLE)
 		TARGET_LINK_LIBRARIES(vst3base "${COREFOUNDATION_FRAMEWORK}")
 	ENDIF()
 ENDIF()
+
+IF(MSVC)
+	# The lmms executable exports ValueBuffer, which pulls the base
+	# std::vector<float> special members into its import library. vst3base
+	# instantiates the same templates itself, which MSVC otherwise reports as
+	# multiply defined symbols (LNK2005). They are identical COMDATs.
+	TARGET_LINK_OPTIONS(vst3base PRIVATE /FORCE:MULTIPLE)
+ENDIF()

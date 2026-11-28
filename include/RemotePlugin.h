@@ -87,13 +87,14 @@ public:
 
 	inline void waitForHostInfoGotten()
 	{
-		m_failed = waitForMessage( IdHostInfoGotten ).id
+		m_failed = waitForMessage( IdHostInfoGotten, false, 15000 ).id
 							!= IdHostInfoGotten;
 	}
 
 	inline void waitForInitDone( bool _busyWaiting = true )
 	{
-		m_failed = waitForMessage( IdInitDone, _busyWaiting ).id != IdInitDone;
+		m_failed = waitForMessage( IdInitDone, _busyWaiting, 15000 ).id
+							!= IdInitDone;
 	}
 
 	bool processMessage( const message & _m ) override;

@@ -117,6 +117,12 @@ void PatternClipView::paintEvent(QPaintEvent*)
 	p.fillRect(rect(), underlayColor());
 
 	const int pixelsPerPattern = Engine::patternStore()->lengthOfPattern(m_patternClip->patternIndex()) * pixelsPerBar();
+	if (pixelsPerPattern <= 0)
+	{
+		// Malformed clip/pattern lengths can overflow this value. Avoid a
+		// modulo by zero and a huge pixmap allocation.
+		return;
+	}
 	int offset = static_cast<int>(m_patternClip->startTimeOffset() * (pixelsPerBar() / TimePos::ticksPerBar()))
 			% pixelsPerPattern;
 	if (offset < 2) {

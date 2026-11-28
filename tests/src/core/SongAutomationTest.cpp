@@ -58,6 +58,18 @@ private slots:
 		auto song = Engine::getSong();
 		QVERIFY(song);
 
+		// Engine::init(true) still starts the dummy audio device, whose thread
+		// renders continuously. This test drives processNextBuffer() itself and
+		// destroys an automated model between two buffers, so keep the device
+		// thread out of the song until the test is done.
+		auto* audioEngine = Engine::audioEngine();
+		audioEngine->requestChangeInModel();
+		struct ModelLockRelease
+		{
+			AudioEngine* engine;
+			~ModelLockRelease() { engine->doneChangeInModel(); }
+		} release{audioEngine};
+
 		auto model = std::make_unique<FloatModel>(0.0f, 0.0f, 1.0f, 0.01f);
 
 		{

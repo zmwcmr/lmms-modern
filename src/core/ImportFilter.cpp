@@ -24,6 +24,8 @@
 
 
 #include <memory>
+#include <QDebug>
+#include <QFileInfo>
 #include <QMessageBox>
 
 #include "ImportFilter.h"
@@ -52,6 +54,14 @@ ImportFilter::ImportFilter( const QString & _file_name,
 void ImportFilter::import( const QString & _file_to_import,
 							TrackContainer* tc )
 {
+	const QFileInfo fileInfo(_file_to_import);
+	if (!fileInfo.exists() || !fileInfo.isFile())
+	{
+		qWarning() << "Refusing to import a non-regular file:"
+			<< _file_to_import;
+		return;
+	}
+
 	bool successful = false;
 
 	QByteArray s = _file_to_import.toUtf8();

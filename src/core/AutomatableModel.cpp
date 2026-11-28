@@ -422,6 +422,13 @@ void AutomatableModel::setStep( const float step )
 
 float AutomatableModel::fittedValue(float value) const
 {
+	// Malformed project files can contain "nan"/"inf" attribute values.
+	// std::clamp does not sanitize them, and a NaN tempo or meter value can
+	// later cause a division by zero or an endless render loop.
+	if (!std::isfinite(value))
+	{
+		value = std::clamp(m_initValue, m_minValue, m_maxValue);
+	}
 	value = std::clamp(value, m_minValue, m_maxValue);
 
 	if (m_step != 0 && m_hasStrictStepSize)

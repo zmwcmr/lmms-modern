@@ -189,8 +189,10 @@ void Vibed::loadSettings(const QDomElement& elem)
 			float* shp = nullptr;
 			base64::decode(elem.attribute("graph" + is), &shp, &size);
 
-			assert(size == 128 * sizeof(float));
-			m_graphModels[i]->setSamples(shp);
+			if( shp != nullptr && size >= 128 * static_cast<int>( sizeof( float ) ) )
+			{
+				m_graphModels[i]->setSamples(shp);
+			}
 			delete[] shp;
 		}
 	}

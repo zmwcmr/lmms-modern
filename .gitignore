@@ -1,4 +1,6 @@
 /build/
+/build-*/
+/build-ui/
 /target/
 .*.sw?
 .DS_Store
@@ -14,6 +16,14 @@ Brewfile.lock.json
 compile_commands.json
 .vscode/
 .vs/
+/tests/stress/artifacts/
+/tests/stress/failures/
+/tests/stress/plugins/inventory.local.json
+/tests/stress/plugins/inventory.generated.json
+/tests/stress/plugins/inventory.results.json
+/tests/stress/plugins/effect-results.json
+/tests/stress/plugins/multi-*.json
+/tests/stress/plugins/fixtures/
 
 # Python bytecode
 __pycache__/

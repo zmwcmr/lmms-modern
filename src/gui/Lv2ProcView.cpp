@@ -32,7 +32,6 @@
 
 #include <QByteArray>
 
-#include <QApplication>
 #include <QComboBox>
 #include <QDebug>
 #include <QDir>
@@ -73,6 +72,7 @@
 #include "Lv2Manager.h"
 #include "Lv2Ports.h"
 #include "Lv2Proc.h"
+#include "Lv2HostClient.h"
 #include "MainWindow.h"
 #include "SubWindow.h"
 
@@ -87,12 +87,14 @@ namespace lmms::gui
 
 namespace
 {
+#ifdef LMMS_HAVE_SUIL
 // UIs occasionally report bogus sizes (0, negative or near UINT_MAX) through
 // ui:resize. Clamp them before they reach the plugin, which may assert.
 int clampUiDimension(int value, int maximum)
 {
 	return std::clamp(value, 1, std::max(maximum, 1));
 }
+#endif
 
 // Temporarily switch the working directory for plugin calls that resolve
 // assets relative to the CWD (Zyn Fusion's qml/ and libzest.so).
@@ -117,7 +119,7 @@ private:
 };
 }
 
-#if defined(LMMS_BUILD_LINUX)
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 namespace
 {
 XErrorHandler g_previousXErrorHandler = nullptr;
@@ -419,21 +421,17 @@ bool Lv2ProcView::hasPluginUi() const
 
 
 
-bool Lv2ProcView::useFloatingWindow() const
-{
-	const QString mode = ConfigManager::inst()->lv2UiEmbedMethod();
-	return mode == "floating"
-		|| QGuiApplication::platformName() != "xcb";
-}
-
-
-
-
 void Lv2ProcView::createUi()
 {
 #ifdef LMMS_HAVE_SUIL
 	if (m_uiInstance || !m_proc || !hasPluginUi())
 	{
+		return;
+	}
+
+	if (m_proc->isRemote())
+	{
+		createRemoteUi();
 		return;
 	}
 
@@ -473,69 +471,45 @@ void Lv2ProcView::createUi()
 #endif
 
 	WId parentId = 0;
-	if (!useFloatingWindow())
-	{
-		m_uiHostWidget = new QWidget;
-		m_uiHostWidget->setAttribute(Qt::WA_NativeWindow);
-		m_uiHostWidget->setAttribute(Qt::WA_OpaquePaintEvent);
-		m_uiHostWidget->setMinimumSize(320, 240);
-		m_uiHostWidget->resize(900, 700);
-
-		m_uiWindow = getGUI()->mainWindow()->addWindowedWidget(m_uiHostWidget);
-		if (!m_uiWindow)
-		{
-			destroyUi();
-			return;
-		}
-		m_uiWindow->setAttribute(Qt::WA_DeleteOnClose, false);
-		m_uiWindow->setWindowTitle(qStringFromPluginNode(m_proc->getPlugin(),
-			lilv_plugin_get_name));
-		m_uiWindow->show();
-		m_uiHostWidget->show();
-		QApplication::processEvents();
-
-		parentId = m_uiHostWidget->winId();
-	}
-	else
-	{
 #if defined(LMMS_BUILD_LINUX)
-		// Create a standalone X11 window (Wayland, or floating mode).
-		Display* dpy = XOpenDisplay(nullptr);
-		if (!dpy)
-		{
-			qWarning() << "Could not open an X11 display for the LV2 UI";
-			return;
-		}
-
-		const int screen = DefaultScreen(dpy);
-		m_x11Window = XCreateSimpleWindow(dpy, RootWindow(dpy, screen),
-			100, 100, 900, 700, 1,
-			BlackPixel(dpy, screen), WhitePixel(dpy, screen));
-		if (!m_x11Window)
-		{
-			qWarning() << "Could not create an X11 window for the LV2 UI";
-			XCloseDisplay(dpy);
-			return;
-		}
-
-		const QByteArray title = qStringFromPluginNode(m_proc->getPlugin(),
-			lilv_plugin_get_name).toUtf8();
-		XStoreName(dpy, m_x11Window, title.constData());
-
-		Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-		m_x11WmDelete = wmDelete;
-		XSetWMProtocols(dpy, m_x11Window, &wmDelete, 1);
-		XSelectInput(dpy, m_x11Window, StructureNotifyMask);
-
-		XMapWindow(dpy, m_x11Window);
-		XFlush(dpy);
-
-		m_x11Display = dpy;
-		parentId = static_cast<WId>(m_x11Window);
-#else
+	// The UI always opens as a standalone X11 window. Embedding it in a Qt
+	// widget was removed: the plugin UIs take `instance-access`, and the
+	// isolated host will run the UI in the plugin process anyway.
+	Display* dpy = XOpenDisplay(nullptr);
+	if (!dpy)
+	{
+		qWarning() << "Could not open an X11 display for the LV2 UI";
 		return;
-#endif
 	}
+
+	const int screen = DefaultScreen(dpy);
+	m_x11Window = XCreateSimpleWindow(dpy, RootWindow(dpy, screen),
+		100, 100, 900, 700, 1,
+		BlackPixel(dpy, screen), WhitePixel(dpy, screen));
+	if (!m_x11Window)
+	{
+		qWarning() << "Could not create an X11 window for the LV2 UI";
+		XCloseDisplay(dpy);
+		return;
+	}
+
+	const QByteArray title = qStringFromPluginNode(m_proc->getPlugin(),
+		lilv_plugin_get_name).toUtf8();
+	XStoreName(dpy, m_x11Window, title.constData());
+
+	Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	m_x11WmDelete = wmDelete;
+	XSetWMProtocols(dpy, m_x11Window, &wmDelete, 1);
+	XSelectInput(dpy, m_x11Window, StructureNotifyMask);
+
+	XMapWindow(dpy, m_x11Window);
+	XFlush(dpy);
+
+	m_x11Display = dpy;
+	parentId = static_cast<WId>(m_x11Window);
+#else
+	return;
+#endif
 
 	if (parentId == 0)
 	{
@@ -587,16 +561,13 @@ void Lv2ProcView::createUi()
 	};
 	m_resizeFeature = LV2_Feature{LV2_UI__resize, &m_resize};
 
-	QWidget* const scaleWidget = m_uiHostWidget
-		? static_cast<QWidget*>(m_uiHostWidget) : m_pluginWidget;
 	// The floating UI is a raw X11 window managed outside Qt's Wayland
 	// surfaces. Qt's device pixel ratio is rounded up (often to 2.0) for
 	// fractional desktops, which would make the plugin render at double size
 	// and push its lower part below the screen. Use 1.0 so the plugin's
 	// natural pixel size matches VST2 editors; the environment override can
 	// still request a different scale.
-	qreal scale = m_uiHostWidget
-		? (scaleWidget ? scaleWidget->devicePixelRatioF() : 1.0) : 1.0;
+	qreal scale = 1.0;
 	if (const QByteArray override = qgetenv("LMMS_LV2_UI_SCALE");
 		!override.isEmpty())
 	{
@@ -665,6 +636,18 @@ void Lv2ProcView::createUi()
 		return;
 	}
 
+	// DrumGizmo and other UIs request their natural size from inside
+	// suil_instance_new(), before m_uiInstance existed. Apply that request now;
+	// otherwise the UI stays at the 1x1 size of its initial X11 window.
+	if (m_pendingUiWidth > 0 && m_pendingUiHeight > 0)
+	{
+		const int width = m_pendingUiWidth;
+		const int height = m_pendingUiHeight;
+		m_pendingUiWidth = 0;
+		m_pendingUiHeight = 0;
+		applyUiResize(width, height);
+	}
+
 	m_uiShow = static_cast<const LV2UI_Show_Interface*>(
 		suil_instance_extension_data(m_uiInstance, LV2_UI__showInterface));
 	if (m_uiShow && m_uiShow->show)
@@ -690,9 +673,68 @@ void Lv2ProcView::createUi()
 
 
 
+void Lv2ProcView::createRemoteUi()
+{
+	auto* client = m_proc ? m_proc->remoteClient() : nullptr;
+	if (client == nullptr)
+	{
+		return;
+	}
+
+	// Same default as the in-process path: the child window uses the plugin's
+	// natural pixel size unless the user overrides it.
+	float scale = 1.0f;
+	if (const QByteArray override = qgetenv("LMMS_LV2_UI_SCALE");
+		!override.isEmpty())
+	{
+		bool ok = false;
+		const double value = override.toDouble(&ok);
+		if (ok && value > 0.0)
+		{
+			scale = static_cast<float>(value);
+		}
+	}
+
+	if (!client->showUi(scale))
+	{
+		qWarning() << "Could not show the remote LV2 UI";
+		return;
+	}
+
+	m_uiVisible = true;
+	if (!m_uiTimer)
+	{
+		m_uiTimer = new QTimer(m_pluginWidget);
+		QObject::connect(m_uiTimer, &QTimer::timeout, m_pluginWidget,
+			[this] { updateUi(); });
+		m_uiTimer->start(100);
+	}
+	updateToggleButton();
+}
+
+
+
+
 void Lv2ProcView::destroyUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (auto* client = m_proc->remoteClient())
+		{
+			client->destroyUi();
+		}
+		if (m_uiTimer)
+		{
+			m_uiTimer->stop();
+			delete m_uiTimer;
+			m_uiTimer = nullptr;
+		}
+		m_uiVisible = false;
+		updateToggleButton();
+		return;
+	}
+
 	CurrentDirGuard cwdGuard(m_uiDataRoot);
 	if (m_proc)
 	{
@@ -706,6 +748,8 @@ void Lv2ProcView::destroyUi()
 	}
 	m_uiShow = nullptr;
 	m_uiResizable = true;
+	m_pendingUiWidth = 0;
+	m_pendingUiHeight = 0;
 	m_lastUiWidth = 0;
 	m_lastUiHeight = 0;
 
@@ -736,18 +780,6 @@ void Lv2ProcView::destroyUi()
 	}
 	m_x11WmDelete = 0;
 #endif
-	if (m_uiWindow)
-	{
-		m_uiWindow->hide();
-		m_uiWindow->deleteLater();
-		m_uiWindow = nullptr;
-		m_uiHostWidget = nullptr;
-	}
-	if (m_uiHostWidget)
-	{
-		delete m_uiHostWidget;
-		m_uiHostWidget = nullptr;
-	}
 	updateToggleButton();
 #endif // LMMS_HAVE_SUIL
 }
@@ -774,16 +806,27 @@ void Lv2ProcView::resizeUiToPlugin()
 			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
 			&& attr.width > 0 && attr.height > 0)
 		{
+			int widgetWidth = attr.width;
+			int widgetHeight = attr.height;
+			// Some UIs are still 1x1 until the host applies the size they
+			// requested from inside suil_instance_new().
+			if ((widgetWidth <= 1 || widgetHeight <= 1)
+				&& m_lastUiWidth > 1 && m_lastUiHeight > 1)
+			{
+				widgetWidth = m_lastUiWidth;
+				widgetHeight = m_lastUiHeight;
+				resizePluginChild(widgetWidth, widgetHeight);
+			}
 			// Keep the outer window on screen even if the plugin asks for a
 			// larger size. Resizable UIs are told to use the clamped size.
 			const int screen = DefaultScreen(dpy);
 			const int maxWidth = std::max(DisplayWidth(dpy, screen) - 80, 320);
 			const int maxHeight = std::max(DisplayHeight(dpy, screen) - 120, 240);
-			const int windowWidth = std::min(attr.width, maxWidth);
-			const int windowHeight = std::min(attr.height, maxHeight);
+			const int windowWidth = std::min(widgetWidth, maxWidth);
+			const int windowHeight = std::min(widgetHeight, maxHeight);
 			XResizeWindow(dpy, m_x11Window, windowWidth, windowHeight);
 			if (m_uiResizable
-				&& (windowWidth != attr.width || windowHeight != attr.height))
+				&& (windowWidth != widgetWidth || windowHeight != widgetHeight))
 			{
 				resizePluginChild(windowWidth, windowHeight);
 			}
@@ -802,43 +845,6 @@ void Lv2ProcView::resizeUiToPlugin()
 		}
 		return;
 	}
-
-	if (m_uiHostWidget)
-	{
-		Display* dpy = XOpenDisplay(nullptr);
-		if (!dpy)
-		{
-			return;
-		}
-
-		XWindowAttributes attr{};
-		const auto widget = reinterpret_cast<uintptr_t>(
-			suil_instance_get_widget(m_uiInstance));
-		if (widget
-			&& XGetWindowAttributes(dpy, static_cast<::Window>(widget), &attr)
-			&& attr.width > 0 && attr.height > 0)
-		{
-			const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-			const int width = std::max(static_cast<int>(std::lround(attr.width / dpr)), 320);
-			const int height = std::max(static_cast<int>(std::lround(attr.height / dpr)), 240);
-			m_lastUiWidth = attr.width;
-			m_lastUiHeight = attr.height;
-			if (m_uiResizable)
-			{
-				m_uiHostWidget->setMinimumSize(width, height);
-				m_uiHostWidget->resize(width, height);
-			}
-			else
-			{
-				m_uiHostWidget->setFixedSize(width, height);
-			}
-			if (m_uiWindow)
-			{
-				m_uiWindow->resize(width, height);
-			}
-		}
-		XCloseDisplay(dpy);
-	}
 #endif // LMMS_BUILD_LINUX
 #endif // LMMS_HAVE_SUIL
 }
@@ -848,14 +854,18 @@ void Lv2ProcView::resizeUiToPlugin()
 
 int Lv2ProcView::resizeUiRequest(int width, int height)
 {
+#ifdef LMMS_HAVE_SUIL
 	if (width <= 0 || height <= 0)
 	{
 		return 1;
 	}
 
-	// Some UIs request a size from inside suil_instance_new().
+	// Some UIs request a size from inside suil_instance_new(). Remember it and
+	// apply it once the instance exists; the initial X11 window is only 1x1.
 	if (!m_uiInstance)
 	{
+		m_pendingUiWidth = width;
+		m_pendingUiHeight = height;
 		return 0;
 	}
 
@@ -876,6 +886,11 @@ int Lv2ProcView::resizeUiRequest(int width, int height)
 
 	applyUiResize(width, height);
 	return 0;
+#else
+	Q_UNUSED(width);
+	Q_UNUSED(height);
+	return 1;
+#endif
 }
 
 
@@ -883,7 +898,7 @@ int Lv2ProcView::resizeUiRequest(int width, int height)
 
 void Lv2ProcView::applyUiResize(int width, int height)
 {
-#if defined(LMMS_BUILD_LINUX)
+#if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	if (m_x11Window && m_x11Display)
 	{
 		Display* dpy = static_cast<Display*>(m_x11Display);
@@ -897,29 +912,10 @@ void Lv2ProcView::applyUiResize(int width, int height)
 		XFlush(dpy);
 		return;
 	}
+#else
+	Q_UNUSED(width);
+	Q_UNUSED(height);
 #endif
-
-	width = clampUiDimension(width, 16384);
-	height = clampUiDimension(height, 16384);
-
-	if (m_uiHostWidget)
-	{
-		m_lastUiWidth = width;
-		m_lastUiHeight = height;
-		if (m_uiResizable)
-		{
-			m_uiHostWidget->setMinimumSize(width, height);
-			m_uiHostWidget->resize(width, height);
-		}
-		else
-		{
-			m_uiHostWidget->setFixedSize(width, height);
-		}
-		if (m_uiWindow)
-		{
-			m_uiWindow->resize(width, height);
-		}
-	}
 }
 
 
@@ -1028,6 +1024,20 @@ void Lv2ProcView::touchPort(uint32_t portIndex, bool grabbed)
 void Lv2ProcView::updateUi()
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (auto* client = m_proc->remoteClient())
+		{
+			client->poll();
+			if (m_uiVisible && !client->isUiOpen())
+			{
+				m_uiVisible = false;
+			}
+		}
+		updateToggleButton();
+		return;
+	}
+
 	if (!m_uiInstance || !m_proc)
 	{
 		return;
@@ -1036,18 +1046,6 @@ void Lv2ProcView::updateUi()
 	CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 #if defined(LMMS_BUILD_LINUX)
-	if (m_uiHostWidget && m_uiResizable)
-	{
-		const qreal dpr = m_uiHostWidget->devicePixelRatioF();
-		const int width = clampUiDimension(
-			static_cast<int>(std::lround(m_uiHostWidget->width() * dpr)), 16384);
-		const int height = clampUiDimension(
-			static_cast<int>(std::lround(m_uiHostWidget->height() * dpr)), 16384);
-		if (width != m_lastUiWidth || height != m_lastUiHeight)
-		{
-			resizePluginChild(width, height);
-		}
-	}
 	processX11Events();
 #endif
 
@@ -1147,6 +1145,28 @@ void Lv2ProcView::toggleUI()
 void Lv2ProcView::setUiVisible(bool visible)
 {
 #ifdef LMMS_HAVE_SUIL
+	if (m_proc && m_proc->isRemote())
+	{
+		if (m_uiVisible == visible)
+		{
+			return;
+		}
+		if (auto* client = m_proc->remoteClient())
+		{
+			if (visible)
+			{
+				client->showUi(1.0f);
+			}
+			else
+			{
+				client->hideUi();
+			}
+		}
+		m_uiVisible = visible;
+		updateToggleButton();
+		return;
+	}
+
 	if (!m_uiInstance || m_uiVisible == visible)
 	{
 		return;
@@ -1185,11 +1205,6 @@ void Lv2ProcView::setUiVisible(bool visible)
 	}
 #endif
 
-	if (m_uiWindow)
-	{
-		if (visible) { m_uiWindow->show(); }
-		else { m_uiWindow->hide(); }
-	}
 	updateToggleButton();
 #endif // LMMS_HAVE_SUIL
 }
@@ -1234,7 +1249,11 @@ void Lv2ProcView::modelChanged(Lv2Proc *proc)
 	if (m_toggleUIButton)
 	{
 		QSignalBlocker blocker(m_toggleUIButton);
+#ifdef LMMS_HAVE_SUIL
 		m_toggleUIButton->setChecked(m_uiInstance != nullptr);
+#else
+		m_toggleUIButton->setChecked(m_uiVisible);
+#endif
 	}
 
 	ModelGroupView::modelChanged(proc);

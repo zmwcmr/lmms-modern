@@ -200,8 +200,12 @@ MainWindow::MainWindow() :
 	}
 
 	m_workspace->setOption( QMdiArea::DontMaximizeSubWindowOnActivation );
-	m_workspace->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	m_workspace->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	// Plugin UIs can be larger than the workspace. Keep the scroll bars
+	// available so every part of such a window remains reachable; the
+	// scroll bars only appear when a subwindow actually extends past the
+	// viewport.
+	m_workspace->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	m_workspace->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	auto workspacePanel = new SideBarWorkspace(splitter, m_workspace);
 	splitter->setWorkspace(workspacePanel);
 

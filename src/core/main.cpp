@@ -117,6 +117,23 @@ void sigfpeHandler(int signum)
 // started from a debugger.
 static volatile std::sig_atomic_t inCrashHandler = 0;
 
+// write() is marked warn_unused_result in newer glibc versions and may write
+// fewer bytes than requested; keep the crash handler's output reliable without
+// tripping -Werror=unused-result.
+static void writeToStderr( const char * text, size_t length )
+{
+	while( length > 0 )
+	{
+		const ssize_t written = write( STDERR_FILENO, text, length );
+		if( written <= 0 )
+		{
+			return;
+		}
+		text += written;
+		length -= static_cast<size_t>( written );
+	}
+}
+
 static const char * signalName( int sig )
 {
 	switch( sig )
@@ -149,7 +166,7 @@ static void crashHandler( int sig )
 		const size_t n = static_cast<size_t>( headerLength ) < sizeof( header )
 			? static_cast<size_t>( headerLength )
 			: sizeof( header ) - 1;
-		write( STDERR_FILENO, header, n );
+		writeToStderr( header, n );
 	}
 
 	void * frames[64];
@@ -159,8 +176,8 @@ static void crashHandler( int sig )
 	static const char tip[] =
 		"*** tip: resolve <lmms>(+0x...) frames with: "
 		"addr2line -f -C -e <lmms-binary> 0x<offset>\n";
-	write( STDERR_FILENO, tip, sizeof( tip ) - 1 );
-	write( STDERR_FILENO, "*** end of backtrace\n", 22 );
+	writeToStderr( tip, sizeof( tip ) - 1 );
+	writeToStderr( "*** end of backtrace\n", sizeof( "*** end of backtrace\n" ) - 1 );
 
 	// Restore the default handler and re-raise so the exit status and core
 	// dump behaviour stay the same as without the handler.
@@ -794,6 +811,7 @@ int main( int argc, char * * argv )
 #endif
 
 	bool destroyEngine = false;
+	RenderManager* renderManager = nullptr;
 
 	// if we have an output file for rendering, just render the song
 	// without starting the GUI
@@ -822,13 +840,13 @@ int main( int argc, char * * argv )
 		}
 
 		// create renderer
-		auto r = new RenderManager(os, eff, renderOut);
-		QCoreApplication::instance()->connect( r,
+		renderManager = new RenderManager(os, eff, renderOut);
+		QCoreApplication::instance()->connect( renderManager,
 				SIGNAL(finished()), SLOT(quit()));
 
 		// timer for progress-updates
-		auto t = new QTimer(r);
-		r->connect( t, SIGNAL(timeout()),
+		auto t = new QTimer(renderManager);
+		renderManager->connect( t, SIGNAL(timeout()),
 				SLOT(updateConsoleProgress()));
 		t->start( 200 );
 
@@ -840,11 +858,11 @@ int main( int argc, char * * argv )
 		// start now!
 		if ( renderTracks )
 		{
-			r->renderTracks();
+			renderManager->renderTracks();
 		}
 		else
 		{
-			r->renderProject();
+			renderManager->renderProject();
 		}
 	}
 	else // otherwise, start the GUI
@@ -1038,6 +1056,11 @@ int main( int argc, char * * argv )
 	}
 
 	const int ret = app->exec();
+
+	// Destroy the renderer before the application object and the engine:
+	// restoring the original audio device emits sampleRateChanged and some
+	// plugin slots need a live QCoreApplication while doing so.
+	delete renderManager;
 	delete app;
 
 	if( destroyEngine )

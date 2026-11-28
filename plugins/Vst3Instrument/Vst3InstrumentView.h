@@ -29,6 +29,8 @@
 
 #include "InstrumentView.h"
 
+class QPushButton;
+
 namespace lmms
 {
 
@@ -38,17 +40,22 @@ class Vst3EditorWindow;
 namespace gui
 {
 
-class Vst3InstrumentView : public InstrumentViewFixedSize
+class Vst3InstrumentView : public InstrumentView
 {
 	Q_OBJECT
 public:
 	Vst3InstrumentView(Instrument* instrument, QWidget* parent);
 	~Vst3InstrumentView() override = default;
 
+	QSize sizeHint() const override;
+	QSize minimumSizeHint() const override;
+
 private:
 	void modelChanged() override;
+	bool isResizable() const override { return true; }
 
 	QPointer<Vst3EditorWindow> m_editorWindow;
+	QPushButton* m_guiButton = nullptr;
 };
 
 } // namespace gui

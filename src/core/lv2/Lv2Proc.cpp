@@ -24,6 +24,9 @@
 
 #include "Lv2Proc.h"
 
+#include "Lv2HostClient.h"
+#include <limits>
+
 #ifdef LMMS_HAVE_LV2
 
 #include <algorithm>
@@ -66,6 +69,19 @@
 
 namespace lmms
 {
+
+namespace
+{
+bool lv2RemoteMode()
+{
+	if (qEnvironmentVariableIsSet("LMMS_LV2_INPROCESS"))
+	{
+		return false;
+	}
+	const QByteArray value = qgetenv("LMMS_LV2_REMOTE");
+	return !value.isEmpty() && value != "0";
+}
+} // namespace
 
 
 
@@ -389,7 +405,26 @@ void Lv2Proc::scanPresets()
 
 bool Lv2Proc::loadPreset(std::size_t index)
 {
-	if (!m_instance || index >= m_presets.size())
+	if (index >= m_presets.size())
+	{
+		return false;
+	}
+
+	if (m_remote)
+	{
+		bool restored = false;
+		{
+			std::lock_guard<std::mutex> lock(m_stateMutex);
+			restored = m_remote->loadPreset(m_presets[index].uri);
+		}
+		if (restored)
+		{
+			applyRemoteControlValues();
+		}
+		return restored;
+	}
+
+	if (!m_instance)
 	{
 		return false;
 	}
@@ -538,6 +573,12 @@ void Lv2Proc::copyModelsFromCore()
 		{
 			port->accept(copy);
 		}
+	}
+
+	if (m_remote)
+	{
+		copyModelsToRemote();
+		return;
 	}
 
 	// send pending MIDI events to atom port
@@ -837,8 +878,80 @@ char* duplicateCString(const QByteArray& str)
 
 
 
+/** Write the files stored in an lv2state element into @a directory.
+ *  Returns true when state.ttl was written, which is what lilv needs.
+ */
+bool writeStateFilesFromXml(const QDomElement& stateElem, const QString& directory)
+{
+	for (QDomElement fileElem = stateElem.firstChildElement("file");
+		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
+	{
+		const QString name = fileElem.attribute("name");
+		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
+		{
+			qWarning() << "Ignoring invalid LV2 state file name" << name;
+			continue;
+		}
+
+		const QString path = QDir(directory).filePath(name);
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		QFile file(path);
+		if (!file.open(QIODevice::WriteOnly))
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return false;
+		}
+		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
+		{
+			qWarning() << "Could not write LV2 state file" << path;
+			return false;
+		}
+	}
+	return QFileInfo::exists(QDir(directory).filePath("state.ttl"));
+}
+
+/** Append all files from @a directory (except manifest.ttl) to @a stateElem. */
+void appendStateFilesToXml(QDomDocument& doc, QDomElement& stateElem,
+	const QString& directory)
+{
+	const QDir dir(directory);
+	QDirIterator it(directory, QDir::Files | QDir::NoDotAndDotDot,
+		QDirIterator::Subdirectories);
+	while (it.hasNext())
+	{
+		const QString path = it.next();
+		const QString rel = dir.relativeFilePath(path);
+		if (rel == "manifest.ttl")
+		{
+			continue;
+		}
+
+		QFile file(path);
+		if (!file.open(QIODevice::ReadOnly))
+		{
+			qWarning() << "Could not read LV2 state file" << path;
+			continue;
+		}
+
+		QDomElement fileElem = doc.createElement("file");
+		fileElem.setAttribute("name", rel);
+		fileElem.appendChild(doc.createTextNode(
+			QString::fromLatin1(file.readAll().toBase64())));
+		stateElem.appendChild(fileElem);
+	}
+}
+
+
+
+
 void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 {
+	if (m_remote)
+	{
+		saveStateRemote(doc, that);
+		return;
+	}
+
 	if (!m_instance || !m_plugin || !m_stateDir)
 	{
 		return;
@@ -889,36 +1002,52 @@ void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 
 	QDomElement stateElem = doc.createElement("lv2state");
 	stateElem.setAttribute("version", 1);
+	appendStateFilesToXml(doc, stateElem, saveDir.path());
 
-	const QDir dir(saveDir.path());
-	QDirIterator it(saveDir.path(), QDir::Files | QDir::NoDotAndDotDot,
-		QDirIterator::Subdirectories);
-	bool anyFile = false;
-	while (it.hasNext())
+	if (stateElem.hasChildNodes())
 	{
-		const QString path = it.next();
-		const QString rel = dir.relativeFilePath(path);
-		if (rel == "manifest.ttl")
-		{
-			continue;
-		}
+		that.appendChild(stateElem);
+	}
+}
 
-		QFile file(path);
-		if (!file.open(QIODevice::ReadOnly))
-		{
-			qWarning() << "Could not read LV2 state file" << path;
-			continue;
-		}
 
-		QDomElement fileElem = doc.createElement("file");
-		fileElem.setAttribute("name", rel);
-		fileElem.appendChild(doc.createTextNode(
-			QString::fromLatin1(file.readAll().toBase64())));
-		stateElem.appendChild(fileElem);
-		anyFile = true;
+
+
+void Lv2Proc::saveStateRemote(QDomDocument& doc, QDomElement& that)
+{
+	if (!m_plugin || !m_remote)
+	{
+		return;
 	}
 
-	if (anyFile)
+	Lv2Manager* mgr = Engine::getLv2Manager();
+	AutoLilvNode stateIface = mgr->uri(LV2_STATE__interface);
+	if (!lilv_plugin_has_extension_data(m_plugin, stateIface.get()))
+	{
+		return;
+	}
+
+	QTemporaryDir saveDir(QDir::tempPath() + "/lmms-lv2save-XXXXXX");
+	if (!saveDir.isValid())
+	{
+		qWarning() << "Could not create temporary LV2 save directory";
+		return;
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		if (!m_remote->saveState(saveDir.path()))
+		{
+			qWarning() << "Could not save the remote LV2 state for"
+				<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+			return;
+		}
+	}
+
+	QDomElement stateElem = doc.createElement("lv2state");
+	stateElem.setAttribute("version", 1);
+	appendStateFilesToXml(doc, stateElem, saveDir.path());
+	if (stateElem.hasChildNodes())
 	{
 		that.appendChild(stateElem);
 	}
@@ -929,6 +1058,12 @@ void Lv2Proc::saveState(QDomDocument& doc, QDomElement& that)
 
 void Lv2Proc::loadState(const QDomElement& that)
 {
+	if (m_remote)
+	{
+		loadStateRemote(that);
+		return;
+	}
+
 	const QDomElement stateElem = that.firstChildElement("lv2state");
 	if (stateElem.isNull() || !m_instance || !m_plugin)
 	{
@@ -949,37 +1084,13 @@ void Lv2Proc::loadState(const QDomElement& that)
 		return;
 	}
 
-	for (QDomElement fileElem = stateElem.firstChildElement("file");
-		!fileElem.isNull(); fileElem = fileElem.nextSiblingElement("file"))
-	{
-		const QString name = fileElem.attribute("name");
-		if (name.isEmpty() || QDir::isAbsolutePath(name) || name.contains(".."))
-		{
-			qWarning() << "Ignoring invalid LV2 state file name" << name;
-			continue;
-		}
-
-		const QString path = QDir(stateDir->path()).filePath(name);
-		QDir().mkpath(QFileInfo(path).absolutePath());
-		QFile file(path);
-		if (!file.open(QIODevice::WriteOnly))
-		{
-			qWarning() << "Could not write LV2 state file" << path;
-			return;
-		}
-		if (file.write(QByteArray::fromBase64(fileElem.text().toLatin1())) < 0)
-		{
-			qWarning() << "Could not write LV2 state file" << path;
-			return;
-		}
-	}
-
-	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
-	if (!QFileInfo::exists(statePath))
+	if (!writeStateFilesFromXml(stateElem, stateDir->path()))
 	{
 		qWarning() << "LV2 state has no state.ttl";
 		return;
 	}
+
+	const QString statePath = QDir(stateDir->path()).filePath("state.ttl");
 
 	Lv2Manager* mgr = Engine::getLv2Manager();
 	LilvState* state = lilv_state_new_from_file(
@@ -1005,6 +1116,75 @@ void Lv2Proc::loadState(const QDomElement& that)
 	lilv_state_free(state);
 
 	copyModelsFromCore();
+}
+
+
+
+
+void Lv2Proc::loadStateRemote(const QDomElement& that)
+{
+	const QDomElement stateElem = that.firstChildElement("lv2state");
+	if (stateElem.isNull() || !m_remote || !m_plugin)
+	{
+		return;
+	}
+
+	const int version = stateElem.attribute("version", "0").toInt();
+	if (version != 1)
+	{
+		qWarning() << "Unsupported LV2 state version" << version;
+		return;
+	}
+
+	auto stateDir = std::make_unique<QTemporaryDir>(QDir::tempPath() + "/lmms-lv2state-XXXXXX");
+	if (!stateDir->isValid())
+	{
+		qWarning() << "Could not create temporary LV2 state directory";
+		return;
+	}
+	if (!writeStateFilesFromXml(stateElem, stateDir->path()))
+	{
+		qWarning() << "LV2 state has no state.ttl";
+		return;
+	}
+
+	bool restored = false;
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		restored = m_remote->restoreState(stateDir->path());
+	}
+	if (!restored)
+	{
+		qWarning() << "Could not restore the remote LV2 state for"
+			<< qStringFromPluginNode(m_plugin, lilv_plugin_get_name);
+		return;
+	}
+
+	m_stateDir = std::move(stateDir);
+	applyRemoteControlValues();
+}
+
+
+
+
+void Lv2Proc::applyRemoteControlValues()
+{
+	if (!m_remote)
+	{
+		return;
+	}
+	const auto& values = m_remote->controlValues();
+	for (std::size_t i = 0; i < values.size() && i < m_ports.size(); ++i)
+	{
+		auto* control = dcast<Lv2Ports::Control>(m_ports[i].get());
+		if (control != nullptr && control->m_flow == Lv2Ports::Flow::Input)
+		{
+			setControlFromUi(static_cast<uint32_t>(i), values[i]);
+		}
+	}
+	// Push the model values again on the next block.
+	m_lastRemoteControl.assign(m_ports.size(),
+		std::numeric_limits<float>::quiet_NaN());
 }
 
 
@@ -1081,6 +1261,12 @@ void Lv2Proc::run(f_cnt_t frames)
 {
 	// State save/restore must not run concurrently with the plugin instance
 	std::lock_guard<std::mutex> lock(m_stateMutex);
+
+	if (m_remote)
+	{
+		runRemote(frames);
+		return;
+	}
 
 	if (m_worker)
 	{
@@ -1236,6 +1422,12 @@ AutomatableModel *Lv2Proc::modelAtPort(const QString &uri)
 
 void Lv2Proc::initPlugin()
 {
+	if (lv2RemoteMode())
+	{
+		startRemote();
+		return;
+	}
+
 	m_features.initCommon();
 	initPluginSpecificFeatures();
 	m_features.createFeatureVectors();
@@ -1288,11 +1480,117 @@ void Lv2Proc::initPlugin()
 
 
 
+void Lv2Proc::startRemote()
+{
+	m_remote = std::make_unique<Lv2HostClient>();
+	const QString uri = QString::fromUtf8(pluginUri());
+	const auto sampleRate = Engine::audioEngine()->outputSampleRate();
+	const f_cnt_t frames = Engine::audioEngine()->framesPerPeriod();
+	if (!m_remote->start(QString(), uri, sampleRate, frames))
+	{
+		qCritical() << "Could not start the isolated LV2 host for" << uri
+			<< ":" << m_remote->errorString();
+		m_remote.reset();
+		throw std::runtime_error("Failed to create remote Lv2 processor");
+	}
+	if (m_remote->ports().size() != m_ports.size())
+	{
+		qWarning() << "Isolated LV2 host reported"
+			<< static_cast<int>(m_remote->ports().size())
+			<< "ports, LMMS built" << static_cast<int>(m_ports.size());
+	}
+	m_lastRemoteControl.assign(m_ports.size(),
+		std::numeric_limits<float>::quiet_NaN());
+}
+
+
+
+
+void Lv2Proc::runRemote(f_cnt_t frames)
+{
+	const float* input[2] = { nullptr, nullptr };
+	float* output[2] = { nullptr, nullptr };
+	if (inPorts().m_left) { input[0] = inPorts().m_left->data(); }
+	if (inPorts().m_right) { input[1] = inPorts().m_right->data(); }
+	if (outPorts().m_left) { output[0] = outPorts().m_left->data(); }
+	if (outPorts().m_right) { output[1] = outPorts().m_right->data(); }
+
+	m_remote->processBlock(input, output, frames);
+	m_latency.store(m_remote->latency(), std::memory_order_relaxed);
+
+	m_midiOutEvents.clear();
+	for (const auto& event : m_remote->midiOutput())
+	{
+		if (event.data.empty() || event.data.size() > 3)
+		{
+			continue;
+		}
+		MidiOutEvent outEvent;
+		outEvent.offset = event.frame;
+		outEvent.size = static_cast<uint8_t>(event.data.size());
+		std::memcpy(outEvent.data.data(), event.data.data(), event.data.size());
+		m_midiOutEvents.push_back(outEvent);
+	}
+}
+
+
+
+
+void Lv2Proc::copyModelsToRemote()
+{
+	std::vector<lv2host::MidiEventData> events;
+	if (m_midiIn)
+	{
+		while (m_midiInputReader.read_space() > 0)
+		{
+			const MidiInputEvent ev = m_midiInputReader.read(1)[0];
+			const uint32_t stamp =
+				ev.time.frames(Engine::framesPerTick()) + ev.offset;
+			std::array<uint8_t, 4> buffer{};
+			const std::size_t size = writeToByteSeq(ev.ev, buffer.data(), buffer.size());
+			if (size > 0)
+			{
+				events.push_back(lv2host::MidiEventData{
+					stamp,
+					std::vector<uint8_t>(buffer.data(), buffer.data() + size)});
+			}
+		}
+	}
+	m_remote->setMidiEvents(std::move(events));
+
+	for (std::size_t i = 0; i < m_ports.size(); ++i)
+	{
+		auto* control = dcast<Lv2Ports::Control>(m_ports[i].get());
+		if (control == nullptr || control->m_flow != Lv2Ports::Flow::Input)
+		{
+			continue;
+		}
+		const float value = control->m_val;
+		if (std::isnan(m_lastRemoteControl[i]) || m_lastRemoteControl[i] != value)
+		{
+			m_remote->setControlValue(static_cast<int>(i), value);
+			m_lastRemoteControl[i] = value;
+		}
+	}
+}
+
+
+
+
 void Lv2Proc::shutdownPlugin()
 {
-	lilv_instance_deactivate(m_instance);
-	lilv_instance_free(m_instance);
-	m_instance = nullptr;
+	if (m_remote)
+	{
+		m_remote->stop();
+		m_remote.reset();
+	}
+
+	if (m_instance)
+	{
+		lilv_instance_deactivate(m_instance);
+		lilv_instance_free(m_instance);
+		m_instance = nullptr;
+	}
 
 	m_features.clear();
 	m_options.clear();

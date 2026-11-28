@@ -96,7 +96,10 @@ public:
 
 	operator int() const { return m_ticks; }
 
-	tick_t ticksPerBeat(const TimeSig& sig) const { return ticksPerBar(sig) / sig.numerator(); }
+	tick_t ticksPerBeat(const TimeSig& sig) const
+	{
+		return ticksPerBar(sig) / std::max(1, sig.numerator());
+	}
 
 	// Remainder ticks after bar is removed
 	tick_t getTickWithinBar(const TimeSig& sig) const { return m_ticks % ticksPerBar(sig); }
@@ -125,10 +128,18 @@ public:
 	}
 
 	static tick_t ticksPerBar() { return s_ticksPerBar; }
-	static tick_t ticksPerBar(const TimeSig& sig) { return DefaultTicksPerBar * sig.numerator() / sig.denominator(); }
+	static tick_t ticksPerBar(const TimeSig& sig)
+	{
+		// Meter models are normally clamped, but a malformed project can
+		// contain NaN/overflowed integers. Never return zero here: callers
+		// divide by this value.
+		const int numerator = std::clamp(sig.numerator(), 1, 32);
+		const int denominator = std::clamp(sig.denominator(), 1, 32);
+		return DefaultTicksPerBar * numerator / denominator;
+	}
 
 	static int stepsPerBar() { return std::max(1, ticksPerBar() / DefaultBeatsPerBar); }
-	static void setTicksPerBar(tick_t ticks) { s_ticksPerBar = ticks; }
+	static void setTicksPerBar(tick_t ticks) { s_ticksPerBar = std::max<tick_t>(1, ticks); }
 	static TimePos stepPosition(int step) { return step * ticksPerBar() / stepsPerBar(); }
 
 	static double ticksToMilliseconds(tick_t ticks, bpm_t beatsPerMinute)

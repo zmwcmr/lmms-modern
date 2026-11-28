@@ -100,7 +100,8 @@ void MidiClip::resizeToFirstTrack()
 				const auto currentClipIt = std::ranges::find(instrumentTrackClips, this);
 				unsigned int currentClip = currentClipIt != instrumentTrackClips.end() ?
 					std::distance(instrumentTrackClips.begin(), currentClipIt) : -1;
-				m_steps = static_cast<MidiClip*>(track->getClip(currentClip))->m_steps;
+				m_steps = std::min(1024,
+					static_cast<MidiClip*>(track->getClip(currentClip))->m_steps);
 			}
 			break;
 		}
@@ -135,8 +136,9 @@ void MidiClip::updateLength()
 			// Keep the step count in sync with note-driven lengths. Older
 			// projects only store the steps, so without this a melody clip
 			// longer than a bar would be truncated to one bar on load (#8575).
-			m_steps = std::max(m_steps, static_cast<int>(length.getTicks()
-				* TimePos::stepsPerBar() / TimePos::ticksPerBar()));
+			m_steps = std::min(1024, std::max(m_steps,
+				static_cast<int>(length.getTicks()
+					* TimePos::stepsPerBar() / TimePos::ticksPerBar())));
 			changeLength(length);
 			updatePatternTrack();
 			return;
@@ -510,10 +512,17 @@ void MidiClip::loadSettings( const QDomElement & _this )
 		node = node.nextSibling();
         }
 
+	constexpr int maxStepsPerPattern = 1024;
 	m_steps = _this.attribute( "steps" ).toInt();
-	if( m_steps == 0 )
+	if( m_steps <= 0 )
 	{
 		m_steps = TimePos::stepsPerBar();
+	}
+	else
+	{
+		// A malformed project can claim billions of steps, which would make
+		// the pattern editor draw billions of step buttons.
+		m_steps = std::min(m_steps, maxStepsPerPattern);
 	}
 
 	checkType();
@@ -675,8 +684,8 @@ void MidiClip::changeTimeSignature()
 		}
 	}
 	last_pos = last_pos.nextFullBar() * TimePos::ticksPerBar();
-	m_steps = std::max<tick_t>(TimePos::stepsPerBar(),
-				last_pos.getBar() * TimePos::stepsPerBar());
+	m_steps = std::min(1024, std::max<int>(TimePos::stepsPerBar(),
+				last_pos.getBar() * TimePos::stepsPerBar()));
 	updateLength();
 }
 

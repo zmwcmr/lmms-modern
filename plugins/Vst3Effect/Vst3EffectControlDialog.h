@@ -29,6 +29,8 @@
 
 #include "EffectControlDialog.h"
 
+class QPushButton;
+
 namespace lmms
 {
 
@@ -47,6 +49,7 @@ public:
 
 private:
 	QPointer<Vst3EditorWindow> m_editorWindow;
+	QPushButton* m_guiButton = nullptr;
 };
 
 } // namespace gui

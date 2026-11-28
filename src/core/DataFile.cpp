@@ -27,7 +27,9 @@
 #include "DataFile.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstring>
 #include <map>
 
 #include <QDebug>
@@ -37,6 +39,7 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QtEndian>
 
 #include "base64.h"
 #include "ConfigManager.h"
@@ -102,6 +105,119 @@ const std::vector<ProjectVersion> DataFile::UPGRADE_VERSIONS = {
 
 namespace
 {
+	// QDomDocument's XML reader recurses once per element. A deeply nested
+	// (possibly malicious) project can overflow the stack before the parser
+	// reports an error, so reject excessive nesting up front.
+	bool xmlDepthExceeds(const QByteArray& data, int maxDepth)
+	{
+		const char* p = data.constData();
+		const int n = data.size();
+		int depth = 0;
+		int i = 0;
+		while (i < n)
+		{
+			if (p[i] != '<')
+			{
+				++i;
+				continue;
+			}
+			if (i + 4 <= n && std::memcmp(p + i, "<!--", 4) == 0)
+			{
+				i += 4;
+				while (i + 2 < n && !(p[i] == '-' && p[i + 1] == '-' && p[i + 2] == '>'))
+				{
+					++i;
+				}
+				i += 3;
+				continue;
+			}
+			if (i + 9 <= n && std::memcmp(p + i, "<![CDATA[", 9) == 0)
+			{
+				i += 9;
+				while (i + 2 < n && !(p[i] == ']' && p[i + 1] == ']' && p[i + 2] == '>'))
+				{
+					++i;
+				}
+				i += 3;
+				continue;
+			}
+			if (i + 2 <= n && p[i + 1] == '?')
+			{
+				i += 2;
+				while (i + 1 < n && !(p[i] == '?' && p[i + 1] == '>'))
+				{
+					++i;
+				}
+				i += 2;
+				continue;
+			}
+			if (i + 2 <= n && p[i + 1] == '!')
+			{
+				// DOCTYPE / markup declaration: skip to the next '>' outside
+				// quotes. Element depth is unaffected.
+				i += 2;
+				char quote = 0;
+				while (i < n)
+				{
+					const char c = p[i];
+					if (quote != 0)
+					{
+						if (c == quote) { quote = 0; }
+					}
+					else if (c == '"' || c == '\'')
+					{
+						quote = c;
+					}
+					else if (c == '>')
+					{
+						++i;
+						break;
+					}
+					++i;
+				}
+				continue;
+			}
+
+			const bool closing = (i + 1 < n && p[i + 1] == '/');
+			int j = i + 1;
+			char quote = 0;
+			while (j < n)
+			{
+				const char c = p[j];
+				if (quote != 0)
+				{
+					if (c == quote) { quote = 0; }
+				}
+				else if (c == '"' || c == '\'')
+				{
+					quote = c;
+				}
+				else if (c == '>')
+				{
+					break;
+				}
+				++j;
+			}
+			if (j >= n) { break; }
+
+			int k = j - 1;
+			while (k > i && std::isspace(static_cast<unsigned char>(p[k]))) { --k; }
+			const bool selfClosing = (p[k] == '/');
+
+			if (closing)
+			{
+				if (depth > 0) { --depth; }
+			}
+			else if (!selfClosing)
+			{
+				++depth;
+				if (depth > maxDepth) { return true; }
+			}
+			i = j + 1;
+		}
+		return false;
+	}
+
 	struct TypeDescStruct
 	{
 		DataFile::Type m_type;
@@ -161,6 +277,13 @@ DataFile::DataFile( const QString & _fileName ) :
 	m_type( Type::Unknown ),
 	m_fileVersion( UPGRADE_METHODS.size() )
 {
+	const QFileInfo fileInfo(_fileName);
+	if (!fileInfo.exists() || !fileInfo.isFile())
+	{
+		qWarning() << "Project is not a regular file:" << _fileName;
+		return;
+	}
+
 	QFile inFile( _fileName );
 	if( !inFile.open( QIODevice::ReadOnly ) )
 	{
@@ -2103,14 +2226,41 @@ void DataFile::upgrade()
 
 void DataFile::loadData( const QByteArray & _data, const QString & _sourceFile )
 {
+	constexpr int maxXmlDepth = 1000;
+	if (xmlDepthExceeds(_data, maxXmlDepth))
+	{
+		qWarning() << "Refusing to load excessively nested XML from" << _sourceFile;
+		return;
+	}
+
 	QString errorMsg;
 	int line = -1, col = -1;
 	if (!lmms::setContent(*this, _data, &errorMsg, &line, &col))
 	{
 		// parsing failed? then try to uncompress data
+		if (_data.size() >= 4)
+		{
+			// qCompress stores the uncompressed size in the first four
+			// bytes. Refuse decompression bombs before qUncompress has a
+			// chance to allocate the requested amount.
+			constexpr quint32 maxUncompressedSize = 512u * 1024u * 1024u;
+			const auto expectedSize = qFromBigEndian<quint32>(_data.constData());
+			if (expectedSize > maxUncompressedSize)
+			{
+				qWarning() << "Refusing to decompress project larger than"
+					<< maxUncompressedSize << "bytes:" << _sourceFile;
+				return;
+			}
+		}
 		QByteArray uncompressed = qUncompress( _data );
 		if( !uncompressed.isEmpty() )
 		{
+			if (xmlDepthExceeds(uncompressed, maxXmlDepth))
+			{
+				qWarning() << "Refusing to load excessively nested XML from"
+					<< _sourceFile;
+				return;
+			}
 			if (lmms::setContent(*this, uncompressed, &errorMsg, &line, &col))
 			{
 				line = col = -1;

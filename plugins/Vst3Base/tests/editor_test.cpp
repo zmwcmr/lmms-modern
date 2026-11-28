@@ -85,7 +85,9 @@ int main(int argc, char* argv[])
 	QTimer::singleShot(seconds * 1000, &application, &QApplication::quit);
 	application.exec();
 
-	QTextStream(stdout) << "editor-open=" << host->isEditorOpen()
+	QTextStream(stdout) << "gui-supported="
+		<< lmms::Vst3EditorWindow::isSupported(host.get()) << ' '
+		<< "editor-open=" << host->isEditorOpen()
 		<< " size=" << window.width() << 'x' << window.height() << '\n';
 	return 0;
 }

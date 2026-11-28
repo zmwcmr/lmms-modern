@@ -153,6 +153,9 @@ bool Vst3RemoteEditorClient::start(const QString& title, QString* error)
 			}
 		});
 
+	auto environment = QProcessEnvironment::systemEnvironment();
+	environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("xcb"));
+	m_process->setProcessEnvironment(environment);
 	m_process->setProgram(executable);
 	m_process->setArguments({
 		serverName,

@@ -206,6 +206,10 @@ struct Audio : public VisitablePort<Audio, PortBase>
 	bool mustBeUsed() const { return !isSideChain() && !isOptional(); }
 	std::size_t bufferSize() const { return m_buffer.size(); }
 
+	//! Processing buffer, used by the isolated host to access the audio planes
+	const float* data() const { return m_buffer.data(); }
+	float* data() { return m_buffer.data(); }
+
 private:
 	std::vector<float> m_buffer; //!< The buffer where Lv2 reads/writes the data from/to
 	bool m_sidechain;
