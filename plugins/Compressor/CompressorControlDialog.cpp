@@ -33,6 +33,7 @@
 
 #include "AutomatableButton.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "../Eq/EqFader.h"
 #include "GuiApplication.h"
 #include "Knob.h"
@@ -151,7 +152,7 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	m_tiltKnob = new Knob(KnobType::Styled, this);
 	makeSmallKnob(m_tiltKnob, tr("Tilt Gain:") , " dB");
 	m_tiltKnob->setModel(&controls->m_tiltModel);
-	m_tiltKnob->setToolTip(tr("Bias the sidechain signal to the low or high frequencies.  -6 db is lowpass, 6 db is highpass."));
+	m_tiltKnob->setToolTip(tr("Bias the sidechain signal to the low or high frequencies.  -6 dB is lowpass, 6 dB is highpass."));
 
 	m_tiltFreqKnob = new Knob(KnobType::Styled, this);
 	makeSmallKnob(m_tiltFreqKnob, tr("Tilt Frequency:") , " Hz");
@@ -672,7 +673,7 @@ void CompressorControlDialog::drawGraph()
 	m_p.setPen(QPen(m_textColor, 1));
 
 	// Arbitrary formula for increasing font size when window size increases
-	m_p.setFont(QFont("Arial", qMax(int(m_windowSizeY / 1080.f * 24), 12)));
+	m_p.setFont(auxiliaryFont(m_p.font()));
 
 	// Redraw graph
 	m_p.setPen(QPen(m_graphColor, 1));

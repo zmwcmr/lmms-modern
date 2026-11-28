@@ -1,7 +1,9 @@
 #include <QApplication>
+#include <QCheckBox>
 #include <QFile>
 #include <QLineEdit>
 #include <QProxyStyle>
+#include <QPixmapCache>
 #include <QTemporaryDir>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
@@ -10,6 +12,9 @@
 #include "ConfigManager.h"
 #include "Engine.h"
 #include "FileBrowser.h"
+#include "LmmsStyle.h"
+#include "LmmsPalette.h"
+#include "embed.h"
 
 class FileBrowserTestStyle : public QProxyStyle
 {
@@ -41,11 +46,69 @@ private slots:
 
 	void cleanupTestCase() { lmms::Engine::destroy(); }
 
+	void captureBrowserPreview()
+	{
+		if (!qEnvironmentVariableIsSet("LMMS_FONT_PREVIEW_DIR")) { QSKIP("Preview not requested"); }
+		const auto originalFont = QApplication::font();
+		const auto originalPalette = QApplication::palette();
+		auto font = originalFont;
+		font.setPointSize(11);
+		QApplication::setFont(font);
+		QTemporaryDir directory;
+		QVERIFY(directory.isValid());
+		QDir root(directory.path());
+		QVERIFY(root.mkdir(QStringLiteral("demos")));
+		QVERIFY(root.mkdir(QStringLiteral("projects")));
+		QDir::setSearchPaths(QStringLiteral("resources"), {QDir::cleanPath(QCoreApplication::applicationDirPath() + QStringLiteral("/../../data/themes/default"))});
+		QDir::setSearchPaths(QStringLiteral("artwork"), QDir::searchPaths(QStringLiteral("resources")));
+		QPixmapCache::clear();
+		{
+			lmms::gui::LmmsStyle style;
+			lmms::gui::LmmsPalette palette(nullptr, &style);
+			QApplication::setPalette(palette.palette());
+			lmms::gui::FileBrowser browser(lmms::gui::FileBrowser::Type::Normal, directory.path(),
+				"*.mmp", "My projects", lmms::embed::getIconPixmap("project_file").transformed(QTransform().rotate(90)), nullptr, false, directory.path(), directory.path());
+			browser.resize(350, 520);
+			browser.show();
+			QApplication::processEvents();
+			QVERIFY(browser.grab().save(qEnvironmentVariable("LMMS_FONT_PREVIEW_DIR") + "/browser.png"));
+		}
+		QApplication::setPalette(originalPalette);
+		QApplication::setFont(originalFont);
+	}
+
 	void cleanup()
 	{
 		auto* config = lmms::ConfigManager::inst();
 		config->deleteValue("shortcuts", "browser_search");
 		config->deleteValue("shortcuts", "browser_refresh");
+	}
+
+	void contentFiltersFitAtLargeFontSize()
+	{
+		const auto originalFont = QApplication::font();
+		auto font = originalFont;
+		font.setPointSize(18);
+		QApplication::setFont(font);
+		QTemporaryDir directory;
+		QVERIFY(directory.isValid());
+		{
+			lmms::gui::FileBrowser browser(lmms::gui::FileBrowser::Type::Normal,
+				directory.path(), "*.wav", "Browser", QPixmap{}, nullptr, false,
+				directory.path(), directory.path());
+			browser.resize(300, 500);
+			browser.show();
+			QCoreApplication::processEvents();
+			const auto boxes = browser.findChildren<QCheckBox*>();
+			QCOMPARE(boxes.size(), 3);
+			for (auto* box : boxes)
+			{
+				QVERIFY(box->width() >= box->sizeHint().width());
+				QVERIFY(box->height() >= box->sizeHint().height());
+			}
+			QVERIFY(boxes[0]->geometry().bottom() < boxes[1]->geometry().top());
+		}
+		QApplication::setFont(originalFont);
 	}
 
 	void dispatchesBrowserShortcuts()

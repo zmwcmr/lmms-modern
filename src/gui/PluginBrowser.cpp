@@ -31,12 +31,14 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPushButton>
 #include <QStyleOption>
 #include <QTimer>
 #include <QTreeWidget>
 
 #include "embed.h"
+#include "FontHelper.h"
 #include "Engine.h"
 #include "InstrumentTrack.h"
 #include "Song.h"
@@ -47,9 +49,41 @@
 namespace lmms::gui
 {
 
+namespace
+{
+class PluginBrowserTree : public QTreeWidget
+{
+public:
+	explicit PluginBrowserTree(QWidget* parent) : QTreeWidget(parent)
+	{
+		setObjectName(QStringLiteral("pluginBrowserTree"));
+	}
+
+protected:
+	void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override
+	{
+		QTreeWidget::drawBranches(painter, rect, index);
+		if (!rootIsDecorated() || !index.isValid() || !model()->hasChildren(index)) { return; }
+		painter->save();
+		painter->setRenderHint(QPainter::Antialiasing);
+		painter->setPen(Qt::NoPen);
+		painter->setBrush(palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text));
+		painter->translate(rect.right() - indentation() / 2.0 + 1, rect.center().y());
+		if (isExpanded(index)) { painter->rotate(90); }
+		QPainterPath arrow;
+		arrow.moveTo(-2.0, -3.5);
+		arrow.lineTo(2.5, 0.0);
+		arrow.lineTo(-2.0, 3.5);
+		arrow.closeSubpath();
+		painter->drawPath(arrow);
+		painter->restore();
+	}
+};
+}
+
 
 PluginBrowser::PluginBrowser( QWidget * _parent ) :
-	SideBarWidget( tr( "Instrument Plugins" ),
+	SideBarWidget( tr( "Instrument plugins" ),
 				embed::getIconPixmap( "plugins" ).transformed( QTransform().rotate( 90 ) ), _parent )
 {
 	setWindowTitle( tr( "Instrument browser" ) );
@@ -69,17 +103,20 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 					"existing instrument track." ),
 								m_view );
 	hint->setWordWrap( true );
+	hint->setFont(bodyFont(hint->font()));
 
 	m_searchBar = new QLineEdit(m_view);
+	m_searchBar->setFont(bodyFont(m_searchBar->font()));
 	m_searchBar->setPlaceholderText(tr("Search"));
 	m_searchBar->setMaxLength(64);
 	m_searchBar->setClearButtonEnabled(true);
 	m_searchBar->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
 
-	m_descTree = new QTreeWidget( m_view );
+	m_descTree = new PluginBrowserTree(m_view);
+	m_descTree->setFont(bodyFont(m_descTree->font()));
 	m_descTree->setColumnCount( 1 );
 	m_descTree->header()->setVisible( false );
-	m_descTree->setIndentation( 10 );
+	m_descTree->setIndentation(20);
 	m_descTree->setSelectionMode( QAbstractItemView::NoSelection );
 
 	connect( m_searchBar, SIGNAL( textEdited( const QString& ) ),
@@ -100,6 +137,7 @@ PluginBrowser::PluginBrowser( QWidget * _parent ) :
 	if (canRescan)
 	{
 		auto* rescanButton = new QPushButton(tr("Rescan plugins"), m_view);
+		rescanButton->setFont(bodyFont(rescanButton->font()));
 		rescanButton->setToolTip(tr("Scan for newly installed VST plugins"));
 		connect(rescanButton, &QPushButton::clicked,
 			this, &PluginBrowser::rescanPlugins);
@@ -260,7 +298,8 @@ PluginDescWidget::PluginDescWidget(const PluginKey &_pk,
 	m_logo( _pk.logo()->pixmap() ),
 	m_mouseOver( false )
 {
-	setFixedHeight( DEFAULT_HEIGHT );
+	setFont(bodyFont(font()));
+	setFixedHeight(qMax(DEFAULT_HEIGHT, QFontMetrics(bodyFont(font())).height() + 6));
 	setMouseTracking( true );
 	setCursor( Qt::PointingHandCursor );
 	setToolTip(_pk.desc->subPluginFeatures
@@ -301,11 +340,13 @@ void PluginDescWidget::paintEvent( QPaintEvent * )
 	QFont f = p.font();
 	if ( m_mouseOver )
 	{
-		f.setBold( true );
+		f.setWeight(QFont::DemiBold);
 	}
 
 	p.setFont( f );
-	p.drawText( 10 + s, 15, m_pluginKey.displayName());
+	const auto metrics = p.fontMetrics();
+	const int baseline = (height() - metrics.height()) / 2 + metrics.ascent();
+	p.drawText(10 + s, baseline, m_pluginKey.displayName());
 }
 
 

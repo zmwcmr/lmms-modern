@@ -27,6 +27,7 @@
 #include "DummyEffect.h"
 #include "EffectChain.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "PluginFactory.h"
 
 #include <QApplication>
@@ -40,6 +41,8 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
+#include <QScrollBar>
+#include <QTimer>
 #include <QTableView>
 #include <QVBoxLayout>
 
@@ -104,7 +107,8 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 	m_scrollArea(new QScrollArea(this))
 {
 	setWindowTitle(tr("Add effect"));
-	resize(640, 480);
+	// The plugin list and description need more room as the UI font grows.
+	resize(scaledFontSize(640), scaledFontSize(480));
 
 	setWindowIcon(embed::getIconPixmap("setup_audio"));
 
@@ -121,51 +125,30 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 	QStringList buttonLabels = { tr("All"), "LMMS", "LADSPA", "LV2", "VST" };
 	QStringList buttonSearchString = { "", "LMMS", "LADSPA", "LV2", "VST" };
 
+	const QFont filterFont = bodyFont(font());
+	int filterButtonWidth = 50;
+	for (const auto& label : buttonLabels)
+	{
+		filterButtonWidth = qMax(filterButtonWidth,
+			QFontMetrics(filterFont).horizontalAdvance(label) + 16);
+	}
+
 	for (int i = 0; i < buttonLabels.size(); ++i)
 	{
 		const QString& label = buttonLabels[i];
 		const QString& searchString = buttonSearchString[i];
 
 		QPushButton* button = new QPushButton(label, this);
-		button->setFixedSize(50, 50);
+		// Use the normal dialog-button styling and body font, not a separate
+		// compact tile style. The buttons still line up in one column.
+		button->setFont(filterFont);
+		button->setFixedWidth(filterButtonWidth);
+		button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 		button->setFocusPolicy(Qt::NoFocus);
-		leftSectionLayout->addWidget(button);
+		leftSectionLayout->addWidget(button, 0, Qt::AlignLeft);
 
 		connect(button, &QPushButton::clicked, this, [this, searchString] {
 			m_model.setEffectTypeFilter(searchString);
-			updateSelection();
-		});
-	}
-
-	bool canRescan = false;
-	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
-	{
-		if (desc->subPluginFeatures && desc->subPluginFeatures->canRescan())
-		{
-			canRescan = true;
-			break;
-		}
-	}
-	if (canRescan)
-	{
-		auto* rescanButton = new QPushButton(tr("Rescan"), this);
-		rescanButton->setFixedSize(50, 50);
-		rescanButton->setFocusPolicy(Qt::NoFocus);
-		rescanButton->setToolTip(tr("Rescan VST plugins"));
-		leftSectionLayout->addWidget(rescanButton);
-		connect(rescanButton, &QPushButton::clicked, this, [this] {
-			QApplication::setOverrideCursor(Qt::WaitCursor);
-			for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
-			{
-				if (auto* features = desc->subPluginFeatures;
-					features && features->canRescan())
-				{
-					features->rescan();
-				}
-			}
-			QApplication::restoreOverrideCursor();
-			loadPlugins();
-			m_pluginList->sortByColumn(0, Qt::AscendingOrder);
 			updateSelection();
 		});
 	}
@@ -185,6 +168,12 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 	m_filterEdit->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
 
 	m_pluginList->setModel(&m_model);
+	// QTableView does not reliably inherit the application font change in this
+	// dialog, so set the body tier explicitly for rows and headers.
+	const QFont listFont = bodyFont(m_pluginList->font());
+	m_pluginList->setFont(listFont);
+	m_pluginList->horizontalHeader()->setFont(listFont);
+	m_pluginList->verticalHeader()->setFont(listFont);
 	m_pluginList->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	m_pluginList->setSelectionBehavior(QAbstractItemView::SelectRows);
 	m_pluginList->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -213,7 +202,66 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 
 	QVBoxLayout* rightSectionLayout = new QVBoxLayout();
 	rightSectionLayout->addWidget(m_filterEdit);
-	rightSectionLayout->addWidget(m_pluginList);
+
+	// Keep the plugin list and its action row in one container so the
+	// Rescan button's right edge follows the list's right edge.
+	auto* listContainer = new QWidget(this);
+	auto* listLayout = new QVBoxLayout(listContainer);
+	listLayout->setContentsMargins(0, 0, 0, 0);
+	listLayout->setSpacing(0);
+	listLayout->addWidget(m_pluginList);
+	rightSectionLayout->addWidget(listContainer);
+	// "Rescan" is an action, not a plugin category. Put it below the plugin
+	// list, aligned to the right, instead of mixing it into the filter tiles.
+	bool canRescan = false;
+	for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
+	{
+		if (desc->subPluginFeatures && desc->subPluginFeatures->canRescan())
+		{
+			canRescan = true;
+			break;
+		}
+	}
+	if (canRescan)
+	{
+		auto* rescanLayout = new QHBoxLayout();
+		rescanLayout->setContentsMargins(0, 0, 0, 0);
+		rescanLayout->addStretch();
+		auto* rescanButton = new QPushButton(tr("Rescan"), this);
+		rescanButton->setFont(bodyFont(rescanButton->font()));
+		const int rescanWidth = qMax(50, rescanButton->fontMetrics().horizontalAdvance(tr("Rescan")) + 16);
+		rescanButton->setFixedWidth(rescanWidth);
+		rescanButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+		rescanButton->setFocusPolicy(Qt::NoFocus);
+		rescanButton->setToolTip(tr("Rescan VST plugins"));
+		rescanLayout->addWidget(rescanButton);
+		listLayout->addLayout(rescanLayout);
+		QTimer::singleShot(0, this, [this, rescanLayout] {
+			const int viewportInset = m_pluginList->verticalScrollBar()->width() + m_pluginList->frameWidth();
+			rescanLayout->setContentsMargins(0, 0, viewportInset, 0);
+		});
+		connect(rescanButton, &QPushButton::clicked, this, [this] {
+			QApplication::setOverrideCursor(Qt::WaitCursor);
+			for (const auto desc : getPluginFactory()->descriptors(Plugin::Type::Effect))
+			{
+				if (auto* features = desc->subPluginFeatures;
+					features && features->canRescan())
+				{
+					features->rescan();
+				}
+			}
+			QApplication::restoreOverrideCursor();
+			loadPlugins();
+			// Clearing the source model removes its columns, so Qt discards the
+			// per-column resize modes when the columns are created again.
+			auto* header = m_pluginList->horizontalHeader();
+			header->setSectionResizeMode(0, QHeaderView::Stretch);
+			header->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+			m_pluginList->sortByColumn(0, Qt::AscendingOrder);
+			updateSelection();
+		});
+	}
+
 	rightSectionLayout->addWidget(m_scrollArea);
 	rightSectionLayout->addWidget(buttonBox);
 	mainLayout->addLayout(rightSectionLayout);
@@ -233,6 +281,9 @@ EffectSelectDialog::EffectSelectDialog(QWidget* parent) :
 
 	updateSelection();
 	show();
+	QTimer::singleShot(0, this, [this] {
+		m_pluginList->horizontalHeader()->setFont(bodyFont(m_pluginList->font()));
+	});
 }
 
 

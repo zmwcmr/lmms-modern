@@ -135,27 +135,27 @@ void LadspaDescription::update( const ladspa_key_t & _key )
 	layout->addWidget( copyright );
 
 	auto requiresRealTime = new QLabel(description);
-	requiresRealTime->setText(tr("Requires Real Time: ") +
+	requiresRealTime->setText(tr("Requires real time: ") +
 				(manager->hasRealTimeDependency(_key) ? tr("Yes") : tr("No")));
 	layout->addWidget( requiresRealTime );
 
 	auto realTimeCapable = new QLabel(description);
-	realTimeCapable->setText(tr("Real Time Capable: ") +
+	realTimeCapable->setText(tr("Real-time capable: ") +
 				(manager->isRealTimeCapable(_key) ? tr("Yes") : tr("No")));
 	layout->addWidget( realTimeCapable );
 
 	auto inplaceBroken = new QLabel(description);
-	inplaceBroken->setText(tr("In Place Broken: ") +
+	inplaceBroken->setText(tr("In-place broken: ") +
 				(manager->isInplaceBroken(_key) ? tr("Yes") : tr("No")));
 	layout->addWidget( inplaceBroken );
 
 	auto channelsIn = new QLabel(description);
-	channelsIn->setText(tr("Channels In: ") + QString::number(
+	channelsIn->setText(tr("Channels in: ") + QString::number(
 			manager->getDescription( _key )->inputChannels ) );
 	layout->addWidget( channelsIn );
 
 	auto channelsOut = new QLabel(description);
-	channelsOut->setText(tr("Channels Out: ") + QString::number(
+	channelsOut->setText(tr("Channels out: ") + QString::number(
 			manager->getDescription( _key )->outputChannels ) );
 	layout->addWidget( channelsOut );
 }

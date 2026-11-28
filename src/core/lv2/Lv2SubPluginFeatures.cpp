@@ -28,6 +28,7 @@
 
 #ifdef LMMS_HAVE_LV2
 
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 
@@ -67,6 +68,21 @@ Lv2SubPluginFeatures::Lv2SubPluginFeatures(Plugin::Type type) :
 
 
 
+static void setLink(QLabel* label, const QString& prefix, const QString& url)
+{
+	const auto update = [label, prefix, url] {
+		const auto escaped = url.toHtmlEscaped();
+		label->setText(prefix.toHtmlEscaped() + QString("<a href=\"%1\" style=\"color: %2\">%1</a>")
+			.arg(escaped, qApp->palette().color(QPalette::Link).name()));
+	};
+	QObject::connect(qApp, &QApplication::paletteChanged, label, [update](const QPalette&) { update(); });
+	label->setTextInteractionFlags(label->textInteractionFlags()
+		| Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
+	label->setTextFormat(Qt::RichText);
+	label->setOpenExternalLinks(true);
+	update();
+}
+
 static void addHbox(QWidget* parent, QString left, QString right)
 {
 	if (right.isEmpty()) { return; }
@@ -83,13 +99,9 @@ static void addHbox(QWidget* parent, QString left, QString right)
 	auto rightLabel = new QLabel(container);
 	if (right.startsWith("http") && !right.contains(' ') && !right.contains('\n'))
 	{
-		right = QString("<a href=\"%1\">%1</a>").arg(right);
-		rightLabel->setTextInteractionFlags(rightLabel->textInteractionFlags()
-			| Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
-		rightLabel->setTextFormat(Qt::RichText);
-		rightLabel->setOpenExternalLinks(true);
+		setLink(rightLabel, {}, right);
 	}
-	rightLabel->setText(right);
+	else { rightLabel->setText(right); }
 	rightLabel->setWordWrap(true);
 
 	l->addWidget(leftLabel);
@@ -105,13 +117,10 @@ static void addLabel(QWidget* parent, QString left, QString right)
 	if (right.isEmpty()) { return; }
 	if (right.startsWith("http") && !right.contains(' ') && !right.contains('\n'))
 	{
-		right = QString("<a href=\"%1\">%1</a>").arg(right);
-		lbl->setTextInteractionFlags(lbl->textInteractionFlags()
-			| Qt::LinksAccessibleByMouse | Qt::LinksAccessibleByKeyboard);
-		lbl->setTextFormat(Qt::RichText);
-		lbl->setOpenExternalLinks(true);
+		setLink(lbl, left, right);
 	}
-	lbl->setText(left + right);
+	else { lbl->setText(left + right); }
+	lbl->setWordWrap(true);
 }
 
 

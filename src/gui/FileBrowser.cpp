@@ -107,7 +107,6 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	addContentCheckBox();
 
 	auto searchWidget = new QWidget(contentParent());
-	searchWidget->setFixedHeight( 24 );
 
 	auto searchWidgetLayout = new QHBoxLayout(searchWidget);
 	searchWidgetLayout->setContentsMargins(0, 0, 0, 0);
@@ -131,6 +130,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	searchWidgetLayout->addWidget( m_filterEdit );
 	searchWidgetLayout->addSpacing( 5 );
 	searchWidgetLayout->addWidget( reload_btn );
+	searchWidget->setMinimumHeight(24);
 
 	addContentWidget( searchWidget );
 
@@ -171,10 +171,11 @@ void FileBrowser::addContentCheckBox()
 	auto filterWidget = new QWidget(contentParent());
 
 	outerLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom, filterWidget);
+	outerLayout->setContentsMargins(0, 0, 0, 0);
 	outerLayout->setSpacing(0);
 
 	if (user_checkbox || factory){
-		filterWidgetLayout = new QBoxLayout(QBoxLayout::Direction::LeftToRight);
+		filterWidgetLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom);
 		filterWidgetLayout->setContentsMargins(0, 0, 0, 0);
 		filterWidgetLayout->setSpacing(0);
 
@@ -784,7 +785,7 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 
 		if (file->isTrack())
 		{
-			contextMenu.addAction(tr("Send to active instrument-track"), [&] { sendToActiveInstrumentTrack(file); });
+			contextMenu.addAction(tr("Send to active instrument track"), [&] { sendToActiveInstrumentTrack(file); });
 		}
 
 		addActionsGroup(tr("Song Editor"), getContextActions(file, true));

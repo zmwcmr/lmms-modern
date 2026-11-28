@@ -180,7 +180,12 @@ ExportProjectDialog::ExportProjectDialog(const QString& path, Mode mode, QWidget
 	m_progressBar->setValue(0);
 	m_loopRepeatBox->setRange(1, maxLoopRepeat);
 	m_loopRepeatBox->setValue(1);
-	m_loopRepeatBox->setSuffix(tr(" time(s)"));
+	const auto updateLoopSuffix = [this] {
+		m_loopRepeatBox->setSuffix(m_loopRepeatBox->value() == 1 ? tr(" time") : tr(" times"));
+	};
+	connect(m_loopRepeatBox, qOverload<int>(&QSpinBox::valueChanged), this,
+		[updateLoopSuffix](int) { updateLoopSuffix(); });
+	updateLoopSuffix();
 
 	m_fileFormatComboBox->setCurrentIndex(-1);
 	connect(m_fileFormatComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this,

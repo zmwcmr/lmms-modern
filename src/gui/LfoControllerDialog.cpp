@@ -61,23 +61,30 @@ LfoControllerDialog::LfoControllerDialog( Controller * _model, QWidget * _parent
 	title.append( ")" );
 	setWindowTitle( title );
 	setWindowIcon( embed::getIconPixmap( "controller" ) );
-	setFixedSize( 240, 58 );
 	
 	m_baseKnob = new Knob(KnobType::Bright26, tr("BASE"), SMALL_FONT_SIZE, this);
-	m_baseKnob->move( CD_LFO_BASE_CD_KNOB_X, CD_LFO_CD_KNOB_Y );
 	m_baseKnob->setHintText( tr( "Base:" ), "" );
 
 	m_speedKnob = new TempoSyncKnob(KnobType::Bright26, tr("FREQ"), SMALL_FONT_SIZE, this);
-	m_speedKnob->move( CD_LFO_SPEED_CD_KNOB_X, CD_LFO_CD_KNOB_Y );
 	m_speedKnob->setHintText( tr( "LFO frequency:" ), "" );
 
 	m_amountKnob = new Knob(KnobType::Bright26, tr("AMNT"), SMALL_FONT_SIZE, this);
-	m_amountKnob->move( CD_LFO_AMOUNT_CD_KNOB_X, CD_LFO_CD_KNOB_Y );
 	m_amountKnob->setHintText( tr( "Modulation amount:" ), "" );
 
 	m_phaseKnob = new Knob(KnobType::Bright26, tr("PHS"), SMALL_FONT_SIZE, this);
-	m_phaseKnob->move( CD_LFO_PHASE_CD_KNOB_X, CD_LFO_CD_KNOB_Y );
 	m_phaseKnob->setHintText( tr( "Phase offset:" ) , "" + tr( " degrees" ) );
+
+	// Allocate each caption its own width at the current font size.
+	int knobX = CD_LFO_BASE_CD_KNOB_X;
+	for (auto* knob : {m_baseKnob, static_cast<Knob*>(m_speedKnob), m_amountKnob, m_phaseKnob})
+	{
+		knob->move(knobX, CD_LFO_CD_KNOB_Y);
+		knobX += qMax(CD_KNOB_X_SPACING, knob->width() + 4);
+	}
+	const int multiplierX = qMax(CD_LFO_MULTIPLIER_X, knobX + 3);
+	const int knobHeight = qMax(qMax(m_baseKnob->height(), m_speedKnob->height()),
+		qMax(m_amountKnob->height(), m_phaseKnob->height()));
+	setFixedSize(qMax(240, multiplierX + 35), qMax(58, CD_LFO_CD_KNOB_Y + knobHeight + 4));
 
 	auto sin_wave_btn = new PixmapButton(this, nullptr);
 	sin_wave_btn->move( CD_LFO_SHAPES_X, CD_LFO_SHAPES_Y );
@@ -165,19 +172,19 @@ LfoControllerDialog::LfoControllerDialog( Controller * _model, QWidget * _parent
 	m_waveBtnGrp->addButton( m_userWaveBtn );
 
 	auto x1 = new PixmapButton(this, nullptr);
-	x1->move(CD_LFO_MULTIPLIER_X, CD_LFO_SHAPES_Y + 7);
+	x1->move(multiplierX, CD_LFO_SHAPES_Y + 7);
 	x1->setActiveGraphic(embed::getIconPixmap("lfo_x1_active"));
 	x1->setInactiveGraphic(embed::getIconPixmap("lfo_x1_inactive"));
 	x1->setToolTip(tr("Multiply modulation frequency by 1"));
 
 	auto x100 = new PixmapButton(this, nullptr);
-	x100->move(CD_LFO_MULTIPLIER_X, CD_LFO_SHAPES_Y - 8);
+	x100->move(multiplierX, CD_LFO_SHAPES_Y - 8);
 	x100->setActiveGraphic(embed::getIconPixmap("lfo_x100_active"));
 	x100->setInactiveGraphic(embed::getIconPixmap("lfo_x100_inactive"));
 	x100->setToolTip(tr("Multiply modulation frequency by 100"));
 
 	auto d100 = new PixmapButton(this, nullptr);
-	d100->move(CD_LFO_MULTIPLIER_X, CD_LFO_SHAPES_Y + 22);
+	d100->move(multiplierX, CD_LFO_SHAPES_Y + 22);
 	d100->setActiveGraphic(embed::getIconPixmap("lfo_d100_active"));
 	d100->setInactiveGraphic(embed::getIconPixmap("lfo_d100_inactive"));
 	d100->setToolTip(tr("Divide modulation frequency by 100"));
@@ -192,7 +199,11 @@ LfoControllerDialog::LfoControllerDialog( Controller * _model, QWidget * _parent
 
 	setAutoFillBackground( true );
 	QPalette pal;
-	pal.setBrush( backgroundRole(), embed::getIconPixmap( "lfo_controller_artwork" ) );
+	auto background = embed::getIconPixmap("lfo_controller_artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	pal.setBrush(backgroundRole(), background);
 	setPalette( pal );
 
 }

@@ -44,7 +44,7 @@ extern "C" {
 Plugin::Descriptor PLUGIN_EXPORT slicert_plugin_descriptor = {
 	LMMS_STRINGIFY(PLUGIN_NAME),
 	"SlicerT",
-	QT_TRANSLATE_NOOP("PluginBrowser", "Basic Slicer"),
+	QT_TRANSLATE_NOOP("PluginBrowser", "Basic slicer"),
 	"Daniel Kauss Serna <daniel.kauss.serna@gmail.com>",
 	0x0100,
 	Plugin::Type::Instrument,

@@ -40,6 +40,7 @@
 
 #include "EditorShortcuts.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "Engine.h"
 #include "GuiApplication.h"
 #include "MainWindow.h"
@@ -78,7 +79,7 @@ ProjectNotes::ProjectNotes()
 	getGUI()->mainWindow()->addWindowedWidget( this );
 	parentWidget()->setAttribute( Qt::WA_DeleteOnClose, false );
 	parentWidget()->move( 700, 10 );
-	parentWidget()->resize( 400, 300 );
+	parentWidget()->resize(scaledFontSize(400), scaledFontSize(300));
 	parentWidget()->hide();
 }
 
@@ -111,7 +112,7 @@ void ProjectNotes::setText( const QString & _text )
 
 void ProjectNotes::setupActions()
 {
-	QToolBar * tb = addToolBar( tr( "Edit Actions" ) );
+	QToolBar * tb = addToolBar( tr( "Edit actions" ) );
 
 	auto a = new QAction(embed::getIconPixmap("edit_undo"), tr("&Undo"), this);
 	a->setShortcut( QKeySequence::Undo );
@@ -143,7 +144,7 @@ void ProjectNotes::setupActions()
 	tb->addAction( a );
 
 
-	tb = addToolBar( tr( "Format Actions" ) );
+	tb = addToolBar( tr( "Format actions" ) );
 	const auto formatShortcuts = projectNotesShortcuts();
 
 	m_comboFont = new QComboBox( tb );

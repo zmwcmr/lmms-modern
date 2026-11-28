@@ -25,6 +25,7 @@
 
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QVBoxLayout>
 
 #include "RenameDialog.h"
 
@@ -38,10 +39,12 @@ RenameDialog::RenameDialog( QString & _string ) :
 	m_originalString( _string )
 {
 	setWindowTitle( tr("Rename...") );
-	setFixedHeight( 30 );
 	m_stringLE = new QLineEdit( this );
 	m_stringLE->setText( _string );
-	m_stringLE->setGeometry ( 10, 5, 220, 20 );
+	auto* layout = new QVBoxLayout(this);
+	layout->setContentsMargins(10, 5, 10, 5);
+	layout->addWidget(m_stringLE);
+	resize(240, sizeHint().height());
 	m_stringLE->selectAll();
 	connect( m_stringLE, SIGNAL( textChanged( const QString& ) ), this,
 				SLOT( textChanged( const QString& ) ) );
@@ -49,13 +52,6 @@ RenameDialog::RenameDialog( QString & _string ) :
 							SLOT(accept()));
 }
 
-
-
-
-
-void RenameDialog::resizeEvent (QResizeEvent * event) {
-	m_stringLE->setGeometry ( 10, 5, width() - 20, 20 );	
-}
 
 
 

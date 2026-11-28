@@ -32,6 +32,7 @@
 #include "ComboBox.h"
 #include "DataFile.h"
 #include "FileDialog.h"
+#include "FontHelper.h"
 #include "InstrumentView.h"
 #include "Knob.h"
 #include "LcdSpinBox.h"
@@ -94,7 +95,7 @@ SlicerTView::SlicerTView(SlicerT* instrument, QWidget* parent)
 
 	m_midiExportButton = new QPushButton(this);
 	m_midiExportButton->setIcon(PLUGIN_NAME::getIconPixmap("copy_midi"));
-	m_midiExportButton->setToolTip(tr("Copy midi pattern to clipboard"));
+	m_midiExportButton->setToolTip(tr("Copy MIDI pattern to clipboard"));
 	connect(m_midiExportButton, &PixmapButton::clicked, this, &SlicerTView::exportMidi);
 
 	m_folderButton = new PixmapButton(this);
@@ -206,7 +207,7 @@ void SlicerTView::dropEvent(QDropEvent* de)
 void SlicerTView::paintEvent(QPaintEvent* pe)
 {
 	QPainter brush(this);
-	brush.setFont(QFont(brush.font().family(), 7, -1, false));
+	brush.setFont(auxiliaryFont(brush.font()));
 
 	int boxTopY = height() - s_bottomBoxHeight;
 
@@ -240,7 +241,7 @@ void SlicerTView::paintEvent(QPaintEvent* pe)
 	brush.drawText(s_x1 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Threshold"));
 	brush.drawText(s_x2 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Fade Out"));
 	brush.drawText(s_x3 - 25, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Reset"));
-	brush.drawText(s_x4 - 8, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Midi"));
+	brush.drawText(s_x4 - 8, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("MIDI"));
 	brush.drawText(s_x5 - 16, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("BPM"));
 	brush.drawText(s_x6 - 8, y1_text, s_textBoxWidth, s_textBoxHeight, Qt::AlignCenter, tr("Snap"));
 
@@ -272,7 +273,7 @@ void SlicerTView::paintEvent(QPaintEvent* pe)
 	brush.drawLine(width() - 24, boxTopY - s_sampleBoxHeight, width() - 24, boxTopY);
 
 	brush.setPen(QColor(255, 255, 255, 180));
-	brush.setFont(QFont(brush.font().family(), 8, -1, false));
+	brush.setFont(auxiliaryFont(brush.font()));
 	QString sampleName = m_slicerTParent->getSampleName();
 	if (sampleName == "") { sampleName = "No sample loaded"; }
 

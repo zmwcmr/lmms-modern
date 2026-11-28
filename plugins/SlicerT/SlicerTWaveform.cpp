@@ -32,6 +32,7 @@
 #include "DeprecationHelper.h"
 #include "SampleThumbnailRenderer.h"
 #include "SlicerT.h"
+#include "FontHelper.h"
 #include "SlicerTView.h"
 #include "embed.h"
 
@@ -210,7 +211,7 @@ void SlicerTWaveform::drawEditor()
 	if (m_slicerTParent->m_originalSample.sampleSize() <= 1)
 	{
 		brush.setPen(s_playHighlightColor);
-		brush.setFont(QFont(brush.font().family(), 9.0f, -1, false));
+		brush.setFont(auxiliaryFont(brush.font()));
 		brush.drawText(
 			m_editorWidth / 2 - 100, m_editorHeight / 2 - 110, 200, 200, Qt::AlignCenter, tr("Click to load sample"));
 		int iconOffsetX = m_emptySampleIcon.width() / 2.0f;
