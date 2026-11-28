@@ -1011,7 +1011,7 @@ lmms--gui--SubWindow {
 /* Subwindow title text */
 lmms--gui--SubWindow > QLabel {
 	color: #d1d8e4;
-	font-size: 12px;
+	font-size: 14px;
 	font-weight: 600;
 	font-style: normal;
 }

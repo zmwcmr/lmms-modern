@@ -433,7 +433,7 @@ int LmmsStyle::pixelMetric( PixelMetric _metric, const QStyleOption * _option,
 			if (qobject_cast<const QMdiSubWindow*>(_widget))
 			{
 				// Qt uses this metric to position the editor below our custom title bar.
-				return std::max(24, QFontMetrics(groupTitleFont(_widget->font())).height() + 6);
+				return std::max(24, QFontMetrics(titleFont(_widget->font())).height() + 6);
 			}
 			return 24;
 

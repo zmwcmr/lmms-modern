@@ -30,9 +30,9 @@
 #include <QFontInfo>
 #include <QtGlobal>
 
-constexpr int BODY_FONT_SIZE = 11;
-constexpr int AUXILIARY_FONT_SIZE = 9;
-constexpr int TITLE_FONT_SIZE = 13;
+constexpr int BODY_FONT_SIZE = 12;
+constexpr int AUXILIARY_FONT_SIZE = 10;
+constexpr int TITLE_FONT_SIZE = 14;
 
 // Legacy names kept for call sites and out-of-tree plugins.
 constexpr int DEFAULT_FONT_SIZE = BODY_FONT_SIZE;
