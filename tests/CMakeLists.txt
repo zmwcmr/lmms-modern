@@ -10,6 +10,7 @@ set(LMMS_TESTS
 	src/core/AutomatableModelTest.cpp
 	src/core/Base64Test.cpp
 	src/core/ConfigUpgradeTest.cpp
+	src/core/DataFileGuardTest.cpp
 	src/core/MathTest.cpp
 	src/core/MixerSidechainTest.cpp
 	src/core/HostedEffectTest.cpp
@@ -19,8 +20,10 @@ set(LMMS_TESTS
 	src/core/PluginProcessSupervisorTest.cpp
 	src/core/ProjectVersionTest.cpp
 	src/core/RelativePathsTest.cpp
+	src/core/SampleDecoderTest.cpp
 	src/core/SongAutomationTest.cpp
 	src/core/TimelineTest.cpp
+	src/core/TimePosTest.cpp
 	src/core/ValidationTest.cpp
 	src/core/InlineValueEditorTest.cpp
 	src/gui/SideBarWorkspaceTest.cpp
@@ -29,6 +32,7 @@ set(LMMS_TESTS
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp
 	src/tracks/MidiClipTest.cpp
+	src/tracks/NoteOffsetTest.cpp
 )
 
 if(LMMS_HAVE_LV2)
@@ -132,6 +136,10 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 	target_compile_features(${LMMS_TEST_NAME} PRIVATE cxx_std_20)
 	target_compile_definitions(${LMMS_TEST_NAME} PRIVATE LMMS_TESTING)
 endforeach()
+
+# Long-running helpers (GUI, TSAN, soak). All targets are EXCLUDE_FROM_ALL
+# and are deliberately not registered as ctest tests.
+add_subdirectory(stress)
 
 if(TARGET vstbase)
 	add_executable(Vst2PluginHostTest src/core/Vst2PluginHostTest.cpp)

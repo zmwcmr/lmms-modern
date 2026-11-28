@@ -19,5 +19,9 @@ compile_commands.json
 /tests/stress/artifacts/
 /tests/stress/failures/
 /tests/stress/plugins/inventory.local.json
+/tests/stress/plugins/inventory.generated.json
+/tests/stress/plugins/inventory.results.json
+/tests/stress/plugins/effect-results.json
+/tests/stress/plugins/multi-*.json
 /tests/stress/plugins/fixtures/
 __pycache__/

@@ -1,0 +1,8 @@
+{
+  "scenarios": [
+    {"id": "dexed-vst3", "plugin": "dexed", "format": "vst3", "seconds": 5},
+    {"id": "zyn-vst2", "plugin": "zyn-add-sub-fx", "format": "vst2", "seconds": 5},
+    {"id": "surge-lv2", "plugin": "surge-xt", "format": "lv2", "seconds": 5},
+    {"id": "surge-vst3", "plugin": "surge-xt-vst3", "format": "vst3", "seconds": 5}
+  ]
+}

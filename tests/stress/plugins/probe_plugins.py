@@ -1,100 +1,21 @@
 #!/usr/bin/env python3
-"""Probe real third-party plugins with a minimal render.
-
-Generates one fixture project per plugin (based on a demo song), renders it
-with the local LMMS build and records load/render/audio metrics.
-"""
+"""Probe real third-party plugin instruments with a minimal render."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
-STRESS_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(STRESS_ROOT))
+PLUGIN_DIR = Path(__file__).resolve().parent
+STRESS_ROOT = PLUGIN_DIR.parent
+if str(STRESS_ROOT) not in sys.path:
+    sys.path.insert(0, str(STRESS_ROOT))
 
-from generator import (  # noqa: E402
-    Case,
-    PLUGIN_DEFS,
-    REPO_ROOT,
-    _inject_plugins,
-    _load_seed,
-    _write_tree,
-)
+from generator import Case  # noqa: E402
 from runner import run_case  # noqa: E402
-
-INVENTORY = Path(__file__).resolve().parent / "inventory.local.json"
-
-EXTRA_PLUGINS = [
-    {
-        "id": "surge-xt-vst3",
-        "format": "vst3",
-        "name": "Surge XT",
-        "path": str(Path.home() / ".vst3/Surge XT.vst3"),
-        "class": "abcdef019182faeb566d624153675854",
-        "requires_content": False,
-    },
-    {
-        "id": "ob-xf-vst3",
-        "format": "vst3",
-        "name": "OB-Xf",
-        "path": str(Path.home() / ".vst3/OB-Xf.vst3"),
-        "class": "abcdef019182faeb535354784f425846",
-        "requires_content": False,
-    },
-    {
-        "id": "sfizz-vst3",
-        "format": "vst3",
-        "name": "sfizz",
-        "path": str(Path.home() / ".vst3/sfizz.vst3"),
-        "class": "e8fab71815ed46e38b5983101e12993f",
-        "requires_content": True,
-    },
-    {
-        "id": "pianoteq-vst2",
-        "format": "vst2",
-        "name": "Pianoteq 8 STAGE",
-        "path": str(Path.home() / ".vst/Pianoteq 8 STAGE.so"),
-        "requires_content": True,
-    },
-]
-
-SEED = REPO_ROOT / "data/projects/shorties/Crunk(Demo).mmp"
-
-
-def plugin_list(include_optional: bool) -> list[dict]:
-    plugins = []
-    for plugin in PLUGIN_DEFS + EXTRA_PLUGINS:
-        if not Path(plugin["path"]).exists():
-            continue
-        if plugin.get("requires_content") and not include_optional:
-            continue
-        plugins.append(plugin)
-    return plugins
-
-
-def make_fixture(plugin: dict) -> Case:
-    tree = _load_seed(SEED)
-    root = tree.getroot()
-    injected = _inject_plugins(root, __import__("random").Random(0), [plugin])
-    if not injected:
-        raise RuntimeError("could not inject plugin")
-    data = _write_tree(root, False, __import__("random").Random(0))
-    return Case(
-        case_id=f"plugin-{plugin['id']}",
-        seed=0,
-        profile="plugin",
-        xml_bytes=data,
-        expect_audio=not plugin.get("requires_content", False),
-        strict_audio=not plugin.get("requires_content", False),
-        plugins=[plugin],
-        notes=1,
-        description=f"plugin fixture {plugin['id']}",
-    )
+from plugins import fixtures, inventory  # noqa: E402
 
 
 def main(argv: list[str]) -> int:
@@ -104,23 +25,47 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--include-optional", action="store_true")
     parser.add_argument("--keep-wav", action="store_true")
     parser.add_argument("--run-id", default="plugin-probe")
+    parser.add_argument("--write-inventory", action="store_true")
+    parser.add_argument("--plugin", default=None, help="only probe one plugin id")
     args = parser.parse_args(argv)
 
     binary = Path(args.build)
     if binary.is_dir():
         binary = binary / "lmms"
     binary = binary.resolve()
+
+    all_plugins = inventory.discover(
+        include_optional=args.include_optional or args.plugin is not None
+    )
+    plugins = all_plugins
+    if args.plugin:
+        plugins = [p for p in plugins if p.get("id") == args.plugin]
+    instruments = inventory.by_role(plugins, "instrument")
+    if args.write_inventory:
+        inventory.write_inventory(all_plugins)
+
     work = Path("/tmp/opencode/lmms-stress/runs") / args.run_id
     work.mkdir(parents=True, exist_ok=True)
-
     results = []
-    for plugin in plugin_list(args.include_optional):
-        print(f"--- {plugin['id']} ({plugin['format']})")
+    for plugin in instruments:
+        print(f"--- {plugin['id']} ({plugin['format']})", flush=True)
         try:
-            case = make_fixture(plugin)
+            data = fixtures.load_or_create(plugin, "instruments")
         except Exception as exc:  # noqa: BLE001
-            print(f"    fixture failed: {exc}")
+            print(f"    fixture skipped: {exc}", flush=True)
+            results.append({"plugin": plugin, "status": "skipped", "reason": str(exc)})
             continue
+        case = Case(
+            case_id=f"plugin-{plugin['id']}",
+            seed=0,
+            profile="plugin",
+            xml_bytes=data,
+            expect_audio=not plugin.get("requires_content", False),
+            strict_audio=not plugin.get("requires_content", False),
+            plugins=[plugin],
+            notes=1,
+            description=f"plugin fixture {plugin['id']}",
+        )
         result = run_case(
             case,
             binary=binary,
@@ -143,19 +88,19 @@ def main(argv: list[str]) -> int:
         print(
             f"    {result.status} {result.wall_s:.2f}s rss={result.max_rss_kb}KB "
             f"rms={result.wav.get('rms')} peak={result.wav.get('peak')} "
-            f"problems={result.problems}"
+            f"problems={result.problems}",
+            flush=True,
         )
 
-    INVENTORY.write_text(
-        json.dumps({"seed": str(SEED), "results": results}, indent=2),
+    output = PLUGIN_DIR / "inventory.results.json"
+    output.write_text(
+        json.dumps({"results": results}, indent=2),
         encoding="utf-8",
     )
-    print(f"inventory written to {INVENTORY}")
+    print(f"results written to {output}", flush=True)
 
-    hard_failures = [
-        r for r in results if r["status"] in ("crash", "timeout", "sanitizer")
-    ]
-    return 1 if hard_failures else 0
+    hard = [r for r in results if r.get("status") in ("crash", "timeout", "sanitizer")]
+    return 1 if hard else 0
 
 
 if __name__ == "__main__":

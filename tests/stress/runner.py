@@ -169,6 +169,15 @@ def default_env(case_dir: Path) -> dict[str, str]:
                     "/usr/local/lib/lv2",
                 ]
             ),
+            "LADSPA_PATH": ":".join(
+                [
+                    str(Path.home() / ".ladspa"),
+                    "/usr/lib/ladspa",
+                    "/usr/lib64/ladspa",
+                    "/usr/local/lib/ladspa",
+                    "/usr/local/lib64/ladspa",
+                ]
+            ),
             "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
             "LSAN_OPTIONS": f"suppressions={Path(__file__).resolve().parent / 'lsan.supp'}",
         }
