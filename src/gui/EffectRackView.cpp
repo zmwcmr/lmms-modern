@@ -27,6 +27,7 @@
 
 #include <QApplication>
 #include <QAction>
+#include <QEvent>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -49,7 +50,7 @@ EffectRackView::EffectRackView( EffectChain* model, QWidget* parent ) :
 	auto mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(5, 5, 5, 5);
 
-	m_effectsGroupBox = new GroupBox( tr( "EFFECTS CHAIN" ) );
+	m_effectsGroupBox = new GroupBox( tr( "Effects chain" ) );
 	mainLayout->addWidget( m_effectsGroupBox );
 
 	auto effectsLayout = new QVBoxLayout(m_effectsGroupBox);
@@ -58,10 +59,11 @@ EffectRackView::EffectRackView( EffectChain* model, QWidget* parent ) :
 
 	m_scrollArea = new QScrollArea;
 	m_scrollArea->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
-	m_scrollArea->setHorizontalScrollBarPolicy( Qt::ScrollBarAlwaysOff );
+	m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	m_scrollArea->setPalette( QApplication::palette( m_scrollArea ) );
 	m_scrollArea->setFrameStyle( QFrame::NoFrame );
 	m_scrollArea->setWidget( new QWidget );
+	m_scrollArea->viewport()->installEventFilter(this);
 
 	effectsLayout->addWidget( m_scrollArea );
 
@@ -209,9 +211,6 @@ void EffectRackView::update()
 
 	int i = 0, nView = 0;
 
-	const int EffectViewMargin = 3;
-	m_lastY = EffectViewMargin;
-
 	for( QVector<EffectView *>::Iterator it = m_effectViews.begin(); 
 					it != m_effectViews.end(); i++ )
 	{
@@ -222,16 +221,35 @@ void EffectRackView::update()
 		}
 		else
 		{
-			( *it )->move( EffectViewMargin, m_lastY );
-			m_lastY += ( *it )->height();
 			++nView;
 			++it;
 		}
 	}
 
-	w->setFixedSize(EffectView::DEFAULT_WIDTH + 2 * EffectViewMargin, m_lastY);
+	layoutEffects();
 
 	QWidget::update();
+}
+
+bool EffectRackView::eventFilter(QObject* watched, QEvent* event)
+{
+	if (watched == m_scrollArea->viewport() && event->type() == QEvent::Resize) { layoutEffects(); }
+	return QWidget::eventFilter(watched, event);
+}
+
+void EffectRackView::layoutEffects()
+{
+	constexpr int margin = 3;
+	int width = qMax(EffectView::DEFAULT_WIDTH, m_scrollArea->viewport()->width() - 2 * margin);
+	for (const auto* view : m_effectViews) { width = qMax(width, view->minimumWidth()); }
+	m_lastY = margin;
+	for (auto* view : m_effectViews)
+	{
+		view->resize(width, view->height());
+		view->move(margin, m_lastY);
+		m_lastY += view->height() + margin;
+	}
+	m_scrollArea->widget()->setFixedSize(width + 2 * margin, m_lastY);
 }
 
 

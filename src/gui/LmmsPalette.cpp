@@ -89,6 +89,7 @@ STYLECOLOR(inactiveTitleText, setInactiveTitleText, "_lmms_inactiveTitleText", Q
 STYLECOLOR(titleText, setTitleText, "_lmms_titleText", QColor(64, 64, 64))
 STYLECOLOR(mdiButton, setMdiButton, "_lmms_mdiButton", QColor(223, 228, 236))
 STYLECOLOR(frameInner, setFrameInner, "_lmms_frameInner", QColor(0, 0, 0))
+STYLECOLOR(linkColor, setLinkColor, "_lmms_linkColor", text())
 #undef STYLECOLOR
 
 
@@ -106,6 +107,8 @@ QPalette LmmsPalette::palette() const
 	pal.setColor( QPalette::Shadow, 			shadow() );	
 	pal.setColor( QPalette::Highlight, 			highlight() );	
 	pal.setColor( QPalette::HighlightedText, 	highlightedText() );
+	pal.setColor(QPalette::Link, linkColor());
+	pal.setColor(QPalette::LinkVisited, linkColor());
 	return pal;
 }
 

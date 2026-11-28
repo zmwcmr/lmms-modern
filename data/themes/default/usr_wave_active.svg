@@ -1,15 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 168 168"><rect width="168" height="168" fill="#000000" fill-opacity="0.651"/>
-<metadata>
-Created by potrace 1.16, written by Peter Selinger 2001-2019
-</metadata>
-<g transform="translate(0.000000,168.000000) scale(0.100000,-0.100000)"
-fill="#ffffff" fill-opacity="1.000" stroke="none">
-<path d="M743 1294 c-26 -26 -26 -27 -20 -139 7 -120 -1 -168 -33 -185 -10 -6
--78 -10 -150 -10 -125 0 -132 -1 -155 -24 -45 -45 -45 -147 0 -192 23 -23 30
--24 155 -24 72 0 140 -4 150 -10 32 -17 40 -65 33 -185 -6 -112 -6 -113 20
--139 23 -23 34 -26 97 -26 63 0 74 3 97 26 26 26 26 27 20 139 -7 120 1 168
-33 185 10 6 78 10 150 10 125 0 132 1 155 24 13 13 27 40 30 60 10 51 -2 104
--30 132 -23 23 -30 24 -155 24 -72 0 -140 4 -150 10 -32 17 -40 65 -33 185 6
-112 6 113 -20 139 -23 23 -34 26 -97 26 -63 0 -74 -3 -97 -26z"/>
-</g>
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+  <rect width="14" height="14" fill="#000000" fill-opacity="0.55"/>
+  <path d="M7 3.3 V10.7 M3.3 7 H10.7" fill="none" stroke="#d1d8e4" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
