@@ -107,6 +107,7 @@ CrossoverEQControlDialog::CrossoverEQControlDialog(CrossoverEQControls *controls
 	makeMuteBtn(&controls->m_mute2, tr("Mute band 2"), 1);
 	makeMuteBtn(&controls->m_mute3, tr("Mute band 3"), 2);
 	makeMuteBtn(&controls->m_mute4, tr("Mute band 4"), 3);
+	adjustSize();
 }
 
 
