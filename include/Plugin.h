@@ -242,6 +242,10 @@ public:
 
 		SubPluginFeatures * subPluginFeatures;
 
+		//! Hide this plugin from the plugin browser. It remains loadable by
+		//! name for old projects and compatibility paths.
+		bool hidden = false;
+
 	} ;
 	// typedef a list so we can easily work with list of plugin descriptors
 	using DescriptorList = QList<Descriptor*>;

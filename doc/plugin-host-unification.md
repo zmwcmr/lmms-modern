@@ -400,8 +400,9 @@ Wayland; only a genuine in-process Qt widget may be embedded.
 
 - Decision: do not delete VeSTige. It is a compatibility implementation for
   old `<vestige>` / `<vstplugin>` projects and for the 32-bit/Wine paths.
-- New projects use `<vst2instrument>`; VeSTige's browser entry is labelled
-  legacy and is not the default VST2 path.
+- New projects use `<vst2instrument>`; VeSTige is hidden from the plugin
+  browser and is not the default VST2 path. It remains loadable by name for
+  old `<vestige>` projects.
 - Keep the project loader accepting old nodes unchanged.
 - Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged,
   and a new VST2 instrument round-trips without touching Vestige code.
