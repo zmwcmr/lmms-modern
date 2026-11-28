@@ -89,12 +89,26 @@ protected:
 	void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override
 	{
 		QTreeWidget::drawBranches(painter, rect, index);
+		// CompactItemDelegate draws the selection pill around the content only;
+		// keep the branch/indentation area on the plain background.
+		painter->fillRect(rect, palette().color(QPalette::Base));
 		if (!rootIsDecorated() || !index.isValid() || !model()->hasChildren(index)) { return; }
 		painter->save();
 		painter->setRenderHint(QPainter::Antialiasing);
 		painter->setPen(Qt::NoPen);
-		painter->setBrush(palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text));
-		painter->translate(rect.right() - indentation() / 2.0 + 1, rect.center().y());
+		const auto arrowColor = palette().color(isEnabled() ? QPalette::Active : QPalette::Disabled, QPalette::Text);
+		painter->setBrush(arrowColor);
+
+		const QPointF arrowCenter(rect.right() - indentation() / 2.0 + 1, rect.center().y());
+		const QRectF arrowHoverRect(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0);
+		if (m_mousePos.x() >= 0 && arrowHoverRect.contains(QPointF(m_mousePos)))
+		{
+			painter->setBrush(QColor(60, 68, 78));
+			painter->drawRoundedRect(arrowHoverRect, 3, 3);
+			painter->setBrush(arrowColor);
+		}
+
+		painter->translate(arrowCenter);
 		if (isExpanded(index)) { painter->rotate(90); }
 		QPainterPath arrow;
 		arrow.moveTo(-2.0, -3.5);
@@ -118,6 +132,8 @@ protected:
 
 	void mouseMoveEvent(QMouseEvent* event) override
 	{
+		m_mousePos = event->pos();
+		viewport()->update();
 		if (m_pressItem && (event->buttons() & Qt::LeftButton)
 			&& (event->pos() - m_pressPos).manhattanLength() >= QApplication::startDragDistance())
 		{
@@ -139,8 +155,26 @@ protected:
 		QTreeWidget::mouseReleaseEvent(event);
 	}
 
+	void leaveEvent(QEvent* event) override
+	{
+		m_mousePos = QPoint(-1, -1);
+		viewport()->update();
+		QTreeWidget::leaveEvent(event);
+	}
+
+	bool viewportEvent(QEvent* event) override
+	{
+		if (event->type() == QEvent::Leave)
+		{
+			m_mousePos = QPoint(-1, -1);
+			viewport()->update();
+		}
+		return QTreeWidget::viewportEvent(event);
+	}
+
 private:
 	QPoint m_pressPos;
+	QPoint m_mousePos{-1, -1};
 	PluginItem* m_pressItem = nullptr;
 };
 }

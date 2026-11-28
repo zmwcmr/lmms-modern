@@ -482,6 +482,7 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 {
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	setHorizontalScrollMode(ScrollPerPixel);
+	setMouseTracking(true);
 	header()->setStretchLastSection(true);
 	header()->setSectionResizeMode(QHeaderView::Stretch);
 	setTextElideMode(Qt::ElideMiddle);
@@ -565,6 +566,10 @@ void FileBrowserTreeWidget::animateBranch(const QModelIndex& index, bool expande
 void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
 {
 	QTreeWidget::drawBranches(painter, rect, index);
+	// The compact selection is drawn by CompactItemDelegate. Keep the branch
+	// and indentation area on the plain viewport background instead of letting
+	// the style paint a full-row hover/selection block there.
+	painter->fillRect(rect, palette().color(QPalette::Base));
 	if (!rootIsDecorated() || !index.isValid()) { return; }
 
 	int depth = 0;
@@ -582,9 +587,18 @@ void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, c
 	painter->setPen(Qt::NoPen);
 	painter->setBrush(color);
 
+	const QPointF arrowCenter(depth * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
+	const QRectF arrowHoverRect(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0);
+	if (m_mousePos.x() >= 0 && arrowHoverRect.contains(QPointF(m_mousePos)))
+	{
+		painter->setBrush(QColor(60, 68, 78));
+		painter->drawRoundedRect(arrowHoverRect, 3, 3);
+		painter->setBrush(color);
+	}
+
 	const qreal angle = m_branchAngles.value(QPersistentModelIndex{index},
 		isExpanded(index) ? 90.0 : 0.0);
-	painter->translate(depth * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
+	painter->translate(arrowCenter);
 	painter->rotate(angle);
 	QPainterPath arrow;
 	arrow.moveTo(-2.0, -3.5);
@@ -622,6 +636,25 @@ QList<QString> FileBrowserTreeWidget::expandedDirs( QTreeWidgetItem * item ) con
 	}
 	return dirs;
 }
+
+void FileBrowserTreeWidget::leaveEvent(QEvent* event)
+{
+	m_mousePos = QPoint(-1, -1);
+	viewport()->update();
+	QTreeWidget::leaveEvent(event);
+}
+
+
+bool FileBrowserTreeWidget::viewportEvent(QEvent* event)
+{
+	if (event->type() == QEvent::Leave)
+	{
+		m_mousePos = QPoint(-1, -1);
+		viewport()->update();
+	}
+	return QTreeWidget::viewportEvent(event);
+}
+
 
 void FileBrowserTreeWidget::scrollTo(const QModelIndex &index, ScrollHint hint)
 {
@@ -988,6 +1021,8 @@ void FileBrowserTreeWidget::stopPreview()
 
 void FileBrowserTreeWidget::mouseMoveEvent( QMouseEvent * me )
 {
+	m_mousePos = me->pos();
+	viewport()->update();
 	if (m_mousePressed && (m_pressPos - position(me)).manhattanLength() > QApplication::startDragDistance())
 	{
 		// make sure any playback is stopped

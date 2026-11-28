@@ -156,6 +156,8 @@ protected:
 	void keyPressEvent( QKeyEvent * ke ) override;
 	void keyReleaseEvent( QKeyEvent * ke ) override;
 	void hideEvent( QHideEvent * he ) override;
+	void leaveEvent( QEvent * event ) override;
+	bool viewportEvent( QEvent * event ) override;
 	void focusOutEvent( QFocusEvent * fe ) override;
 	void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
 	void wheelEvent(QWheelEvent * event) override;
@@ -176,6 +178,7 @@ private:
 
 	bool m_mousePressed;
 	QPoint m_pressPos;
+	QPoint m_mousePos{-1, -1};
 
 	QHash<QPersistentModelIndex, qreal> m_branchAngles;
 	QHash<QPersistentModelIndex, QVariantAnimation*> m_branchAnimations;
