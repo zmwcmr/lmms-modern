@@ -308,6 +308,7 @@ private:
 
 	Clip * m_clip;
 	Action m_action;
+	bool m_clipMoved = false;
 	QPoint m_initialMousePos;
 	QPoint m_initialMouseGlobalPos;
 	QVector<TimePos> m_initialOffsets;

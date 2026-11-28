@@ -33,6 +33,7 @@
 
 #include "AutomatableButton.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "../Eq/EqFader.h"
 #include "GuiApplication.h"
 #include "Knob.h"
@@ -114,7 +115,7 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	m_rangeKnob->setToolTip(tr("Maximum gain reduction"));
 
 	m_lookaheadLengthKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_lookaheadLengthKnob, tr("Lookahead Length:") , " ms");
+	makeSmallKnob(m_lookaheadLengthKnob, tr("Lookahead length:") , " ms");
 	m_lookaheadLengthKnob->setModel(&controls->m_lookaheadLengthModel);
 	m_lookaheadLengthKnob->setToolTip(tr("How long the compressor has to react to the sidechain signal ahead of time"));
 
@@ -124,37 +125,37 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	m_holdKnob->setToolTip(tr("Delay between attack and release stages"));
 
 	m_rmsKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_rmsKnob, tr("RMS Size:") , "");
+	makeSmallKnob(m_rmsKnob, tr("RMS size:") , "");
 	m_rmsKnob->setModel(&controls->m_rmsModel);
 	m_rmsKnob->setToolTip(tr("Size of the RMS buffer"));
 
 	m_inBalanceKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_inBalanceKnob, tr("Input Balance:") , "");
+	makeSmallKnob(m_inBalanceKnob, tr("Input balance:") , "");
 	m_inBalanceKnob->setModel(&controls->m_inBalanceModel);
 	m_inBalanceKnob->setToolTip(tr("Bias the input audio to the left/right or mid/side"));
 
 	m_outBalanceKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_outBalanceKnob, tr("Output Balance:") , "");
+	makeSmallKnob(m_outBalanceKnob, tr("Output balance:") , "");
 	m_outBalanceKnob->setModel(&controls->m_outBalanceModel);
 	m_outBalanceKnob->setToolTip(tr("Bias the output audio to the left/right or mid/side"));
 
 	m_stereoBalanceKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_stereoBalanceKnob, tr("Stereo Balance:") , "");
+	makeSmallKnob(m_stereoBalanceKnob, tr("Stereo balance:") , "");
 	m_stereoBalanceKnob->setModel(&controls->m_stereoBalanceModel);
 	m_stereoBalanceKnob->setToolTip(tr("Bias the sidechain signal to the left/right or mid/side"));
 
 	m_blendKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_blendKnob, tr("Stereo Link Blend:") , "");
+	makeSmallKnob(m_blendKnob, tr("Stereo link blend:") , "");
 	m_blendKnob->setModel(&controls->m_blendModel);
 	m_blendKnob->setToolTip(tr("Blend between unlinked/maximum/average/minimum stereo linking modes"));
 
 	m_tiltKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_tiltKnob, tr("Tilt Gain:") , " dB");
+	makeSmallKnob(m_tiltKnob, tr("Tilt gain:") , " dB");
 	m_tiltKnob->setModel(&controls->m_tiltModel);
-	m_tiltKnob->setToolTip(tr("Bias the sidechain signal to the low or high frequencies.  -6 db is lowpass, 6 db is highpass."));
+	m_tiltKnob->setToolTip(tr("Bias the sidechain signal to the low or high frequencies.  -6 dB is lowpass, 6 dB is highpass."));
 
 	m_tiltFreqKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_tiltFreqKnob, tr("Tilt Frequency:") , " Hz");
+	makeSmallKnob(m_tiltFreqKnob, tr("Tilt frequency:") , " Hz");
 	m_tiltFreqKnob->setModel(&controls->m_tiltFreqModel);
 	m_tiltFreqKnob->setToolTip(tr("Center frequency of sidechain tilt filter"));
 
@@ -164,12 +165,12 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	m_mixKnob->setToolTip(tr("Balance between wet and dry signals"));
 
 	m_autoAttackKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_autoAttackKnob, tr("Auto Attack:") , "%");
+	makeSmallKnob(m_autoAttackKnob, tr("Auto attack:") , "%");
 	m_autoAttackKnob->setModel(&controls->m_autoAttackModel);
 	m_autoAttackKnob->setToolTip(tr("Automatically control attack value depending on crest factor"));
 
 	m_autoReleaseKnob = new Knob(KnobType::Styled, this);
-	makeSmallKnob(m_autoReleaseKnob, tr("Auto Release:") , "%");
+	makeSmallKnob(m_autoReleaseKnob, tr("Auto release:") , "%");
 	m_autoReleaseKnob->setModel(&controls->m_autoReleaseModel);
 	m_autoReleaseKnob->setToolTip(tr("Automatically control release value depending on crest factor"));
 
@@ -185,7 +186,7 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	m_inFader->setHintText(tr("Gain"), "dBFS");
 	m_inFader->setToolTip(tr("Input volume"));
 
-	rmsButton = new PixmapButton(this, tr("Root Mean Square"));
+	rmsButton = new PixmapButton(this, tr("Root mean square"));
 	rmsButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("rms_sel"));
 	rmsButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("rms_unsel"));
 	rmsButton->setToolTip(tr("Use RMS of the input"));
@@ -263,28 +264,28 @@ CompressorControlDialog::CompressorControlDialog(CompressorControls* controls) :
 	stereoLinkGroup->addButton(blendButton);
 	stereoLinkGroup->setModel(&controls->m_stereoLinkModel);
 
-	autoMakeupButton = new PixmapButton(this, tr("Auto Makeup Gain"));
+	autoMakeupButton = new PixmapButton(this, tr("Auto makeup gain"));
 	autoMakeupButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("autogain_sel"));
 	autoMakeupButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("autogain_unsel"));
 	autoMakeupButton->setToolTip(tr("Automatically change makeup gain depending on threshold, knee, and ratio settings"));
 	autoMakeupButton->setCheckable(true);
 	autoMakeupButton->setModel(&controls->m_autoMakeupModel);
 
-	auditionButton = new PixmapButton(this, tr("Soft Clip"));
+	auditionButton = new PixmapButton(this, tr("Soft clip"));
 	auditionButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("audition_sel"));
 	auditionButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("audition_unsel"));
 	auditionButton->setToolTip(tr("Play the delta signal"));
 	auditionButton->setCheckable(true);
 	auditionButton->setModel(&controls->m_auditionModel);
 
-	feedbackButton = new PixmapButton(this, tr("Soft Clip"));
+	feedbackButton = new PixmapButton(this, tr("Feedback"));
 	feedbackButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("feedback_sel"));
 	feedbackButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("feedback_unsel"));
 	feedbackButton->setToolTip(tr("Use the compressor's output as the sidechain input"));
 	feedbackButton->setCheckable(true);
 	feedbackButton->setModel(&controls->m_feedbackModel);
 
-	lookaheadButton = new PixmapButton(this, tr("Lookahead Enabled"));
+	lookaheadButton = new PixmapButton(this, tr("Lookahead enabled"));
 	lookaheadButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("lookahead_sel"));
 	lookaheadButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("lookahead_unsel"));
 	lookaheadButton->setToolTip(tr("Enable Lookahead, which introduces 20 milliseconds of latency"));
@@ -672,7 +673,7 @@ void CompressorControlDialog::drawGraph()
 	m_p.setPen(QPen(m_textColor, 1));
 
 	// Arbitrary formula for increasing font size when window size increases
-	m_p.setFont(QFont("Arial", qMax(int(m_windowSizeY / 1080.f * 24), 12)));
+	m_p.setFont(auxiliaryFont(m_p.font()));
 
 	// Redraw graph
 	m_p.setPen(QPen(m_graphColor, 1));

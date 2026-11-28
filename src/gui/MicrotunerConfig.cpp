@@ -65,7 +65,7 @@ MicrotunerConfig::MicrotunerConfig() :
 	m_baseFreqModel(DefaultBaseFreq, 0.1f, 9999.999f, 0.001f, nullptr, tr("Base note frequency"))
 {
 	setWindowIcon(embed::getIconPixmap("microtuner"));
-	setWindowTitle(tr("Microtuner Configuration"));
+	setWindowTitle(tr("Microtuner configuration"));
 
 	// Organize into 2 main columns: scales and keymaps
 	auto microtunerLayout = new QGridLayout();

@@ -25,6 +25,8 @@
 
 #include "TrackView.h"
 
+#include <algorithm>
+
 #include <QApplication>
 #include <QHBoxLayout>
 #include <QMouseEvent>
@@ -39,6 +41,7 @@
 #include "DeprecationHelper.h"
 #include "Engine.h"
 #include "FadeButton.h"
+#include "FontHelper.h"
 #include "StringPairDrag.h"
 #include "Track.h"
 #include "TrackGrip.h"
@@ -78,7 +81,7 @@ TrackView::TrackView(Track* track, TrackContainerView* tcv)
 	layout->addWidget( &m_trackOperationsWidget );
 	layout->addWidget( &m_trackSettingsWidget );
 	layout->addWidget( &m_trackContentWidget, 1 );
-	setFixedHeight( m_track->getHeight() );
+	setFixedHeight(std::max(m_track->getHeight(), minimumTrackHeight()));
 
 	resizeEvent( nullptr );
 
@@ -172,7 +175,7 @@ void TrackView::modelChanged()
 	m_trackOperationsWidget.m_muteBtn->setModel( &m_track->m_mutedModel );
 	m_trackOperationsWidget.m_soloBtn->setModel( &m_track->m_soloModel );
 	ModelView::modelChanged();
-	setFixedHeight( m_track->getHeight() );
+	setFixedHeight(std::max(m_track->getHeight(), minimumTrackHeight()));
 }
 
 
@@ -423,9 +426,15 @@ void TrackView::setIndicatorMute(FadeButton* indicator, bool muted)
 }
 
 
+int TrackView::minimumTrackHeight()
+{
+	return DEFAULT_TRACK_HEIGHT + scaledFontSize(AUXILIARY_FONT_SIZE) - AUXILIARY_FONT_SIZE;
+}
+
+
 void TrackView::resizeToHeight(int h)
 {
-	setFixedHeight(qMax<int>(h, MINIMAL_TRACK_HEIGHT));
+	setFixedHeight(std::max(h, minimumTrackHeight()));
 	m_trackContainerView->realignTracks();
 	m_track->setHeight(height());
 }

@@ -47,7 +47,7 @@ LfoGraph::LfoGraph(QWidget* parent) :
 	m_noAmountColor(96, 91, 96),
 	m_fullAmountColor(0, 255, 128)
 {
-	setMinimumSize(m_lfoGraph.size());
+	setMinimumSize(embed::logicalSize(m_lfoGraph));
 }
 
 void LfoGraph::mousePressEvent(QMouseEvent* me)

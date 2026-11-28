@@ -215,17 +215,17 @@ sample_t Lb302Filter3Pole::process(sample_t samp)
 
 Lb302Synth::Lb302Synth(InstrumentTrack* instrumentTrack)
 	: Instrument(instrumentTrack, &lb302_plugin_descriptor, nullptr, Flag::IsSingleStreamed)
-	, m_vcfCutKnob(0.75f, 0.0f, 1.5f, 0.005f, this, tr("VCF Cutoff Frequency"))
-	, m_vcfResKnob(0.75f, 0.0f, 1.25f, 0.005f, this, tr("VCF Resonance"))
-	, m_vcfModKnob(0.1f, 0.0f, 1.0f, 0.005f, this, tr("VCF Envelope Mod"))
-	, m_vcfDecKnob(0.1f, 0.0f, 1.0f, 0.005f, this, tr("VCF Envelope Decay"))
+	, m_vcfCutKnob(0.75f, 0.0f, 1.5f, 0.005f, this, tr("VCF cutoff frequency"))
+	, m_vcfResKnob(0.75f, 0.0f, 1.25f, 0.005f, this, tr("VCF resonance"))
+	, m_vcfModKnob(0.1f, 0.0f, 1.0f, 0.005f, this, tr("VCF envelope mod"))
+	, m_vcfDecKnob(0.1f, 0.0f, 1.0f, 0.005f, this, tr("VCF envelope decay"))
 	, m_distKnob(0.0f, 0.0f, 1.0f, 0.01f, this, tr("Distortion"))
 	, m_waveShape(8.0f, 0.0f, 11.0f, this, tr("Waveform"))
-	, m_slideDecKnob(0.6f, 0.0f, 1.0f, 0.005f, this, tr("Slide Decay"))
+	, m_slideDecKnob(0.6f, 0.0f, 1.0f, 0.005f, this, tr("Slide decay"))
 	, m_slideToggle(false, this, tr("Slide"))
 	, m_accentToggle(false, this, tr("Accent"))
 	, m_deadToggle(false, this, tr("Dead"))
-	, m_db24Toggle(false, this, tr("24dB/oct Filter"))
+	, m_db24Toggle(false, this, tr("24dB/oct filter"))
 	, m_vcfs{std::make_unique<Lb302FilterIIR2>(&m_fs), std::make_unique<Lb302Filter3Pole>(&m_fs)}
 {
 	connect(Engine::audioEngine(), &AudioEngine::sampleRateChanged, this, &Lb302Synth::filterChanged);
@@ -627,7 +627,7 @@ Lb302SynthView::Lb302SynthView(Instrument* instrument, QWidget* parent)
 	// GUI
 	m_vcfCutKnob = new Knob(KnobType::Bright26, this);
 	m_vcfCutKnob->move(75, 130);
-	m_vcfCutKnob->setHintText(tr("Cutoff Freq:"), "");
+	m_vcfCutKnob->setHintText(tr("Cutoff freq:"), "");
 
 	m_vcfResKnob = new Knob(KnobType::Bright26, this);
 	m_vcfResKnob->move(120, 130);
@@ -635,7 +635,7 @@ Lb302SynthView::Lb302SynthView(Instrument* instrument, QWidget* parent)
 
 	m_vcfModKnob = new Knob(KnobType::Bright26, this);
 	m_vcfModKnob->move(165, 130);
-	m_vcfModKnob->setHintText(tr("Env Mod:"), "");
+	m_vcfModKnob->setHintText(tr("Env mod:"), "");
 
 	m_vcfDecKnob = new Knob(KnobType::Bright26, this);
 	m_vcfDecKnob->move(210, 130);
@@ -657,11 +657,11 @@ Lb302SynthView::Lb302SynthView(Instrument* instrument, QWidget* parent)
 
 	m_slideDecKnob = new Knob(KnobType::Bright26, this);
 	m_slideDecKnob->move(210, 75);
-	m_slideDecKnob->setHintText(tr("Slide Decay:"), "");
+	m_slideDecKnob->setHintText(tr("Slide decay:"), "");
 
 	m_distKnob = new Knob(KnobType::Bright26, this);
 	m_distKnob->move(210, 190);
-	m_distKnob->setHintText(tr("DIST:"), "");
+	m_distKnob->setHintText(tr("Dist:"), "");
 
 	// Shapes
 	const int waveBtnX = 10;

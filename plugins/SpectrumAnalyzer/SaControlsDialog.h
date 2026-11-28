@@ -56,7 +56,7 @@ private:
 
 	// Pointers to created widgets are needed to keep track of their sizeHint() changes.
 	// Config widget is a plain QWidget so it has just a fixed height instead.
-	const int m_configHeight = 75;
+	const int m_configHeight;
 	SaSpectrumView *m_spectrum;
 	SaWaterfallView *m_waterfall;
 };

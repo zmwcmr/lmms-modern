@@ -86,6 +86,7 @@ private:
 	void cancel();
 
 	QPointer<AutomatableModel> m_model;
+	QPointer<QWidget> m_control;
 	ValueTransform m_toDisplay;
 	ValueTransform m_fromDisplay;
 	int m_decimals;

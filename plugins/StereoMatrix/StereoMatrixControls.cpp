@@ -34,10 +34,10 @@ namespace lmms
 StereoMatrixControls::StereoMatrixControls( StereoMatrixEffect * _eff ) :
 		EffectControls( _eff ),
 		m_effect( _eff ),
-		m_llModel( 1.0f, -1.0f, 1.0f, 0.01f, this, tr( "Left to Left" ) ),
-		m_lrModel( 0.0f, -1.0f, 1.0f, 0.01f, this, tr( "Left to Right" ) ),
-		m_rlModel( 0.0f, -1.0f, 1.0f, 0.01f, this, tr( "Right to Left" ) ),
-		m_rrModel( 1.0f, -1.0f, 1.0f, 0.01f, this, tr( "Right to Right" ) )
+		m_llModel( 1.0f, -1.0f, 1.0f, 0.01f, this, tr( "Left to left" ) ),
+		m_lrModel( 0.0f, -1.0f, 1.0f, 0.01f, this, tr( "Left to right" ) ),
+		m_rlModel( 0.0f, -1.0f, 1.0f, 0.01f, this, tr( "Right to left" ) ),
+		m_rrModel( 1.0f, -1.0f, 1.0f, 0.01f, this, tr( "Right to right" ) )
 {
 	m_llModel.setCenterValue( 0 );
 	m_lrModel.setCenterValue( 0 );

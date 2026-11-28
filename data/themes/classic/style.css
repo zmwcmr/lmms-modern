@@ -6,9 +6,26 @@
 QLabel, QTreeWidget, QListWidget, QGroupBox, QMenuBar {
 	color: #e0e0e0;
 }
+QSplitter::handle:horizontal {
+	background: #3c444e;
+	border-left: 1px solid #1e2226;
+	border-right: 1px solid #1e2226;
+}
+
+QSplitter::handle:horizontal:hover {
+	background: #5d6b77;
+}
+
+
+QTabBar::tab { color: #e0e0e0; }
 
 QMdiArea {
 	background-image: url("resources:background_artwork.png");
+}
+
+/* Group boxes use the body size with semibold weight, like custom GroupBox titles. */
+QGroupBox::title {
+	font-weight: 600;
 }
 
 lmms--gui--Knob {
@@ -85,6 +102,21 @@ lmms--gui--ProjectNotes QTextEdit {
 	background-color: #404040;
 }
 
+/* Keyboard focus indication. Draw only an outline so focus never changes
+   layout, and match the classic theme's green accent. */
+QToolButton:focus,
+QPushButton:focus {
+	outline: 1px solid #4afd85;
+	outline-offset: -2px;
+}
+
+QTreeView:focus,
+QListView:focus,
+QTableView:focus {
+	outline: 1px solid #4afd85;
+	outline-offset: -1px;
+}
+
 QToolTip {
 	border-radius: 4px;
 	background: qlineargradient(spread:reflect, x1:0.5, y1:0.5, x2:0.5, y2:0,
@@ -126,7 +158,7 @@ QMenu::item:selected {
 }
 
 QMenu::item:disabled {
-	color: #747474;
+	color: #666666;
 	background-color: #c9c9c9;
 	padding: 4px 32px 4px 20px;
 }
@@ -153,7 +185,6 @@ QMenu::indicator:selected {
 
 lmms--gui--FileBrowser QCheckBox
 {
-	font-size: 11px;
 	color: white;
 }
 
@@ -236,7 +267,7 @@ lmms--gui--Oscilloscope {
 
 lmms--gui--CPULoadWidget {
 	border: none;
-	background: url("resources:cpuload_bg.png");
+	background: none;
 	qproperty-stepSize: 4;
 	qproperty-labelColor: black;
 }
@@ -503,11 +534,11 @@ QPushButton#btn-solo:checked {
 
 lmms--gui--InstrumentTrackWindow QLabel#trackSettingsLabel,
 lmms--gui--SampleTrackWindow QLabel#trackSettingsLabel {
-	font-size: 10px;
+	font-size: 8px;
 }
 
 lmms--gui--Sf2InstrumentView > QLabel {
-	font-size:10px;
+	font-size:8px;
 }
 
 /* main toolbar sliders (master vol, master pitch) */
@@ -665,7 +696,6 @@ QToolButton::menu-button {
 lmms--gui--TrackLabelButton {
 	background-color: #5b6571;
 	color: #c9c9c9;
-	font-size: 11px;
 	font-weight: normal;
 	border-radius: 1px;
 	border: none;
@@ -687,7 +717,7 @@ lmms--gui--TrackLabelButton:pressed {
 	color: white;
 	border: 1px solid rgba(0,0,0,64);
 	padding: 2px 0px 0px;
-	font-weight: bold;
+	font-weight: 600;
 }
 
 lmms--gui--TrackLabelButton:checked {
@@ -696,7 +726,7 @@ lmms--gui--TrackLabelButton:checked {
 	color: white;
 	border: 1px solid rgba(0,0,0,128);
 	padding: 2px 0px 0px;
-	font-weight: bold;
+	font-weight: 600;
 }
 
 lmms--gui--TrackLabelButton:checked:hover {
@@ -716,20 +746,7 @@ lmms--gui--SideBar {
 }
 
 lmms--gui--SideBar QToolButton {
-	font-size: 12px;
-}
-
-/* Instrument plugin list */
-
-lmms--gui--PluginDescWidget {
-	background-color: #e0e0e0;
-	color: #404040;
-	border: 1px solid rgb(64, 64, 64);
-	margin: 0px;
-}
-
-lmms--gui--PluginDescWidget:hover {
-	background-color: #e0e0e0;
+	font-size: 10px;
 }
 
 /* piano widget */
@@ -763,7 +780,7 @@ lmms--gui--MixerChannelView QGraphicsView {
 
 lmms--gui--PeakIndicator {
 	background-color: #111811;
-	font-size: 10px;
+	font-size: 8px;
 }
 
 /* Meter colors and fader ticks */
@@ -777,7 +794,7 @@ lmms--gui--Fader {
 
 lmms--gui--TimeLineWidget {
         /* font-size only supports px and pt. */
-	font-size: 10px;
+	font-size: 8px;
 	/* lengths also support em. This will make sure that the height
 	   will always change in the same proportion as the font size
 	   defined above.
@@ -807,6 +824,25 @@ QTreeView {
 	alternate-background-color: #747474;
 }
 
+lmms--gui--FileBrowserTreeWidget::branch:has-children:open,
+lmms--gui--FileBrowserTreeWidget::branch:has-children:closed,
+QTreeWidget#pluginBrowserTree::branch:has-children:open,
+QTreeWidget#pluginBrowserTree::branch:has-children:closed {
+	image: none;
+}
+
+lmms--gui--FileBrowserTreeWidget::branch:selected,
+lmms--gui--FileBrowserTreeWidget::branch:hover,
+QTreeWidget#pluginBrowserTree::branch:selected,
+QTreeWidget#pluginBrowserTree::branch:hover {
+	background: transparent;
+}
+
+lmms--gui--FileBrowserTreeWidget:focus,
+QTreeWidget#pluginBrowserTree:focus {
+	outline: none;
+}
+
 lmms--gui--TrackContainerView QLabel
 {
 	background: none;
@@ -827,7 +863,7 @@ lmms--gui--ClipView   {
 	qproperty-textShadowColor: rgb( 0, 0, 0 );
 	qproperty-gradient: true; /* boolean property, set true to have a gradient */
 	qproperty-markerColor: rgb(0, 0, 0);
-	font-size: 11px;
+	font-size: 10px;
 }
 
 /* MIDI (instrument) clip */
@@ -874,7 +910,8 @@ lmms--gui--SubWindow {
 /* Subwindow title text */
 lmms--gui--SubWindow > QLabel {
 	color: rgb( 255, 255, 255 );
-	font-size: 12px;
+	font-size: 13px;
+	font-weight: 600;
 	font-style: normal;
 }
 
@@ -1186,4 +1223,5 @@ lmms--gui--LmmsPalette {
 	qproperty-brightText: #4afd85;
 	qproperty-highlight: #202020;
 	qproperty-highlightedText: #ffffff;
+	qproperty-linkColor: #8cfab6;
 }

@@ -550,7 +550,7 @@ SidInstrumentView::SidInstrumentView( Instrument * _instrument,
 		rk->move( 7 + 3*28, 114 + i*50 );
 
 		Knob *pwk = new sidKnob( this );
-		pwk->setHintText( tr("Pulse Width:"), "" );
+		pwk->setHintText( tr("Pulse width:"), "" );
 		pwk->move( 7 + 4*28, 114 + i*50 );
 
 		Knob *crsk = new sidKnob( this );

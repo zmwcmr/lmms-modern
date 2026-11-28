@@ -144,6 +144,8 @@ public:
 	//! This is essentially a sum of both the TrackOperationsWidget width and the Track settings widget width.
 	int trackHeadWidth() const { return m_trackHeadWidth; }
 	void setTrackHeadWidth(int width);
+	static int scaledTrackHeadWidth(int width);
+	int trackHeadWidthForStorage() const;
 
 	//! This function only exists because the pattern editor cannot yet handle scrolling, so the track head cannot
 	//! extend too far or it will cause the clips to have 0 width.

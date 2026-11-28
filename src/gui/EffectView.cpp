@@ -52,7 +52,8 @@ EffectView::EffectView( Effect * _model, QWidget * _parent ) :
 	m_controlView(nullptr),
 	m_dragging(false)
 {
-	setFixedSize(EffectView::DEFAULT_WIDTH, EffectView::DEFAULT_HEIGHT);
+	setMinimumWidth(EffectView::DEFAULT_WIDTH);
+	resize(EffectView::DEFAULT_WIDTH, EffectView::DEFAULT_HEIGHT);
 	setFocusPolicy(Qt::StrongFocus);
 
 	// Disable effects that are of type "DummyEffect"
@@ -64,16 +65,18 @@ EffectView::EffectView( Effect * _model, QWidget * _parent ) :
 
 	connect(getGUI()->mainWindow(), &MainWindow::periodicUpdate, this, &EffectView::corruptStateUpdate);
 
-	m_wetDry = new Knob(KnobType::Bright26, tr("W/D"), this, Knob::LabelRendering::LegacyFixedFontSize);
+	m_wetDry = new Knob(KnobType::Bright26, tr("W/D"), SMALL_FONT_SIZE, this);
 	m_wetDry->move( 40 - m_wetDry->width() / 2, 5 );
 	m_wetDry->setEnabled( isEnabled );
-	m_wetDry->setHintText( tr( "Wet Level:" ), "" );
+	m_wetDry->setHintText( tr( "Wet level:" ), "" );
 
 
-	m_autoQuit = new TempoSyncKnob(KnobType::Bright26, tr("DECAY"), this, Knob::LabelRendering::LegacyFixedFontSize);
-	m_autoQuit->move( 78 - m_autoQuit->width() / 2, 5 );
+	m_autoQuit = new TempoSyncKnob(KnobType::Bright26, tr("DECAY"), SMALL_FONT_SIZE, this);
+	m_autoQuit->move(qMax(78 - m_autoQuit->width() / 2, m_wetDry->geometry().right() + 5), 5);
 	m_autoQuit->setEnabled(isEnabled && effect()->autoQuitEnabled());
 	m_autoQuit->setHintText( tr( "Time:" ), "ms" );
+	const int titleHeight = QFontMetrics(bodyFont(font())).height();
+	setFixedHeight(qMax(DEFAULT_HEIGHT, 5 + qMax(m_wetDry->height(), m_autoQuit->height()) + 6 + titleHeight + 5));
 
 	setModel( _model );
 
@@ -87,7 +90,9 @@ EffectView::EffectView( Effect * _model, QWidget * _parent ) :
 		const QFontMetrics buttonMetrics(f);
 		const int buttonWidth = buttonMetrics.horizontalAdvance(ctls_btn->text()) + 12;
 		const int buttonHeight = buttonMetrics.height() + 4;
-		ctls_btn->setGeometry(200 - buttonWidth, 34 - buttonHeight, buttonWidth, buttonHeight);
+		const int buttonX = qMax(200 - buttonWidth, m_autoQuit->geometry().right() + 8);
+		ctls_btn->setGeometry(buttonX, 34 - buttonHeight, buttonWidth, buttonHeight);
+		setMinimumWidth(qMax(DEFAULT_WIDTH, buttonX + buttonWidth + 15));
 		ctls_btn->setFocusPolicy(Qt::NoFocus);
 		connect( ctls_btn, SIGNAL(clicked()),
 					this, SLOT(editControls()));
@@ -214,7 +219,7 @@ void EffectView::mouseMoveEvent(QMouseEvent* event)
 	{
 		moveUp();
 	}
-	else if (event->pos().y() > EffectView::DEFAULT_HEIGHT)
+	else if (event->pos().y() > height())
 	{
 		moveDown();
 	}
@@ -225,18 +230,18 @@ void EffectView::mouseMoveEvent(QMouseEvent* event)
 void EffectView::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
-	p.drawPixmap( 0, 0, m_bg );
+	p.drawPixmap(rect(), m_bg);
 
 	QFont f = adjustedToPixelSize(font(), DEFAULT_FONT_SIZE);
-	f.setBold( true );
 	p.setFont( f );
 
 	QString elidedText = p.fontMetrics().elidedText( model()->displayName(), Qt::ElideRight, width() - 22 );
 
 	p.setPen( palette().shadow().color() );
-	p.drawText( 6, 55, elidedText );
+	const int baseline = height() - 5 - p.fontMetrics().descent();
+	p.drawText(6, baseline + 1, elidedText);
 	p.setPen( palette().text().color() );
-	p.drawText( 5, 54, elidedText );
+	p.drawText(5, baseline, elidedText);
 }
 
 
@@ -244,6 +249,7 @@ void EffectView::paintEvent( QPaintEvent * )
 
 void EffectView::modelChanged()
 {
+	setToolTip(model()->displayName());
 	m_bypass->setModel( &effect()->m_enabledModel );
 	m_wetDry->setModel( &effect()->m_wetDryModel );
 	m_autoQuit->setModel( &effect()->m_autoQuitModel );

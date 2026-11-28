@@ -28,6 +28,7 @@
 
 #include <cmath>
 
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
@@ -40,7 +41,6 @@
 #include "DeprecationHelper.h"
 #include "embed.h"
 #include "GuiApplication.h"
-#include "FontHelper.h"
 #include "InlineValueEditor.h"
 #include "KeyboardShortcuts.h"
 #include "MainWindow.h"
@@ -98,18 +98,39 @@ void LcdFloatSpinBox::layoutSetup(const QString &style)
 	lcdLayout->setContentsMargins(0, 0, 0, 0);
 	lcdLayout->setSpacing(0);
 
-	// Add space for the label. The LCD artwork is fixed-size, so the caption
-	// keeps the design size instead of growing with the system font.
-	const int labelSpace = 9;
-	auto outerLayout = new QVBoxLayout();
+	auto outerLayout = new QVBoxLayout(this);
 	outerLayout->addLayout(lcdLayout);
-	outerLayout->addSpacing(labelSpace);
+	outerLayout->setAlignment(lcdLayout, Qt::AlignHCenter);
+	m_labelSpace = new QSpacerItem(0, 0, QSizePolicy::Fixed, QSizePolicy::Fixed);
+	outerLayout->addSpacerItem(m_labelSpace);
 	outerLayout->setContentsMargins(0, 0, 0, 0);
+	outerLayout->setSpacing(0);
 	outerLayout->setSizeConstraint(QLayout::SetFixedSize);
-	this->setLayout(outerLayout);
-	this->setFixedHeight(m_wholeDisplay.cellHeight() + labelSpace);
 }
 
+
+void LcdFloatSpinBox::setLabel(const QString& label)
+{
+	m_label = label;
+	updateLabelLayout();
+}
+
+void LcdFloatSpinBox::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() == QEvent::FontChange && m_labelSpace && !m_label.isEmpty())
+	{
+		updateLabelLayout();
+	}
+}
+
+void LcdFloatSpinBox::updateLabelLayout()
+{
+	const auto size = m_wholeDisplay.labelSize(m_label);
+	m_labelSpace->changeSize(size.width(), size.height(), QSizePolicy::Fixed, QSizePolicy::Fixed);
+	layout()->invalidate();
+	QWidget::update();
+}
 
 void LcdFloatSpinBox::update()
 {
@@ -141,7 +162,7 @@ void LcdFloatSpinBox::mousePressEvent(QMouseEvent* event)
 	const auto pos = position(event);
 
 	// switch between integer and fractional step based on cursor position
-	m_intStep = pos.x() < m_wholeDisplay.width();
+	m_intStep = pos.x() <= m_wholeDisplay.geometry().right();
 
 	if (event->button() == Qt::LeftButton &&
 		!(event->modifiers() & KBD_COPY_MODIFIER) &&
@@ -194,7 +215,7 @@ void LcdFloatSpinBox::mouseReleaseEvent(QMouseEvent*)
 void LcdFloatSpinBox::wheelEvent(QWheelEvent *event)
 {
 	// switch between integer and fractional step based on cursor position
-	if (event->position().toPoint().x() < m_wholeDisplay.width()) { m_intStep = true; }
+	if (event->position().toPoint().x() <= m_wholeDisplay.geometry().right()) { m_intStep = true; }
 	else { m_intStep = false; }
 
 	event->accept();
@@ -208,7 +229,7 @@ void LcdFloatSpinBox::mouseDoubleClickEvent(QMouseEvent *)
 	mouseReleaseEvent(nullptr);
 	InlineValueEditor::showEditorWithHint(this, model(),
 		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue()),
-		{}, {}, m_fractionDisplay.numDigits());
+		{}, {}, m_fractionDisplay.numDigits(), m_wholeDisplay.geometry().bottom() + 1);
 }
 
 
@@ -227,19 +248,14 @@ void LcdFloatSpinBox::paintEvent(QPaintEvent*)
 	QStyleOptionFrame opt;
 	opt.initFrom(this);
 	opt.state = QStyle::State_Sunken;
-	opt.rect = QRect(0, 0, width() - 1, m_wholeDisplay.height());
+	opt.rect = m_wholeDisplay.geometry().united(m_fractionDisplay.geometry());
+	opt.rect.adjust(0, 0, -1, 0);
 	style()->drawPrimitive(QStyle::PE_Frame, &opt, &p, this);
 
 	// Label
 	if (!m_label.isEmpty())
 	{
-		QFont labelFont = p.font();
-		labelFont.setPixelSize(DEFAULT_FONT_SIZE);
-		p.setFont(labelFont);
-		p.setPen(m_wholeDisplay.textShadowColor());
-		p.drawText(width() / 2 - p.fontMetrics().boundingRect(m_label).width() / 2 + 1, height(), m_label);
-		p.setPen(m_wholeDisplay.textColor());
-		p.drawText(width() / 2 - p.fontMetrics().boundingRect(m_label).width() / 2, height() - 1, m_label);
+		m_wholeDisplay.drawLabel(p, rect(), m_label);
 	}
 }
 

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="143" height="38" viewBox="0 0 143 38">
+  <defs>
+    <path id="unlit" d="M1 3h9v2h-9zM1 5h2v4h-2zM8 5h2v4h-2zM1 9h9v2h-9zM1 11h2v4h-2zM8 11h2v4h-2zM1 15h9v2h-9z"/>
+    <g id="lit">
+      <path d="M1 3h9v2h-9zM1 5h2v10h-2zM8 5h2v10h-2zM1 15h9v2h-9z"/> <!-- 0 -->
+      <path d="M19 3h2v14h-2z"/> <!-- 1 -->
+      <path d="M23 3h9v2h-9zM30 5h2v4h-2zM23 9h9v2h-9zM23 11h2v4h-2zM23 15h9v2h-9z"/> <!-- 2 -->
+      <path d="M34 3h9v2h-9zM41 5h2v4h-2zM36 9h7v2h-7zM41 11h2v4h-2zM34 15h9v2h-9z"/> <!-- 3 -->
+      <path d="M45 3h2v6h-2zM52 3h2v6h-2zM45 9h9v2h-9zM52 11h2v6h-2z"/> <!-- 4 -->
+      <path d="M56 3h9v2h-9zM56 5h2v4h-2zM56 9h9v2h-9zM63 11h2v4h-2zM56 15h9v2h-9z"/> <!-- 5 -->
+      <path d="M67 3h9v2h-9zM67 5h2v4h-2zM67 9h9v2h-9zM67 11h2v4h-2zM74 11h2v4h-2zM67 15h9v2h-9z"/> <!-- 6 -->
+      <path d="M78 3h9v2h-9zM85 5h2v12h-2z"/> <!-- 7 -->
+      <path d="M89 3h9v2h-9zM89 5h2v4h-2zM96 5h2v4h-2zM89 9h9v2h-9zM89 11h2v4h-2zM96 11h2v4h-2zM89 15h9v2h-9z"/> <!-- 8 -->
+      <path d="M100 3h9v2h-9zM100 5h2v4h-2zM107 5h2v4h-2zM100 9h9v2h-9zM107 11h2v4h-2zM100 15h9v2h-9z"/> <!-- 9 -->
+      <path d="M124 9h5v2h-5z"/> <!-- - -->
+    </g>
+    <g id="segments">
+      <use xlink:href="#unlit" x="0"/>
+      <use xlink:href="#unlit" x="11"/>
+      <use xlink:href="#unlit" x="22"/>
+      <use xlink:href="#unlit" x="33"/>
+      <use xlink:href="#unlit" x="44"/>
+      <use xlink:href="#unlit" x="55"/>
+      <use xlink:href="#unlit" x="66"/>
+      <use xlink:href="#unlit" x="77"/>
+      <use xlink:href="#unlit" x="88"/>
+      <use xlink:href="#unlit" x="99"/>
+      <use xlink:href="#unlit" x="110"/>
+      <use xlink:href="#unlit" x="121"/>
+    </g>
+  </defs>
+  <rect width="143" height="38" fill="#000000"/>
+  <use xlink:href="#segments" y="0" fill="#1a0206"/>
+  <use xlink:href="#lit" y="0" fill="#af0e28"/>
+  <use xlink:href="#segments" y="19" fill="#0e0103"/>
+  <use xlink:href="#lit" y="19" fill="#610816"/>
+</svg>

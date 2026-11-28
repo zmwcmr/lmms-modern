@@ -29,6 +29,8 @@
 
 #include <QTextEdit>
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -45,6 +47,12 @@ public:
 	~GranularPitchShifterControlDialog() override = default;
 public slots:
 	void showHelpWindow();
+
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 };
 
 class GranularPitchShifterHelpView : public QTextEdit

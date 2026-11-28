@@ -56,7 +56,6 @@ namespace lmms::gui
 SampleTrackView::SampleTrackView( SampleTrack * _t, TrackContainerView* tcv ) :
 	TrackView( _t, tcv )
 {
-	setFixedHeight( 32 );
 
 	m_tlb = new TrackLabelButton(this, getTrackSettingsWidget());
 	m_tlb->setCheckable(true);
@@ -66,9 +65,10 @@ SampleTrackView::SampleTrackView( SampleTrack * _t, TrackContainerView* tcv ) :
 	m_tlb->show();
 
 	m_mixerChannelNumber = new MixerChannelLcdSpinBox(2, getTrackSettingsWidget(), tr("Mixer channel"), this);
-	m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= COMPACT_TRACK_WIDTH);
-	connect(trackContainerView(), &TrackContainerView::trackHeadWidthChanged, this, [this](int width){
-		m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= COMPACT_TRACK_WIDTH);
+	const int channelNumberThreshold = TrackContainerView::scaledTrackHeadWidth(COMPACT_TRACK_WIDTH);
+	m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= channelNumberThreshold);
+	connect(trackContainerView(), &TrackContainerView::trackHeadWidthChanged, this, [this, channelNumberThreshold](int width) {
+		m_mixerChannelNumber->setVisible(width >= channelNumberThreshold);
 	});
 
 	m_volumeKnob = new VolumeKnob(KnobType::Small17, tr("VOL"), getTrackSettingsWidget(), Knob::LabelRendering::LegacyFixedFontSize, tr("Track volume"));

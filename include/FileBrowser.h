@@ -26,7 +26,10 @@
 #define LMMS_GUI_FILE_BROWSER_H
 
 #include <QDir>
+#include <QHash>
+#include <QKeySequence>
 #include <QMutex>
+#include <QPersistentModelIndex>
 
 #include "FileSearchJob.h"
 #include "embed.h"
@@ -38,7 +41,9 @@
 
 class QCheckBox;
 class QLineEdit;
+class QPainter;
 class QProgressBar;
+class QVariantAnimation;
 
 namespace lmms
 {
@@ -108,6 +113,7 @@ private:
 	FileBrowserTreeWidget * m_searchTreeWidget;
 
 	QLineEdit * m_filterEdit;
+	QKeySequence m_refreshShortcut;
 	Type m_type;
 
 	QProgressBar* m_searchIndicator = nullptr;
@@ -146,16 +152,22 @@ protected:
 	void contextMenuEvent( QContextMenuEvent * e ) override;
 	void mousePressEvent( QMouseEvent * me ) override;
 	void mouseMoveEvent( QMouseEvent * me ) override;
+	void mouseDoubleClickEvent( QMouseEvent * me ) override;
 	void mouseReleaseEvent( QMouseEvent * me ) override;
 	void keyPressEvent( QKeyEvent * ke ) override;
 	void keyReleaseEvent( QKeyEvent * ke ) override;
 	void hideEvent( QHideEvent * he ) override;
+	void leaveEvent( QEvent * event ) override;
+	bool viewportEvent( QEvent * event ) override;
 	void focusOutEvent( QFocusEvent * fe ) override;
 	void scrollTo(const QModelIndex &index, ScrollHint hint = EnsureVisible) override;
 	void wheelEvent(QWheelEvent * event) override;
-
+	void drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const override;
 
 private:
+	//! Animates the disclosure arrow of \a index between its closed and open angle.
+	void animateBranch(const QModelIndex& index, bool expanded);
+
 	//! Start a preview of a file item
 	void previewFileItem(FileItem* file);
 	//! If a preview is playing, stop it.
@@ -167,6 +179,10 @@ private:
 
 	bool m_mousePressed;
 	QPoint m_pressPos;
+	QPoint m_mousePos{-1, -1};
+
+	QHash<QPersistentModelIndex, qreal> m_branchAngles;
+	QHash<QPersistentModelIndex, QVariantAnimation*> m_branchAnimations;
 
 	//! This should only be accessed or modified when m_pphMutex is held
 	PlayHandle* m_previewPlayHandle;

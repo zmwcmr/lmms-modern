@@ -35,6 +35,7 @@
 class QGraphicsDropShadowEffect;
 class QLabel;
 class QPushButton;
+class QVariantAnimation;
 class QWidget;
 
 namespace lmms::gui
@@ -123,6 +124,9 @@ signals:
 	void focusLost();
 
 private:
+	//! Cross-fades the title bar between the inactive and active colours.
+	void animateActivation(bool active);
+
 	const QSize m_buttonSize;
 	const int m_titleBarHeight;
 	QPushButton * m_closeBtn;
@@ -138,6 +142,8 @@ private:
 	QGraphicsDropShadowEffect * m_shadow;
 	bool m_hasFocus;
 	bool m_isDetachable;
+	qreal m_activation;
+	QVariantAnimation* m_activationAnimation;
 
 	//! @brief Stores the given text into the given label.
 	//!
@@ -155,6 +161,7 @@ private:
 
 private slots:
 	void focusChanged( QMdiSubWindow * subWindow );
+	void activationChanged( QMdiSubWindow * subWindow );
 };
 
 

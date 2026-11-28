@@ -31,12 +31,17 @@
 #include <QFileInfo>
 #include <QPainter>
 #include <QPainterPath>  // IWYU pragma: keep
+#include <QPixmapCache>
+#include <QFontMetrics>
+#include <QMdiSubWindow>
+#include <QRegularExpression>
 #include <QStyleFactory>
 #include <QStyleOption>
 #include <QVariant>
 
 #include "ConfigManager.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "LmmsPalette.h"
 #include "LmmsStyle.h"
 #include "TextFloat.h"
@@ -44,7 +49,6 @@
 
 namespace lmms::gui
 {
-
 
 QPalette * LmmsStyle::s_palette = nullptr;
 
@@ -56,6 +60,29 @@ int LmmsStyle::uiAnimationDuration(const QWidget* widget, int maximum)
 
 namespace
 {
+QString scaledStyleSheet(QString css)
+{
+	// Theme files use design pixels for font sizes. Scale only the font-size
+	// declarations so the three text tiers follow the application font while
+	// layout dimensions keep their existing behaviour.
+	static const QRegularExpression fontSizeRe(QStringLiteral(R"((font-size\s*:\s*)(\d+)(\s*px))"));
+
+	QString scaled;
+	int offset = 0;
+	auto matches = fontSizeRe.globalMatch(css);
+	while (matches.hasNext())
+	{
+		const auto match = matches.next();
+		scaled += css.mid(offset, match.capturedStart() - offset);
+		scaled += match.captured(1);
+		scaled += QString::number(scaledFontSize(match.captured(2).toInt()));
+		scaled += match.captured(3);
+		offset = match.capturedEnd();
+	}
+	scaled += css.mid(offset);
+	return scaled;
+}
+
 QColor styleColor(const char* key, const QColor& fallback)
 {
 	const auto color = qApp->property(key).value<QColor>();
@@ -65,7 +92,7 @@ QColor styleColor(const char* key, const QColor& fallback)
 void resetStyleColors()
 {
 	for (const auto* key : {"_lmms_activeTitleText", "_lmms_inactiveTitleText", "_lmms_titleText",
-		"_lmms_mdiButton", "_lmms_frameInner"})
+		"_lmms_mdiButton", "_lmms_frameInner", "_lmms_linkColor"})
 	{
 		qApp->setProperty(key, QVariant{});
 	}
@@ -176,7 +203,7 @@ LmmsStyle::LmmsStyle() :
 {
 	QFile file( "resources:style.css" );
 	file.open( QIODevice::ReadOnly );
-	qApp->setStyleSheet( file.readAll() );
+	qApp->setStyleSheet( scaledStyleSheet( QString::fromUtf8( file.readAll() ) ) );
 
 	m_styleReloader.addPath(QFileInfo{file}.absoluteFilePath());
 	connect(&m_styleReloader, &QFileSystemWatcher::fileChanged, this,
@@ -186,11 +213,17 @@ LmmsStyle::LmmsStyle() :
 			{
 				file.open(QIODevice::ReadOnly);
 				resetStyleColors();
-				qApp->setStyleSheet(file.readAll());
+				qApp->setStyleSheet(scaledStyleSheet(QString::fromUtf8(file.readAll())));
 				// The hidden palette used during startup is not automatically
 				// repolished on stylesheet reload. Read the new style properties
 				// from a freshly polished palette before widgets repaint.
 				LmmsPalette refreshedPalette(nullptr, this);
+				const auto palette = refreshedPalette.palette();
+				if (s_palette) { *s_palette = palette; }
+				qApp->setPalette(palette);
+				// `currentColor` icons are resolved against the palette at
+				// load time, so cached pixmaps belong to the previous theme.
+				QPixmapCache::clear();
 				TextFloat::displayMessage(
 					tr("Theme updated"),
 					tr("LMMS theme file %1 has been reloaded.").arg(file.fileName()),
@@ -400,6 +433,11 @@ int LmmsStyle::pixelMetric( PixelMetric _metric, const QStyleOption * _option,
 			return QProxyStyle::pixelMetric(_metric, _option, _widget);
 
 		case QStyle::PM_TitleBarHeight:
+			if (qobject_cast<const QMdiSubWindow*>(_widget))
+			{
+				// Qt uses this metric to position the editor below our custom title bar.
+				return std::max(24, QFontMetrics(titleFont(_widget->font())).height() + 6);
+			}
 			return 24;
 
 		default:

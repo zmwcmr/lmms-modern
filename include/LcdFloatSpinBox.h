@@ -31,6 +31,8 @@
 #include "LcdWidget.h"
 #include "AutomatableModelView.h"
 
+class QSpacerItem;
+
 namespace lmms::gui
 {
 
@@ -48,7 +50,7 @@ public:
 		update();
 	}
 
-	void setLabel(const QString &label) { m_label = label; }
+	void setLabel(const QString& label);
 	
 	void setSeamless(bool left, bool right)
 	{
@@ -60,6 +62,7 @@ public slots:
 	virtual void update();
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void contextMenuEvent(QContextMenuEvent *me) override;
 	void mousePressEvent(QMouseEvent *me) override;
 	void mouseMoveEvent(QMouseEvent *me) override;
@@ -71,6 +74,7 @@ protected:
 private:
 	void layoutSetup(const QString &style = QString("19green"));
 	float getStep() const;
+	void updateLabelLayout();
 
 	LcdWidget m_wholeDisplay;
 	LcdWidget m_fractionDisplay;
@@ -79,6 +83,7 @@ private:
 	QPoint m_origMousePos;
 	int m_displayOffset;
 	QString m_label;
+	QSpacerItem* m_labelSpace = nullptr;
 
 signals:
 	void manualChange();

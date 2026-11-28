@@ -53,6 +53,7 @@
 #include "TrackContainer.h"
 #include "TrackContainerView.h"
 #include "TrackView.h"
+#include "UiFeedback.h"
 
 namespace lmms::gui
 {
@@ -337,6 +338,7 @@ void ClipView::dropEvent( QDropEvent * de )
 	m_clip->restoreState( clips.firstChildElement().firstChildElement() );
 	m_clip->movePosition( pos );
 	AutomationClip::resolveAllIDs();
+	UiFeedback::flash(this);
 	de->accept();
 }
 
@@ -448,6 +450,8 @@ void ClipView::paintTextLabel(QString const & text, QPainter & painter)
 void ClipView::mousePressEvent( QMouseEvent * me )
 {
 	const auto pos = position(me);
+
+	m_clipMoved = false;
 
 	// Right now, active is only used on right/mid clicks actions, so we use a ternary operator
 	// to avoid the overhead of calling getClickedClips when it's not used
@@ -659,6 +663,7 @@ void ClipView::mouseMoveEvent( QMouseEvent * me )
 	{
 		TimePos newPos = draggedClipPos( me );
 		m_clip->movePosition(newPos);
+		m_clipMoved = true;
 		newPos = m_clip->startPosition(); // Get the real position the Clip was dragged to for the label
 		m_trackView->getTrackContentWidget()->changePosition();
 		s_textFloat->setText( QString( "%1:%2" ).
@@ -696,6 +701,7 @@ void ClipView::mouseMoveEvent( QMouseEvent * me )
 			int index = std::distance( clips.begin(), it );
 			( *it )->movePosition( newPos + m_initialOffsets[index] );
 		}
+		m_clipMoved = true;
 	}
 	else if( m_action == Action::Resize || m_action == Action::ResizeLeft )
 	{
@@ -852,6 +858,26 @@ void ClipView::mouseReleaseEvent( QMouseEvent * me )
 		// TODO: Fix m_clip->setJournalling() consistency
 		m_clip->setJournalling( true );
 	}
+
+	const bool moved = m_clipMoved
+		&& (m_action == Action::Move || m_action == Action::MoveSelection);
+	if (moved)
+	{
+		if (m_action == Action::MoveSelection)
+		{
+			bool flashed = false;
+			for (auto* object : m_trackView->trackContainerView()->selectedObjects())
+			{
+				if (auto* clipView = dynamic_cast<ClipView*>(object))
+				{
+					UiFeedback::flash(clipView);
+					flashed = true;
+				}
+			}
+			if (!flashed) { UiFeedback::flash(this); }
+		}
+		else { UiFeedback::flash(this); }
+	}
 	else if( m_action == Action::Split )
 	{
 		const float ppb = m_trackView->trackContainerView()->pixelsPerBar();
@@ -868,6 +894,7 @@ void ClipView::mouseReleaseEvent( QMouseEvent * me )
 	}
 
 	m_action = Action::None;
+	m_clipMoved = false;
 	delete m_hint;
 	m_hint = nullptr;
 	s_textFloat->hide();

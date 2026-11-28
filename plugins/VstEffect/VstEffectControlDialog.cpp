@@ -194,7 +194,6 @@ VstEffectControlDialog::VstEffectControlDialog( VstEffectControls * _ctl ) :
 		space0->resize(8, 10);
 		auto space1 = new QWidget(this);
 		space1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-		QFont f( "Arial", 10 );
 
 		l->addItem( new QSpacerItem( newSize - 20, 30, QSizePolicy::Fixed,
 						QSizePolicy::Fixed ), 1, 0 );
@@ -219,7 +218,7 @@ VstEffectControlDialog::VstEffectControlDialog( VstEffectControls * _ctl ) :
 		tb->addWidget(space1);
 
 		tbLabel = new QLabel( tr( "Effect by: " ), this );
-		tbLabel->setFont(adjustedToPixelSize(f, SMALL_FONT_SIZE));
+		tbLabel->setFont(adjustedToPixelSize(font(), SMALL_FONT_SIZE));
 		tbLabel->setTextFormat(Qt::RichText);
 		tbLabel->setAlignment( Qt::AlignTop | Qt::AlignLeft );
 		tb->addWidget( tbLabel );

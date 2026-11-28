@@ -159,7 +159,7 @@ wie z.B. Samples, Presets und Demo-Projekte.
 Name=LMMS
 Comment=Powerful sequencer-, synthesizer- and sample-studio for Linux
 Exec=lmms
-Icon=%{_datadir}/%{name}/themes/default/icon.png
+Icon=%{_datadir}/%{name}/themes/default/icon.svg
 Terminal=false
 Type=Application
 Categories=Application;AudioVideo;X-Fedora;X-RPMfarm;

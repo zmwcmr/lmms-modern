@@ -51,7 +51,8 @@ namespace lmms::gui
 SaControlsDialog::SaControlsDialog(SaControls *controls, SaProcessor *processor) :
 	EffectControlDialog(controls),
 	m_controls(controls),
-	m_processor(processor)
+	m_processor(processor),
+	m_configHeight(scaledFontSize(75))
 {
 	// Top level placement of sections is handled by QSplitter widget.
 	auto master_layout = new QHBoxLayout;
@@ -164,7 +165,7 @@ SaControlsDialog::SaControlsDialog(SaControls *controls, SaProcessor *processor)
 	auto freqRangeCombo = new ComboBox(this, tr("Frequency range"));
 	freqRangeCombo->setToolTip(tr("Frequency range"));
 	freqRangeCombo->setMinimumSize(100, ComboBox::DEFAULT_HEIGHT);
-	freqRangeCombo->setMaximumSize(200, ComboBox::DEFAULT_HEIGHT);
+	freqRangeCombo->setMaximumWidth(scaledFontSize(200));
 	freqRangeCombo->setModel(&controls->m_freqRangeModel);
 	config_layout->addWidget(freqRangeCombo, 0, 3, 2, 1);
 
@@ -186,7 +187,7 @@ SaControlsDialog::SaControlsDialog(SaControls *controls, SaProcessor *processor)
 	auto ampRangeCombo = new ComboBox(this, tr("Amplitude range"));
 	ampRangeCombo->setToolTip(tr("Amplitude range"));
 	ampRangeCombo->setMinimumSize(100, ComboBox::DEFAULT_HEIGHT);
-	ampRangeCombo->setMaximumSize(200, ComboBox::DEFAULT_HEIGHT);
+	ampRangeCombo->setMaximumWidth(scaledFontSize(200));
 	ampRangeCombo->setModel(&controls->m_ampRangeModel);
 	config_layout->addWidget(ampRangeCombo, 2, 3, 2, 1);
 
@@ -200,7 +201,7 @@ SaControlsDialog::SaControlsDialog(SaControls *controls, SaProcessor *processor)
 	auto blockSizeCombo = new ComboBox(this, tr("FFT block size"));
 	blockSizeCombo->setToolTip(tr("FFT block size"));
 	blockSizeCombo->setMinimumSize(100, 22);
-	blockSizeCombo->setMaximumSize(200, 22);
+	blockSizeCombo->setMaximumWidth(scaledFontSize(200));
 	blockSizeCombo->setModel(&controls->m_blockSizeModel);
 	config_layout->addWidget(blockSizeCombo, 0, 5, 2, 1);
 	processor->reallocateBuffers();
@@ -216,7 +217,7 @@ SaControlsDialog::SaControlsDialog(SaControls *controls, SaProcessor *processor)
 	auto windowCombo = new ComboBox(this, tr("FFT window type"));
 	windowCombo->setToolTip(tr("FFT window type"));
 	windowCombo->setMinimumSize(100, ComboBox::DEFAULT_HEIGHT);
-	windowCombo->setMaximumSize(200, ComboBox::DEFAULT_HEIGHT);
+	windowCombo->setMaximumWidth(scaledFontSize(200));
 	windowCombo->setModel(&controls->m_windowModel);
 	config_layout->addWidget(windowCombo, 2, 5, 2, 1);
 	processor->rebuildWindow();

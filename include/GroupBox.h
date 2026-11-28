@@ -64,6 +64,7 @@ public:
 	 * @param value Set to true to show the LED check box or to false to hide it.
 	 */
 	void setLedButtonShown(bool value);
+	QSize minimumSizeHint() const override;
 
 	int titleBarHeight() const
 	{
@@ -72,16 +73,19 @@ public:
 
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 	void paintEvent( QPaintEvent * _pe ) override;
 
 
 private:
+	void updateTitleBarGeometry();
+	int captionLeft() const;
 	void updatePixmap();
 
-	PixmapButton * m_led;
+	PixmapButton * m_led = nullptr;
 	QString m_caption;
-	const int m_titleBarHeight;
+	int m_titleBarHeight = 0;
 
 } ;
 

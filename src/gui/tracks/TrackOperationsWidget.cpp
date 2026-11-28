@@ -26,6 +26,7 @@
 
 #include <QCheckBox>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
@@ -95,6 +96,29 @@ TrackOperationsWidget::TrackOperationsWidget(TrackView* parent)
 	m_soloBtn->setToolTip(tr("Solo"));
 	m_soloBtn->setObjectName("btn-solo");
 
+	// Draw the operation icons in code so they follow the theme ink. The QSS
+	// image rules cannot resolve currentColor.
+	constexpr int operationIconSize = 14;
+	const auto ink = embed::iconColor(embed::IconRole::Normal);
+	const auto disabledInk = embed::iconColor(embed::IconRole::Disabled);
+	m_trackOps->setIcon(QIcon(embed::getIconPixmap("gear", operationIconSize, operationIconSize, ink)));
+	m_trackOps->setIconSize(QSize(operationIconSize, operationIconSize));
+
+	QIcon muteIcon;
+	muteIcon.addPixmap(embed::getIconPixmap("speaker", operationIconSize, operationIconSize, ink),
+		QIcon::Normal, QIcon::Off);
+	muteIcon.addPixmap(embed::getIconPixmap("speaker_slash", operationIconSize, operationIconSize, ink),
+		QIcon::Normal, QIcon::On);
+	muteIcon.addPixmap(embed::getIconPixmap("speaker", operationIconSize, operationIconSize, disabledInk),
+		QIcon::Disabled, QIcon::Off);
+	muteIcon.addPixmap(embed::getIconPixmap("speaker_slash", operationIconSize, operationIconSize, disabledInk),
+		QIcon::Disabled, QIcon::On);
+	m_muteBtn->setIcon(muteIcon);
+	m_muteBtn->setIconSize(QSize(operationIconSize, operationIconSize));
+
+	m_soloBtn->setIcon(QIcon(embed::getIconPixmap("headphones", operationIconSize, operationIconSize, ink)));
+	m_soloBtn->setIconSize(QSize(operationIconSize, operationIconSize));
+
 	operationsLayout->addWidget(m_trackOps);
 	operationsLayout->addWidget(m_muteBtn);
 	operationsLayout->addWidget(m_soloBtn);
@@ -126,7 +150,7 @@ bool TrackOperationsWidget::confirmRemoval()
 	bool needConfirm = ConfigManager::inst()->value("ui", "trackdeletionwarning", "1").toInt();
 	if (!needConfirm){ return true; }
 	
-	QString messageRemoveTrack = tr("After removing a track, it can not "
+	QString messageRemoveTrack = tr("After removing a track, it cannot "
 					"be recovered. Are you sure you want to remove track \"%1\"?")
 					.arg(m_trackView->getTrack()->name());
 	QString messageTitleRemoveTrack = tr("Confirm removal");
@@ -255,7 +279,7 @@ void TrackOperationsWidget::updateMenu()
 	{
 		toMenu->addAction( tr( "Clear this track" ), this, SLOT(clearTrack()));
 	}
-	if (QMenu *mixerMenu = m_trackView->createMixerMenu(tr("Channel %1: %2"), tr("Assign to new Mixer Channel")))
+	if (QMenu *mixerMenu = m_trackView->createMixerMenu(tr("Channel %1: %2"), tr("Assign to new mixer channel")))
 	{
 		toMenu->addMenu(mixerMenu);
 	}

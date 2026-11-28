@@ -65,7 +65,6 @@ InstrumentTrackView::InstrumentTrackView( InstrumentTrack * _it, TrackContainerV
 	m_lastPos( -1, -1 )
 {
 	setAcceptDrops( true );
-	setFixedHeight( 32 );
 
 	m_tlb = new TrackLabelButton( this, getTrackSettingsWidget() );
 	m_tlb->setCheckable( true );
@@ -91,9 +90,10 @@ InstrumentTrackView::InstrumentTrackView( InstrumentTrack * _it, TrackContainerV
 	}, Qt::QueuedConnection);
 
 	m_mixerChannelNumber = new MixerChannelLcdSpinBox(2, getTrackSettingsWidget(), tr("Mixer channel"), this);
-	m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= COMPACT_TRACK_WIDTH);
-	connect(trackContainerView(), &TrackContainerView::trackHeadWidthChanged, this, [this](int width){
-		m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= COMPACT_TRACK_WIDTH);
+	const int channelNumberThreshold = TrackContainerView::scaledTrackHeadWidth(COMPACT_TRACK_WIDTH);
+	m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= channelNumberThreshold);
+	connect(trackContainerView(), &TrackContainerView::trackHeadWidthChanged, this, [this, channelNumberThreshold](int width) {
+		m_mixerChannelNumber->setVisible(width >= channelNumberThreshold);
 	});
 
 	m_volumeKnob = new VolumeKnob(KnobType::Small17, tr("VOL"), getTrackSettingsWidget(), Knob::LabelRendering::LegacyFixedFontSize, tr("VOL"));
@@ -141,7 +141,7 @@ InstrumentTrackView::InstrumentTrackView( InstrumentTrack * _it, TrackContainerV
 	m_midiInputAction->setText( tr( "Input" ) );
 	m_midiOutputAction->setText( tr( "Output" ) );
 
-	QAction *midiRackAction = m_midiMenu->addAction(tr("Open/Close MIDI CC Rack"));
+	QAction *midiRackAction = m_midiMenu->addAction(tr("Open/close MIDI CC Rack"));
 	midiRackAction->setIcon(embed::getIconPixmap("midi_cc_rack"));
 	connect(midiRackAction, SIGNAL(triggered()),
 		this, SLOT(toggleMidiCCRack()));

@@ -136,7 +136,7 @@ private:
 				QDomElement attribute = attributes.item( j ).toElement();
 				if( attribute.hasAttribute( "value" ) )
 				{
-					QString name = tr("NOT FOUND") + " (" + attribute.attribute( "value" ) + ")";
+					QString name = tr("Not found") + " (" + attribute.attribute( "value" ) + ")";
 					setDisplayName(name);
 					return;
 				}

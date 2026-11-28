@@ -47,6 +47,7 @@
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QEvent>
+#include <QFontDatabase>
 #include <QtGlobal>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -169,6 +170,10 @@ protected:
 			{
 				applyToInputDialog(*dialog);
 			}
+			else if (auto* box = qobject_cast<QDialogButtonBox*>(watched))
+			{
+				applyToDialogButtonBox(*box);
+			}
 		}
 		return QObject::eventFilter(watched, event);
 	}
@@ -177,7 +182,7 @@ private:
 	static void setButtonIcon(QAbstractButton* button, const char* icon)
 	{
 		if (button == nullptr) { return; }
-		constexpr int iconSize = 14;
+		constexpr int iconSize = icon::Small;
 		button->setIconSize(QSize(iconSize, iconSize));
 		button->setIcon(QIcon(embed::getIconPixmap(icon, iconSize, iconSize)));
 	}
@@ -223,14 +228,23 @@ private:
 		setButtonIcon(box.button(QMessageBox::Help), "help");
 	}
 
+	static void applyToDialogButtonBox(QDialogButtonBox& box)
+	{
+		setButtonIcon(box.button(QDialogButtonBox::Ok), "apply");
+		setButtonIcon(box.button(QDialogButtonBox::Cancel), "cancel");
+		setButtonIcon(box.button(QDialogButtonBox::Help), "help");
+		setButtonIcon(box.button(QDialogButtonBox::Save), "project_save");
+		setButtonIcon(box.button(QDialogButtonBox::Apply), "apply");
+		setButtonIcon(box.button(QDialogButtonBox::Reset), "reload");
+		setButtonIcon(box.button(QDialogButtonBox::Discard), "discard");
+		setButtonIcon(box.button(QDialogButtonBox::Close), "close");
+	}
+
 	static void applyToInputDialog(QInputDialog& dialog)
 	{
-		const auto* buttonBox = dialog.findChild<QDialogButtonBox*>();
+		auto* buttonBox = dialog.findChild<QDialogButtonBox*>();
 		if (buttonBox == nullptr) { return; }
-
-		setButtonIcon(buttonBox->button(QDialogButtonBox::Ok), "apply");
-		setButtonIcon(buttonBox->button(QDialogButtonBox::Cancel), "cancel");
-		setButtonIcon(buttonBox->button(QDialogButtonBox::Help), "help");
+		applyToDialogButtonBox(*buttonBox);
 	}
 };
 
@@ -263,6 +277,8 @@ GuiApplication::GuiApplication()
 	createSocketNotifier();
 
 	// Init style and palette
+	QFontDatabase::addApplicationFont(QStringLiteral(":/LMMS-LFO-Display-Bold.ttf"));
+	QFontDatabase::addApplicationFont(QStringLiteral(":/LMMS-Send-Sans-Bold.ttf"));
 	QDir::addSearchPath("artwork", ConfigManager::inst()->themeDir());
 	QDir::addSearchPath("artwork", ConfigManager::inst()->defaultThemeDir());
 	QDir::addSearchPath("artwork", ":/artwork");
@@ -304,7 +320,7 @@ GuiApplication::GuiApplication()
 
 	// Show splash screen
 	QSplashScreen splashScreen( embed::getIconPixmap( "splash" ) );
-	splashScreen.setFixedSize(splashScreen.pixmap().size());
+	splashScreen.setFixedSize(embed::logicalSize(splashScreen.pixmap()));
 	splashScreen.show();
 
 	QHBoxLayout layout;
@@ -345,7 +361,7 @@ GuiApplication::GuiApplication()
 	connect(m_mainWindow, SIGNAL(initProgress(const QString&)), 
 		this, SLOT(displayInitProgress(const QString&)));
 
-	displayInitProgress(tr("Preparing song editor"));
+	displayInitProgress(tr("Preparing Song Editor"));
 	m_songEditor = new SongEditorWindow(Engine::getSong());
 	connect(m_songEditor, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
@@ -353,11 +369,11 @@ GuiApplication::GuiApplication()
 	m_mixerView = new MixerView(Engine::mixer());
 	connect(m_mixerView, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
-	displayInitProgress(tr("Preparing controller rack"));
+	displayInitProgress(tr("Preparing Controller Rack"));
 	m_controllerRackView = new ControllerRackView;
 	connect(m_controllerRackView, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
-	displayInitProgress(tr("Preparing project notes"));
+	displayInitProgress(tr("Preparing Project Notes"));
 	m_projectNotes = new ProjectNotes;
 	connect(m_projectNotes, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
@@ -365,15 +381,15 @@ GuiApplication::GuiApplication()
 	m_microtunerConfig = new MicrotunerConfig;
 	connect(m_microtunerConfig, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
-	displayInitProgress(tr("Preparing pattern editor"));
+	displayInitProgress(tr("Preparing Pattern Editor"));
 	m_patternEditor = new PatternEditorWindow(Engine::patternStore());
 	connect(m_patternEditor, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
-	displayInitProgress(tr("Preparing piano roll"));
+	displayInitProgress(tr("Preparing Piano Roll"));
 	m_pianoRoll = new PianoRollWindow();
 	connect(m_pianoRoll, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 
-	displayInitProgress(tr("Preparing automation editor"));
+	displayInitProgress(tr("Preparing Automation Editor"));
 	m_automationEditor = new AutomationEditorWindow;
 	connect(m_automationEditor, SIGNAL(destroyed(QObject*)), this, SLOT(childDestroyed(QObject*)));
 

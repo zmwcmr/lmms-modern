@@ -22,6 +22,7 @@
  *
  */
 
+#include <QLayout>
 #include <QMouseEvent>
 #include <QPainter>
 
@@ -37,18 +38,17 @@ namespace lmms::gui
 GroupBox::GroupBox( const QString & _caption, QWidget * _parent ) :
 	QWidget( _parent ),
 	BoolModelView( nullptr, this ),
-	m_caption( _caption ),
-	m_titleBarHeight( 11 )
+	m_caption( _caption )
 {
 	m_led = new PixmapButton( this, _caption );
 	m_led->setCheckable( true );
-	m_led->move( 3, 0 );
 	m_led->setActiveGraphic( embed::getIconPixmap( "led_green" ) );
 	m_led->setInactiveGraphic( embed::getIconPixmap( "led_off" ) );
 
 	setModel( new BoolModel( false, nullptr, _caption, true ) );
 	setAutoFillBackground( true );
 	unsetCursor();
+	updateTitleBarGeometry();
 }
 
 
@@ -70,21 +70,56 @@ void GroupBox::modelChanged()
 
 bool GroupBox::ledButtonShown() const
 {
-	return m_led->isVisible();
+	return !m_led->isHidden();
 }
 
 
 void GroupBox::setLedButtonShown(bool value)
 {
 	m_led->setVisible(value);
+	updateTitleBarGeometry();
 }
 
+void GroupBox::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (m_led && event->type() == QEvent::FontChange) { updateTitleBarGeometry(); }
+}
+
+void GroupBox::updateTitleBarGeometry()
+{
+	const QFontMetrics metrics(groupTitleFont(font()));
+	const auto previousHeight = m_titleBarHeight;
+	const bool showLed = ledButtonShown();
+	m_titleBarHeight = qMax(metrics.height(), showLed ? m_led->height() : 0) + 4;
+	m_led->move(3, (m_titleBarHeight - m_led->height()) / 2);
+	if (auto* contentLayout = layout())
+	{
+		auto margins = contentLayout->contentsMargins();
+		margins.setTop(margins.top() + m_titleBarHeight - previousHeight);
+		contentLayout->setContentsMargins(margins);
+	}
+	updateGeometry();
+	update();
+}
+
+int GroupBox::captionLeft() const
+{
+	return ledButtonShown() ? qMax(22, m_led->width() + 7) : 6;
+}
+
+QSize GroupBox::minimumSizeHint() const
+{
+	const QFontMetrics metrics(groupTitleFont(font()));
+	const int captionWidth = qMax(metrics.horizontalAdvance(m_caption), metrics.boundingRect(m_caption).right() + 1);
+	return QWidget::minimumSizeHint().expandedTo(QSize(captionLeft() + captionWidth + 6, m_titleBarHeight + 2));
+}
 
 void GroupBox::mousePressEvent( QMouseEvent * _me )
 {
 	const auto pos = position(_me);
 
-	if (ledButtonShown() && pos.y() > 1 && pos.y() < 13 && _me->button() == Qt::LeftButton)
+	if (ledButtonShown() && pos.y() > 1 && pos.y() < m_titleBarHeight + 2 && _me->button() == Qt::LeftButton)
 	{
 		model()->setValue(!model()->value());
 	}
@@ -109,10 +144,10 @@ void GroupBox::paintEvent( QPaintEvent * pe )
 
 	// draw text
 	p.setPen( palette().color( QPalette::Active, QPalette::Text ) );
-	p.setFont(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	p.setFont(groupTitleFont(font()));
 
-	int const captionX = ledButtonShown() ? 22 : 6;
-	p.drawText(captionX, m_titleBarHeight, m_caption);
+	const int baseline = (m_titleBarHeight - p.fontMetrics().height()) / 2 + p.fontMetrics().ascent();
+	p.drawText(captionLeft(), baseline, m_caption);
 }
 
 

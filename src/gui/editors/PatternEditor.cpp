@@ -31,13 +31,16 @@
 #include "ClipView.h"
 #include "ComboBox.h"
 #include "DataFile.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "MainWindow.h"
 #include "PatternStore.h"
 #include "PatternTrack.h"
 #include "Song.h"
 #include "StringPairDrag.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "TrackView.h"
 
 #include "MidiClip.h"
@@ -135,13 +138,16 @@ void PatternEditor::removeViewsForPattern(int pattern)
 void PatternEditor::saveSettings(QDomDocument& doc, QDomElement& element)
 {
 	MainWindow::saveWidgetState( parentWidget(), element );
-	element.setAttribute("trackheadwidth", trackHeadWidth());
+	element.setAttribute("trackheadwidth", trackHeadWidthForStorage());
 }
 
 void PatternEditor::loadSettings(const QDomElement& element)
 {
 	MainWindow::restoreWidgetState(parentWidget(), element);
-	setTrackHeadWidth(element.attribute("trackheadwidth", QString::number(trackHeadWidth())).toInt());
+	if (element.hasAttribute("trackheadwidth"))
+	{
+		setTrackHeadWidth(scaledTrackHeadWidth(element.attribute("trackheadwidth").toInt()));
+	}
 	updateMaxSteps();
 }
 
@@ -293,17 +299,17 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 	connect(m_toolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
 	connect(m_toolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
 
-	setMinimumWidth(MINIMUM_TRACK_WIDTH + 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels);
+	setMinimumWidth(TrackContainerView::scaledTrackHeadWidth(MINIMUM_TRACK_WIDTH)
+		+ 2 * ClipView::BORDER_WIDTH + PatternEditor::MinPatternWidthPixels);
 
-	m_playAction->setToolTip(tr("Play/pause current pattern (Space)"));
-	m_stopAction->setToolTip(tr("Stop playback of current pattern (Space)"));
+	setTransportToolTips(tr("Play current pattern"), tr("Stop playback of current pattern"));
 
 
 	// Pattern selector
 	DropToolBar* patternSelectionToolBar = addDropToolBarToTop(tr("Pattern selector"));
 
 	m_patternComboBox = new ComboBox(m_toolBar);
-	m_patternComboBox->setFixedSize(200, ComboBox::DEFAULT_HEIGHT);
+	m_patternComboBox->setFixedWidth(scaledFontSize(200));
 	m_patternComboBox->setModel(&ps->m_patternComboBoxModel);
 
 	patternSelectionToolBar->addWidget(m_patternComboBox);
@@ -312,14 +318,22 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 	// Track actions
 	DropToolBar *trackAndStepActionsToolBar = addDropToolBarToTop(tr("Track and step actions"));
 
+	auto addTrackAndStepAction = [trackAndStepActionsToolBar](const QIcon& icon, const QString& text,
+		const QObject* receiver, const char* slot)
+	{
+		auto* action = new ToolButtonAction(icon, text, trackAndStepActionsToolBar);
+		connect(action, SIGNAL(triggered()), receiver, slot);
+		trackAndStepActionsToolBar->addAction(action);
+	};
 
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_pattern_track"), tr("New pattern"),
+
+	addTrackAndStepAction(embed::getIconPixmap("add_pattern_track"), tr("New pattern"),
 						Engine::getSong(), SLOT(addPatternTrack()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("clone_pattern_track_clip"), tr("Clone pattern"),
+	addTrackAndStepAction(embed::getIconPixmap("clone_pattern_track_clip"), tr("Clone pattern"),
 						m_editor, SLOT(cloneClip()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_sample_track"),	tr("Add sample-track"),
+	addTrackAndStepAction(embed::getIconPixmap("add_sample_track"),	tr("Add sample-track"),
 						m_editor, SLOT(addSampleTrack()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("add_automation"), tr("Add automation-track"),
+	addTrackAndStepAction(embed::getIconPixmap("add_automation"), tr("Add automation-track"),
 						m_editor, SLOT(addAutomationTrack()));
 
 	auto stretch = new QWidget(m_toolBar);
@@ -328,26 +342,42 @@ PatternEditorWindow::PatternEditorWindow(PatternStore* ps) :
 
 
 	// Step actions
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("step_btn_remove"), tr("Remove steps"),
+	addTrackAndStepAction(embed::getIconPixmap("step_btn_remove"), tr("Remove steps"),
 						m_editor, SLOT(removeSteps()));
-	trackAndStepActionsToolBar->addAction(embed::getIconPixmap("step_btn_add"), tr("Add steps"),
+	addTrackAndStepAction(embed::getIconPixmap("step_btn_add"), tr("Add steps"),
 						m_editor, SLOT(addSteps()));
-	trackAndStepActionsToolBar->addAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone Steps"),
+	addTrackAndStepAction( embed::getIconPixmap("step_btn_duplicate"), tr("Clone steps"),
 						m_editor, SLOT(cloneSteps()));
 
 	connect(&ps->m_patternComboBoxModel, SIGNAL(dataChanged()),
 			m_editor, SLOT(updatePosition()));
 	connect(&ps->m_patternComboBoxModel, &ComboBoxModel::dataChanged, m_editor, &PatternEditor::updateMaxSteps);
 
+	const auto navigationShortcuts = patternNavigationShortcuts();
+	const auto nextShortcut = navigationShortcuts.value(QStringLiteral("pattern_next"));
+	const auto previousShortcut = navigationShortcuts.value(QStringLiteral("pattern_previous"));
+	m_patternComboBox->setToolTip(tr("Previous pattern: %1\nNext pattern: %2")
+		.arg(previousShortcut.toString(QKeySequence::NativeText), nextShortcut.toString(QKeySequence::NativeText)));
 	auto viewNext = new QAction(this);
 	connect(viewNext, SIGNAL(triggered()), m_patternComboBox, SLOT(selectNext()));
-	viewNext->setShortcut(Qt::Key_Plus);
+	viewNext->setShortcut(nextShortcut);
 	addAction(viewNext);
 
 	auto viewPrevious = new QAction(this);
 	connect(viewPrevious, SIGNAL(triggered()), m_patternComboBox, SLOT(selectPrevious()));
-	viewPrevious->setShortcut(Qt::Key_Minus);
+	viewPrevious->setShortcut(previousShortcut);
 	addAction(viewPrevious);
+}
+
+
+bool PatternEditorWindow::isPatternSelector(const QWidget* widget) const
+{
+	// Follow the parent chain across the pattern selector's popup window.
+	for (; widget; widget = widget->parentWidget())
+	{
+		if (widget == m_patternComboBox) { return true; }
+	}
+	return false;
 }
 
 

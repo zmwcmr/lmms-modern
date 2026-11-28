@@ -44,7 +44,7 @@ namespace lmms::gui
 TempoSyncBarModelEditor::TempoSyncBarModelEditor(QString text, FloatModel * floatModel, QWidget * parent) :
 	BarModelEditor(text, floatModel, parent),
 	m_tempoSyncIcon(embed::getIconPixmap("tempo_sync")),
-	m_tempoSyncDescription(tr("Tempo Sync")),
+	m_tempoSyncDescription(tr("Tempo sync")),
 	m_custom(nullptr)
 {
 	modelChanged();
@@ -106,7 +106,7 @@ void TempoSyncBarModelEditor::contextMenuEvent(QContextMenuEvent *)
 		connect(syncMenu, SIGNAL(triggered(QAction*)), tempoSyncModel, SLOT(setTempoSync(QAction*)));
 
 		syncMenu->addAction(embed::getIconPixmap("note_none"),
-			tr("No Sync"))->setData((int) TempoSyncKnobModel::SyncMode::None);
+			tr("No sync"))->setData((int) TempoSyncKnobModel::SyncMode::None);
 
 		if(limit / 0.125f <= maxValue)
 		{
@@ -210,7 +210,7 @@ void TempoSyncBarModelEditor::showCustom()
 		flags &= ~Qt::WindowMaximizeButtonHint;
 		subWindow->setWindowFlags(flags);
 		setFixedSize(size());
-		m_custom->setWindowTitle("Meter");
+		m_custom->setWindowTitle(tr("Meter"));
 		m_custom->setModel(&model()->getCustomMeterModel());
 	}
 
@@ -228,7 +228,7 @@ void TempoSyncBarModelEditor::updateTextDescription()
 	switch(syncMode)
 	{
 		case TempoSyncKnobModel::SyncMode::None:
-			m_tempoSyncDescription = tr("Tempo Sync");
+			m_tempoSyncDescription = tr("Tempo sync");
 			break;
 		case TempoSyncKnobModel::SyncMode::Custom:
 			m_tempoSyncDescription = tr("Custom ") +
@@ -239,25 +239,25 @@ void TempoSyncBarModelEditor::updateTextDescription()
 				")";
 			break;
 		case TempoSyncKnobModel::SyncMode::DoubleWholeNote:
-			m_tempoSyncDescription = tr("Synced to Eight Beats");
+			m_tempoSyncDescription = tr("Synced to eight beats");
 			break;
 		case TempoSyncKnobModel::SyncMode::WholeNote:
-			m_tempoSyncDescription = tr("Synced to Whole Note");
+			m_tempoSyncDescription = tr("Synced to whole note");
 			break;
 		case TempoSyncKnobModel::SyncMode::HalfNote:
-			m_tempoSyncDescription = tr("Synced to Half Note");
+			m_tempoSyncDescription = tr("Synced to half note");
 			break;
 		case TempoSyncKnobModel::SyncMode::QuarterNote:
-			m_tempoSyncDescription = tr("Synced to Quarter Note");
+			m_tempoSyncDescription = tr("Synced to quarter note");
 			break;
 		case TempoSyncKnobModel::SyncMode::EighthNote:
-			m_tempoSyncDescription = tr("Synced to 8th Note");
+			m_tempoSyncDescription = tr("Synced to 8th note");
 			break;
 		case TempoSyncKnobModel::SyncMode::SixteenthNote:
-			m_tempoSyncDescription = tr("Synced to 16th Note");
+			m_tempoSyncDescription = tr("Synced to 16th note");
 			break;
 		case TempoSyncKnobModel::SyncMode::ThirtysecondNote:
-			m_tempoSyncDescription = tr("Synced to 32nd Note");
+			m_tempoSyncDescription = tr("Synced to 32nd note");
 			break;
 		default: ;
 	}

@@ -41,9 +41,11 @@
 #include <QPushButton>
 #include <QStyleOption>
 #include <QStyleOptionTitleBar>
+#include <QVariantAnimation>
 #include <QWindow>
 
 #include "ConfigManager.h"
+#include "LmmsStyle.h"
 #include "embed.h"
 
 namespace lmms::gui
@@ -56,6 +58,8 @@ SubWindow::SubWindow(QWidget* parent, Qt::WindowFlags windowFlags)
 	, m_titleBarHeight{titleBarHeight()}
 	, m_hasFocus{false}
 	, m_isDetachable{true}
+	, m_activation{0.0}
+	, m_activationAnimation{nullptr}
 {
 	// initialize the tracked geometry to whatever Qt thinks the normal geometry currently is.
 	// this should always work, since QMdiSubWindows will not start as maximized
@@ -114,8 +118,6 @@ SubWindow::SubWindow(QWidget* parent, Qt::WindowFlags windowFlags)
 
 	// Disable the minimize button and make sure that the custom window hint is set
 	setWindowFlags((this->windowFlags() & ~Qt::WindowMinimizeButtonHint) | Qt::CustomizeWindowHint);
-
-	connect(mdiArea(), &QMdiArea::subWindowActivated, this, &SubWindow::focusChanged);
 }
 
 
@@ -132,7 +134,16 @@ void SubWindow::paintEvent( QPaintEvent * )
 
 	const bool isActive = windowState() & Qt::WindowActive;
 
-	p.fillRect( rect, isActive ? activeColor() : p.pen().brush() );
+	if (!m_activationAnimation) { m_activation = isActive ? 1.0 : 0.0; }
+	const QBrush inactiveColor = p.pen().brush();
+	p.fillRect(rect, inactiveColor);
+	if (m_activation > 0.0)
+	{
+		p.save();
+		p.setOpacity(m_activation);
+		p.fillRect(rect, activeColor());
+		p.restore();
+	}
 
 	// window border
 	p.setPen( borderColor() );
@@ -146,8 +157,51 @@ void SubWindow::paintEvent( QPaintEvent * )
 	if( widget() )
 	{
 		QPixmap winicon( widget()->windowIcon().pixmap( m_buttonSize ) );
-		p.drawPixmap( 3, 3, m_buttonSize.width(), m_buttonSize.height(), winicon );
+		p.drawPixmap(3, (m_titleBarHeight - m_buttonSize.height()) / 2, m_buttonSize.width(), m_buttonSize.height(), winicon);
 	}
+}
+
+
+
+
+void SubWindow::animateActivation(bool active)
+{
+	const qreal target = active ? 1.0 : 0.0;
+
+	if (m_activationAnimation)
+	{
+		QObject::disconnect(m_activationAnimation, nullptr, this, nullptr);
+		m_activationAnimation->stop();
+		m_activationAnimation->deleteLater();
+		m_activationAnimation = nullptr;
+	}
+
+	const int duration = LmmsStyle::uiAnimationDuration(this, 160);
+	if (duration <= 0 || qFuzzyCompare(m_activation, target))
+	{
+		m_activation = target;
+		update(0, 0, width(), m_titleBarHeight);
+		return;
+	}
+
+	auto* animation = new QVariantAnimation(this);
+	animation->setDuration(duration);
+	animation->setStartValue(m_activation);
+	animation->setEndValue(target);
+	animation->setEasingCurve(QEasingCurve::OutCubic);
+	m_activationAnimation = animation;
+
+	connect(animation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+		m_activation = value.toReal();
+		update(0, 0, width(), m_titleBarHeight);
+	});
+	connect(animation, &QVariantAnimation::finished, this, [this, animation, target] {
+		m_activation = target;
+		if (m_activationAnimation == animation) { m_activationAnimation = nullptr; }
+		animation->deleteLater();
+		update(0, 0, width(), m_titleBarHeight);
+	});
+	animation->start();
 }
 
 
@@ -191,6 +245,12 @@ void SubWindow::showEvent(QShowEvent* e)
 	if (isDetached())
 	{
 		widget()->setWindowState((widget()->windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+	}
+	if (auto* area = mdiArea())
+	{
+		connect(area, &QMdiArea::subWindowActivated, this, &SubWindow::activationChanged,
+			Qt::UniqueConnection);
+		animateActivation(area->activeSubWindow() == this);
 	}
 }
 
@@ -453,7 +513,8 @@ void SubWindow::adjustTitleBar()
 	const int buttonGap = 1;
 	const int menuButtonSpace = 24;
 
-	auto buttonPos = QPoint{width() - rightSpace - m_buttonSize.width(), 3};
+	auto buttonPos = QPoint{width() - rightSpace - m_buttonSize.width(),
+		(m_titleBarHeight - m_buttonSize.height()) / 2};
 	const auto buttonStep = QPoint{m_buttonSize.width() + buttonGap, 0};
 
 	// the buttonBarWidth depends on the number of buttons.
@@ -523,12 +584,22 @@ void SubWindow::focusChanged( QMdiSubWindow *subWindow )
 	if( m_hasFocus && subWindow != this )
 	{
 		m_hasFocus = false;
+		animateActivation(false);
 		emit focusLost();
 	}
 	else if( subWindow == this )
 	{
 		m_hasFocus = true;
+		animateActivation(true);
 	}
+}
+
+
+
+
+void SubWindow::activationChanged(QMdiSubWindow* subWindow)
+{
+	animateActivation(subWindow == this);
 }
 
 

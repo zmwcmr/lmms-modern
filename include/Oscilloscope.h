@@ -53,6 +53,7 @@ public:
 
 	Oscilloscope( QWidget * _parent );
 	~Oscilloscope() override;
+	QSize sizeHint() const override;
 
 	void setActive( bool _active );
 
@@ -70,6 +71,7 @@ public:
 
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void paintEvent( QPaintEvent * _pe ) override;
 	void mousePressEvent( QMouseEvent * _me ) override;
 

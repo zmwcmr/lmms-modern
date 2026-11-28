@@ -25,6 +25,7 @@
 
 
 
+#include <QEvent>
 #include <QStyleOptionFrame>
 #include <QPainter>
 
@@ -138,15 +139,22 @@ void LcdWidget::paintEvent( QPaintEvent* )
 {
 	QPainter p( this );
 
-	QSize cellSize( m_cellWidth, m_cellHeight );
-
 	QRect cellRect( 0, 0, m_cellWidth, m_cellHeight );
+	const auto spriteSize = embed::logicalSize(m_lcdPixmap);
+	const qreal scaleX = qreal(m_lcdPixmap.width()) / spriteSize.width();
+	const qreal sourceHeight = m_cellHeight * (qreal(m_lcdPixmap.height()) / spriteSize.height());
+	const qreal sourceY = isEnabled() ? 0.0 : sourceHeight;
+	const auto drawCell = [&](const QRect& target, int column, int sourceWidth)
+	{
+		const QRectF source{column * m_cellWidth * scaleX, sourceY, sourceWidth * scaleX, sourceHeight};
+		p.drawPixmap(target, m_lcdPixmap, source);
+	};
 
-	int margin = 1;  // QStyle::PM_DefaultFrameWidth;
-	//int lcdWidth = m_cellWidth * m_numDigits + (margin*m_marginWidth)*2;
-
-//	p.translate( width() / 2 - lcdWidth / 2, 0 ); 
+	const int margin = 1;
+	const int lcdWidth = displayWidth();
+	const int displayLeft = (width() - lcdWidth) / 2;
 	p.save();
+	p.translate(displayLeft, 0);
 
 	// Don't skip any space and don't draw margin on the left side in seamless mode
 	if (m_seamlessLeft)
@@ -157,8 +165,7 @@ void LcdWidget::paintEvent( QPaintEvent* )
 	{
 		p.translate(margin, margin);
 		// Left Margin
-		p.drawPixmap(cellRect, m_lcdPixmap,
-			QRect(QPoint(charsPerPixmap * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, charsPerPixmap, m_cellWidth);
 
 		p.translate(m_marginWidth, 0);
 	}
@@ -166,7 +173,7 @@ void LcdWidget::paintEvent( QPaintEvent* )
 	// Padding
 	for( int i=0; i < m_numDigits - m_display.length(); i++ ) 
 	{
-		p.drawPixmap(cellRect, m_lcdPixmap, QRect(QPoint(10 * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, 10, m_cellWidth);
 		p.translate( m_cellWidth, 0 );
 	}
 
@@ -180,13 +187,13 @@ void LcdWidget::paintEvent( QPaintEvent* )
 			else
 				val = 10;
 		}
-		p.drawPixmap(cellRect, m_lcdPixmap, QRect(QPoint(val * m_cellWidth, isEnabled() ? 0 : m_cellHeight), cellSize));
+		drawCell(cellRect, val, m_cellWidth);
 		p.translate( m_cellWidth, 0 );
 	}
 
 	// Right Margin
-	p.drawPixmap(QRect(0, 0, m_seamlessRight ? 0 : m_marginWidth - 1, m_cellHeight), m_lcdPixmap,
-		QRect(charsPerPixmap * m_cellWidth, isEnabled() ? 0 : m_cellHeight, m_cellWidth / 2, m_cellHeight));
+	drawCell(QRect(0, 0, m_seamlessRight ? 0 : m_marginWidth - 1, m_cellHeight),
+		charsPerPixmap, m_cellWidth / 2);
 
 	p.restore();
 
@@ -198,19 +205,14 @@ void LcdWidget::paintEvent( QPaintEvent* )
 		QStyleOptionFrame opt;
 		opt.initFrom(this);
 		opt.state = QStyle::State_Sunken;
-		opt.rect = QRect(0, 0, m_cellWidth * m_numDigits + (margin + m_marginWidth) * 2 - 1,
-			m_cellHeight + (margin * 2));
+		opt.rect = QRect(displayLeft, 0, lcdWidth - 1, m_cellHeight + 2 * margin);
 
 		style()->drawPrimitive(QStyle::PE_Frame, &opt, &p, this);
 	}
 
-	p.resetTransform();
-
 	// Label
 	if( !m_label.isEmpty() )
 	{
-		// The LCD digits are fixed-size artwork, so the caption keeps the
-		// design size instead of growing with the system font.
 		drawLabel(p, rect(), m_label);
 	}
 
@@ -218,19 +220,28 @@ void LcdWidget::paintEvent( QPaintEvent* )
 
 QFont LcdWidget::labelFont() const
 {
-	auto result = font();
-	result.setPixelSize(DEFAULT_FONT_SIZE);
-	return result;
+	return auxiliaryFont(font());
+}
+
+QSize LcdWidget::labelSize(const QString& label) const
+{
+	if (label.isEmpty()) { return {0, 0}; }
+
+	const QFontMetrics metrics(labelFont());
+	// Include one pixel for the shadow.
+	return {metrics.horizontalAdvance(label) + 1, metrics.height() + 1};
 }
 
 void LcdWidget::drawLabel(QPainter& painter, const QRect& area, const QString& label) const
 {
 	painter.setFont(labelFont());
-	const int left = area.x() + (area.width() - painter.fontMetrics().horizontalAdvance(label)) / 2;
+	const auto metrics = painter.fontMetrics();
+	const int left = area.x() + (area.width() - metrics.horizontalAdvance(label)) / 2;
+	const int baseline = area.bottom() - metrics.descent() - 1;
 	painter.setPen(textShadowColor());
-	painter.drawText(left + 1, area.bottom() + 1, label);
+	painter.drawText(left + 1, baseline + 1, label);
 	painter.setPen(textColor());
-	painter.drawText(left, area.bottom(), label);
+	painter.drawText(left, baseline, label);
 }
 
 
@@ -255,29 +266,26 @@ void LcdWidget::setMarginWidth( int width )
 
 
 
+int LcdWidget::displayWidth() const
+{
+	const int leftMargin = m_seamlessLeft ? 0 : 1 + m_marginWidth;
+	const int rightMargin = m_seamlessRight ? 0 : 1 + m_marginWidth;
+	return m_cellWidth * m_numDigits + leftMargin + rightMargin;
+}
+
+void LcdWidget::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() == QEvent::FontChange && !m_lcdPixmap.isNull() && hasLabel())
+	{
+		updateSize();
+	}
+}
+
 void LcdWidget::updateSize()
 {
-	const int marginX1 = m_seamlessLeft ? 0 : 1 + m_marginWidth;
-	const int marginX2 = m_seamlessRight ? 0 : 1 + m_marginWidth;
-	const int marginY = 1;
-	if (m_label.isEmpty())
-	{
-		setFixedSize(
-			m_cellWidth * m_numDigits + marginX1 + marginX2,
-			m_cellHeight + (2 * marginY)
-		);
-	}
-	else
-	{
-		setFixedSize(
-			qMax<int>(
-				m_cellWidth * m_numDigits + marginX1 + marginX2,
-				QFontMetrics(labelFont()).horizontalAdvance(m_label)
-			),
-			m_cellHeight + (2 * marginY) + LabelHeight
-		);
-	}
-
+	const auto caption = labelSize(m_label);
+	setFixedSize(qMax(displayWidth(), caption.width()), m_cellHeight + 2 + caption.height());
 	update();
 }
 
@@ -295,8 +303,9 @@ void LcdWidget::initUi(const QString& name , const QString& style)
 	//m_lcdPixmap = embed::getIconPixmap("lcd_19green"); // TODO!!
 
 	m_lcdPixmap = embed::getIconPixmap(QString("lcd_" + style).toUtf8().constData());
-	m_cellWidth = m_lcdPixmap.size().width() / LcdWidget::charsPerPixmap;
-	m_cellHeight = m_lcdPixmap.size().height() / 2;
+	const auto spriteSize = embed::logicalSize(m_lcdPixmap);
+	m_cellWidth = spriteSize.width() / LcdWidget::charsPerPixmap;
+	m_cellHeight = spriteSize.height() / 2;
 
 	m_marginWidth =  m_cellWidth / 2;
 

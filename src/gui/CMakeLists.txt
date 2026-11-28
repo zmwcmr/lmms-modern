@@ -55,6 +55,7 @@ SET(LMMS_SRCS
 
 	gui/editors/AutomationEditor.cpp
 	gui/editors/Editor.cpp
+	gui/editors/EditorShortcuts.cpp
 	gui/editors/PatternEditor.cpp
 	gui/editors/PianoRoll.cpp
 	gui/editors/PositionLine.cpp
@@ -133,6 +134,7 @@ SET(LMMS_SRCS
 	gui/widgets/TextFloat.cpp
 	gui/widgets/TimeDisplayWidget.cpp
 	gui/widgets/ToolButton.cpp
+	gui/widgets/UiFeedback.cpp
 
 	PARENT_SCOPE
 )

@@ -21,9 +21,15 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1">
      <item>
       <widget class="QLabel" name="iconLabel">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="minimumSize">
         <size>
          <width>64</width>
@@ -36,9 +42,6 @@
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QLabel" name="label">
-         <property name="styleSheet">
-          <string notr="true">font:12pt; font-weight:bold;</string>
-         </property>
          <property name="text">
           <string>LMMS</string>
          </property>
@@ -49,22 +52,12 @@
          <property name="text">
           <string>Version %1 (%2/%3, Qt %4, %5).</string>
          </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
       </layout>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
-      </spacer>
      </item>
     </layout>
    </item>
@@ -149,7 +142,10 @@
        <item>
         <widget class="QLabel" name="label_4">
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;a href=&quot;https://lmms.io&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#33cc33;&quot;&gt;https://lmms.io&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string notr="true">&lt;a href="https://lmms.io"&gt;https://lmms.io&lt;/a&gt;</string>
+         </property>
+         <property name="openExternalLinks">
+          <bool>true</bool>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

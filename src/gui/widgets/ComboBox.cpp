@@ -49,9 +49,8 @@ ComboBox::ComboBox( QWidget * _parent, const QString & _name ) :
 	m_menu( this ),
 	m_pressed( false )
 {
-	setFixedHeight( ComboBox::DEFAULT_HEIGHT );
-
-	setFont(adjustedToPixelSize(font(), DEFAULT_FONT_SIZE));
+	setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+	resize(width(), sizeHint().height());
 
 	connect( &m_menu, SIGNAL(triggered(QAction*)),
 				this, SLOT(setItem(QAction*)));
@@ -69,18 +68,20 @@ ComboBox::ComboBox( QWidget * _parent, const QString & _name ) :
 
 QSize ComboBox::sizeHint() const
 {
+	const QFontMetrics metrics(captionFont());
+	const int height = qMax(DEFAULT_HEIGHT, metrics.height() + 6);
 	// Only toolbars that opt in pay for content-based sizing. A dynamic
 	// property is used instead of a data member so the widget layout does not
 	// change for plugins built against this header.
-	if (!property("_lmms_contentWidth").toBool())
+	if (!property("_lmms_contentWidth").isValid())
 	{
-		return QWidget::sizeHint();
+		return QSize(qMax(0, QWidget::sizeHint().width()), height);
 	}
 
 	const auto* comboModel = model();
 	if (comboModel == nullptr || comboModel->size() == 0)
 	{
-		return QSize(CB_ARROW_BTN_WIDTH + 32, DEFAULT_HEIGHT);
+		return QSize(CB_ARROW_BTN_WIDTH + 32, height);
 	}
 
 	int widestItem = 0;
@@ -88,7 +89,7 @@ QSize ComboBox::sizeHint() const
 	for (int i = 0; i < comboModel->size(); ++i)
 	{
 		widestItem = std::max(widestItem,
-			fontMetrics().horizontalAdvance(comboModel->itemText(i)));
+			metrics.horizontalAdvance(comboModel->itemText(i)));
 		hasPixmap = hasPixmap || comboModel->itemPixmap(i) != nullptr;
 	}
 
@@ -104,19 +105,34 @@ QSize ComboBox::sizeHint() const
 	{
 		width += embed::logicalSize(fieldIcon).width() + 4;
 	}
-	return QSize(width, DEFAULT_HEIGHT);
+	return QSize(width, height);
 }
 
+QFont ComboBox::captionFont() const
+{
+	return adjustedToPixelSize(font(), DEFAULT_FONT_SIZE);
+}
 
 void ComboBox::setMinimumContentWidth(int width)
 {
-	setProperty("_lmms_contentWidth", true);
+	setProperty("_lmms_contentWidth", width);
 	setMinimumWidth(std::max(width, sizeHint().width()));
 	// Keep toolbars from squeezing the combo below its content width; they
 	// will move it into their overflow menu instead.
 	setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
 
+void ComboBox::changeEvent(QEvent* event)
+{
+	QWidget::changeEvent(event);
+	if (event->type() != QEvent::FontChange) { return; }
+	if (const auto width = property("_lmms_contentWidth"); width.isValid())
+	{
+		setMinimumWidth(qMax(width.toInt(), sizeHint().width()));
+	}
+	updateGeometry();
+	update();
+}
 
 
 
@@ -224,7 +240,15 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 {
 	QPainter p( this );
 
-	p.fillRect(2, 2, width() - 2, height() - 4, m_background);
+	const auto backgroundHeight = embed::logicalSize(m_background).height();
+	if (backgroundHeight > 0 && height() > 4)
+	{
+		QBrush background(m_background);
+		background.setTransform(QTransform::fromScale(1, qreal(height() - 4) / backgroundHeight));
+		p.setBrushOrigin(2, 2);
+		p.fillRect(2, 2, width() - 4, height() - 4, background);
+		p.setBrushOrigin(0, 0);
+	}
 
 	QColor shadow = palette().shadow().color();
 	QColor highlight = palette().highlight().color();
@@ -260,13 +284,18 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 	else
 	{
 		const auto& arrow = m_pressed ? m_arrowSelected : m_arrow;
-		p.drawPixmap(width() - CB_ARROW_BTN_WIDTH + 3, 4, arrow);
+		p.drawPixmap(width() - CB_ARROW_BTN_WIDTH + 3, (height() - embed::logicalSize(arrow).height()) / 2, arrow);
 	}
 
 	if( model() && model()->size() > 0 )
 	{
-		p.setFont( font() );
-		p.setClipRect( QRect( 4, 2, width() - CB_ARROW_BTN_WIDTH - 8, height() - 2 ) );
+		auto textFont = captionFont();
+		while (textFont.pixelSize() > 1 && QFontMetrics(textFont).height() > height() - 4)
+		{
+			textFont.setPixelSize(textFont.pixelSize() - 1);
+		}
+		p.setFont(textFont);
+		p.setClipRect(QRect(4, 2, width() - CB_ARROW_BTN_WIDTH - 8, height() - 4));
 		QPixmap pm = model()->currentData() ?  model()->currentData()->pixmap() : QPixmap();
 		int tx = 5;
 		const auto prefix = fieldIcon.value<QPixmap>();
@@ -282,14 +311,18 @@ void ComboBox::paintEvent( QPaintEvent * _pe )
 			{
 				pm = pm.scaledToHeight( 16, Qt::SmoothTransformation );
 			}
-			p.drawPixmap( tx, 3, pm );
-			tx += pm.width() + 3;
+			const auto size = embed::logicalSize(pm);
+			p.drawPixmap(tx, (height() - size.height()) / 2, pm);
+			tx += size.width() + 3;
 		}
-		const int y = ( height()+p.fontMetrics().height() ) /2;
+		const auto metrics = p.fontMetrics();
+		const auto caption = metrics.elidedText(model()->currentText(), Qt::ElideRight,
+			qMax(0, width() - CB_ARROW_BTN_WIDTH - tx - 5));
+		const int baseline = (height() - metrics.height()) / 2 + metrics.ascent();
 		p.setPen(textShadowColor());
-		p.drawText( tx+1, y-3, model()->currentText() );
+		p.drawText(tx + 1, baseline + 1, caption);
 		p.setPen(textColor());
-		p.drawText( tx, y-4, model()->currentText() );
+		p.drawText(tx, baseline, caption);
 	}
 }
 

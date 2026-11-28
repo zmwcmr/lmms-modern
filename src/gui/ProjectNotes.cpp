@@ -38,8 +38,9 @@
 #include <QToolBar>
 #include <QDomCDATASection>
 
-#include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
+#include "FontHelper.h"
 #include "Engine.h"
 #include "GuiApplication.h"
 #include "MainWindow.h"
@@ -78,7 +79,7 @@ ProjectNotes::ProjectNotes()
 	getGUI()->mainWindow()->addWindowedWidget( this );
 	parentWidget()->setAttribute( Qt::WA_DeleteOnClose, false );
 	parentWidget()->move( 700, 10 );
-	parentWidget()->resize( 400, 300 );
+	parentWidget()->resize(scaledFontSize(400), scaledFontSize(300));
 	parentWidget()->hide();
 }
 
@@ -111,7 +112,7 @@ void ProjectNotes::setText( const QString & _text )
 
 void ProjectNotes::setupActions()
 {
-	QToolBar * tb = addToolBar( tr( "Edit Actions" ) );
+	QToolBar * tb = addToolBar( tr( "Edit actions" ) );
 
 	auto a = new QAction(embed::getIconPixmap("edit_undo"), tr("&Undo"), this);
 	a->setShortcut( QKeySequence::Undo );
@@ -143,7 +144,8 @@ void ProjectNotes::setupActions()
 	tb->addAction( a );
 
 
-	tb = addToolBar( tr( "Format Actions" ) );
+	tb = addToolBar( tr( "Format actions" ) );
+	const auto formatShortcuts = projectNotesShortcuts();
 
 	m_comboFont = new QComboBox( tb );
 	m_comboFont->setEditable( true );
@@ -170,14 +172,14 @@ void ProjectNotes::setupActions()
 
 	m_actionTextBold = new QAction( embed::getIconPixmap( "text_bold" ),
 							tr( "&Bold" ), this );
-	m_actionTextBold->setShortcut( keySequence( Qt::CTRL, Qt::Key_B ) );
+	m_actionTextBold->setShortcut(formatShortcuts.value(QStringLiteral("notes_bold")));
 	m_actionTextBold->setCheckable( true );
 	connect( m_actionTextBold, SIGNAL(triggered()), this,
 							SLOT(textBold()));
 
 	m_actionTextItalic = new QAction( embed::getIconPixmap( "text_italic" ),
 							tr( "&Italic" ), this );
-	m_actionTextItalic->setShortcut( keySequence( Qt::CTRL, Qt::Key_I ) );
+	m_actionTextItalic->setShortcut(formatShortcuts.value(QStringLiteral("notes_italic")));
 	m_actionTextItalic->setCheckable( true );
 	connect( m_actionTextItalic, SIGNAL(triggered()), this,
 							SLOT(textItalic()));
@@ -185,7 +187,7 @@ void ProjectNotes::setupActions()
 	m_actionTextUnderline = new QAction( embed::getIconPixmap(
 								"text_under" ),
 						tr( "&Underline" ), this );
-	m_actionTextUnderline->setShortcut( QKeySequence::Underline );
+	m_actionTextUnderline->setShortcut(formatShortcuts.value(QStringLiteral("notes_underline")));
 	m_actionTextUnderline->setCheckable( true );
 	connect( m_actionTextUnderline, SIGNAL(triggered()), this,
 						SLOT(textUnderline()));
@@ -196,7 +198,7 @@ void ProjectNotes::setupActions()
 
 	m_actionAlignLeft = new QAction( embed::getIconPixmap( "text_left" ),
 						tr( "&Left" ), m_edit );
-	m_actionAlignLeft->setShortcut( keySequence( Qt::CTRL, Qt::Key_L ) );
+	m_actionAlignLeft->setShortcut(formatShortcuts.value(QStringLiteral("notes_align_left")));
 	m_actionAlignLeft->setCheckable( true );
 	grp->addAction( m_actionAlignLeft );
 
@@ -204,21 +206,26 @@ void ProjectNotes::setupActions()
 								"text_center" ),
 						tr( "C&enter" ), m_edit );
 	m_actionAlignCenter->setShortcutContext( Qt::WidgetShortcut );
-	m_actionAlignCenter->setShortcut( keySequence( Qt::CTRL, Qt::Key_E ) );
+	m_actionAlignCenter->setShortcut(formatShortcuts.value(QStringLiteral("notes_align_center")));
 	m_actionAlignCenter->setCheckable( true );
 	grp->addAction( m_actionAlignCenter );
+	if (m_actionAlignCenter->shortcut() != QKeySequence(QStringLiteral("Ctrl+E")))
+	{
+		m_edit->addAction(m_actionAlignCenter);
+	}
 
 	m_actionAlignRight = new QAction( embed::getIconPixmap( "text_right" ),
 						tr( "&Right" ), m_edit );
 	m_actionAlignRight->setShortcutContext( Qt::WidgetShortcut );
-	m_actionAlignRight->setShortcut( keySequence( Qt::CTRL, Qt::Key_R ) );
+	m_actionAlignRight->setShortcut(formatShortcuts.value(QStringLiteral("notes_align_right")));
 	m_actionAlignRight->setCheckable( true );
 	grp->addAction( m_actionAlignRight );
+	m_edit->addAction(m_actionAlignRight);
 
 	m_actionAlignJustify = new QAction( embed::getIconPixmap(
 								"text_block" ),
 						tr( "&Justify" ), m_edit );
-	m_actionAlignJustify->setShortcut( keySequence( Qt::CTRL, Qt::Key_J ) );
+	m_actionAlignJustify->setShortcut(formatShortcuts.value(QStringLiteral("notes_align_justify")));
 	m_actionAlignJustify->setCheckable( true );
 	grp->addAction( m_actionAlignJustify );
 

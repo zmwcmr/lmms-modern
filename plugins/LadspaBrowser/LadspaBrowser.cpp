@@ -104,32 +104,34 @@ LadspaBrowserView::LadspaBrowserView( ToolPlugin * _tool ) :
 	m_tabBar->setFixedWidth( 72 );
 
 	auto ws = new QWidget(this);
-	ws->setFixedSize( 500, 480 );
+	auto* wsLayout = new QVBoxLayout(ws);
+	wsLayout->setContentsMargins(0, 0, 0, 0);
+	wsLayout->setSpacing(0);
 
-	QWidget * available = createTab( ws, tr( "Available Effects" ), LadspaPluginType::Valid );
-	QWidget * unavailable = createTab( ws, tr( "Unavailable Effects" ),
+	QWidget * available = createTab( ws, tr( "Available effects" ), LadspaPluginType::Valid );
+	QWidget * unavailable = createTab( ws, tr( "Unavailable effects" ),
 								LadspaPluginType::Invalid );
 	QWidget * instruments = createTab( ws, tr( "Instruments" ), LadspaPluginType::Source );
-	QWidget * analysis = createTab( ws, tr( "Analysis Tools" ), LadspaPluginType::Sink );
+	QWidget * analysis = createTab( ws, tr( "Analysis tools" ), LadspaPluginType::Sink );
 	QWidget * other = createTab( ws, tr( "Don't know" ), LadspaPluginType::Other );
 
 
-	m_tabBar->addTab( available, tr( "Available Effects" ), 
-				0, false, true 
+	m_tabBar->addTab( available, tr( "Available effects" ),
+				0, false, true, false
 			)->setIcon( embed::getIconPixmap( "setup_audio" ) );
-	m_tabBar->addTab( unavailable, tr( "Unavailable Effects" ), 
-				1, false, true 
+	m_tabBar->addTab( unavailable, tr( "Unavailable effects" ),
+				1, false, true, false
 			)->setIcon( embed::getIconPixmap(
 						"unavailable_sound" ) );
-	m_tabBar->addTab( instruments, tr( "Instruments" ), 
-				2, false, true 
+	m_tabBar->addTab( instruments, tr( "Instruments" ),
+				2, false, true, false
 			)->setIcon( embed::getIconPixmap(
 							"setup_midi" ) );
-	m_tabBar->addTab( analysis, tr( "Analysis Tools" ), 
-				3, false, true
+	m_tabBar->addTab( analysis, tr( "Analysis tools" ),
+				3, false, true, false
 			)->setIcon( embed::getIconPixmap( "analysis" ) );
-	m_tabBar->addTab( other, tr( "Don't know" ), 
-				4, true, true
+	m_tabBar->addTab( other, tr( "Don't know" ),
+				4, true, true, false
 			)->setIcon( embed::getIconPixmap( "uhoh" ) );
 
 
@@ -137,11 +139,10 @@ LadspaBrowserView::LadspaBrowserView( ToolPlugin * _tool ) :
 
 	hlayout->addWidget( m_tabBar );
 	hlayout->addSpacing( 10 );
-	hlayout->addWidget( ws );
+	hlayout->addWidget( ws, 1 );
 	hlayout->addSpacing( 10 );
-	hlayout->addStretch();
-	
-	layout()->setSizeConstraint(QLayout::SetFixedSize);
+
+	resize( 600, 480 );
 
 	hide();
 	if( parentWidget() )
@@ -157,7 +158,7 @@ QWidget * LadspaBrowserView::createTab( QWidget * _parent, const QString & _txt,
 							LadspaPluginType _type )
 {
 	auto tab = new QWidget(_parent);
-	tab->setFixedSize( 500, 400 );
+	tab->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	auto layout = new QVBoxLayout(tab);
 	layout->setSpacing( 0 );
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -165,7 +166,7 @@ QWidget * LadspaBrowserView::createTab( QWidget * _parent, const QString & _txt,
 	const QString type = "<b>" + tr( "Type:" ) + "</b> ";
 	auto title = new QLabel(type + _txt, tab);
 	QFont f = title->font();
-	f.setBold( true );
+	f.setWeight(QFont::DemiBold);
 
 	layout->addSpacing( 5 );
 	layout->addWidget( title );
@@ -175,6 +176,11 @@ QWidget * LadspaBrowserView::createTab( QWidget * _parent, const QString & _txt,
 	connect( description, SIGNAL( doubleClicked( const ::lmms::ladspa_key_t & ) ),
 				SLOT( showPorts( const ::lmms::ladspa_key_t & ) ) );
 	layout->addWidget( description, 1 );
+
+	if (auto* parentLayout = qobject_cast<QVBoxLayout*>(_parent->layout()))
+	{
+		parentLayout->addWidget(tab);
+	}
 
 	return tab;
 }

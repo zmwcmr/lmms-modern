@@ -27,6 +27,10 @@
 #include "MultitapEchoControlDialog.h"
 #include "MultitapEchoControls.h"
 #include "embed.h"
+#include <QHBoxLayout>
+#include <QResizeEvent>
+#include <QVBoxLayout>
+
 #include "FontHelper.h"
 #include "Graph.h"
 #include "LedCheckBox.h"
@@ -42,63 +46,84 @@ MultitapEchoControlDialog::MultitapEchoControlDialog( MultitapEchoControls * con
 	EffectControlDialog( controls )
 {
 	setAutoFillBackground( true );
-	QPalette pal;
-	pal.setBrush( backgroundRole(),	PLUGIN_NAME::getIconPixmap( "artwork" ) );
-	setPalette( pal );
-	setFixedSize( 245, 300 );
-	
-	// graph widgets
 
+	// graph widgets
 	auto ampGraph = new Graph(this, Graph::Style::Bar, 204, 105);
 	auto lpGraph = new Graph(this, Graph::Style::Bar, 204, 105);
 
-	ampGraph->move( 30, 10 );
-	lpGraph->move( 30, 125 );
-	
 	ampGraph->setModel( & controls->m_ampGraph );
 	lpGraph->setModel( & controls->m_lpGraph );
-	
-	pal = QPalette();
+
+	QPalette pal;
 	pal.setBrush( backgroundRole(),	PLUGIN_NAME::getIconPixmap("graph_bg") );
-	
 	ampGraph->setAutoFillBackground( true );
 	ampGraph->setPalette( pal );
 	ampGraph->setGraphColor( QColor( 11, 213, 86) );
-	ampGraph -> setMaximumSize( 204, 105 );
-	
+	ampGraph->setMaximumSize( 204, 105 );
 	lpGraph->setAutoFillBackground( true );
 	lpGraph->setPalette( pal );
 	lpGraph->setGraphColor( QColor( 0, 200, 187) );
-	lpGraph -> setMaximumSize( 204, 105 );
-	
-	// steps spinbox
+	lpGraph->setMaximumSize( 204, 105 );
 
 	auto steps = new LcdSpinBox(2, this, "Steps");
-	steps->move( 20, 245 );
 	steps->setModel( & controls->m_steps );
-	
-	// knobs
 
 	auto stepLength = new TempoSyncKnob(KnobType::Bright26, tr("Length"), SMALL_FONT_SIZE,  this);
-	stepLength->move( 100, 245 );
 	stepLength->setModel( & controls->m_stepLength );
 	stepLength->setHintText( tr( "Step length:" ) , " ms" );
 
 	auto dryGain = new Knob(KnobType::Bright26, tr("Dry"), SMALL_FONT_SIZE, this);
-	dryGain->move( 150, 245 );
 	dryGain->setModel( & controls->m_dryGain );
 	dryGain->setHintText( tr( "Dry gain:" ) , " dBFS" );
 
 	auto stages = new Knob(KnobType::Bright26, tr("Stages"), SMALL_FONT_SIZE, this);
-	stages->move( 200, 245 );
 	stages->setModel( & controls->m_stages );
 	stages->setHintText( tr( "Low-pass stages:" ) , "x" );
-	// switch led
 
 	auto swapInputs = new LedCheckBox("Swap inputs", this, tr("Swap inputs"), LedCheckBox::LedColor::Green);
-	swapInputs->move( 20, 275 );
 	swapInputs->setModel( & controls->m_swapInputs );
 	swapInputs->setToolTip(tr("Swap left and right input channels for reflections"));
+
+	auto* controlsLayout = new QHBoxLayout;
+	controlsLayout->setSpacing(4);
+	controlsLayout->addWidget(steps);
+	controlsLayout->addWidget(stepLength);
+	controlsLayout->addWidget(dryGain);
+	controlsLayout->addWidget(stages);
+
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(10, 8, 10, 8);
+	mainLayout->setSpacing(2);
+	mainLayout->addWidget(ampGraph, 0, Qt::AlignHCenter);
+	mainLayout->addWidget(lpGraph, 0, Qt::AlignHCenter);
+	mainLayout->addLayout(controlsLayout);
+	mainLayout->addWidget(swapInputs);
+	mainLayout->addStretch();
+
+	setMinimumSize(245, 300);
+	adjustSize();
+	updateBackground();
+}
+
+
+
+void MultitapEchoControlDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void MultitapEchoControlDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
 }
 
 

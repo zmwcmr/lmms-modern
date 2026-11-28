@@ -849,10 +849,10 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 
 	m_selPresetButton->setMenu(menu);
 
-	m_toggleGUIButton = new QPushButton( tr( "Show/hide GUI" ), this );
+	m_toggleGUIButton = new QPushButton( tr( "Show/hide" ), this );
 	m_toggleGUIButton->setGeometry( 20, 130, 200, 24 );
 	m_toggleGUIButton->setIcon( embed::getIconPixmap( "zoom" ) );
-	m_toggleGUIButton->setFont(adjustedToPixelSize(m_toggleGUIButton->font(), LARGE_FONT_SIZE));
+	m_toggleGUIButton->setFont(adjustedToPixelSize(m_toggleGUIButton->font(), DEFAULT_FONT_SIZE));
 	connect( m_toggleGUIButton, SIGNAL( clicked() ), this,
 							SLOT( toggleGUI() ) );
 
@@ -861,7 +861,7 @@ VestigeInstrumentView::VestigeInstrumentView( Instrument * _instrument,
 		this);
 	note_off_all_btn->setGeometry( 20, 160, 200, 24 );
 	note_off_all_btn->setIcon( embed::getIconPixmap( "stop" ) );
-	note_off_all_btn->setFont(adjustedToPixelSize(note_off_all_btn->font(), LARGE_FONT_SIZE));
+	note_off_all_btn->setFont(adjustedToPixelSize(note_off_all_btn->font(), DEFAULT_FONT_SIZE));
 	connect( note_off_all_btn, SIGNAL( clicked() ), this,
 							SLOT( noteOffAll() ) );
 
@@ -942,7 +942,7 @@ void VestigeInstrumentView::openPlugin()
 		types << tr("All VST files (*.dll *.so)")
 			<< tr("Windows VST2 files (*.dll)");
 #	endif
-	types << tr("LinuxVST files (*.so)");
+	types << tr("Linux VST files (*.so)");
 #endif
 
 	ofd.setNameFilters(types);
@@ -1202,7 +1202,7 @@ ManageVestigeInstrumentView::ManageVestigeInstrumentView( Instrument * _instrume
 	l->setVerticalSpacing( 10 );
 	l->setHorizontalSpacing( 23 );
 
-	m_syncButton = new QPushButton( tr( "VST Sync" ), this );
+	m_syncButton = new QPushButton( tr( "VST sync" ), this );
 	connect( m_syncButton, SIGNAL( clicked() ), this,
 							SLOT( syncPlugin() ) );
 

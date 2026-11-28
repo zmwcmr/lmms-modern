@@ -28,6 +28,8 @@
 
 #include "EffectControlDialog.h"
 
+class QResizeEvent;
+
 namespace lmms
 {
 
@@ -45,6 +47,11 @@ public:
 	DualFilterControlDialog( DualFilterControls* controls );
 	~DualFilterControlDialog() override = default;
 
+protected:
+	void resizeEvent( QResizeEvent * event ) override;
+
+private:
+	void updateBackground();
 } ;
 
 

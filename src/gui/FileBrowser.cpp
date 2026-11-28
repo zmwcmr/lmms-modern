@@ -35,17 +35,23 @@
 #include <QMdiSubWindow>
 #include <QMenu>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPainterPath>
 #include <QProgressBar>
 #include <QScrollBar>
 #include <QPushButton>
+#include <QKeyEvent>
 #include <QShortcut>
 #include <QStringList>
+#include <QVariantAnimation>
+#include <QVector>
 #include <cassert>
 
 #include "AudioEngine.h"
 #include "ConfigManager.h"
 #include "DataFile.h"
 #include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "Engine.h"
 #include "FileBrowser.h"
 #include "FileRevealer.h"
@@ -55,6 +61,7 @@
 #include "InstrumentTrack.h"
 #include "InstrumentTrackWindow.h"
 #include "KeyboardShortcuts.h"
+#include "LmmsStyle.h"
 #include "MainWindow.h"
 #include "PatternStore.h"
 #include "Plugin.h"
@@ -70,6 +77,8 @@
 #include "ThreadPool.h"
 #include "Track.h"
 #include "embed.h"
+#include "CompactItemDelegate.h"
+#include "FontHelper.h"
 
 namespace lmms::gui
 {
@@ -93,17 +102,22 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 {
 	setWindowTitle( tr( "Browser" ) );
 
+	const auto shortcuts = fileBrowserShortcuts();
+	const auto searchShortcut = shortcuts.value(QStringLiteral("browser_search"));
+	m_refreshShortcut = shortcuts.value(QStringLiteral("browser_refresh"));
+
 	addContentCheckBox();
 
 	auto searchWidget = new QWidget(contentParent());
-	searchWidget->setFixedHeight( 24 );
 
 	auto searchWidgetLayout = new QHBoxLayout(searchWidget);
 	searchWidgetLayout->setContentsMargins(0, 0, 0, 0);
 	searchWidgetLayout->setSpacing( 0 );
 
 	m_filterEdit = new QLineEdit(searchWidget);
+	m_filterEdit->setFont(bodyFont(m_filterEdit->font()));
 	m_filterEdit->setPlaceholderText(tr("Search"));
+	m_filterEdit->setToolTip(tr("Search (%1)").arg(searchShortcut.toString(QKeySequence::NativeText)));
 	m_filterEdit->setClearButtonEnabled(true);
 	m_filterEdit->addAction(embed::getIconPixmap("zoom"), QLineEdit::LeadingPosition);
 
@@ -113,12 +127,13 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	connect(&m_searchJob, &FileSearchJob::foundMatch, this, &FileBrowser::onSearchMatch, Qt::QueuedConnection);
 
 	auto reload_btn = new QPushButton(embed::getIconPixmap("reload"), QString(), searchWidget);
-	reload_btn->setToolTip( tr( "Refresh list" ) );
+	reload_btn->setToolTip(tr("Refresh list (%1)").arg(m_refreshShortcut.toString(QKeySequence::NativeText)));
 	connect( reload_btn, SIGNAL(clicked()), this, SLOT(reloadTree()));
 
 	searchWidgetLayout->addWidget( m_filterEdit );
 	searchWidgetLayout->addSpacing( 5 );
 	searchWidgetLayout->addWidget( reload_btn );
+	searchWidget->setMinimumHeight(24);
 
 	addContentWidget( searchWidget );
 
@@ -133,8 +148,7 @@ FileBrowser::FileBrowser(Type type, const QString& directories, const QString& f
 	m_searchIndicator->setRange(0, 1);
 	addContentWidget(m_searchIndicator);
 
-	// Whenever the FileBrowser has focus, Ctrl+F should direct focus to its filter box.
-	auto filterFocusShortcut = new QShortcut(QKeySequence(QKeySequence::Find), this, SLOT(giveFocusToFilter()));
+	auto filterFocusShortcut = new QShortcut(searchShortcut, this, SLOT(giveFocusToFilter()));
 	filterFocusShortcut->setContext(Qt::WidgetWithChildrenShortcut);
 
 	m_previousFilterValue = "";
@@ -160,10 +174,11 @@ void FileBrowser::addContentCheckBox()
 	auto filterWidget = new QWidget(contentParent());
 
 	outerLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom, filterWidget);
+	outerLayout->setContentsMargins(0, 0, 0, 0);
 	outerLayout->setSpacing(0);
 
 	if (user_checkbox || factory){
-		filterWidgetLayout = new QBoxLayout(QBoxLayout::Direction::LeftToRight);
+		filterWidgetLayout = new QBoxLayout(QBoxLayout::Direction::TopToBottom);
 		filterWidgetLayout->setContentsMargins(0, 0, 0, 0);
 		filterWidgetLayout->setSpacing(0);
 
@@ -178,6 +193,7 @@ void FileBrowser::addContentCheckBox()
 
 	auto configCheckBox = [this](QBoxLayout* boxLayout, QCheckBox* box, Qt::CheckState checkState)
 	{
+		box->setFont(bodyFont(box->font()));
 		box->setCheckState(checkState);
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 7, 0))
@@ -441,13 +457,14 @@ void FileBrowser::addItems(const QString & path )
 
 void FileBrowser::keyPressEvent(QKeyEvent * ke )
 {
-	switch( ke->key() ){
-		case Qt::Key_F5:
-			reloadTree();
-			break;
-		default:
-			ke->ignore();
+	const auto pressed = QKeySequence(ke->key() | static_cast<int>(ke->modifiers()));
+	if (pressed == m_refreshShortcut || (ke->key() == Qt::Key_F5 && m_refreshShortcut == QKeySequence(Qt::Key_F5)))
+	{
+		reloadTree();
+		ke->accept();
+		return;
 	}
+	ke->ignore();
 }
 
 
@@ -465,10 +482,14 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 {
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	setHorizontalScrollMode(ScrollPerPixel);
-	header()->setStretchLastSection(false);
-	header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+	setMouseTracking(true);
+	header()->setStretchLastSection(true);
+	header()->setSectionResizeMode(QHeaderView::Stretch);
+	setTextElideMode(Qt::ElideMiddle);
 
 	setColumnCount( 1 );
+	setFont(bodyFont(font()));
+	setItemDelegate(new CompactItemDelegate(this));
 	headerItem()->setHidden( true );
 	setSortingEnabled( false );
 
@@ -478,6 +499,115 @@ FileBrowserTreeWidget::FileBrowserTreeWidget(QWidget * parent ) :
 				SLOT(updateDirectory(QTreeWidgetItem*)));
 	connect( this, SIGNAL(itemExpanded(QTreeWidgetItem*)),
 				SLOT(updateDirectory(QTreeWidgetItem*)));
+	connect(this, &QTreeWidget::itemExpanded, this, [this](QTreeWidgetItem* item) {
+		animateBranch(indexFromItem(item), true);
+	});
+	connect(this, &QTreeWidget::itemCollapsed, this, [this](QTreeWidgetItem* item) {
+		animateBranch(indexFromItem(item), false);
+	});
+}
+
+
+
+
+void FileBrowserTreeWidget::animateBranch(const QModelIndex& index, bool expanded)
+{
+	if (!index.isValid() || !index.model()->hasChildren(index)) { return; }
+
+	const QPersistentModelIndex key{index};
+	const qreal target = expanded ? 90.0 : 0.0;
+	const qreal start = m_branchAngles.value(key, expanded ? 0.0 : 90.0);
+
+	if (auto* previous = m_branchAnimations.take(key))
+	{
+		QObject::disconnect(previous, nullptr, this, nullptr);
+		previous->stop();
+		previous->deleteLater();
+	}
+
+	if (qFuzzyCompare(start, target))
+	{
+		m_branchAngles[key] = target;
+		viewport()->update();
+		return;
+	}
+
+	const int duration = LmmsStyle::uiAnimationDuration(this, 140);
+	if (duration <= 0)
+	{
+		m_branchAngles[key] = target;
+		viewport()->update();
+		return;
+	}
+
+	auto* animation = new QVariantAnimation(this);
+	animation->setDuration(duration);
+	animation->setStartValue(start);
+	animation->setEndValue(target);
+	animation->setEasingCurve(QEasingCurve::OutCubic);
+	m_branchAnimations[key] = animation;
+
+	connect(animation, &QVariantAnimation::valueChanged, this, [this, key](const QVariant& value) {
+		m_branchAngles[key] = value.toReal();
+		viewport()->update();
+	});
+	connect(animation, &QVariantAnimation::finished, this, [this, key, animation, target] {
+		m_branchAngles[key] = target;
+		if (m_branchAnimations.value(key) == animation) { m_branchAnimations.remove(key); }
+		animation->deleteLater();
+		viewport()->update();
+	});
+	animation->start();
+}
+
+
+
+
+void FileBrowserTreeWidget::drawBranches(QPainter* painter, const QRect& rect, const QModelIndex& index) const
+{
+	QTreeWidget::drawBranches(painter, rect, index);
+	// The compact selection is drawn by CompactItemDelegate. Keep the branch
+	// and indentation area on the plain viewport background instead of letting
+	// the style paint a full-row hover/selection block there.
+	painter->fillRect(rect, palette().color(QPalette::Base));
+	if (!rootIsDecorated() || !index.isValid()) { return; }
+
+	int depth = 0;
+	for (auto parent = index.parent(); parent.isValid(); parent = parent.parent()) { ++depth; }
+
+	const int indent = indentation();
+	if (indent <= 0 || !model()->hasChildren(index)) { return; }
+
+	const bool selected = selectionModel() && selectionModel()->isSelected(index);
+	QColor color = palette().color(selected ? QPalette::HighlightedText : QPalette::Text);
+	if (!isEnabled()) { color = palette().color(QPalette::Disabled, QPalette::Text); }
+
+	painter->save();
+	painter->setRenderHint(QPainter::Antialiasing);
+	painter->setPen(Qt::NoPen);
+	painter->setBrush(color);
+
+	const QPointF arrowCenter(depth * indent + indent / 2.0, rect.y() + rect.height() / 2.0);
+	const QRectF arrowHoverRect(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0);
+	if (m_mousePos.x() >= 0 && arrowHoverRect.contains(QPointF(m_mousePos)))
+	{
+		painter->setBrush(QColor(60, 68, 78));
+		painter->drawRoundedRect(arrowHoverRect, 3, 3);
+		painter->setBrush(color);
+	}
+
+	const qreal angle = m_branchAngles.value(QPersistentModelIndex{index},
+		isExpanded(index) ? 90.0 : 0.0);
+	painter->translate(arrowCenter);
+	painter->rotate(angle);
+	QPainterPath arrow;
+	arrow.moveTo(-2.0, -3.5);
+	arrow.lineTo(2.5, 0.0);
+	arrow.lineTo(-2.0, 3.5);
+	arrow.closeSubpath();
+	painter->drawPath(arrow);
+
+	painter->restore();
 }
 
 
@@ -506,6 +636,25 @@ QList<QString> FileBrowserTreeWidget::expandedDirs( QTreeWidgetItem * item ) con
 	}
 	return dirs;
 }
+
+void FileBrowserTreeWidget::leaveEvent(QEvent* event)
+{
+	m_mousePos = QPoint(-1, -1);
+	viewport()->update();
+	QTreeWidget::leaveEvent(event);
+}
+
+
+bool FileBrowserTreeWidget::viewportEvent(QEvent* event)
+{
+	if (event->type() == QEvent::Leave)
+	{
+		m_mousePos = QPoint(-1, -1);
+		viewport()->update();
+	}
+	return QTreeWidget::viewportEvent(event);
+}
+
 
 void FileBrowserTreeWidget::scrollTo(const QModelIndex &index, ScrollHint hint)
 {
@@ -618,7 +767,7 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 
 	auto contextMenu = QMenu{this};
 
-	const auto fontMetrics = QFontMetrics{qApp->font()};
+	const auto fontMetrics = QFontMetrics{font()};
 	const auto maxHeaderWidth = 50 * fontMetrics.averageCharWidth();
 	const auto elidedPath = fontMetrics.elidedText(PathUtil::toShortestRelative(item->fullName()), Qt::TextElideMode::ElideMiddle, maxHeaderWidth);
 
@@ -660,7 +809,7 @@ void FileBrowserTreeWidget::contextMenuEvent(QContextMenuEvent* e)
 
 		if (file->isTrack())
 		{
-			contextMenu.addAction(tr("Send to active instrument-track"), [&] { sendToActiveInstrumentTrack(file); });
+			contextMenu.addAction(tr("Send to active instrument track"), [&] { sendToActiveInstrumentTrack(file); });
 		}
 
 		addActionsGroup(tr("Song Editor"), getContextActions(file, true));
@@ -872,6 +1021,8 @@ void FileBrowserTreeWidget::stopPreview()
 
 void FileBrowserTreeWidget::mouseMoveEvent( QMouseEvent * me )
 {
+	m_mousePos = me->pos();
+	viewport()->update();
 	if (m_mousePressed && (m_pressPos - position(me)).manhattanLength() > QApplication::startDragDistance())
 	{
 		// make sure any playback is stopped
@@ -922,6 +1073,27 @@ void FileBrowserTreeWidget::mouseMoveEvent( QMouseEvent * me )
 }
 
 
+
+
+void FileBrowserTreeWidget::mouseDoubleClickEvent(QMouseEvent* me)
+{
+	if (me->button() == Qt::LeftButton)
+	{
+		const QModelIndex index = indexAt(QPoint(viewport()->width() - 1, me->pos().y()));
+		if (index.isValid() && model()->hasChildren(index))
+		{
+			const QRect itemRect = visualRect(index);
+			const QPointF arrowCenter(itemRect.left() - indentation() / 2.0, itemRect.center().y());
+			if (QRectF(arrowCenter.x() - 8.0, arrowCenter.y() - 8.0, 16.0, 16.0).contains(QPointF(me->pos())))
+			{
+				setExpanded(index, !isExpanded(index));
+				me->accept();
+				return;
+			}
+		}
+	}
+	QTreeWidget::mouseDoubleClickEvent(me);
+}
 
 
 void FileBrowserTreeWidget::mouseReleaseEvent(QMouseEvent * me )
@@ -1091,6 +1263,7 @@ void FileBrowserTreeWidget::updateDirectory(QTreeWidgetItem * item )
 FileBrowserWidgetItem::FileBrowserWidgetItem(const QStringList& strings, int type, QTreeWidget* parent)
 	: QTreeWidgetItem(parent, strings, type)
 {
+	setToolTip(0, strings.value(0));
 }
 
 Directory::Directory(const QString& filename, const QString& path, const QString& filter)

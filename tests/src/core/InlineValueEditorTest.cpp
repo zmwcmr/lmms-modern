@@ -1,21 +1,46 @@
 #include <memory>
 
 #include <QtTest>
+#include <QApplication>
+#include <QGraphicsOpacityEffect>
 #include <QLabel>
+#include <QProxyStyle>
 
 #include "AutomatableModel.h"
+#include "ConfigManager.h"
 #include "Engine.h"
 #include "InlineValueEditor.h"
 
 using lmms::FloatModel;
 using lmms::gui::InlineValueEditor;
 
+class InlineValueEditorTestStyle : public QProxyStyle
+{
+public:
+	explicit InlineValueEditorTestStyle(int duration) : m_duration(duration) {}
+
+	int styleHint(StyleHint hint, const QStyleOption* option, const QWidget* widget,
+		QStyleHintReturn* result) const override
+	{
+		return hint == SH_Widget_Animation_Duration
+			? m_duration : QProxyStyle::styleHint(hint, option, widget, result);
+	}
+
+private:
+	int m_duration;
+};
+
 class InlineValueEditorTest : public QObject
 {
 	Q_OBJECT
 
 private slots:
-	void initTestCase() { lmms::Engine::init(true); }
+	void initTestCase()
+	{
+		lmms::Engine::init(true);
+		QApplication::setStyle(new InlineValueEditorTestStyle(100));
+		lmms::ConfigManager::inst()->setValue("ui", "animations", "1");
+	}
 	void cleanupTestCase() { lmms::Engine::destroy(); }
 
 	void edit_data()
@@ -68,6 +93,39 @@ private slots:
 		QVERIFY(window.findChild<InlineValueEditor*>());
 		model.reset();
 		QTRY_VERIFY(!window.findChild<InlineValueEditor*>());
+	}
+
+	void fadesInWithoutDelayingFocus()
+	{
+		FloatModel model;
+		QWidget window;
+		window.resize(320, 200);
+		QWidget control(&window);
+		control.setGeometry(140, 80, 40, 25);
+		window.show();
+
+		InlineValueEditor::showEditor(&control, &model);
+		auto* editor = window.findChild<InlineValueEditor*>();
+		QVERIFY(editor);
+		QVERIFY(editor->hasFocus() || window.focusWidget() == editor);
+		QVERIFY(qobject_cast<QGraphicsOpacityEffect*>(editor->graphicsEffect()));
+		QTRY_VERIFY(!editor->graphicsEffect());
+	}
+
+	void doesNotFadeWhenDisabled()
+	{
+		QApplication::setStyle(new InlineValueEditorTestStyle(0));
+		FloatModel model;
+		QWidget window;
+		window.resize(320, 200);
+		QWidget control(&window);
+		control.setGeometry(140, 80, 40, 25);
+
+		InlineValueEditor::showEditor(&control, &model);
+		auto* editor = window.findChild<InlineValueEditor*>();
+		QVERIFY(editor);
+		QVERIFY(!editor->graphicsEffect());
+		QApplication::setStyle(new InlineValueEditorTestStyle(100));
 	}
 
 	void leavesCaptionVisible()

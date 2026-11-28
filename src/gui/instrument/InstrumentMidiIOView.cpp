@@ -50,11 +50,11 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 {
 	auto layout = new QVBoxLayout(this);
 	layout->setContentsMargins(5, 5, 5, 5);
-	m_midiInputGroupBox = new GroupBox( tr( "ENABLE MIDI INPUT" ) );
+	m_midiInputGroupBox = new GroupBox( tr( "Enable MIDI input" ) );
 	layout->addWidget( m_midiInputGroupBox );
 
 	auto midiInputLayout = new QHBoxLayout(m_midiInputGroupBox);
-	midiInputLayout->setContentsMargins( 8, 18, 8, 8 );
+	midiInputLayout->setContentsMargins(8, m_midiInputGroupBox->titleBarHeight() + 7, 8, 8);
 	midiInputLayout->setSpacing( 4 );
 
 	m_inputChannelSpinBox = new LcdSpinBox( 2, m_midiInputGroupBox );
@@ -81,11 +81,11 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 
 
 
-	m_midiOutputGroupBox = new GroupBox( tr( "ENABLE MIDI OUTPUT" ) );
+	m_midiOutputGroupBox = new GroupBox( tr( "Enable MIDI output" ) );
 	layout->addWidget( m_midiOutputGroupBox );
 
 	auto midiOutputLayout = new QVBoxLayout(m_midiOutputGroupBox);
-	midiOutputLayout->setContentsMargins( 8, 18, 8, 8 );
+	midiOutputLayout->setContentsMargins(8, m_midiOutputGroupBox->titleBarHeight() + 7, 8, 8);
 	midiOutputLayout->setSpacing( 4 );
 
 	auto midiOutputControls = new QHBoxLayout();
@@ -158,12 +158,12 @@ InstrumentMidiIOView::InstrumentMidiIOView( QWidget* parent ) :
 	midiOutputLayout->addLayout( midiOutTargetLayout );
 	midiOutputLayout->addStretch();
 
-	auto baseVelocityGroupBox = new GroupBox(tr("VELOCITY MAPPING"));
+	auto baseVelocityGroupBox = new GroupBox(tr("Velocity mapping"));
 	baseVelocityGroupBox->setLedButtonShown(false);
 	layout->addWidget( baseVelocityGroupBox );
 
 	auto baseVelocityLayout = new QVBoxLayout(baseVelocityGroupBox);
-	baseVelocityLayout->setContentsMargins( 8, 18, 8, 8 );
+	baseVelocityLayout->setContentsMargins(8, baseVelocityGroupBox->titleBarHeight() + 7, 8, 8);
 	baseVelocityLayout->setSpacing( 6 );
 
 	m_baseVelocitySpinBox = new LcdSpinBox( 3, baseVelocityGroupBox );

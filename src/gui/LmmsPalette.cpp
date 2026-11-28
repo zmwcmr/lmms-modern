@@ -89,6 +89,14 @@ STYLECOLOR(inactiveTitleText, setInactiveTitleText, "_lmms_inactiveTitleText", Q
 STYLECOLOR(titleText, setTitleText, "_lmms_titleText", QColor(64, 64, 64))
 STYLECOLOR(mdiButton, setMdiButton, "_lmms_mdiButton", QColor(223, 228, 236))
 STYLECOLOR(frameInner, setFrameInner, "_lmms_frameInner", QColor(0, 0, 0))
+STYLECOLOR(linkColor, setLinkColor, "_lmms_linkColor", text())
+STYLECOLOR(iconColor, setIconColor, "_lmms_iconColor", text())
+STYLECOLOR(iconDisabledColor, setIconDisabledColor, "_lmms_iconDisabledColor", QColor(209, 216, 228, 102))
+STYLECOLOR(iconAccentColor, setIconAccentColor, "_lmms_iconAccentColor", QColor(11, 213, 86))
+STYLECOLOR(iconRecordColor, setIconRecordColor, "_lmms_iconRecordColor", QColor(255, 71, 87))
+STYLECOLOR(iconWarningColor, setIconWarningColor, "_lmms_iconWarningColor", QColor(245, 166, 35))
+STYLECOLOR(iconErrorColor, setIconErrorColor, "_lmms_iconErrorColor", QColor(255, 92, 92))
+STYLECOLOR(iconInfoColor, setIconInfoColor, "_lmms_iconInfoColor", QColor(89, 176, 255))
 #undef STYLECOLOR
 
 
@@ -106,6 +114,8 @@ QPalette LmmsPalette::palette() const
 	pal.setColor( QPalette::Shadow, 			shadow() );	
 	pal.setColor( QPalette::Highlight, 			highlight() );	
 	pal.setColor( QPalette::HighlightedText, 	highlightedText() );
+	pal.setColor(QPalette::Link, linkColor());
+	pal.setColor(QPalette::LinkVisited, linkColor());
 	return pal;
 }
 

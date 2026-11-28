@@ -100,11 +100,11 @@ SaControls::SaControls(Analyzer *effect) :
 	m_blockSizeModel.setValue(m_blockSizeModel.findText("2048"));
 
 	// Window type order must match FFTWindow defined in fft_helpers.h
-	m_windowModel.addItem(tr("Rectangular (Off)"));
-	m_windowModel.addItem(tr("Blackman-Harris (Default)"));
+	m_windowModel.addItem(tr("Rectangular (off)"));
+	m_windowModel.addItem(tr("Blackman-Harris (default)"));
 	m_windowModel.addItem(tr("Hamming"));
 	m_windowModel.addItem(tr("Hanning"));
-	m_windowModel.setValue(m_windowModel.findText(tr("Blackman-Harris (Default)")));
+	m_windowModel.setValue(m_windowModel.findText(tr("Blackman-Harris (default)")));
 
 	// Colors
 	// Background color is defined by Qt / theme.

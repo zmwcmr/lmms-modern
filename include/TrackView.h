@@ -203,6 +203,7 @@ protected:
 	void resizeEvent(QResizeEvent* re) override;
 
 private:
+	static int minimumTrackHeight();
 	void resizeToHeight(int height);
 
 private:

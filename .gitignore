@@ -24,4 +24,7 @@ compile_commands.json
 /tests/stress/plugins/effect-results.json
 /tests/stress/plugins/multi-*.json
 /tests/stress/plugins/fixtures/
+
+# Python bytecode
 __pycache__/
+*.pyc

@@ -192,7 +192,7 @@ void LcdSpinBox::mouseDoubleClickEvent( QMouseEvent * )
 	mouseReleaseEvent(nullptr);
 	InlineValueEditor::showEditorWithHint(this, model(),
 		InlineValueEditor::rangeHint(model()->minValue(), model()->maxValue()), {}, {}, 0,
-		height() - (hasLabel() ? LabelHeight : 0));
+		cellHeight() + 2);
 }
 
 } // namespace lmms::gui

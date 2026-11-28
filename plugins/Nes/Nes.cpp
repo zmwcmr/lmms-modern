@@ -813,7 +813,7 @@ NesInstrumentView::NesInstrumentView( Instrument * instrument,	QWidget * parent 
 
 	//channel 4
 	makeknob( m_ch4VolumeKnob, KNOB_X1, KNOB_Y4, tr( "Volume" ), "", "" )
-	makeknob( m_ch4NoiseFreqKnob, KNOB_X2, KNOB_Y4, tr( "Noise Frequency" ), "", "" )
+	makeknob( m_ch4NoiseFreqKnob, KNOB_X2, KNOB_Y4, tr( "Noise frequency" ), "", "" )
 	makeknob( m_ch4EnvLenKnob, KNOB_X3, KNOB_Y4, tr( "Envelope length" ), "", "" )
 	makeknob( m_ch4SweepKnob, KNOB_X4, KNOB_Y4, tr( "Frequency sweep" ), "", "" )
 	

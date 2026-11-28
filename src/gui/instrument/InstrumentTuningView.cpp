@@ -51,12 +51,12 @@ InstrumentTuningView::InstrumentTuningView(InstrumentTrack *it, QWidget *parent)
 	layout->setContentsMargins(5, 5, 5, 5);
 
 	// Master pitch toggle
-	m_pitchGroupBox = new GroupBox(tr("GLOBAL TRANSPOSITION"));
+	m_pitchGroupBox = new GroupBox(tr("Global transposition"));
 	m_pitchGroupBox->setModel(&it->m_useMasterPitchModel);
 	layout->addWidget(m_pitchGroupBox);
 
 	auto masterPitchLayout = new QHBoxLayout(m_pitchGroupBox);
-	masterPitchLayout->setContentsMargins(8, 18, 8, 8);
+	masterPitchLayout->setContentsMargins(8, m_pitchGroupBox->titleBarHeight() + 7, 8, 8);
 
 	auto tlabel = new QLabel(tr("Enables the use of global transposition"));
 	tlabel->setWordWrap(true);
@@ -69,12 +69,12 @@ InstrumentTuningView::InstrumentTuningView(InstrumentTrack *it, QWidget *parent)
 	m_microtunerNotSupportedLabel->hide();
 	layout->addWidget(m_microtunerNotSupportedLabel);
 
-	m_microtunerGroupBox = new GroupBox(tr("MICROTUNER"));
+	m_microtunerGroupBox = new GroupBox(tr("Microtuner"));
 	m_microtunerGroupBox->setModel(it->m_microtuner.enabledModel());
 	layout->addWidget(m_microtunerGroupBox);
 
 	auto microtunerLayout = new QVBoxLayout(m_microtunerGroupBox);
-	microtunerLayout->setContentsMargins(8, 18, 8, 8);
+	microtunerLayout->setContentsMargins(8, m_microtunerGroupBox->titleBarHeight() + 7, 8, 8);
 
 	auto scaleEditLayout = new QHBoxLayout();
 	scaleEditLayout->setContentsMargins(0, 0, 4, 0);

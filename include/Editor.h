@@ -52,7 +52,10 @@ public:
 	void setPauseIcon(bool displayPauseIcon=true);
 	QAction *playAction() const;
 	static Editor* lastPlayedEditor() { return s_lastPlayedEditor; }
+	static bool handleTransportKey(QKeyEvent* event, Editor* target);
 protected:
+	void setTransportToolTips(const QString& play, const QString& stop);
+	void setRecordingToolTips(const QString& record, const QString& accompany, const QString& step = {});
 	DropToolBar * addDropToolBarToTop(QString const & windowTitle);
 	DropToolBar * addDropToolBar(Qt::ToolBarArea whereToAdd, QString const & windowTitle);
 	DropToolBar * addDropToolBar(QWidget * parent, Qt::ToolBarArea whereToAdd, QString const & windowTitle);
@@ -60,9 +63,7 @@ protected:
 	void keyPressEvent(QKeyEvent* ke) override;
 
 public slots:
-	//! Called by pressing the space key. Plays or stops.
 	void togglePlayStop();
-	//! Called by pressing shift+space. Toggles pause state.
 	void togglePause();
 
 protected slots:

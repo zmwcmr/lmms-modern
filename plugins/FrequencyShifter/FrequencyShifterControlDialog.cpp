@@ -27,6 +27,10 @@
 #include <QTextEdit>
 
 #include "AutomatableButton.h"
+#include <QHBoxLayout>
+#include <QResizeEvent>
+#include <QVBoxLayout>
+
 #include "embed.h"
 #include "GuiApplication.h"
 #include "Knob.h"
@@ -63,19 +67,12 @@ FrequencyShifterControlDialog::FrequencyShifterControlDialog(FrequencyShifterCon
 	EffectControlDialog(c)
 {
 	setAutoFillBackground(true);
-	QPalette pal;
-	pal.setBrush(backgroundRole(), PLUGIN_NAME::getIconPixmap("artwork"));
-	setPalette(pal);
-	setFixedSize(288, 360);
 
-	auto mk = [this](int x, int y,
-		const QString& lbl, FloatModel* m, const QString& unit,
-		const char* objName,
-		QSize sz)
+	auto mk = [this](const QString& lbl, FloatModel* m, const QString& unit,
+		const char* objName, QSize sz) -> Knob*
 	{
 		Knob* k = new Knob(KnobType::Styled, this);
 		k->setObjectName(objName);
-		k->move(x, y);
 		k->setModel(m);
 		k->setHintText(lbl, unit);
 		setupKnobGeometry(k, sz.width(), sz.height());
@@ -87,87 +84,134 @@ FrequencyShifterControlDialog::FrequencyShifterControlDialog(FrequencyShifterCon
 	const QSize K24(24, 24);
 	const QSize K19(19, 19);
 
-	LcdFloatSpinBox* shiftSpin = new LcdFloatSpinBox(6, 3, "19red", tr("Frequency Shift"), this);
-	shiftSpin->move(100, 43);
+	auto* topLayout = new QHBoxLayout;
+	topLayout->setSpacing(4);
+	topLayout->addWidget(mk("Mix", &c->m_mix, "", "fs_mix", K60));
+
+	auto shiftSpin = new LcdFloatSpinBox(6, 3, "19red", tr("Frequency shift"), this);
 	shiftSpin->setModel(&c->m_freqShift);
 	shiftSpin->setSeamless(true, true);
+	topLayout->addWidget(shiftSpin);
 
-	mk(18, 30, "Mix", &c->m_mix, "", "fs_mix", K60);
-	mk(235, 24, "Spread", &c->m_spreadShift,"Hz", "fs_spread", K24);
-	mk(235, 72, "Phase",&c->m_phase, "", "fs_phase", K24);
-	mk(24, 115, "Ring", &c->m_ring, "", "fs_ring", K36);
-	mk(72, 115, "Harmonics", &c->m_harmonics, "", "fs_harm", K36);
-	mk(120, 115, "Tone",&c->m_tone, "Hz", "fs_tone", K36);
-	mk(200, 147, "Glide", &c->m_glide, "", "fs_glide", K19);
+	auto resetShifterBtn = new PixmapButton(this, tr("Reset shifter"));
+	resetShifterBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_on"));
+	resetShifterBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_off"));
+	resetShifterBtn->setToolTip(tr("Reset the shifter's oscillator phases to 0 (automatable)"));
+	resetShifterBtn->setCheckable(false);
+	resetShifterBtn->setModel(&c->m_resetShifter);
+	topLayout->addWidget(resetShifterBtn);
 
-	mk(18, 200, "LFO", &c->m_lfoAmount, "Hz", "fs_lfo", K36);
-	mk(66, 200, "LFO Rate", &c->m_lfoRate, "Hz", "fs_lforate", K36);
-	mk(114, 200, "LFO Stereo Phase", &c->m_lfoStereoPhase, "", "fs_lfost", K36);
+	topLayout->addWidget(mk("Spread", &c->m_spreadShift, "Hz", "fs_spread", K24));
+	topLayout->addWidget(mk("Phase", &c->m_phase, "", "fs_phase", K24));
+	topLayout->addStretch();
 
-	mk(18, 282, "Delay Length", &c->m_delayLengthLong, "ms", "fs_delay", K36);
-	mk(114, 282, "Feedback", &c->m_feedback, "", "fs_feedback", K36);
-	mk(24, 324, "Delay Length (fine)", &c->m_delayLengthShort, "ms", "fs_finedelay", K24);
-	mk(120, 324, "Delay Damping", &c->m_delayDamp, "Hz", "fs_damp", K24);
-	mk(245, 315, "Delay Glide", &c->m_delayGlide, "", "fs_dglide", K19);
+	auto* shapeLayout = new QHBoxLayout;
+	shapeLayout->setSpacing(4);
+	shapeLayout->addWidget(mk("Ring", &c->m_ring, "", "fs_ring", K36));
+	shapeLayout->addWidget(mk("Harmonics", &c->m_harmonics, "", "fs_harm", K36));
+	shapeLayout->addWidget(mk("Tone", &c->m_tone, "Hz", "fs_tone", K36));
 
-	PixmapButton* antireflectButton = new PixmapButton(this, "Antireflect");
+	auto antireflectButton = new PixmapButton(this, "Antireflect");
 	antireflectButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("antireflect_on"));
 	antireflectButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("antireflect_off"));
 	antireflectButton->setToolTip("Anti-reflect");
-	antireflectButton->move(188, 122);
 	antireflectButton->setCheckable(true);
 	antireflectButton->setModel(&c->m_antireflect);
+	shapeLayout->addWidget(antireflectButton);
+	shapeLayout->addWidget(mk("Glide", &c->m_glide, "", "fs_glide", K19));
+	shapeLayout->addStretch();
 
-	PixmapButton* routeSend = new PixmapButton(this, tr("Send"));
+	auto* lfoLayout = new QHBoxLayout;
+	lfoLayout->setSpacing(4);
+	auto resetLfoBtn = new PixmapButton(this, tr("Reset LFO"));
+	resetLfoBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("reset_lfo_on"));
+	resetLfoBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("reset_lfo_off"));
+	resetLfoBtn->setToolTip(tr("Reset the LFO phase to 0 (automatable)"));
+	resetLfoBtn->setCheckable(false);
+	resetLfoBtn->setModel(&c->m_resetLfo);
+	lfoLayout->addWidget(resetLfoBtn);
+	lfoLayout->addWidget(mk("LFO", &c->m_lfoAmount, "Hz", "fs_lfo", K36));
+	lfoLayout->addWidget(mk("LFO Rate", &c->m_lfoRate, "Hz", "fs_lforate", K36));
+	lfoLayout->addWidget(mk("LFO Stereo Phase", &c->m_lfoStereoPhase, "", "fs_lfost", K36));
+
+	auto* routeLayout = new QVBoxLayout;
+	routeLayout->setSpacing(2);
+	auto routeSend = new PixmapButton(this, tr("Send"));
 	routeSend->setActiveGraphic(PLUGIN_NAME::getIconPixmap("send_on"));
 	routeSend->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("send_off"));
-	routeSend->setToolTip(tr("Route: Send"));
+	routeSend->setToolTip(tr("Route: send"));
 	routeSend->setCheckable(true);
-	routeSend->move(188, 199);
-
-	PixmapButton* routePass = new PixmapButton(this, tr("Pass"));
+	auto routePass = new PixmapButton(this, tr("Pass"));
 	routePass->setActiveGraphic(PLUGIN_NAME::getIconPixmap("pass_on"));
 	routePass->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("pass_off"));
-	routePass->setToolTip(tr("Route: Pass"));
+	routePass->setToolTip(tr("Route: pass"));
 	routePass->setCheckable(true);
-	routePass->move(188, 217);
-
-	PixmapButton* routeMute = new PixmapButton(this, tr("Mute"));
+	auto routeMute = new PixmapButton(this, tr("Mute"));
 	routeMute->setActiveGraphic(PLUGIN_NAME::getIconPixmap("mute_on"));
 	routeMute->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("mute_off"));
-	routeMute->setToolTip(tr("Route: Mute"));
+	routeMute->setToolTip(tr("Route: mute"));
 	routeMute->setCheckable(true);
-	routeMute->move(188, 235);
-
-	AutomatableButtonGroup* routeGroup = new AutomatableButtonGroup(this);
+	routeLayout->addWidget(routeSend);
+	routeLayout->addWidget(routePass);
+	routeLayout->addWidget(routeMute);
+	lfoLayout->addLayout(routeLayout);
+	lfoLayout->addStretch();
+	auto routeGroup = new AutomatableButtonGroup(this);
 	routeGroup->addButton(routeSend);
 	routeGroup->addButton(routePass);
 	routeGroup->addButton(routeMute);
 	routeGroup->setModel(&c->m_routeMode);
 
-	PixmapButton* resetShifterBtn = new PixmapButton(this, tr("Reset Shifter"));
-	resetShifterBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_on"));
-	resetShifterBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("reset_shifter_off"));
-	resetShifterBtn->setToolTip(tr("Reset the shifter's oscillator phases to 0 (automatable)"));
-	resetShifterBtn->setCheckable(false);
-	resetShifterBtn->move(77, 5);
-	resetShifterBtn->setModel(&c->m_resetShifter);
+	auto* delayLayout = new QHBoxLayout;
+	delayLayout->setSpacing(4);
+	delayLayout->addWidget(mk("Delay Length", &c->m_delayLengthLong, "ms", "fs_delay", K36));
+	delayLayout->addWidget(mk("Feedback", &c->m_feedback, "", "fs_feedback", K36));
+	delayLayout->addWidget(mk("Delay Length (fine)", &c->m_delayLengthShort, "ms", "fs_finedelay", K24));
+	delayLayout->addWidget(mk("Delay Damping", &c->m_delayDamp, "Hz", "fs_damp", K24));
+	delayLayout->addWidget(mk("Delay Glide", &c->m_delayGlide, "", "fs_dglide", K19));
 
-	PixmapButton* resetLfoBtn = new PixmapButton(this, tr("Reset LFO"));
-	resetLfoBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("reset_lfo_on"));
-	resetLfoBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("reset_lfo_off"));
-	resetLfoBtn->setToolTip(tr("Reset the LFO phase to 0 (automatable)"));
-	resetLfoBtn->setCheckable(false);
-	resetLfoBtn->move(60, 179);
-	resetLfoBtn->setModel(&c->m_resetLfo);
-
-	PixmapButton* helpBtn = new PixmapButton(this, nullptr);
-	helpBtn->move(256, 278);
+	auto helpBtn = new PixmapButton(this, nullptr);
 	helpBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("help_on"));
 	helpBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("help_off"));
 	helpBtn->setToolTip(tr("Open help window"));
 	connect(helpBtn, &PixmapButton::clicked, this, &FrequencyShifterControlDialog::showHelpWindow);
+	delayLayout->addWidget(helpBtn);
+	delayLayout->addStretch();
+
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(10, 8, 10, 8);
+	mainLayout->setSpacing(6);
+	mainLayout->addLayout(topLayout);
+	mainLayout->addLayout(shapeLayout);
+	mainLayout->addLayout(lfoLayout);
+	mainLayout->addLayout(delayLayout);
+	mainLayout->addStretch();
+
+	setMinimumSize(288, 360);
+	adjustSize();
+	updateBackground();
 }
+
+
+void FrequencyShifterControlDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void FrequencyShifterControlDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
+}
+
 
 void FrequencyShifterControlDialog::showHelpWindow()
 {
@@ -244,7 +288,7 @@ FrequencyShifterHelpView::FrequencyShifterHelpView() :
 	// Bug workaround: https://codereview.qt-project.org/c/qt/qtbase/+/225348
 	using ::operator|;
 #endif
-	setWindowTitle(tr("Frequency Shifter Help"));
+	setWindowTitle(tr("Frequency shifter help"));
 	setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	getGUI()->mainWindow()->addWindowedWidget(this);
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);

@@ -61,6 +61,8 @@ private slots:
 
 
 private:
+	bool eventFilter(QObject* watched, QEvent* event) override;
+	void layoutEffects();
 	void modelChanged() override;
 	QSize sizeHint() const override;
 	QSize minimumSizeHint() const override { return sizeHint(); }

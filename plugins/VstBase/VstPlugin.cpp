@@ -599,7 +599,7 @@ QWidget *VstPlugin::editor()
 
 void VstPlugin::openPreset()
 {
-	gui::FileDialog ofd(nullptr, tr("Open Preset"), "", tr("VST Plugin Preset (*.fxp *.fxb)"));
+	gui::FileDialog ofd(nullptr, tr("Open preset"), "", tr("VST plugin preset (*.fxp *.fxb)"));
 	ofd.setFileMode(gui::FileDialog::ExistingFiles);
 	if (ofd.exec() == QDialog::Accepted && !ofd.selectedFiles().isEmpty())
 	{
@@ -696,8 +696,8 @@ void VstPlugin::savePreset()
 	QString presName = currentProgramName().isEmpty() ? tr(": default") : currentProgramName();
 	presName.replace("\"", "'"); // QFileDialog unable to handle double quotes properly
 
-	gui::FileDialog sfd(nullptr, tr("Save Preset"), presName.section(": ", 1, 1) + tr(".fxp"),
-		tr("VST Plugin Preset (*.fxp *.fxb)"));
+	gui::FileDialog sfd(nullptr, tr("Save preset"), presName.section(": ", 1, 1) + tr(".fxp"),
+		tr("VST plugin preset (*.fxp *.fxb)"));
 
 	if (p_name != "") // remember last directory
 	{

@@ -29,6 +29,7 @@
 
 #include <QToolButton>
 #include <QVariantAnimation>
+#include <QWidgetAction>
 
 namespace lmms::gui
 {
@@ -59,6 +60,15 @@ private:
 	std::unique_ptr<QVariantAnimation> m_hoverAnimation;
 
 } ;
+
+class ToolButtonAction : public QWidgetAction
+{
+public:
+	ToolButtonAction(const QIcon& icon, const QString& text, QObject* parent);
+
+protected:
+	QWidget* createWidget(QWidget* parent) override;
+};
 
 } // namespace lmms::gui
 

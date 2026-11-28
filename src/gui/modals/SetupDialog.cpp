@@ -80,7 +80,7 @@ inline void labelWidget(QWidget * w, const QString & txt)
 {
 	auto title = new QLabel(txt, w);
 	QFont f = title->font();
-	f.setBold(true);
+	f.setWeight(QFont::DemiBold);
 	title->setFont(f);
 
 	QBoxLayout * boxLayout = dynamic_cast<QBoxLayout *>(w->layout());
@@ -242,13 +242,13 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 		m_tooltips, SLOT(toggleTooltips(bool)), true);
 	addCheckBox(tr("Enable master oscilloscope by default"), guiGroupBox, guiGroupLayout,
 		m_displayWaveform, SLOT(toggleDisplayWaveform(bool)), true);
-	addCheckBox(tr("Enable all note labels in piano roll"), guiGroupBox, guiGroupLayout,
+	addCheckBox(tr("Enable all note labels in Piano Roll"), guiGroupBox, guiGroupLayout,
 		m_printNoteLabels, SLOT(toggleNoteLabels(bool)), false);
 	addCheckBox(tr("Show fader ticks"), guiGroupBox, guiGroupLayout,
 		m_showFaderTicks, SLOT(toggleShowFaderTicks(bool)), false);
 	addCheckBox(tr("Use compact track buttons by default"), guiGroupBox, guiGroupLayout,
 		m_compactTrackButtons, SLOT(toggleCompactTrackButtons(bool)), true);
-	addCheckBox(tr("Enable one instrument-track-window mode"), guiGroupBox, guiGroupLayout,
+	addCheckBox(tr("Enable one instrument track window mode"), guiGroupBox, guiGroupLayout,
 		m_oneInstrumentTrackWindow, SLOT(toggleOneInstrumentTrackWindow(bool)), true);
 	addCheckBox(tr("Show sidebar on the right-hand side"), guiGroupBox, guiGroupLayout,
 		m_sideBarOnRight, SLOT(toggleSideBarOnRight(bool)), true);
@@ -297,7 +297,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	connect(m_autoScrollComboBox, qOverload<int>(&QComboBox::currentIndexChanged),
 		this, [this](){ m_autoScroll = m_autoScrollComboBox->currentData().toString(); });
 
-	guiGroupLayout->addWidget(new QLabel{tr("Default Autoscroll Mode"), guiGroupBox});
+	guiGroupLayout->addWidget(new QLabel{tr("Default autoscroll mode"), guiGroupBox});
 	guiGroupLayout->addWidget(m_autoScrollComboBox);
 
 	m_autoScrollResumeDelaySpinBox = new QSpinBox{guiGroupBox};
@@ -459,7 +459,7 @@ SetupDialog::SetupDialog(ConfigTab tab_to_open) :
 	QGroupBox * uiFxBox = new QGroupBox(tr("User interface (UI) effects vs. performance"), performance_w);
 	QVBoxLayout * uiFxLayout = new QVBoxLayout(uiFxBox);
 
-	addCheckBox(tr("Smooth scroll in song editor"), uiFxBox, uiFxLayout,
+	addCheckBox(tr("Smooth scroll in Song Editor"), uiFxBox, uiFxLayout,
 		m_smoothScroll, SLOT(toggleSmoothScroll(bool)), false);
 	addCheckBox(tr("Display playback cursor in AudioFileProcessor"), uiFxBox, uiFxLayout,
 		m_animateAFP, SLOT(toggleAnimateAFP(bool)), false);

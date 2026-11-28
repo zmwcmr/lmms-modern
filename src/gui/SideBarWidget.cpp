@@ -34,6 +34,15 @@
 namespace lmms::gui
 {
 
+namespace
+{
+int titleBarHeight(const QFont& font)
+{
+	return qMax(27, QFontMetrics(titleFont(font)).height() + 6);
+}
+}
+
+
 
 SideBarWidget::SideBarWidget( const QString & _title, const QPixmap & _icon,
 							QWidget * _parent ) :
@@ -60,23 +69,22 @@ SideBarWidget::SideBarWidget( const QString & _title, const QPixmap & _icon,
 void SideBarWidget::paintEvent( QPaintEvent * )
 {
 	QPainter p( this );
-	p.fillRect( 0, 0, width(), 27, palette().highlight().color() );
+	const auto barFont = titleFont(font());
+	const QFontMetrics metrics(barFont);
+	const int barHeight = titleBarHeight(font());
+	p.fillRect( 0, 0, width(), barHeight, palette().highlight().color() );
 
-	QFont f = p.font();
-	f.setBold( true );
-	f.setUnderline(false);
-	p.setFont(adjustedToPixelSize(f, LARGE_FONT_SIZE));
-
+	p.setFont(barFont);
 	p.setPen( palette().highlightedText().color() );
 
 	const auto iconSize = embed::logicalSize(m_icon);
 	const int tx = iconSize.width() + 8;
+	const int ty = (barHeight - metrics.height()) / 2 + metrics.ascent();
+	const int titleWidth = qMax(0, width() - tx - m_buttonSize.width() - 12);
+	p.drawText( tx, ty, metrics.elidedText(m_title, Qt::ElideRight, titleWidth) );
 
-	QFontMetrics metrics( f );
-	const int ty = (metrics.ascent() + iconSize.height()) / 2;
-	p.drawText( tx, ty, m_title );
-
-	p.drawPixmap( 2, 2, m_icon.transformed( QTransform().rotate( -90 ) ) );
+	const int iconTop = (barHeight - iconSize.height()) / 2;
+	p.drawPixmap( 2, iconTop, m_icon.transformed( QTransform().rotate( -90 ) ) );
 }
 
 
@@ -84,9 +92,11 @@ void SideBarWidget::paintEvent( QPaintEvent * )
 void SideBarWidget::resizeEvent( QResizeEvent * )
 {
 	const int MARGIN = 6;
-	m_contents->setGeometry( MARGIN, 40 + MARGIN, width() - MARGIN * 2,
-						height() - MARGIN * 2 - 40 );
-	m_closeBtn->move(m_contents->geometry().width() - MARGIN - 5, 5);
+	const int barHeight = titleBarHeight(font());
+	m_contents->setGeometry( MARGIN, barHeight + MARGIN, width() - MARGIN * 2,
+						height() - MARGIN * 2 - barHeight );
+	m_closeBtn->move(m_contents->geometry().width() - MARGIN - 5,
+		(barHeight - m_closeBtn->height()) / 2);
 }
 
 

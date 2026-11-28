@@ -26,6 +26,7 @@
 #include <QEvent>
 #include <QStyleOptionToolButton>
 #include <QStylePainter>
+#include <QToolBar>
 
 #include "LmmsStyle.h"
 #include "ToolButton.h"
@@ -132,5 +133,31 @@ void ToolButton::paintEvent(QPaintEvent* event)
 	painter.drawControl(QStyle::CE_ToolButtonLabel, label);
 }
 
+
+ToolButtonAction::ToolButtonAction(const QIcon& icon, const QString& text, QObject* parent) :
+	QWidgetAction(parent)
+{
+	setIcon(icon);
+	setText(text);
+}
+
+QWidget* ToolButtonAction::createWidget(QWidget* parent)
+{
+	auto* toolbar = qobject_cast<QToolBar*>(parent);
+	// Overflow menus display the same action as an ordinary menu item.
+	if (!toolbar) { return nullptr; }
+
+	auto* button = new ToolButton(toolbar);
+	button->setAutoRaise(true);
+	button->setFocusPolicy(Qt::NoFocus);
+	button->setIconSize(toolbar->iconSize());
+	button->setToolButtonStyle(toolbar->toolButtonStyle());
+	button->setDefaultAction(this);
+	button->setHoverTransitionEnabled(true);
+	connect(toolbar, &QToolBar::iconSizeChanged, button, &ToolButton::setIconSize);
+	connect(toolbar, &QToolBar::toolButtonStyleChanged, button, &ToolButton::setToolButtonStyle);
+	connect(button, &ToolButton::triggered, toolbar, &QToolBar::actionTriggered);
+	return button;
+}
 
 } // namespace lmms::gui

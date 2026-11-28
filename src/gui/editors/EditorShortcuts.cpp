@@ -1,0 +1,444 @@
+#include "EditorShortcuts.h"
+
+#include <iterator>
+
+#include <QAction>
+#include <QDebug>
+#include <QKeyEvent>
+#include <QKeySequence>
+#include <QMap>
+#include <QWidget>
+
+#include "ConfigManager.h"
+#include "DeprecationHelper.h"
+
+namespace lmms::gui
+{
+
+namespace
+{
+const auto transportPlayStop = QStringLiteral("transport_play_stop");
+const auto transportPause = QStringLiteral("transport_pause");
+const auto transportRecord = QStringLiteral("transport_record");
+const auto transportRecordAccompany = QStringLiteral("transport_record_accompany");
+const auto transportRecordStep = QStringLiteral("transport_record_step");
+const QKeySequence defaultPlayStop(Qt::Key_Space);
+const auto defaultPause = keySequence(Qt::SHIFT, Qt::Key_Space);
+
+const QMap<QString, QKeySequence> defaults{
+	{QStringLiteral("piano_roll_draw"), keySequence(Qt::SHIFT, Qt::Key_D)},
+	{QStringLiteral("piano_roll_erase"), keySequence(Qt::SHIFT, Qt::Key_E)},
+	{QStringLiteral("piano_roll_select"), keySequence(Qt::SHIFT, Qt::Key_S)},
+	{QStringLiteral("piano_roll_pitch_bend"), keySequence(Qt::SHIFT, Qt::Key_T)},
+	{QStringLiteral("piano_roll_cut"), keySequence(Qt::CTRL, Qt::Key_X)},
+	{QStringLiteral("piano_roll_copy"), keySequence(Qt::CTRL, Qt::Key_C)},
+	{QStringLiteral("piano_roll_paste"), keySequence(Qt::CTRL, Qt::Key_V)},
+	{QStringLiteral("piano_roll_glue"), keySequence(Qt::SHIFT, Qt::Key_G)},
+	{QStringLiteral("piano_roll_knife"), keySequence(Qt::SHIFT, Qt::Key_K)},
+	{QStringLiteral("piano_roll_strum"), keySequence(Qt::SHIFT, Qt::Key_J)},
+	{QStringLiteral("piano_roll_fill"), keySequence(Qt::SHIFT, Qt::Key_F)},
+	{QStringLiteral("piano_roll_cut_overlaps"), keySequence(Qt::SHIFT, Qt::Key_C)},
+	{QStringLiteral("piano_roll_reverse"), keySequence(Qt::SHIFT, Qt::Key_R)},
+	{QStringLiteral("automation_editor_draw"), keySequence(Qt::SHIFT, Qt::Key_D)},
+	{QStringLiteral("automation_editor_erase"), keySequence(Qt::SHIFT, Qt::Key_E)},
+	{QStringLiteral("automation_editor_draw_out"), keySequence(Qt::SHIFT, Qt::Key_C)},
+	{QStringLiteral("automation_editor_edit_tangents"), keySequence(Qt::SHIFT, Qt::Key_T)},
+	{QStringLiteral("pattern_next"), QKeySequence(Qt::Key_Plus)},
+	{QStringLiteral("pattern_previous"), QKeySequence(Qt::Key_Minus)},
+	{QStringLiteral("window_song_editor"), keySequence(Qt::CTRL, Qt::Key_1)},
+	{QStringLiteral("window_pattern_editor"), keySequence(Qt::CTRL, Qt::Key_2)},
+	{QStringLiteral("window_piano_roll"), keySequence(Qt::CTRL, Qt::Key_3)},
+	{QStringLiteral("window_automation_editor"), keySequence(Qt::CTRL, Qt::Key_4)},
+	{QStringLiteral("window_mixer"), keySequence(Qt::CTRL, Qt::Key_5)},
+	{QStringLiteral("window_controller_rack"), keySequence(Qt::CTRL, Qt::Key_6)},
+	{QStringLiteral("window_project_notes"), keySequence(Qt::CTRL, Qt::Key_7)},
+};
+
+bool isValid(const QKeySequence& sequence)
+{
+	if (sequence.isEmpty()) { return false; }
+	for (int index = 0; index < sequence.count(); ++index)
+	{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+		const auto key = sequence[index].key();
+#else
+		const int key = sequence[index] & ~Qt::KeyboardModifierMask;
+#endif
+		if (key == 0 || key == Qt::Key_unknown) { return false; }
+	}
+	return true;
+}
+
+bool isValidTransportBinding(const QKeySequence& sequence, const TransportShortcuts* playback = nullptr)
+{
+	if (!isValid(sequence) || sequence.count() != 1) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	// Default playback also handles Space with extra modifiers.
+	if (playback && key == Qt::Key_Space)
+	{
+		const bool shift = modifiers & Qt::ShiftModifier;
+		if (shift ? playback->pause == defaultPause : playback->playStop == defaultPlayStop) { return false; }
+	}
+	const auto pianoRollValueModifiers = Qt::AltModifier | Qt::ControlModifier | Qt::KeypadModifier;
+	return key < Qt::Key_0 || key > Qt::Key_9 || !(modifiers & pianoRollValueModifiers);
+}
+
+bool shortcutsOverlap(const QKeySequence& first, const QKeySequence& second)
+{
+	return !first.isEmpty() && !second.isEmpty()
+		&& (first.matches(second) != QKeySequence::NoMatch || second.matches(first) != QKeySequence::NoMatch);
+}
+
+QMap<QString, QKeySequence> defaultShortcuts(const QString& prefix)
+{
+	QMap<QString, QKeySequence> shortcuts;
+	for (auto item = defaults.cbegin(); item != defaults.cend(); ++item)
+	{
+		if (item.key().startsWith(prefix)) { shortcuts.insert(item.key(), item.value()); }
+	}
+	return shortcuts;
+}
+
+template<typename Accepts = decltype(&isValid)>
+QMap<QString, QKeySequence> resolveShortcuts(const QMap<QString, QKeySequence>& groupDefaults,
+	const QList<QKeySequence>& reserved, Accepts accepts = isValid, const QString& legacyOverlap = {})
+{
+	auto shortcuts = groupDefaults;
+	const auto section = QStringLiteral("shortcuts");
+	for (auto item = shortcuts.begin(); item != shortcuts.end(); ++item)
+	{
+		const auto configured = ConfigManager::inst()->value(section, item.key()).trimmed();
+		const auto sequence = QKeySequence::fromString(configured, QKeySequence::PortableText);
+		if (accepts(sequence)) { item.value() = sequence; }
+		else if (!configured.isEmpty())
+		{
+			qWarning() << "Ignoring invalid shortcut for" << item.key() << ':' << configured;
+		}
+	}
+
+	for (auto first = shortcuts.cbegin(); first != shortcuts.cend(); ++first)
+	{
+		for (const auto& sequence : reserved)
+		{
+			if (shortcutsOverlap(first.value(), sequence)
+				&& !(first.key() == legacyOverlap && first.value() == groupDefaults.value(legacyOverlap)))
+			{
+				qWarning() << "Shortcut for" << first.key() << "conflicts with" << sequence << "; using group defaults";
+				return groupDefaults;
+			}
+		}
+		for (auto second = std::next(first); second != shortcuts.cend(); ++second)
+		{
+			if (shortcutsOverlap(first.value(), second.value()))
+			{
+				qWarning() << "Conflicting shortcuts for" << first.key() << "and" << second.key()
+					<< "; using group defaults";
+				return groupDefaults;
+			}
+		}
+	}
+	return shortcuts;
+}
+
+const QString windowPrefix = QStringLiteral("window_");
+const QString pianoPrefix = QStringLiteral("piano_roll_");
+const QString automationPrefix = QStringLiteral("automation_editor_");
+const QString patternPrefix = QStringLiteral("pattern_");
+
+const QMap<QString, QKeySequence>& menuDefaults()
+{
+	static const QMap<QString, QKeySequence> shortcuts{
+		{QStringLiteral("file_new"), QKeySequence::New},
+		{QStringLiteral("file_open"), QKeySequence::Open},
+		{QStringLiteral("file_save"), QKeySequence::Save},
+		{QStringLiteral("file_save_as"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_S)},
+		{QStringLiteral("file_save_new_version"), keySequence(Qt::CTRL, Qt::ALT, Qt::Key_S)},
+		{QStringLiteral("file_export"), keySequence(Qt::CTRL, Qt::Key_E)},
+		{QStringLiteral("file_export_tracks"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_E)},
+		{QStringLiteral("file_export_midi"), keySequence(Qt::CTRL, Qt::Key_M)},
+		{QStringLiteral("file_quit"), keySequence(Qt::CTRL, Qt::Key_Q)},
+		{QStringLiteral("edit_undo"), QKeySequence::Undo},
+		{QStringLiteral("edit_redo"), QKeySequence::Redo},
+	};
+	return shortcuts;
+}
+
+const QMap<QString, QKeySequence>& windowLayoutDefaults()
+{
+	static const QMap<QString, QKeySequence> shortcuts{
+		{QStringLiteral("layout_fullscreen"), QKeySequence(Qt::Key_F11)},
+		{QStringLiteral("layout_maximize_editor"), keySequence(Qt::SHIFT, Qt::Key_F11)},
+		{QStringLiteral("layout_detach_all"), keySequence(Qt::CTRL, Qt::SHIFT, Qt::Key_D)},
+		{QStringLiteral("layout_attach_all"), keySequence(Qt::CTRL, Qt::ALT, Qt::SHIFT, Qt::Key_D)},
+	};
+	return shortcuts;
+}
+
+QList<QKeySequence> reservedDefaults()
+{
+	return menuDefaults().values() + defaultShortcuts(windowPrefix).values() + defaultShortcuts(patternPrefix).values()
+		+ defaultShortcuts(pianoPrefix).values() + defaultShortcuts(automationPrefix).values();
+}
+
+QList<QKeySequence> effectiveTransportShortcuts()
+{
+	const auto shortcuts = transportShortcuts();
+	return {shortcuts.playStop, shortcuts.pause, shortcuts.record, shortcuts.recordAccompany, shortcuts.recordStep};
+}
+
+bool isValidTextToolBinding(const QKeySequence& sequence, bool preserveModifiedRefresh = false)
+{
+	if (!isValid(sequence) || sequence.count() != 1) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	if (preserveModifiedRefresh && key == Qt::Key_F5) { return !modifiers; }
+	if (key >= Qt::Key_F1 && key <= Qt::Key_F35) { return true; }
+	return ((key >= Qt::Key_A && key <= Qt::Key_Z) || (key >= Qt::Key_0 && key <= Qt::Key_9))
+		&& (modifiers & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier));
+}
+
+bool isValidSongTimelineBinding(const QKeySequence& sequence)
+{
+	if (sequence == QKeySequence(Qt::Key_Left) || sequence == QKeySequence(Qt::Key_Right)
+		|| sequence == QKeySequence(Qt::Key_Home)) { return true; }
+	if (!isValidTextToolBinding(sequence)) { return false; }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+	const auto key = sequence[0].key();
+	const auto modifiers = sequence[0].keyboardModifiers();
+#else
+	const auto key = sequence[0] & ~Qt::KeyboardModifierMask;
+	const auto modifiers = sequence[0] & Qt::KeyboardModifierMask;
+#endif
+	return !(modifiers & Qt::ControlModifier) || (key != Qt::Key_A && key != Qt::Key_0);
+}
+
+const auto notesAlignCenter = QStringLiteral("notes_align_center");
+const auto defaultNotesAlignCenter = keySequence(Qt::CTRL, Qt::Key_E);
+
+QList<QKeySequence> effectiveNotesShortcuts()
+{
+	auto shortcuts = projectNotesShortcuts();
+	if (shortcuts.value(notesAlignCenter) == defaultNotesAlignCenter) { shortcuts.remove(notesAlignCenter); }
+	return shortcuts.values();
+}
+
+QList<QKeySequence> effectiveSongTimelineShortcuts()
+{
+	const auto shortcuts = songTimelineShortcuts();
+	return {shortcuts.previousBar, shortcuts.nextBar, shortcuts.start};
+}
+
+QList<QKeySequence> reservedForNavigation()
+{
+	return reservedDefaults() + windowLayoutShortcuts().values() + rackReorderShortcuts().values()
+		+ fileBrowserShortcuts().values() + effectiveNotesShortcuts() + effectiveTransportShortcuts();
+}
+
+QList<QKeySequence> reservedForEditors()
+{
+	return defaultShortcuts(windowPrefix).values() + menuDefaults().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values();
+}
+
+QMap<QString, QKeySequence> editorShortcuts(const QString& prefix)
+{
+	return resolveShortcuts(defaultShortcuts(prefix), reservedForEditors() + defaultShortcuts(patternPrefix).values());
+}
+
+QList<QKeySequence> effectiveEditorShortcuts()
+{
+	return editorShortcuts(pianoPrefix).values() + editorShortcuts(automationPrefix).values();
+}
+}
+
+QMap<QString, QKeySequence> projectNotesShortcuts()
+{
+	auto reserved = reservedDefaults() + windowLayoutDefaults().values()
+		+ QList<QKeySequence>{QKeySequence(QKeySequence::Find), QKeySequence(Qt::Key_F5)};
+	for (const auto standard : {QKeySequence::Undo, QKeySequence::Redo, QKeySequence::Cut,
+		QKeySequence::Copy, QKeySequence::Paste, QKeySequence::SelectAll})
+	{
+		reserved += QKeySequence::keyBindings(standard);
+	}
+	return resolveShortcuts({
+		{QStringLiteral("notes_bold"), keySequence(Qt::CTRL, Qt::Key_B)},
+		{QStringLiteral("notes_italic"), keySequence(Qt::CTRL, Qt::Key_I)},
+		{QStringLiteral("notes_underline"), QKeySequence::Underline},
+		{QStringLiteral("notes_align_left"), keySequence(Qt::CTRL, Qt::Key_L)},
+		{notesAlignCenter, defaultNotesAlignCenter},
+		{QStringLiteral("notes_align_right"), keySequence(Qt::CTRL, Qt::Key_R)},
+		{QStringLiteral("notes_align_justify"), keySequence(Qt::CTRL, Qt::Key_J)},
+	}, reserved, [](const QKeySequence& sequence) { return isValidTextToolBinding(sequence); }, notesAlignCenter);
+}
+
+QMap<QString, QKeySequence> fileBrowserShortcuts()
+{
+	return resolveShortcuts({
+		{QStringLiteral("browser_search"), QKeySequence::Find},
+		{QStringLiteral("browser_refresh"), QKeySequence(Qt::Key_F5)},
+	}, reservedDefaults() + windowLayoutDefaults().values() + effectiveNotesShortcuts(),
+		[](const QKeySequence& sequence) { return isValidTextToolBinding(sequence, true); });
+}
+
+QMap<QString, QKeySequence> rackReorderShortcuts()
+{
+	return resolveShortcuts({
+		{QStringLiteral("rack_move_up"), keySequence(Qt::ALT, Qt::Key_Up)},
+		{QStringLiteral("rack_move_down"), keySequence(Qt::ALT, Qt::Key_Down)},
+	}, reservedDefaults() + windowLayoutDefaults().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + QList<QKeySequence>{defaultPlayStop, defaultPause});
+}
+
+QMap<QString, QKeySequence> windowLayoutShortcuts()
+{
+	return resolveShortcuts(windowLayoutDefaults(),
+		reservedDefaults() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + QList<QKeySequence>{defaultPlayStop, defaultPause});
+}
+
+TransportShortcuts transportShortcuts()
+{
+	const auto reserved = reservedDefaults() + windowLayoutShortcuts().values() + rackReorderShortcuts().values()
+		+ fileBrowserShortcuts().values() + effectiveNotesShortcuts();
+	const auto playback = resolveShortcuts({{transportPlayStop, defaultPlayStop}, {transportPause, defaultPause}},
+		reserved, [](const QKeySequence& sequence) { return isValidTransportBinding(sequence); });
+	TransportShortcuts shortcuts{playback.value(transportPlayStop), playback.value(transportPause), {}, {}, {}};
+	const auto recording = resolveShortcuts({{transportRecord, {}}, {transportRecordAccompany, {}}, {transportRecordStep, {}}},
+		reserved + playback.values(),
+		[&shortcuts](const QKeySequence& sequence) { return isValidTransportBinding(sequence, &shortcuts); });
+	shortcuts.record = recording.value(transportRecord);
+	shortcuts.recordAccompany = recording.value(transportRecordAccompany);
+	shortcuts.recordStep = recording.value(transportRecordStep);
+	return shortcuts;
+}
+
+TransportShortcuts::Action TransportShortcuts::match(const QKeyEvent& event) const
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	if (pressed == playStop) { return Action::PlayStop; }
+	if (pressed == pause) { return Action::Pause; }
+	if (event.key() == Qt::Key_Space)
+	{
+		if (event.modifiers() & Qt::ShiftModifier) { return pause == defaultPause ? Action::Pause : Action::None; }
+		if (playStop == defaultPlayStop) { return Action::PlayStop; }
+	}
+	return Action::None;
+}
+
+SongTimelineShortcuts songTimelineShortcuts()
+{
+	const auto previous = QStringLiteral("song_previous_bar");
+	const auto next = QStringLiteral("song_next_bar");
+	const auto start = QStringLiteral("song_go_to_start");
+	const auto shortcuts = resolveShortcuts({
+		{previous, QKeySequence(Qt::Key_Left)}, {next, QKeySequence(Qt::Key_Right)}, {start, QKeySequence(Qt::Key_Home)},
+	}, reservedForNavigation(), isValidSongTimelineBinding);
+	return {shortcuts.value(previous), shortcuts.value(next), shortcuts.value(start)};
+}
+
+SongTimelineShortcuts::Action SongTimelineShortcuts::match(const QKeyEvent& event) const
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	const QKeySequence bareKey(event.key());
+	const auto matches = [&pressed, &bareKey](const QKeySequence& binding, Qt::Key defaultKey)
+	{
+		return pressed == binding || (bareKey == binding && binding == QKeySequence(defaultKey));
+	};
+	if (matches(previousBar, Qt::Key_Left)) { return Action::PreviousBar; }
+	if (matches(nextBar, Qt::Key_Right)) { return Action::NextBar; }
+	if (matches(start, Qt::Key_Home)) { return Action::Start; }
+	return Action::None;
+}
+
+QMap<Qt::Key, QKeySequence> automationNavigationShortcuts()
+{
+	const QMap<Qt::Key, QString> actions{
+		{Qt::Key_Up, QStringLiteral("automation_nav_up")},
+		{Qt::Key_Down, QStringLiteral("automation_nav_down")},
+		{Qt::Key_Left, QStringLiteral("automation_nav_left")},
+		{Qt::Key_Right, QStringLiteral("automation_nav_right")},
+		{Qt::Key_Home, QStringLiteral("automation_nav_start")},
+	};
+	QMap<QString, QKeySequence> defaults;
+	for (auto action = actions.cbegin(); action != actions.cend(); ++action)
+	{
+		defaults.insert(action.value(), QKeySequence(action.key()));
+	}
+	const auto resolved = resolveShortcuts(defaults, reservedForNavigation(), [&defaults](const QKeySequence& sequence)
+	{
+		return defaults.key(sequence) != QString{} || isValidTextToolBinding(sequence);
+	});
+	QMap<Qt::Key, QKeySequence> shortcuts;
+	for (auto action = actions.cbegin(); action != actions.cend(); ++action)
+	{
+		shortcuts.insert(action.key(), resolved.value(action.value()));
+	}
+	return shortcuts;
+}
+
+Qt::Key matchAutomationNavigation(const QMap<Qt::Key, QKeySequence>& shortcuts, const QKeyEvent& event)
+{
+	const QKeySequence pressed(event.key() | static_cast<int>(event.modifiers()));
+	for (auto shortcut = shortcuts.cbegin(); shortcut != shortcuts.cend(); ++shortcut)
+	{
+		if (pressed == shortcut.value() || (event.key() == shortcut.key() && shortcut.value() == QKeySequence(shortcut.key())))
+		{
+			return shortcut.key();
+		}
+	}
+	return Qt::Key_unknown;
+}
+
+QMap<QString, QKeySequence> patternNavigationShortcuts()
+{
+	return resolveShortcuts(defaultShortcuts(patternPrefix), reservedForEditors() + effectiveEditorShortcuts());
+}
+
+QMap<QString, QKeySequence> windowToggleShortcuts(const QList<QKeySequence>& reserved)
+{
+	return resolveShortcuts(defaultShortcuts(windowPrefix),
+		reserved + effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values());
+}
+
+QMap<QString, QKeySequence> mainMenuShortcuts(const QList<QKeySequence>& reserved)
+{
+	return resolveShortcuts(menuDefaults(), reserved + defaultShortcuts(windowPrefix).values()
+		+ effectiveEditorShortcuts() + patternNavigationShortcuts().values() + effectiveTransportShortcuts()
+		+ windowLayoutShortcuts().values() + rackReorderShortcuts().values() + fileBrowserShortcuts().values()
+		+ effectiveNotesShortcuts() + effectiveSongTimelineShortcuts() + automationNavigationShortcuts().values());
+}
+
+void bindEditorShortcuts(QWidget& editor,
+	std::initializer_list<std::pair<QString, QAction*>> actions)
+{
+	QMap<QString, QKeySequence> groupDefaults;
+	for (const auto& binding : actions) { groupDefaults.insert(binding.first, defaults.value(binding.first)); }
+	const auto shortcuts = resolveShortcuts(groupDefaults, reservedForEditors() + defaultShortcuts(patternPrefix).values());
+	for (const auto& [id, action] : actions)
+	{
+		const auto sequence = shortcuts.value(id);
+		action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		action->setShortcut(sequence);
+		editor.addAction(action);
+		if (!sequence.isEmpty())
+		{
+			action->setToolTip(QWidget::tr("%1 (%2)").arg(action->toolTip(), sequence.toString(QKeySequence::NativeText)));
+		}
+	}
+}
+
+}

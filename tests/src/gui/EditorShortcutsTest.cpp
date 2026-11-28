@@ -1,0 +1,613 @@
+#include <QAction>
+#include <QFile>
+#include <QKeyEvent>
+#include <QLineEdit>
+#include <QMdiArea>
+#include <QMdiSubWindow>
+#include <QTemporaryDir>
+#include <QToolBar>
+#include <QtTest>
+
+#include "ConfigManager.h"
+#include "Editor.h"
+#include "EditorShortcuts.h"
+#include "ToolButton.h"
+
+using lmms::ConfigManager;
+using lmms::gui::automationNavigationShortcuts;
+using lmms::gui::bindEditorShortcuts;
+using lmms::gui::fileBrowserShortcuts;
+using lmms::gui::mainMenuShortcuts;
+using lmms::gui::matchAutomationNavigation;
+using lmms::gui::patternNavigationShortcuts;
+using lmms::gui::projectNotesShortcuts;
+using lmms::gui::rackReorderShortcuts;
+using lmms::gui::SongTimelineShortcuts;
+using lmms::gui::songTimelineShortcuts;
+using lmms::gui::TransportShortcuts;
+using lmms::gui::transportShortcuts;
+using lmms::gui::windowLayoutShortcuts;
+using lmms::gui::windowToggleShortcuts;
+
+class EditorShortcutsTest : public QObject
+{
+	Q_OBJECT
+
+private slots:
+	void cleanup()
+	{
+		for (const auto* id : {"piano_roll_draw", "piano_roll_erase", "automation_editor_draw", "window_song_editor",
+			"file_save", "pattern_next", "transport_play_stop", "transport_pause", "layout_fullscreen",
+			"layout_maximize_editor", "layout_detach_all", "layout_attach_all", "transport_record",
+			"transport_record_accompany", "transport_record_step", "rack_move_up", "rack_move_down",
+			"browser_search", "browser_refresh", "notes_bold", "notes_align_center",
+			"song_previous_bar", "song_next_bar", "song_go_to_start", "automation_nav_up", "automation_nav_right",
+			"automation_nav_start"})
+		{
+			ConfigManager::inst()->deleteValue("shortcuts", id);
+		}
+	}
+
+	void resolvesAutomationNavigationShortcuts()
+	{
+		const auto defaults = automationNavigationShortcuts();
+		QCOMPARE(defaults.size(), 5);
+		for (const auto key : {Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right, Qt::Key_Home})
+		{
+			QCOMPARE(defaults.value(key), QKeySequence(key));
+			QCOMPARE(matchAutomationNavigation(defaults, QKeyEvent(QEvent::KeyPress, key, Qt::ShiftModifier)), key);
+		}
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "automation_nav_right", "Alt+F7");
+		config->setValue("shortcuts", "song_previous_bar", "Alt+F7");
+		const auto shortcuts = automationNavigationShortcuts();
+		QCOMPARE(shortcuts.value(Qt::Key_Right), QKeySequence("Alt+F7"));
+		QCOMPARE(songTimelineShortcuts().previousBar, shortcuts.value(Qt::Key_Right));
+		QCOMPARE(matchAutomationNavigation(shortcuts,
+			QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::AltModifier)), Qt::Key_Right);
+		QCOMPARE(matchAutomationNavigation(shortcuts,
+			QKeyEvent(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier)), Qt::Key_unknown);
+
+		config->setValue("shortcuts", "file_save", "Alt+F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		config->setValue("shortcuts", "automation_editor_draw", "Alt+F7");
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"automation_editor_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+
+		for (const auto* invalid : {"Space", "Return", "G", "F8, F9"})
+		{
+			config->setValue("shortcuts", "automation_nav_start", invalid);
+			QCOMPARE(automationNavigationShortcuts(), shortcuts);
+		}
+		config->setValue("shortcuts", "automation_nav_start", "Alt+F7");
+		QCOMPARE(automationNavigationShortcuts(), defaults);
+	}
+
+	void resolvesSongTimelineShortcuts()
+	{
+		using Action = SongTimelineShortcuts::Action;
+		const auto defaults = songTimelineShortcuts();
+		QCOMPARE(defaults.previousBar, QKeySequence(Qt::Key_Left));
+		QCOMPARE(defaults.nextBar, QKeySequence(Qt::Key_Right));
+		QCOMPARE(defaults.start, QKeySequence(Qt::Key_Home));
+		QCOMPARE(defaults.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Left, Qt::ShiftModifier)), Action::PreviousBar);
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "song_previous_bar", "Alt+F7");
+		config->setValue("shortcuts", "song_next_bar", "Alt+F8");
+		const auto custom = songTimelineShortcuts();
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::AltModifier)), Action::PreviousBar);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier)), Action::None);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier)), Action::None);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_Home, Qt::NoModifier)), Action::Start);
+
+		config->setValue("shortcuts", "file_save", "Alt+F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		for (const auto* unsafe : {"Space", "Delete", "Ctrl+Alt+A", "Ctrl+0", "F7, F8"})
+		{
+			config->setValue("shortcuts", "song_go_to_start", unsafe);
+			QCOMPARE(songTimelineShortcuts().start, defaults.start);
+			QCOMPARE(songTimelineShortcuts().previousBar, custom.previousBar);
+		}
+		config->setValue("shortcuts", "song_go_to_start", "Alt+F8");
+		QCOMPARE(songTimelineShortcuts().previousBar, defaults.previousBar);
+	}
+
+	void resolvesProjectNotesFormatting()
+	{
+		const auto defaults = projectNotesShortcuts();
+		QCOMPARE(defaults.size(), 7);
+		QCOMPARE(defaults.value("notes_bold"), QKeySequence("Ctrl+B"));
+		QCOMPARE(defaults.value("notes_align_center"), QKeySequence("Ctrl+E"));
+		QCOMPARE(defaults.value("notes_underline"), QKeySequence(QKeySequence::Underline));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "notes_align_center", "F7");
+		QCOMPARE(projectNotesShortcuts().value("notes_align_center"), QKeySequence("F7"));
+		config->setValue("shortcuts", "file_save", "F7");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		for (const auto* conflicting : {"Ctrl+C", "Ctrl+V", "Ctrl+X", "Ctrl+Z", "Ctrl+A", "Ctrl+E", "F7"})
+		{
+			config->setValue("shortcuts", "notes_bold", conflicting);
+			QCOMPARE(projectNotesShortcuts(), defaults);
+		}
+		config->setValue("shortcuts", "notes_bold", "B");
+		QCOMPARE(projectNotesShortcuts().value("notes_bold"), defaults.value("notes_bold"));
+		QCOMPARE(projectNotesShortcuts().value("notes_align_center"), QKeySequence("F7"));
+	}
+
+	void resolvesRackReorderShortcuts()
+	{
+		const auto defaults = rackReorderShortcuts();
+		QCOMPARE(defaults.value("rack_move_up"), QKeySequence("Alt+Up"));
+		QCOMPARE(defaults.value("rack_move_down"), QKeySequence("Alt+Down"));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "rack_move_up", "Ctrl+Shift+F7");
+		QCOMPARE(rackReorderShortcuts().value("rack_move_up"), QKeySequence("Ctrl+Shift+F7"));
+		QCOMPARE(rackReorderShortcuts().value("rack_move_down"), defaults.value("rack_move_down"));
+
+		for (const auto* conflicting : {"F11", "Space", "Ctrl+1", "Ctrl+Shift+F7, F8"})
+		{
+			config->setValue("shortcuts", "rack_move_down", conflicting);
+			QCOMPARE(rackReorderShortcuts(), defaults);
+		}
+	}
+
+	void resolvesBrowserShortcutsWithoutStealingTreeInput()
+	{
+		const auto defaults = fileBrowserShortcuts();
+		QCOMPARE(defaults.value("browser_search"), QKeySequence(QKeySequence::Find));
+		QCOMPARE(defaults.value("browser_refresh"), QKeySequence("F5"));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "browser_refresh", "F7");
+		for (const auto* unsafe : {"Space", "Alt+Space", "A", "Ctrl+Return", "Alt+Right", "F6, F7"})
+		{
+			config->setValue("shortcuts", "browser_search", unsafe);
+			QCOMPARE(fileBrowserShortcuts().value("browser_search"), defaults.value("browser_search"));
+			QCOMPARE(fileBrowserShortcuts().value("browser_refresh"), QKeySequence("F7"));
+		}
+		config->setValue("shortcuts", "browser_search", "F6");
+		config->setValue("shortcuts", "layout_fullscreen", "F6");
+		QCOMPARE(fileBrowserShortcuts().value("browser_search"), QKeySequence("F6"));
+		QCOMPARE(windowLayoutShortcuts().value("layout_fullscreen"), QKeySequence("F11"));
+		config->setValue("shortcuts", "browser_search", "F7");
+		QCOMPARE(fileBrowserShortcuts(), defaults);
+	}
+
+	void rackOverrideCannotBeShadowedByOtherGroups()
+	{
+		auto* config = ConfigManager::inst();
+		for (const auto* id : {"rack_move_up", "layout_fullscreen", "transport_play_stop",
+			"transport_record", "file_save", "window_song_editor"})
+		{
+			config->setValue("shortcuts", id, "Ctrl+Shift+F7");
+		}
+		QCOMPARE(rackReorderShortcuts().value("rack_move_up"), QKeySequence("Ctrl+Shift+F7"));
+		QCOMPARE(windowLayoutShortcuts().value("layout_fullscreen"), QKeySequence("F11"));
+		QCOMPARE(transportShortcuts().playStop, QKeySequence("Space"));
+		QVERIFY(transportShortcuts().record.isEmpty());
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		QCOMPARE(windowToggleShortcuts({}).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void readsAndPreservesPortableOverrides()
+	{
+		QTemporaryDir dir;
+		QVERIFY(dir.isValid());
+		QFile file(dir.filePath("lmmsrc.xml"));
+		QVERIFY(file.open(QIODevice::WriteOnly));
+		file.write(QStringLiteral("<lmms><paths workingdir=\"%1\"/><shortcuts piano_roll_draw=\"Alt+D\"/></lmms>")
+			.arg(dir.path().toHtmlEscaped()).toUtf8());
+		file.close();
+
+		auto* config = ConfigManager::inst();
+		config->loadConfigFile(file.fileName());
+		QWidget editor;
+		QToolBar toolbar(&editor);
+		lmms::gui::ToolButtonAction draw(QIcon{}, QStringLiteral("Draw mode"), &editor);
+		toolbar.addAction(&draw);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}});
+		const auto sequence = QKeySequence::fromString("Alt+D", QKeySequence::PortableText);
+		QCOMPARE(draw.shortcut(), sequence);
+		QVERIFY(draw.toolTip().contains(sequence.toString(QKeySequence::NativeText)));
+		QVERIFY(toolbar.widgetForAction(&draw));
+		QCOMPARE(toolbar.widgetForAction(&draw)->toolTip(), draw.toolTip());
+		config->saveConfigFile();
+		QVERIFY(file.open(QIODevice::ReadOnly));
+		QVERIFY(file.readAll().contains("piano_roll_draw=\"Alt+D\""));
+	}
+
+	void rejectsInvalidAndConflictingOverrides_data()
+	{
+		QTest::addColumn<QString>("overrideKey");
+		QTest::newRow("unknown key") << QStringLiteral("Ctrl+NotAKey");
+		QTest::newRow("duplicate") << QStringLiteral("Shift+E");
+		QTest::newRow("prefix") << QStringLiteral("Shift+E, Shift+D");
+	}
+
+	void rejectsInvalidAndConflictingOverrides()
+	{
+		QFETCH(QString, overrideKey);
+		ConfigManager::inst()->setValue("shortcuts", "piano_roll_draw", overrideKey);
+		QWidget editor;
+		QAction draw(&editor);
+		QAction erase(&editor);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}, {"piano_roll_erase", &erase}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+		QCOMPARE(erase.shortcut(), QKeySequence("Shift+E"));
+	}
+
+	void dispatchesSharedShortcutOnlyInFocusedEditor_data()
+	{
+		QTest::addColumn<bool>("useOverride");
+		QTest::newRow("defaults") << false;
+		QTest::newRow("overrides") << true;
+	}
+
+	void dispatchesSharedShortcutOnlyInFocusedEditor()
+	{
+		QFETCH(bool, useOverride);
+		if (useOverride)
+		{
+			auto* config = ConfigManager::inst();
+			config->setValue("shortcuts", "piano_roll_draw", "Alt+D");
+			config->setValue("shortcuts", "automation_editor_draw", "Alt+D");
+		}
+		const auto modifier = useOverride ? Qt::AltModifier : Qt::ShiftModifier;
+		QMdiArea workspace;
+		auto* piano = new QWidget;
+		auto* automation = new QWidget;
+		auto* pianoWindow = workspace.addSubWindow(piano);
+		auto* automationWindow = workspace.addSubWindow(automation);
+		QWidget pianoChild(piano);
+		QWidget automationChild(automation);
+		pianoChild.setFocusPolicy(Qt::StrongFocus);
+		automationChild.setFocusPolicy(Qt::StrongFocus);
+		QAction pianoDraw(piano);
+		QAction automationDraw(automation);
+		QToolBar pianoTools(piano);
+		QToolBar automationTools(automation);
+		pianoTools.addAction(&pianoDraw);
+		automationTools.addAction(&automationDraw);
+		bindEditorShortcuts(*piano, {{"piano_roll_draw", &pianoDraw}});
+		bindEditorShortcuts(*automation, {{"automation_editor_draw", &automationDraw}});
+		QSignalSpy pianoTriggers(&pianoDraw, &QAction::triggered);
+		QSignalSpy automationTriggers(&automationDraw, &QAction::triggered);
+		workspace.show();
+		QVERIFY(QTest::qWaitForWindowExposed(&workspace));
+		QApplication::setActiveWindow(&workspace);
+
+		workspace.setActiveSubWindow(pianoWindow);
+		pianoChild.setFocus();
+		QCOMPARE(QApplication::focusWidget(), &pianoChild);
+		QTest::keyClick(&pianoChild, Qt::Key_D, modifier);
+		QCOMPARE(pianoTriggers.count(), 1);
+		QCOMPARE(automationTriggers.count(), 0);
+
+		workspace.setActiveSubWindow(automationWindow);
+		automationChild.setFocus();
+		QCOMPARE(QApplication::focusWidget(), &automationChild);
+		QTest::keyClick(&automationChild, Qt::Key_D, modifier);
+		QCOMPARE(pianoTriggers.count(), 1);
+		QCOMPARE(automationTriggers.count(), 1);
+	}
+
+	void resolvesWindowShortcuts_data()
+	{
+		QTest::addColumn<QString>("overrideKey");
+		QTest::addColumn<QString>("expectedKey");
+		QTest::newRow("default") << QString{} << QStringLiteral("Ctrl+1");
+		QTest::newRow("override") << QStringLiteral("Alt+1") << QStringLiteral("Alt+1");
+		QTest::newRow("another window") << QStringLiteral("Ctrl+2") << QStringLiteral("Ctrl+1");
+		QTest::newRow("existing application action") << QStringLiteral("Ctrl+S, Alt+1") << QStringLiteral("Ctrl+1");
+		QTest::newRow("configured editor action") << QStringLiteral("Alt+D") << QStringLiteral("Ctrl+1");
+	}
+
+	void resolvesWindowShortcuts()
+	{
+		QFETCH(QString, overrideKey);
+		QFETCH(QString, expectedKey);
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "window_song_editor", overrideKey);
+		config->setValue("shortcuts", "piano_roll_draw", "Alt+D");
+		const auto map = windowToggleShortcuts({QKeySequence("Ctrl+S")});
+		QCOMPARE(map.size(), 7);
+		QCOMPARE(map.value("window_song_editor"), QKeySequence(expectedKey));
+		QCOMPARE(map.value("window_pattern_editor"), QKeySequence("Ctrl+2"));
+	}
+
+	void editorOverridesCannotTakeWindowDefaults()
+	{
+		ConfigManager::inst()->setValue("shortcuts", "piano_roll_draw", "Ctrl+1");
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+	}
+
+	void resolvesMenuShortcuts_data()
+	{
+		QTest::addColumn<QString>("overrideKey");
+		QTest::addColumn<bool>("accepted");
+		QTest::newRow("default") << QString{} << false;
+		QTest::newRow("override") << QStringLiteral("Alt+9") << true;
+		QTest::newRow("other menu action") << QKeySequence(QKeySequence::Open).toString(QKeySequence::PortableText) << false;
+		QTest::newRow("window default") << QStringLiteral("Ctrl+1") << false;
+		QTest::newRow("editor override") << QStringLiteral("Alt+D") << false;
+		QTest::newRow("fullscreen prefix") << QStringLiteral("F11, Alt+9") << false;
+	}
+
+	void resolvesMenuShortcuts()
+	{
+		QFETCH(QString, overrideKey);
+		QFETCH(bool, accepted);
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "piano_roll_draw", "Alt+D");
+		config->setValue("shortcuts", "file_save", overrideKey);
+		const auto shortcuts = mainMenuShortcuts({QKeySequence(Qt::Key_F11)});
+		QCOMPARE(shortcuts.size(), 11);
+		QCOMPARE(shortcuts.value("file_new"), QKeySequence(QKeySequence::New));
+		QCOMPARE(shortcuts.value("edit_undo"), QKeySequence(QKeySequence::Undo));
+		QCOMPARE(shortcuts.value("edit_redo"), QKeySequence(QKeySequence::Redo));
+		QCOMPARE(shortcuts.value("file_save"), accepted ? QKeySequence(overrideKey) : QKeySequence(QKeySequence::Save));
+	}
+
+	void menuAndWindowOverridesCannotShareAKey()
+	{
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "file_save", "Alt+9");
+		config->setValue("shortcuts", "window_song_editor", "Alt+9");
+		const auto menu = mainMenuShortcuts({});
+		QCOMPARE(menu.value("file_save"), QKeySequence("Alt+9"));
+		QCOMPARE(windowToggleShortcuts(menu.values()).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void editorOverridesCannotTakeMenuDefaults()
+	{
+		ConfigManager::inst()->setValue("shortcuts", "piano_roll_draw",
+			QKeySequence(QKeySequence::Save).toString(QKeySequence::PortableText));
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+	}
+
+	void resolvesPatternNavigation_data()
+	{
+		QTest::addColumn<QString>("overrideKey");
+		QTest::addColumn<bool>("accepted");
+		QTest::newRow("default") << QString{} << false;
+		QTest::newRow("override") << QStringLiteral("Alt+9") << true;
+		QTest::newRow("duplicate") << QStringLiteral("-") << false;
+		QTest::newRow("window default") << QStringLiteral("Ctrl+1") << false;
+		QTest::newRow("menu default") << QKeySequence(QKeySequence::Save).toString(QKeySequence::PortableText) << false;
+		QTest::newRow("editor override") << QStringLiteral("Alt+D") << false;
+		QTest::newRow("editor maximize") << QStringLiteral("Shift+F11") << false;
+	}
+
+	void resolvesPatternNavigation()
+	{
+		QFETCH(QString, overrideKey);
+		QFETCH(bool, accepted);
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "piano_roll_draw", "Alt+D");
+		config->setValue("shortcuts", "pattern_next", overrideKey);
+		const auto shortcuts = patternNavigationShortcuts();
+		QCOMPARE(shortcuts.value("pattern_previous"), QKeySequence(Qt::Key_Minus));
+		QCOMPARE(shortcuts.value("pattern_next"), accepted ? QKeySequence(overrideKey) : QKeySequence(Qt::Key_Plus));
+	}
+
+	void patternOverrideTakesPrecedenceOverMainWindowOverrides()
+	{
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "pattern_next", "Alt+9");
+		config->setValue("shortcuts", "file_save", "Alt+9");
+		config->setValue("shortcuts", "window_song_editor", "Alt+9");
+		const auto menu = mainMenuShortcuts({});
+		QCOMPARE(patternNavigationShortcuts().value("pattern_next"), QKeySequence("Alt+9"));
+		QCOMPARE(menu.value("file_save"), QKeySequence(QKeySequence::Save));
+		QCOMPARE(windowToggleShortcuts(menu.values()).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void matchesTransportKeys()
+	{
+		using Action = TransportShortcuts::Action;
+		const auto defaults = transportShortcuts();
+		const QKeyEvent space(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+		const QKeyEvent shiftSpace(QEvent::KeyPress, Qt::Key_Space, Qt::ShiftModifier);
+		const QKeyEvent ctrlSpace(QEvent::KeyPress, Qt::Key_Space, Qt::ControlModifier);
+		const QKeyEvent left(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+		QCOMPARE(defaults.match(space), Action::PlayStop);
+		QCOMPARE(defaults.match(shiftSpace), Action::Pause);
+		QCOMPARE(defaults.match(ctrlSpace), Action::PlayStop);
+		QCOMPARE(defaults.match(left), Action::None);
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_play_stop", "Alt+F7");
+		config->setValue("shortcuts", "transport_pause", "Alt+F8");
+		const auto custom = transportShortcuts();
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::AltModifier)), Action::PlayStop);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F8, Qt::AltModifier)), Action::Pause);
+		QCOMPARE(custom.match(QKeyEvent(QEvent::KeyPress, Qt::Key_F7, Qt::NoModifier)), Action::None);
+		QCOMPARE(custom.match(space), Action::None);
+		QCOMPARE(custom.match(shiftSpace), Action::None);
+		QCOMPARE(custom.match(ctrlSpace), Action::None);
+	}
+
+	void rejectsTransportConflictsAndMultiStrokeOverrides()
+	{
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_pause", "Alt+F8");
+		for (const auto* sequence : {"Alt+F7, Alt+F8", "Alt+8", "Shift+Alt+9", "Ctrl+1", "Num+0"})
+		{
+			config->setValue("shortcuts", "transport_play_stop", sequence);
+			QCOMPARE(transportShortcuts().playStop, QKeySequence(Qt::Key_Space));
+			QCOMPARE(transportShortcuts().pause, QKeySequence("Alt+F8"));
+		}
+
+		for (const auto* sequence : {"Alt+F8", "Shift+D", "Shift+F11", "+"})
+		{
+			config->setValue("shortcuts", "transport_play_stop", sequence);
+			const auto shortcuts = transportShortcuts();
+			QCOMPARE(shortcuts.playStop, QKeySequence(Qt::Key_Space));
+			QCOMPARE(shortcuts.pause, QKeySequence("Shift+Space"));
+		}
+	}
+
+	void transportOverrideTakesPrecedenceOverOtherOverrides()
+	{
+		auto* config = ConfigManager::inst();
+		for (const auto* id : {"transport_play_stop", "piano_roll_draw", "pattern_next", "file_save", "window_song_editor"})
+		{
+			config->setValue("shortcuts", id, "Alt+F7");
+		}
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+		QCOMPARE(patternNavigationShortcuts().value("pattern_next"), QKeySequence(Qt::Key_Plus));
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		QCOMPARE(windowToggleShortcuts({}).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void resolvesWindowLayoutShortcuts()
+	{
+		const auto defaults = windowLayoutShortcuts();
+		QCOMPARE(defaults.value("layout_fullscreen"), QKeySequence("F11"));
+		QCOMPARE(defaults.value("layout_maximize_editor"), QKeySequence("Shift+F11"));
+		QCOMPARE(defaults.value("layout_detach_all"), QKeySequence("Ctrl+Shift+D"));
+		QCOMPARE(defaults.value("layout_attach_all"), QKeySequence("Ctrl+Alt+Shift+D"));
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "layout_fullscreen", "Ctrl+Shift+F9");
+		config->setValue("shortcuts", "layout_maximize_editor", "Ctrl+Shift+F10");
+		QCOMPARE(windowLayoutShortcuts().value("layout_fullscreen"), QKeySequence("Ctrl+Shift+F9"));
+		QCOMPARE(windowLayoutShortcuts().value("layout_maximize_editor"), QKeySequence("Ctrl+Shift+F10"));
+
+		for (const auto* conflicting : {"Space", "Ctrl+1", "Shift+D", "-", "Ctrl+Shift+F9, F10"})
+		{
+			config->setValue("shortcuts", "layout_maximize_editor", conflicting);
+			QCOMPARE(windowLayoutShortcuts(), defaults);
+		}
+	}
+
+	void layoutOverrideTakesPrecedenceOverOtherOverrides()
+	{
+		auto* config = ConfigManager::inst();
+		for (const auto* id : {"layout_detach_all", "transport_pause", "piano_roll_draw", "pattern_next", "file_save",
+			"window_song_editor"})
+		{
+			config->setValue("shortcuts", id, "Ctrl+Shift+F9");
+		}
+		QCOMPARE(windowLayoutShortcuts().value("layout_detach_all"), QKeySequence("Ctrl+Shift+F9"));
+		QCOMPARE(transportShortcuts().pause, QKeySequence("Shift+Space"));
+		QWidget editor;
+		QAction draw(&editor);
+		bindEditorShortcuts(editor, {{"piano_roll_draw", &draw}});
+		QCOMPARE(draw.shortcut(), QKeySequence("Shift+D"));
+		QCOMPARE(patternNavigationShortcuts().value("pattern_next"), QKeySequence("+"));
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+		QCOMPARE(windowToggleShortcuts({}).value("window_song_editor"), QKeySequence("Ctrl+1"));
+	}
+
+	void resolvesOptionalRecordingShortcuts()
+	{
+		const auto defaults = transportShortcuts();
+		QVERIFY(defaults.record.isEmpty());
+		QVERIFY(defaults.recordAccompany.isEmpty());
+		QVERIFY(defaults.recordStep.isEmpty());
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_play_stop", "Alt+F7");
+		config->setValue("shortcuts", "transport_record_step", "Alt+F6");
+		QCOMPARE(transportShortcuts().recordStep, QKeySequence("Alt+F6"));
+		config->setValue("shortcuts", "file_save", "Alt+F6");
+		QCOMPARE(mainMenuShortcuts({}).value("file_save"), QKeySequence(QKeySequence::Save));
+
+		for (const auto* conflicting : {"Alt+F7", "Alt+F6", "Shift+D"})
+		{
+			config->setValue("shortcuts", "transport_record", conflicting);
+			const auto shortcuts = transportShortcuts();
+			QVERIFY(shortcuts.record.isEmpty());
+			QVERIFY(shortcuts.recordStep.isEmpty());
+			QCOMPARE(shortcuts.playStop, QKeySequence("Alt+F7"));
+		}
+
+		for (const auto* invalid : {"Alt+F5, Alt+F6", "Alt+9", "Ctrl+Shift+Space"})
+		{
+			config->setValue("shortcuts", "transport_record", invalid);
+			QVERIFY(transportShortcuts().record.isEmpty());
+			QCOMPARE(transportShortcuts().recordStep, QKeySequence("Alt+F6"));
+		}
+		config->setValue("shortcuts", "transport_record", "Ctrl+Space");
+		QCOMPARE(transportShortcuts().record, QKeySequence("Ctrl+Space"));
+		config->setValue("shortcuts", "transport_play_stop", "");
+		QVERIFY(transportShortcuts().record.isEmpty());
+	}
+
+	void dispatchesRecordingOnlyInSupportingEditor()
+	{
+		using lmms::gui::Editor;
+		class RecordingEditor : public Editor
+		{
+		public:
+			RecordingEditor(bool recordEnabled, bool stepEnabled) : Editor(recordEnabled, stepEnabled)
+			{
+				setRecordingToolTips("Record", "Record with playback", "Step record");
+			}
+
+			QAction* recordAction() const { return m_recordAction; }
+			QAction* accompanyAction() const { return m_recordAccompanyAction; }
+			QAction* stepAction() const { return m_toggleStepRecordingAction; }
+		};
+
+		auto* config = ConfigManager::inst();
+		config->setValue("shortcuts", "transport_record", "Alt+F5");
+		config->setValue("shortcuts", "transport_record_accompany", "A");
+		config->setValue("shortcuts", "transport_record_step", "Alt+F6");
+
+		RecordingEditor piano(true, true);
+		RecordingEditor song(true, false);
+		RecordingEditor automation(false, false);
+		QSignalSpy record(piano.recordAction(), &QAction::triggered);
+		QSignalSpy accompany(piano.accompanyAction(), &QAction::triggered);
+		QSignalSpy step(piano.stepAction(), &QAction::triggered);
+		QSignalSpy songStep(song.stepAction(), &QAction::triggered);
+		QSignalSpy unavailableRecord(automation.recordAction(), &QAction::triggered);
+		QVERIFY(piano.stepAction()->toolTip().contains(QKeySequence("Alt+F6").toString(QKeySequence::NativeText)));
+
+		QTest::keyClick(&piano, Qt::Key_F5, Qt::AltModifier);
+		QCOMPARE(record.count(), 1);
+		QTest::keyClick(&piano, Qt::Key_A);
+		QCOMPARE(accompany.count(), 1);
+		QTest::keyClick(&piano, Qt::Key_F6, Qt::AltModifier);
+		QCOMPARE(step.count(), 1);
+		QKeyEvent repeatedStep(QEvent::KeyPress, Qt::Key_F6, Qt::AltModifier, {}, true);
+		QApplication::sendEvent(&piano, &repeatedStep);
+		QVERIFY(repeatedStep.isAccepted());
+		QCOMPARE(step.count(), 1);
+
+		QTest::keyClick(&song, Qt::Key_F6, Qt::AltModifier);
+		QTest::keyClick(&automation, Qt::Key_F5, Qt::AltModifier);
+		QCOMPARE(songStep.count(), 0);
+		QCOMPARE(unavailableRecord.count(), 0);
+
+		auto* input = new QLineEdit(&piano);
+		piano.setCentralWidget(input);
+		QTest::keyClick(input, Qt::Key_A);
+		QCOMPARE(input->text(), QStringLiteral("a"));
+		QCOMPARE(accompany.count(), 1);
+
+		QKeyEvent mainWindowFallback(QEvent::KeyPress, Qt::Key_F5, Qt::AltModifier);
+		QVERIFY(!Editor::handleTransportKey(&mainWindowFallback, &piano));
+		QCOMPARE(record.count(), 1);
+	}
+};
+
+QTEST_MAIN(EditorShortcutsTest)
+#include "EditorShortcutsTest.moc"

@@ -55,6 +55,7 @@
 #include "DataFile.h"
 #include "DeprecationHelper.h"
 #include "DetuningHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "GuiApplication.h"
 #include "FontHelper.h"
@@ -71,6 +72,7 @@
 #include "StepRecorderWidget.h"
 #include "TextFloat.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "FileDialog.h"
 
 
@@ -227,8 +229,8 @@ PianoRoll::PianoRoll() :
 	m_blackKeyWidth(BLACK_KEY_WIDTH)
 {
 	// gui names of edit modes
-	m_nemStr.push_back( tr( "Note Velocity" ) );
-	m_nemStr.push_back( tr( "Note Panning" ) );
+	m_nemStr.push_back( tr( "Note velocity" ) );
+	m_nemStr.push_back( tr( "Note panning" ) );
 
 	m_noteEditMenu = new QMenu( this );
 	m_noteEditMenu->clear();
@@ -2235,7 +2237,7 @@ void PianoRoll::setKnifeAction()
 		setCursor(Qt::ArrowCursor);
 		update();
 
-		TextFloat::displayMessage(tr("Knife Tool"),
+		TextFloat::displayMessage(tr("Knife tool"),
 			tr("Click and drag over notes to cut along a line\nHold Shift to automatically remove short ends"),
 			embed::getIconPixmap("edit_knife"), 4000);
 	}
@@ -4536,7 +4538,7 @@ void PianoRoll::setEditMode(int mode)
 {
 	if (static_cast<EditMode>(mode) == EditMode::Detuning)
 	{
-		TextFloat::displayMessage(tr("Pitch Bending"),
+		TextFloat::displayMessage(tr("Pitch bending"),
 			tr("Click and drag on a note or selection to edit its detuning curve\nShift-click to open the note in Automation Editor"),
 			embed::getIconPixmap("automation"), 4000);
 	}
@@ -5176,27 +5178,25 @@ PianoRollWindow::PianoRollWindow() :
 {
 	setCentralWidget( m_editor );
 
-	m_playAction->setToolTip(tr( "Play/pause current clip (Space)" ) );
-	m_recordAction->setToolTip(tr( "Record notes from MIDI-device/channel-piano" ) );
-	m_recordAccompanyAction->setToolTip( tr( "Record notes from MIDI-device/channel-piano while playing song or pattern track" ) );
-	m_toggleStepRecordingAction->setToolTip( tr( "Record notes from MIDI-device/channel-piano, one step at the time" ) );
-	m_stopAction->setToolTip( tr( "Stop playing of current clip (Space)" ) );
+	setTransportToolTips(tr("Play current clip"), tr("Stop playing of current clip"));
+	setRecordingToolTips(tr("Record notes from MIDI-device/channel-piano"),
+		tr("Record notes from MIDI-device/channel-piano while playing song or pattern track"),
+		tr("Record notes from MIDI-device/channel-piano, one step at the time"));
 
 	DropToolBar *notesActionsToolBar = addDropToolBarToTop( tr( "Edit actions" ) );
 
 	// init edit-buttons at the top
 	auto editModeGroup = new ActionGroup(this);
-	QAction* drawAction = editModeGroup->addAction( embed::getIconPixmap( "edit_draw" ), tr( "Draw mode (Shift+D)" ) );
-	QAction* eraseAction = editModeGroup->addAction( embed::getIconPixmap( "edit_erase" ), tr("Erase mode (Shift+E)" ) );
-	QAction* selectAction = editModeGroup->addAction( embed::getIconPixmap( "edit_select" ), tr( "Select mode (Shift+S)" ) );
-	QAction* pitchBendAction = editModeGroup->addAction( embed::getIconPixmap( "automation" ), tr("Pitch Bend mode (Shift+T)" ) );
+	QAction* drawAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_draw" ), tr( "Draw mode" ), editModeGroup));
+	QAction* eraseAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_erase" ), tr("Erase mode" ), editModeGroup));
+	QAction* selectAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "edit_select" ), tr( "Select mode" ), editModeGroup));
+	QAction* pitchBendAction = editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap( "automation" ), tr("Pitch bend mode" ), editModeGroup));
 
 	drawAction->setChecked( true );
-
-	drawAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_D ));
-	eraseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_E));
-	selectAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_S));
-	pitchBendAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_T));
 
 	connect( editModeGroup, SIGNAL(triggered(int)), m_editor, SLOT(setEditMode(int)));
 
@@ -5249,15 +5249,11 @@ PianoRollWindow::PianoRollWindow() :
 	// Copy + paste actions
 	DropToolBar *copyPasteActionsToolBar =  addDropToolBarToTop( tr( "Copy paste controls" ) );
 
-	auto cutAction = new QAction(embed::getIconPixmap("edit_cut"), tr("Cut (%1+X)").arg(UI_CTRL_KEY), this);
+	auto cutAction = new ToolButtonAction(embed::getIconPixmap("edit_cut"), tr("Cut"), this);
 
-	auto copyAction = new QAction(embed::getIconPixmap("edit_copy"), tr("Copy (%1+C)").arg(UI_CTRL_KEY), this);
+	auto copyAction = new ToolButtonAction(embed::getIconPixmap("edit_copy"), tr("Copy"), this);
 
-	auto pasteAction = new QAction(embed::getIconPixmap("edit_paste"), tr("Paste (%1+V)").arg(UI_CTRL_KEY), this);
-
-	cutAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_X));
-	copyAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_C));
-	pasteAction->setShortcut(keySequence(Qt::CTRL, Qt::Key_V));
+	auto pasteAction = new ToolButtonAction(embed::getIconPixmap("edit_paste"), tr("Paste"), this);
 
 	connect( cutAction, SIGNAL(triggered()), m_editor, SLOT(cutSelectedNotes()));
 	connect( copyAction, SIGNAL(triggered()), m_editor, SLOT(copySelectedNotes()));
@@ -5278,23 +5274,18 @@ PianoRollWindow::PianoRollWindow() :
 
 	auto glueAction = new QAction(embed::getIconPixmap("glue"), tr("Glue"), noteToolsButton);
 	connect(glueAction, SIGNAL(triggered()), m_editor, SLOT(glueNotes()));
-	glueAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_G));
 
 	auto knifeAction = new QAction(embed::getIconPixmap("edit_knife"), tr("Knife"), noteToolsButton);
 	connect(knifeAction, &QAction::triggered, m_editor, &PianoRoll::setKnifeAction);
-	knifeAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_K));
 
 	auto strumAction = new QAction(embed::getIconPixmap("arp_free"), tr("Strum"), noteToolsButton);
 	connect(strumAction, &QAction::triggered, m_editor, &PianoRoll::setStrumAction);
-	strumAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_J));
 
 	auto fillAction = new QAction(embed::getIconPixmap("fill"), tr("Fill"), noteToolsButton);
 	connect(fillAction, &QAction::triggered, [this](){ m_editor->fitNoteLengths(true); });
-	fillAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_F));
 
 	auto cutOverlapsAction = new QAction(embed::getIconPixmap("cut_overlaps"), tr("Cut overlaps"), noteToolsButton);
 	connect(cutOverlapsAction, &QAction::triggered, [this](){ m_editor->fitNoteLengths(false); });
-	cutOverlapsAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_C));
 
 	auto minLengthAction = new QAction(embed::getIconPixmap("min_length"), tr("Min length as last"), noteToolsButton);
 	connect(minLengthAction, &QAction::triggered, [this](){ m_editor->constrainNoteLengths(false); });
@@ -5302,9 +5293,8 @@ PianoRollWindow::PianoRollWindow() :
 	auto maxLengthAction = new QAction(embed::getIconPixmap("max_length"), tr("Max length as last"), noteToolsButton);
 	connect(maxLengthAction, &QAction::triggered, [this](){ m_editor->constrainNoteLengths(true); });
 
-	auto reverseAction = new QAction(embed::getIconPixmap("flip_x"), tr("Reverse Notes"), noteToolsButton);
+	auto reverseAction = new QAction(embed::getIconPixmap("flip_x"), tr("Reverse notes"), noteToolsButton);
 	connect(reverseAction, &QAction::triggered, [this](){ m_editor->reverseNotes(); });
-	reverseAction->setShortcut(keySequence(Qt::SHIFT, Qt::Key_R));
 
 	noteToolsButton->addAction(glueAction);
 	noteToolsButton->addAction(knifeAction);
@@ -5317,6 +5307,22 @@ PianoRollWindow::PianoRollWindow() :
 
 	notesActionsToolBar->addWidget(noteToolsButton);
 
+	bindEditorShortcuts(*this, {
+		{QStringLiteral("piano_roll_draw"), drawAction},
+		{QStringLiteral("piano_roll_erase"), eraseAction},
+		{QStringLiteral("piano_roll_select"), selectAction},
+		{QStringLiteral("piano_roll_pitch_bend"), pitchBendAction},
+		{QStringLiteral("piano_roll_cut"), cutAction},
+		{QStringLiteral("piano_roll_copy"), copyAction},
+		{QStringLiteral("piano_roll_paste"), pasteAction},
+		{QStringLiteral("piano_roll_glue"), glueAction},
+		{QStringLiteral("piano_roll_knife"), knifeAction},
+		{QStringLiteral("piano_roll_strum"), strumAction},
+		{QStringLiteral("piano_roll_fill"), fillAction},
+		{QStringLiteral("piano_roll_cut_overlaps"), cutOverlapsAction},
+		{QStringLiteral("piano_roll_reverse"), reverseAction},
+	});
+
 	addToolBarBreak();
 
 
@@ -5328,7 +5334,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingComboBox = new ComboBox( m_toolBar );
 	m_zoomingComboBox->setModel( &m_editor->m_zoomingModel );
-	m_zoomingComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingComboBox->setMinimumContentWidth(64);
 	m_zoomingComboBox->setToolTip( tr( "Horizontal zooming") );
 
@@ -5338,7 +5343,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_zoomingYComboBox = new ComboBox(m_toolBar);
 	m_zoomingYComboBox->setModel(&m_editor->m_zoomingYModel);
-	m_zoomingYComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_zoomingYComboBox->setMinimumContentWidth(64);
 	m_zoomingYComboBox->setToolTip(tr("Vertical zooming"));
 
@@ -5349,7 +5353,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_quantizeComboBox = new ComboBox( m_toolBar );
 	m_quantizeComboBox->setModel( &m_editor->m_quantizeModel );
-	m_quantizeComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_quantizeComboBox->setMinimumContentWidth(85);
 	m_quantizeComboBox->setToolTip( tr( "Quantization") );
 
@@ -5359,14 +5362,12 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_noteLenComboBox = new ComboBox( m_toolBar );
 	m_noteLenComboBox->setModel( &m_editor->m_noteLenModel );
-	m_noteLenComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_noteLenComboBox->setMinimumContentWidth(105);
 	m_noteLenComboBox->setToolTip( tr( "Note length") );
 
 	// setup key-stuff
 	m_keyComboBox = new ComboBox(m_toolBar);
 	m_keyComboBox->setModel(&m_editor->m_keyModel);
-	m_keyComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_keyComboBox->setMinimumContentWidth(72);
 	m_keyComboBox->setToolTip(tr("Key"));
 
@@ -5376,7 +5377,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_scaleComboBox = new ComboBox( m_toolBar );
 	m_scaleComboBox->setModel( &m_editor->m_scaleModel );
-	m_scaleComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_scaleComboBox->setMinimumContentWidth(155);
 	m_scaleComboBox->setToolTip( tr( "Scale") );
 
@@ -5386,7 +5386,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_chordComboBox = new ComboBox( m_toolBar );
 	m_chordComboBox->setModel( &m_editor->m_chordModel );
-	m_chordComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_chordComboBox->setMinimumContentWidth(125);
 	m_chordComboBox->setToolTip( tr( "Chord" ) );
 
@@ -5396,7 +5395,6 @@ PianoRollWindow::PianoRollWindow() :
 
 	m_snapComboBox = new ComboBox(m_toolBar);
 	m_snapComboBox->setModel(&m_editor->m_snapModel);
-	m_snapComboBox->setFixedHeight(ComboBox::DEFAULT_HEIGHT);
 	m_snapComboBox->setMinimumContentWidth(96);
 	m_snapComboBox->setToolTip(tr("Snap mode"));
 
@@ -5512,14 +5510,14 @@ void PianoRollWindow::setCurrentMidiClip( MidiClip* clip )
 
 	if ( clip )
 	{
-		setWindowTitle( tr( "Piano-Roll - %1" ).arg( clip->name() ) );
+		setWindowTitle( tr( "Piano Roll - %1" ).arg( clip->name() ) );
 		m_fileToolsButton->setEnabled(true);
 		connect( clip->instrumentTrack(), SIGNAL(nameChanged()), this, SLOT(updateAfterMidiClipChange()));
 		connect( clip, SIGNAL(dataChanged()), this, SLOT(updateAfterMidiClipChange()));
 	}
 	else
 	{
-		setWindowTitle( tr( "Piano-Roll - no clip" ) );
+		setWindowTitle( tr( "Piano Roll - no clip" ) );
 		m_fileToolsButton->setEnabled(false);
 	}
 }
@@ -5756,12 +5754,12 @@ void PianoRollWindow::clipRenamed()
 {
 	if ( currentMidiClip() )
 	{
-		setWindowTitle( tr( "Piano-Roll - %1" ).arg( currentMidiClip()->name() ) );
+		setWindowTitle( tr( "Piano Roll - %1" ).arg( currentMidiClip()->name() ) );
 		m_fileToolsButton->setEnabled(true);
 	}
 	else
 	{
-		setWindowTitle( tr( "Piano-Roll - no clip" ) );
+		setWindowTitle( tr( "Piano Roll - no clip" ) );
 		m_fileToolsButton->setEnabled(false);
 	}
 }

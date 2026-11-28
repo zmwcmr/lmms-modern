@@ -89,6 +89,7 @@ public:
 	~PatternEditorWindow() = default;
 
 	QSize sizeHint() const override;
+	bool isPatternSelector(const QWidget* widget) const;
 
 	PatternEditor* m_editor;
 

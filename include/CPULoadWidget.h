@@ -47,9 +47,11 @@ class CPULoadWidget : public QWidget
 public:
 	CPULoadWidget( QWidget * _parent );
 	~CPULoadWidget() override = default;
+	QSize sizeHint() const override;
 
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void paintEvent( QPaintEvent * _ev ) override;
 
 
@@ -62,11 +64,9 @@ private:
 
 	int m_currentLoad;
 
-	QPixmap m_temp;
 	QPixmap m_background;
 	QPixmap m_leds;
-
-	bool m_changed;
+	qreal m_backgroundVisibleWidth = 0;
 
 	QTimer m_updateTimer;
 

@@ -27,6 +27,9 @@
 #include "GranularPitchShifterControlDialog.h"
 #include "GranularPitchShifterControls.h"
 #include "Knob.h"
+#include <QGridLayout>
+#include <QResizeEvent>
+
 #include "LcdFloatSpinBox.h"
 #include "MainWindow.h"
 #include "GuiApplication.h"
@@ -40,67 +43,90 @@ GranularPitchShifterControlDialog::GranularPitchShifterControlDialog(GranularPit
 	EffectControlDialog(controls)
 {
 	setAutoFillBackground(true);
-	QPalette pal;
-	pal.setBrush(backgroundRole(), PLUGIN_NAME::getIconPixmap("artwork"));
-	setPalette(pal);
-	setFixedSize(305, 180);
-	
-	auto makeKnob = [this](KnobType style, int x, int y, const QString& hintText, const QString& unit, FloatModel* model)
+
+	auto makeKnob = [this](KnobType style, const QString& hintText, const QString& unit, FloatModel* model) -> Knob*
 	{
 		Knob* newKnob = new Knob(style, this);
-		newKnob->move(x, y);
 		newKnob->setModel(model);
 		newKnob->setHintText(hintText, unit);
 		return newKnob;
 	};
 
-	makeKnob(KnobType::Bright26, 19, 78, tr("Grain Size:"), " Hz", &controls->m_sizeModel);
-	makeKnob(KnobType::Bright26, 116, 10, tr("Spray:"), " seconds", &controls->m_sprayModel);
-	makeKnob(KnobType::Bright26, 158, 10, tr("Jitter:"), " octaves", &controls->m_jitterModel);
-	makeKnob(KnobType::Bright26, 200, 10, tr("Twitch:"), " octaves", &controls->m_twitchModel);
-	makeKnob(KnobType::Bright26, 188, 60, tr("Spray Stereo Spread:"), "", &controls->m_spraySpreadModel);
-	makeKnob(KnobType::Bright26, 135, 110, tr("Grain Shape:"), "", &controls->m_shapeModel);
-	makeKnob(KnobType::Bright26, 188, 110, tr("Fade Length:"), "", &controls->m_fadeLengthModel);
-	makeKnob(KnobType::Bright26, 258, 45, tr("Feedback:"), "", &controls->m_feedbackModel);
-	makeKnob(KnobType::Bright26, 258, 92, tr("Minimum Allowed Latency:"), " seconds", &controls->m_minLatencyModel);
-	makeKnob(KnobType::Small17, 66, 157, tr("Density:"), "x", &controls->m_densityModel);
-	makeKnob(KnobType::Small17, 8, 157, tr("Glide:"), " seconds", &controls->m_glideModel);
-	
-	LcdFloatSpinBox* pitchBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch"), this);
-	pitchBox->move(15, 41);
+	auto* pitchBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch"), this);
 	pitchBox->setModel(&controls->m_pitchModel);
 	pitchBox->setToolTip(tr("Pitch"));
 	pitchBox->setSeamless(true, true);
-	
-	LcdFloatSpinBox* pitchSpreadBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch Stereo Spread"), this);
-	pitchSpreadBox->move(133, 66);
+
+	auto* pitchSpreadBox = new LcdFloatSpinBox(3, 2, "11green", tr("Pitch stereo spread"), this);
 	pitchSpreadBox->setModel(&controls->m_pitchSpreadModel);
-	pitchSpreadBox->setToolTip(tr("Pitch Stereo Spread"));
+	pitchSpreadBox->setToolTip(tr("Pitch stereo spread"));
 	pitchSpreadBox->setSeamless(true, true);
-	
-	QPushButton button("Show Help", this);
-	connect(&button, &QPushButton::clicked, this, &GranularPitchShifterControlDialog::showHelpWindow);
-	
-	PixmapButton* m_helpBtn = new PixmapButton(this, nullptr);
-	m_helpBtn->move(278, 159);
+
+	auto* m_helpBtn = new PixmapButton(this, nullptr);
 	m_helpBtn->setActiveGraphic(PLUGIN_NAME::getIconPixmap("help_active"));
 	m_helpBtn->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("help_inactive"));
 	m_helpBtn->setToolTip(tr("Open help window"));
 	connect(m_helpBtn, SIGNAL(clicked()), this, SLOT(showHelpWindow()));
-	
-	PixmapButton* prefilterButton = new PixmapButton(this, tr("Prefilter"));
-	prefilterButton->move(8, 133);
+
+	auto* prefilterButton = new PixmapButton(this, tr("Prefilter"));
 	prefilterButton->setActiveGraphic(PLUGIN_NAME::getIconPixmap("prefilter_active"));
 	prefilterButton->setInactiveGraphic(PLUGIN_NAME::getIconPixmap("prefilter_inactive"));
 	prefilterButton->setCheckable(true);
 	prefilterButton->setModel(&controls->m_prefilterModel);
 	prefilterButton->setToolTip(tr("Prefilter"));
-	
-	ComboBox* rangeBox = new ComboBox(this);
-	rangeBox->setGeometry(189, 155, 80, 22);
+
+	auto* rangeBox = new ComboBox(this);
 	rangeBox->setModel(&controls->m_rangeModel);
 	controls->updateRange();
+
+	auto* grid = new QGridLayout(this);
+	grid->setContentsMargins(8, 6, 8, 6);
+	grid->setHorizontalSpacing(6);
+	grid->setVerticalSpacing(2);
+
+	grid->addWidget(pitchBox, 0, 0, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Spray:"), " seconds", &controls->m_sprayModel), 0, 1, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Jitter:"), " octaves", &controls->m_jitterModel), 0, 2, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Twitch:"), " octaves", &controls->m_twitchModel), 0, 3, Qt::AlignCenter);
+
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain size:"), " Hz", &controls->m_sizeModel), 1, 0, Qt::AlignCenter);
+	grid->addWidget(pitchSpreadBox, 1, 1, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Spray stereo spread:"), "", &controls->m_spraySpreadModel), 1, 2, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Feedback:"), "", &controls->m_feedbackModel), 1, 3, Qt::AlignCenter);
+
+	grid->addWidget(prefilterButton, 2, 0, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Grain shape:"), "", &controls->m_shapeModel), 2, 1, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Fade length:"), "", &controls->m_fadeLengthModel), 2, 2, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Bright26, tr("Minimum allowed latency:"), " seconds", &controls->m_minLatencyModel), 2, 3, Qt::AlignCenter);
+
+	grid->addWidget(makeKnob(KnobType::Small17, tr("Glide:"), " seconds", &controls->m_glideModel), 3, 0, Qt::AlignCenter);
+	grid->addWidget(makeKnob(KnobType::Small17, tr("Density:"), "x", &controls->m_densityModel), 3, 1, Qt::AlignCenter);
+	grid->addWidget(rangeBox, 3, 2, Qt::AlignCenter);
+	grid->addWidget(m_helpBtn, 3, 3, Qt::AlignCenter);
+
+	setMinimumSize(305, 180);
+	adjustSize();
+	updateBackground();
 }
+void GranularPitchShifterControlDialog::resizeEvent(QResizeEvent* event)
+{
+	EffectControlDialog::resizeEvent(event);
+	updateBackground();
+}
+
+
+void GranularPitchShifterControlDialog::updateBackground()
+{
+	auto background = PLUGIN_NAME::getIconPixmap("artwork");
+	const auto dpr = background.devicePixelRatio();
+	background = background.scaled(qRound(width() * dpr), qRound(height() * dpr),
+		Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+	background.setDevicePixelRatio(dpr);
+	QPalette pal = palette();
+	pal.setBrush(backgroundRole(), background);
+	setPalette(pal);
+}
+
 
 void GranularPitchShifterControlDialog::showHelpWindow() {
 	GranularPitchShifterHelpView::getInstance()->close();
@@ -139,7 +165,7 @@ QString GranularPitchShifterHelpView::s_helpText=
 
 GranularPitchShifterHelpView::GranularPitchShifterHelpView():QTextEdit(s_helpText)
 {
-	setWindowTitle("Granular Pitch Shifter Help");
+	setWindowTitle(tr("Granular Pitch Shifter help"));
 	setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	getGUI()->mainWindow()->addWindowedWidget(this);
 	parentWidget()->setAttribute(Qt::WA_DeleteOnClose, false);

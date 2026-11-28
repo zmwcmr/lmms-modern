@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="86" height="5" viewBox="0 0 86 5">
+  <defs>
+    <linearGradient id="level">
+      <stop offset="0" stop-color="#0aceae"/>
+      <stop offset="0.25" stop-color="#0bd558"/>
+      <stop offset="0.5" stop-color="#aef040"/>
+      <stop offset="0.75" stop-color="#bb2f01"/>
+      <stop offset="1" stop-color="#89001e"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 1h84.5a1.5 1.5 0 0 1 0 3H0z" fill="url(#level)"/>
+</svg>

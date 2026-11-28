@@ -5,3 +5,9 @@ ADD_SUBDIRECTORY(projects)
 ADD_SUBDIRECTORY(samples)
 ADD_SUBDIRECTORY(themes)
 ADD_SUBDIRECTORY(wavetables)
+
+INSTALL(FILES
+	fonts/LMMS-LFO-Display-OFL.txt
+	fonts/LMMS-Send-Sans-OFL.txt
+	DESTINATION "${LMMS_DATA_DIR}/licenses"
+)

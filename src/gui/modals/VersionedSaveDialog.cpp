@@ -70,7 +70,7 @@ VersionedSaveDialog::VersionedSaveDialog( QWidget *parent,
 	layout->addLayout( hLayout, 2, 1 );
 
 	if (saveOptionsWidget) {
-		auto groupBox = new QGroupBox(tr("Save Options"));
+		auto groupBox = new QGroupBox(tr("Save options"));
 		auto optionsLayout = new QGridLayout;
 
 		optionsLayout->addWidget(saveOptionsWidget, 0, 0, Qt::AlignLeft);
@@ -186,7 +186,7 @@ SaveOptionsWidget::SaveOptionsWidget(Song::SaveOptions &saveOptions) {
 	m_discardMIDIConnectionsCheckbox->setModel(&saveOptions.discardMIDIConnections);
 
 	m_saveAsProjectBundleCheckbox = new LedCheckBox(nullptr);
-	m_saveAsProjectBundleCheckbox->setText(tr("Save As Project Bundle (with resources)"));
+	m_saveAsProjectBundleCheckbox->setText(tr("Save as project bundle (with resources)"));
 	m_saveAsProjectBundleCheckbox->setModel(&saveOptions.saveAsProjectBundle);
 
 	layout->addWidget(m_discardMIDIConnectionsCheckbox);

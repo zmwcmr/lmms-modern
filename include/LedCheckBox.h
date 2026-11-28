@@ -70,6 +70,7 @@ public:
 	Q_PROPERTY( QString text READ text WRITE setText )
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void paintEvent( QPaintEvent * _pe ) override;
 
 
@@ -82,7 +83,8 @@ private:
 	bool m_legacyMode;
 	
 
-	void onTextUpdated(); //!< to be called when you updated @a m_text
+	void updateContentSize();
+	QFont captionFont() const;
 	void paintLegacy(QPaintEvent * p);
 	void paintNonLegacy(QPaintEvent * p);
 

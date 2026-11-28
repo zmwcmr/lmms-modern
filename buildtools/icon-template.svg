@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="480" height="480">
+  <title>LMMS icon template — 24 grid, 20 live area, 2 px margin</title>
+  <desc>
+    Edit inside the 20×20 live area. Use currentColor for the ink; the loader
+    resolves it from the active theme. Delete the guides, background and labels
+    before exporting as a plain SVG with only viewBox="0 0 24 24".
+    See doc/ui-spec.md §3.2.
+  </desc>
+
+  <!-- Editing backdrop; delete before export. -->
+  <rect width="24" height="24" fill="#101213"/>
+
+  <!-- 2 px grid -->
+  <g stroke="#2a2f36" stroke-width="0.12">
+    <path d="M2 0V24M4 0V24M6 0V24M8 0V24M10 0V24M12 0V24M14 0V24M16 0V24M18 0V24M20 0V24M22 0V24"/>
+    <path d="M0 2H24M0 4H24M0 6H24M0 8H24M0 10H24M0 12H24M0 14H24M0 16H24M0 18H24M0 20H24M0 22H24"/>
+  </g>
+
+  <!-- Live area: 20×20, 2 px margin -->
+  <rect x="2" y="2" width="20" height="20" fill="none" stroke="#0bd556" stroke-width="0.18" stroke-dasharray="1 0.6"/>
+
+  <!-- Square keyline: 18×18 -->
+  <rect x="3" y="3" width="18" height="18" fill="none" stroke="#ff4757" stroke-width="0.16" stroke-dasharray="0.8 0.5"/>
+
+  <!-- Circle keyline: 20 diameter -->
+  <circle cx="12" cy="12" r="10" fill="none" stroke="#ff4757" stroke-width="0.16" stroke-dasharray="0.8 0.5"/>
+
+  <!-- Horizontal / vertical keylines: 18×2 -->
+  <rect x="3" y="11" width="18" height="2" fill="#ff4757" fill-opacity="0.12"/>
+  <rect x="11" y="3" width="2" height="18" fill="#ff4757" fill-opacity="0.12"/>
+
+  <!-- Corner radius reference -->
+  <rect x="18.4" y="18.4" width="3.2" height="3.2" rx="0.6" fill="none" stroke="#59b0ff" stroke-width="0.16"/>
+
+  <g font-family="Noto Sans, sans-serif" font-size="1.25" fill="#d1d8e4" fill-opacity="0.85">
+    <text x="2.2" y="1.55">24 grid · 20 live · 2 px margin</text>
+    <text x="2.2" y="23.4">outer radius 2 · min detail 2 · one ink</text>
+  </g>
+</svg>

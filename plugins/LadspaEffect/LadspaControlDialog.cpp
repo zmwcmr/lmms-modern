@@ -58,7 +58,7 @@ LadspaControlDialog::LadspaControlDialog( LadspaControls * _ctl ) :
 		mainLay->addSpacing( 3 );
 		auto center = new QHBoxLayout();
 		mainLay->addLayout( center );
-		m_stereoLink = new LedCheckBox( tr( "Link Channels" ), this );
+		m_stereoLink = new LedCheckBox( tr( "Link channels" ), this );
 		m_stereoLink->setModel( &_ctl->m_stereoLinkModel );
 		center->addWidget( m_stereoLink );
 	}

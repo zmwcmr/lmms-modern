@@ -33,6 +33,7 @@
 #include <QKeyEvent>
 #include <QStackedLayout>
 #include <QStackedWidget>
+#include <QSplitter>
 
 #include "EffectRackView.h"
 #include "Engine.h"
@@ -72,8 +73,15 @@ MixerView::MixerView(Mixer* mixer) :
 	setWindowTitle(tr("Mixer"));
 	setWindowIcon(embed::getIconPixmap("mixer"));
 
-	// main-layout
-	auto ml = new QHBoxLayout{this};
+	// Let the user allocate more width to the effect names when needed.
+	auto* outerLayout = new QHBoxLayout(this);
+	outerLayout->setContentsMargins(0, 0, 0, 0);
+	auto* splitter = new QSplitter(Qt::Horizontal, this);
+	splitter->setChildrenCollapsible(false);
+	splitter->setHandleWidth(6);
+	outerLayout->addWidget(splitter);
+	auto* channelPanel = new QWidget(splitter);
+	auto ml = new QHBoxLayout{channelPanel};
 
 	// Set margins
 	ml->setContentsMargins(0, 4, 0, 0);
@@ -132,8 +140,10 @@ MixerView::MixerView(Mixer* mixer) :
 	channelArea->setWidget(m_channelAreaWidget);
 	channelArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	channelArea->setFrameStyle(QFrame::NoFrame);
-	channelArea->setMinimumWidth(mixerChannelSize.width() * 6);
 	channelArea->setWidgetResizable(true);
+	m_channelAreaWidget->adjustSize();
+	// Allow the splitter to shrink the channel area down to a single channel.
+	channelArea->setMinimumWidth(mixerChannelSize.width());
 
 	int const scrollBarExtent = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
 	channelArea->setMinimumHeight(mixerChannelSize.height() + scrollBarExtent);
@@ -151,7 +161,16 @@ MixerView::MixerView(Mixer* mixer) :
 
 
 	// add the stacked layout for the effect racks of mixer channels
-	ml->addWidget(m_racksWidget);
+	splitter->addWidget(channelPanel);
+	splitter->addWidget(m_racksWidget);
+	splitter->setStretchFactor(0, 0);
+	splitter->setStretchFactor(1, 1);
+
+	// Start with room for a few channels, but keep the splitter free to
+	// shrink the channel area down to a single channel.
+	const int initialChannelAreaWidth = mixerChannelSize.width() * 4;
+	const int initialLeftWidth = masterView->width() + initialChannelAreaWidth + newChannelBtn->width();
+	splitter->setSizes({initialLeftWidth, 1});
 
 	setCurrentMixerChannel(m_mixerChannelViews[0]);
 
@@ -187,6 +206,7 @@ int MixerView::addNewChannel()
 	connectToSoloAndMute(newChannelIndex);
 	chLayout->addWidget(m_mixerChannelViews[newChannelIndex]);
 	m_racksLayout->addWidget(m_mixerChannelViews[newChannelIndex]->m_effectRackView);
+	m_channelAreaWidget->adjustSize();
 
 	updateMixerChannel(newChannelIndex);
 

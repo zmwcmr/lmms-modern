@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="52" viewBox="0 0 10 26">
+  <defs>
+    <linearGradient id="body" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="24">
+      <stop offset="0" stop-color="#121417"/>
+      <stop offset="0.45" stop-color="#181c1f"/>
+      <stop offset="1" stop-color="#181c1f"/>
+    </linearGradient>
+    <linearGradient id="edge" gradientUnits="userSpaceOnUse" x1="2" y1="0" x2="8" y2="0">
+      <stop offset="0" stop-color="#1e2226"/>
+      <stop offset="0.6" stop-color="#262b31"/>
+      <stop offset="1" stop-color="#42464c"/>
+    </linearGradient>
+    <linearGradient id="marker" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="24">
+      <stop offset="0" stop-color="#2d8e51"/>
+      <stop offset="0.5" stop-color="#55c981"/>
+      <stop offset="1" stop-color="#319456"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="8" height="24" rx="1.5" fill="#000000" fill-opacity="0.8"/>
+  <rect x="1.5" y="1.5" width="7" height="23" rx="1.2" fill="url(#edge)"/>
+  <rect x="2" y="2" width="6" height="22" rx="1" fill="url(#body)"/>
+  <rect x="5" y="2" width="1" height="22" fill="url(#marker)"/>
+  <rect x="1" y="1" width="8" height="24" rx="1.5" fill="none" stroke="#000000" stroke-opacity="0.8"/>
+</svg>

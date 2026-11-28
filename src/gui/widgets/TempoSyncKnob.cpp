@@ -47,7 +47,7 @@ TempoSyncKnob::TempoSyncKnob( KnobType _knob_num, QWidget * _parent,
 						const QString & _name ) :
 	Knob( _knob_num, _parent, _name ),
 	m_tempoSyncIcon( embed::getIconPixmap( "tempo_sync" ) ),
-	m_tempoSyncDescription( tr( "Tempo Sync" ) ),
+	m_tempoSyncDescription( tr( "Tempo sync" ) ),
 	m_custom( nullptr )
 {
 }
@@ -123,7 +123,7 @@ void TempoSyncKnob::contextMenuEvent( QContextMenuEvent * )
 	connect( syncMenu, SIGNAL(triggered(QAction*)),
 			model(), SLOT(setTempoSync(QAction*)));
 	syncMenu->addAction( embed::getIconPixmap( "note_none" ),
-		tr( "No Sync" ) )->setData( (int) TempoSyncKnobModel::SyncMode::None );
+		tr( "No sync" ) )->setData( (int) TempoSyncKnobModel::SyncMode::None );
 	if( limit / 0.125f <= model()->maxValue() )
 	{
 		syncMenu->addAction( embed::getIconPixmap( "note_double_whole" ),
@@ -195,38 +195,38 @@ void TempoSyncKnob::updateDescAndIcon()
 				break;
 			case TempoSyncKnobModel::SyncMode::DoubleWholeNote:
 				m_tempoSyncDescription = tr(
-						"Synced to Eight Beats" );
+						"Synced to eight beats" );
 				break;
 			case TempoSyncKnobModel::SyncMode::WholeNote:
 				m_tempoSyncDescription = tr(
-						"Synced to Whole Note" );
+						"Synced to whole note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::HalfNote:
 				m_tempoSyncDescription = tr(
-							"Synced to Half Note" );
+							"Synced to half note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::QuarterNote:
 				m_tempoSyncDescription = tr(
-						"Synced to Quarter Note" );
+						"Synced to quarter note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::EighthNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 8th Note" );
+							"Synced to 8th note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::SixteenthNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 16th Note" );
+							"Synced to 16th note" );
 				break;
 			case TempoSyncKnobModel::SyncMode::ThirtysecondNote:
 				m_tempoSyncDescription = tr(
-							"Synced to 32nd Note" );
+							"Synced to 32nd note" );
 				break;
 			default: ;
 		}
 	}
 	else
 	{
-		m_tempoSyncDescription = tr( "Tempo Sync" );
+		m_tempoSyncDescription = tr( "Tempo sync" );
 	}
 	if( m_custom != nullptr &&
 		model()->m_tempoSyncMode != TempoSyncKnobModel::SyncMode::Custom )
@@ -320,7 +320,7 @@ void TempoSyncKnob::showCustom()
 		flags &= ~Qt::WindowMaximizeButtonHint;
 		subWindow->setWindowFlags( flags );
 		setFixedSize(size());
-		m_custom->setWindowTitle( "Meter" );
+		m_custom->setWindowTitle(tr("Meter"));
 		m_custom->setModel( &model()->m_custom );
 	}
 	m_custom->parentWidget()->show();

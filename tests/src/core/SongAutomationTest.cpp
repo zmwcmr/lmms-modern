@@ -41,6 +41,7 @@ private slots:
 	void initTestCase()
 	{
 		lmms::Engine::init(true);
+		lmms::Engine::audioEngine()->audioDev()->stopProcessing();
 	}
 
 	void cleanupTestCase()

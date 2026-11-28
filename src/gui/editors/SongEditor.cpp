@@ -39,6 +39,7 @@
 #include <QTimeLine>
 #include <QTimer>
 #include <QToolButton>
+#include <QTransform>
 
 #include <algorithm>
 
@@ -51,6 +52,7 @@
 #include "ConfigManager.h"
 #include "CPULoadWidget.h"
 #include "DeprecationHelper.h"
+#include "EditorShortcuts.h"
 #include "embed.h"
 #include "GuiApplication.h"
 #include "LcdSpinBox.h"
@@ -63,6 +65,7 @@
 #include "TextFloat.h"
 #include "TimeDisplayWidget.h"
 #include "TimeLineWidget.h"
+#include "ToolButton.h"
 #include "TrackView.h"
 
 namespace lmms::gui
@@ -214,7 +217,7 @@ SongEditor::SongEditor( Song * song ) :
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
 	auto master_vol_lbl = new QLabel(tb);
-	master_vol_lbl->setPixmap( embed::getIconPixmap( "master_volume" ) );
+	master_vol_lbl->setPixmap(embed::getIconPixmap("master_volume").transformed(QTransform().rotate(90)));
 
 	m_masterVolumeSlider = new AutomatableSlider( tb,
 							tr( "Master volume" ) );
@@ -247,7 +250,7 @@ SongEditor::SongEditor( Song * song ) :
 	getGUI()->mainWindow()->addSpacingToToolBar( 10 );
 
 	auto master_pitch_lbl = new QLabel(tb);
-	master_pitch_lbl->setPixmap( embed::getIconPixmap( "master_pitch" ) );
+	master_pitch_lbl->setPixmap(embed::getIconPixmap("master_pitch").transformed(QTransform().rotate(90)));
 
 	m_masterPitchSlider = new AutomatableSlider( tb, tr( "Global transposition" ) );
 	m_masterPitchSlider->setModel( &m_song->m_masterPitchModel );
@@ -278,6 +281,7 @@ SongEditor::SongEditor( Song * song ) :
 
 	// create widget for oscilloscope- and cpu-load-widget
 	auto vc_w = new QWidget(tb);
+	vc_w->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 	auto vcw_layout = new QVBoxLayout(vc_w);
 	vcw_layout->setContentsMargins(0, 0, 0, 0);
 	vcw_layout->setSpacing( 0 );
@@ -328,7 +332,7 @@ SongEditor::SongEditor( Song * song ) :
 	{
 		if (bars > 1.0f)
 		{
-			m_snappingModel->addItem(QString("%1 Bars").arg(bars));
+			m_snappingModel->addItem(QString("%1 bars").arg(bars));
 		}
 		else if (bars == 1.0f)
 		{
@@ -336,10 +340,10 @@ SongEditor::SongEditor( Song * song ) :
 		}
 		else
 		{
-			m_snappingModel->addItem(QString("1/%1 Bar").arg(1 / bars));
+			m_snappingModel->addItem(QString("1/%1 bar").arg(1 / bars));
 		}
 	}
-	m_snappingModel->setInitValue(ConfigManager::inst()->value("ui", "songeditorsnap", QString::number(m_snappingModel->findText( "1/4 Bar" ))).toInt());
+	m_snappingModel->setInitValue(ConfigManager::inst()->value("ui", "songeditorsnap", QString::number(m_snappingModel->findText( "1/4 bar" ))).toInt());
 
 	setFocusPolicy( Qt::StrongFocus );
 	setFocus();
@@ -355,13 +359,16 @@ SongEditor::~SongEditor()
 void SongEditor::saveSettings( QDomDocument& doc, QDomElement& element )
 {
 	MainWindow::saveWidgetState( parentWidget(), element );
-	element.setAttribute("trackheadwidth", trackHeadWidth());
+	element.setAttribute("trackheadwidth", trackHeadWidthForStorage());
 }
 
 void SongEditor::loadSettings( const QDomElement& element )
 {
 	MainWindow::restoreWidgetState(parentWidget(), element);
-	setTrackHeadWidth(element.attribute("trackheadwidth", QString::number(trackHeadWidth())).toInt());
+	if (element.hasAttribute("trackheadwidth"))
+	{
+		setTrackHeadWidth(scaledTrackHeadWidth(element.attribute("trackheadwidth").toInt()));
+	}
 }
 
 
@@ -389,11 +396,11 @@ QString SongEditor::getSnapSizeString() const
 
 	if (bars < 1)
 	{
-		return QString(tr("1/%1 Bar")).arg(round(1 / bars));
+		return QString(tr("1/%1 bar")).arg(round(1 / bars));
 	}
 	else if (bars >= 2)
 	{
-		return QString(tr("%1 Bars")).arg(bars);
+		return QString(tr("%1 bars")).arg(bars);
 	}
 	else
 	{
@@ -406,6 +413,16 @@ void SongEditor::scrolled( int new_pos )
 	update();
 	emit positionChanged(m_currentPosition = TimePos(new_pos));
 	updatePositionLine();
+}
+
+void SongEditor::revealClip(ClipView* view)
+{
+	if (!view->parentWidget()->rect().intersects(view->geometry()))
+	{
+		pauseAutoScroll();
+		m_leftRightScroll->setValue(view->getClip()->startPosition().getTicks());
+	}
+	scrollToTrackView(view->getTrackView());
 }
 
 
@@ -567,6 +584,9 @@ void SongEditor::toggleProportionalSnap()
 
 void SongEditor::keyPressEvent( QKeyEvent * ke )
 {
+	using TimelineAction = SongTimelineShortcuts::Action;
+	static const auto timelineShortcuts = songTimelineShortcuts();
+	const auto timelineAction = timelineShortcuts.match(*ke);
 	bool isShiftPressed = ke->modifiers() & Qt::ShiftModifier;
 	if( isShiftPressed &&
 						( ke->key() == Qt::Key_Insert || ke->key() == Qt::Key_Enter || ke->key() == Qt::Key_Return ) )
@@ -578,7 +598,7 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 	{
 		m_song->removeBar();
 	}
-	else if( ke->key() == Qt::Key_Left )
+	else if (timelineAction == TimelineAction::PreviousBar)
 	{
 		tick_t t = m_song->getPlayPos(Song::PlayMode::Song).getTicks() - TimePos::ticksPerBar();
 		if( t >= 0 )
@@ -586,8 +606,9 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 			m_song->setPlayPos( t, Song::PlayMode::Song );
 			if (!m_song->isPlaying()) { m_song->setPlayPos(t, Song::PlayMode::None); }
 		}
+		ke->accept();
 	}
-	else if( ke->key() == Qt::Key_Right )
+	else if (timelineAction == TimelineAction::NextBar)
 	{
 		tick_t t = m_song->getPlayPos(Song::PlayMode::Song).getTicks() + TimePos::ticksPerBar();
 		if( t < MaxSongLength )
@@ -595,11 +616,13 @@ void SongEditor::keyPressEvent( QKeyEvent * ke )
 			m_song->setPlayPos( t, Song::PlayMode::Song );
 			if (!m_song->isPlaying()) { m_song->setPlayPos(t, Song::PlayMode::None); }
 		}
+		ke->accept();
 	}
-	else if( ke->key() == Qt::Key_Home )
+	else if (timelineAction == TimelineAction::Start)
 	{
 		m_song->setPlayPos( 0, Song::PlayMode::Song );
 		if (!m_song->isPlaying()) { m_song->setPlayPos(0, Song::PlayMode::None); }
+		ke->accept();
 	}
 	else if( ke->key() == Qt::Key_Delete || ke->key() == Qt::Key_Backspace )
 	{
@@ -1024,7 +1047,7 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	m_crtlAction( nullptr ),
 	m_snapSizeLabel( new QLabel( m_toolBar ) )
 {
-	setWindowTitle( tr( "Song-Editor" ) );
+	setWindowTitle( tr( "Song Editor" ) );
 	setWindowIcon( embed::getIconPixmap( "songeditor" ) );
 
 	setCentralWidget(m_editor);
@@ -1035,17 +1058,16 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	removeToolBar(m_toolBar);
 	m_toolBar->hide();
 
-	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song editor"));
+	DropToolBar* songToolBar = addDropToolBarToTop(tr("Song Editor"));
 	songToolBar->setProperty("lmmsWideOverflowButton", true);
 	songToolBar->setAcceptDrops(true);
 	connect(songToolBar, SIGNAL(dragEntered(QDragEnterEvent*)), m_editor, SLOT(dragEnterEvent(QDragEnterEvent*)));
 	connect(songToolBar, SIGNAL(dropped(QDropEvent*)), m_editor, SLOT(dropEvent(QDropEvent*)));
 
 	// Set up buttons
-	m_playAction->setToolTip(tr("Play song (Space)"));
-	m_recordAction->setToolTip(tr("Record samples from Audio-device"));
-	m_recordAccompanyAction->setToolTip(tr("Record samples from Audio-device while playing song or pattern track"));
-	m_stopAction->setToolTip(tr( "Stop song (Space)" ));
+	setTransportToolTips(tr("Play song"), tr("Stop song"));
+	setRecordingToolTips(tr("Record samples from Audio-device"),
+		tr("Record samples from Audio-device while playing song or pattern track"));
 
 	auto addTransportButton = [songToolBar](QAction* action, const char* name) {
 		songToolBar->addAction(action);
@@ -1065,13 +1087,13 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	// Track actions
 	DropToolBar *trackActionsToolBar = songToolBar;
 
-	m_addPatternTrackAction = new QAction(embed::getIconPixmap("add_pattern_track"),
+	m_addPatternTrackAction = new ToolButtonAction(embed::getIconPixmap("add_pattern_track"),
 									 tr("Add pattern-track"), this);
 
-	m_addSampleTrackAction = new QAction(embed::getIconPixmap("add_sample_track"),
+	m_addSampleTrackAction = new ToolButtonAction(embed::getIconPixmap("add_sample_track"),
 										 tr("Add sample-track"), this);
 
-	m_addAutomationTrackAction = new QAction(embed::getIconPixmap("add_automation"),
+	m_addAutomationTrackAction = new ToolButtonAction(embed::getIconPixmap("add_automation"),
 											 tr("Add automation-track"), this);
 
 	connect(m_addPatternTrackAction, SIGNAL(triggered()), m_editor->m_song, SLOT(addPatternTrack()));
@@ -1088,9 +1110,12 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	DropToolBar *editActionsToolBar = songToolBar;
 
 	m_editModeGroup = new ActionGroup(this);
-	m_drawModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_draw"), tr("Draw mode"));
-	m_knifeModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_knife"), tr("Knife mode (split clips)"));
-	m_selectModeAction = m_editModeGroup->addAction(embed::getIconPixmap("edit_select"), tr("Edit mode (select and move)"));
+	m_drawModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_draw"), tr("Draw mode"), m_editModeGroup));
+	m_knifeModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_knife"), tr("Knife mode (split clips)"), m_editModeGroup));
+	m_selectModeAction = m_editModeGroup->addAction(new ToolButtonAction(
+		embed::getIconPixmap("edit_select"), tr("Edit mode (select and move)"), m_editModeGroup));
 	m_drawModeAction->setChecked(true);
 
 	connect(m_drawModeAction, SIGNAL(triggered()), m_editor, SLOT(setEditModeDraw()));
@@ -1107,8 +1132,8 @@ SongEditorWindow::SongEditorWindow(Song* song) :
 	timeLineToolBar->addSeparator();
 
 	DropToolBar *insertActionsToolBar = songToolBar;
-	m_insertBarAction = new QAction(embed::getIconPixmap("insert_bar"), tr("Insert bar"), this);
-	m_removeBarAction = new QAction(embed::getIconPixmap("remove_bar"), tr("Remove bar"), this);
+	m_insertBarAction = new ToolButtonAction(embed::getIconPixmap("insert_bar"), tr("Insert bar"), this);
+	m_removeBarAction = new ToolButtonAction(embed::getIconPixmap("remove_bar"), tr("Remove bar"), this);
 	insertActionsToolBar->addAction( m_insertBarAction );
 	insertActionsToolBar->addAction( m_removeBarAction );
 	connect(m_insertBarAction, SIGNAL(triggered()), song, SLOT(insertBar()));

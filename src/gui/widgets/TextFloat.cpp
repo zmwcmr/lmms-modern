@@ -57,7 +57,7 @@ TextFloat::TextFloat(const QString & title, const QString & text, const QPixmap 
 	titleAndTextWidget->setLayout(titleAndTextLayout);
 
 	m_titleLabel = new QLabel(titleAndTextWidget);
-	m_titleLabel->setStyleSheet("font-weight: bold;");
+	m_titleLabel->setStyleSheet("font-weight: 600;");
 	titleAndTextLayout->addWidget(m_titleLabel);
 
 	m_textLabel = new QLabel(titleAndTextWidget);

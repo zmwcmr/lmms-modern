@@ -42,7 +42,7 @@ Plugin::Descriptor PLUGIN_EXPORT waveshaper_plugin_descriptor =
 	LMMS_STRINGIFY( PLUGIN_NAME ),
 	"Waveshaper Effect",
 	QT_TRANSLATE_NOOP( "PluginBrowser",
-				"plugin for waveshaping" ),
+				"Plugin for waveshaping" ),
 	"Vesa Kivimäki <contact/dot/diizy/at/nbl/dot/fi>",
 	0x0100,
 	Plugin::Type::Effect,

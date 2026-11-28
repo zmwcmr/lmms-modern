@@ -36,6 +36,7 @@ class QMimeData;  // IWYU pragma: keep
 namespace lmms
 {
 
+class Clip;
 class Track;
 
 namespace gui
@@ -87,6 +88,9 @@ public:
 	//!
 	//! @param clipv The ClipView to remove.
 	void removeClipView(ClipView* clipv);
+
+	//! @brief Returns the view for \a clip, or nullptr if this track does not show it.
+	ClipView* clipViewForClip(const Clip* clip) const;
 
 	void removeClipView( int clipNum )
 	{

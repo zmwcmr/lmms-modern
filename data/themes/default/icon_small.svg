@@ -1,0 +1,8 @@
+<!-- LMMS logo by Martin Vacho and the LMMS Development Team, CC0-1.0.
+     Original source: https://github.com/LMMS/artwork/tree/4bdcc1421bb84964c150d519d73e1bef4cd9c820/Icon%20%26%20Mimetypes/lmms-64x64.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
+  <rect x="4" y="4" width="56" height="56" rx="6" fill="#003c1b" fill-opacity=".7"/>
+  <rect x="6" y="6" width="52" height="52" rx="4" fill="#38ae66"/>
+  <path d="M32 11L11 23v24l7 4 7-4v-8l-7-4v-8l14-8 14 8v8l-7 4v8l7 4 7-4V23z" transform="translate(0 2)" fill="#000000" fill-opacity=".15"/>
+  <path d="M32 11L11 23v24l7 4 7-4v-8l-7-4v-8l14-8 14 8v8l-7 4v8l7 4 7-4V23z" fill="#fbfdfc"/>
+</svg>

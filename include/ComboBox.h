@@ -74,6 +74,7 @@ public slots:
 
 
 protected:
+	void changeEvent(QEvent* event) override;
 	void contextMenuEvent( QContextMenuEvent* event ) override;
 	void mousePressEvent( QMouseEvent* event ) override;
 	void mouseReleaseEvent(QMouseEvent* event) override;
@@ -82,6 +83,8 @@ protected:
 
 
 private:
+	QFont captionFont() const;
+
 	QPixmap m_background = embed::getIconPixmap("combobox_bg");
 	QPixmap m_arrow = embed::getIconPixmap("combobox_arrow");
 	QPixmap m_arrowSelected = embed::getIconPixmap("combobox_arrow_selected");

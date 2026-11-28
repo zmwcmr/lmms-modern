@@ -275,7 +275,7 @@ bool MidiImport::readSMF(TrackContainer* tc)
 {
 	constexpr int MIDI_CC_COUNT = 128 + 1; // 0-127 (128) + pitch bend
 	constexpr int preTrackSteps = 2;
-	QProgressDialog pd(TrackContainer::tr("Importing MIDI-file..."),
+	QProgressDialog pd(TrackContainer::tr("Importing MIDI file..."),
 	TrackContainer::tr("Cancel"), 0, preTrackSteps, gui::getGUI()->mainWindow());
 	pd.setWindowTitle(TrackContainer::tr("Please wait..."));
 	pd.setWindowModality(Qt::WindowModal);
@@ -303,9 +303,9 @@ bool MidiImport::readSMF(TrackContainer* tc)
 
 	MeterModel & timeSigMM = Engine::getSong()->getTimeSigModel();
 	auto nt = dynamic_cast<AutomationTrack*>(Track::create(Track::Type::Automation, Engine::getSong()));
-	nt->setName(tr("MIDI Time Signature Numerator"));
+	nt->setName(tr("MIDI time signature numerator"));
 	auto dt = dynamic_cast<AutomationTrack*>(Track::create(Track::Type::Automation, Engine::getSong()));
-	dt->setName(tr("MIDI Time Signature Denominator"));
+	dt->setName(tr("MIDI time signature denominator"));
 	auto timeSigNumeratorPat = new AutomationClip(nt);
 	timeSigNumeratorPat->setDisplayName(tr("Numerator"));
 	timeSigNumeratorPat->addObject(&timeSigMM.numeratorModel());

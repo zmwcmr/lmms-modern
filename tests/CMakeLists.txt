@@ -32,7 +32,17 @@ set(LMMS_TESTS
 	src/core/InlineValueEditorTest.cpp
 	src/gui/SideBarWorkspaceTest.cpp
 	src/gui/ToolButtonTest.cpp
+	src/gui/UiFeedbackTest.cpp
+	src/gui/CaptionWidgetsTest.cpp
+	src/gui/FontScaleTest.cpp
+	src/gui/IconTest.cpp
+	src/gui/CompactItemDelegateTest.cpp
+	src/gui/EditorShortcutsTest.cpp
+	src/gui/FileBrowserTest.cpp
+	src/gui/SubWindowTest.cpp
+	src/gui/LcdFloatSpinBoxTest.cpp
 	src/gui/DropDownInteractionTest.cpp
+	src/gui/EffectSelectDialogTest.cpp
 	src/tracks/AutomationTrackTest.cpp
 	src/tracks/InstrumentTrackTest.cpp
 	src/tracks/MidiClipTest.cpp
