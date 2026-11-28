@@ -25,19 +25,10 @@
 #include "Vst3InstrumentView.h"
 
 #include <QComboBox>
-#include <QGridLayout>
-#include <QLabel>
-#include <QPushButton>
-#include <QScrollArea>
-#include <QSignalBlocker>
 #include <QVBoxLayout>
 
-#include <algorithm>
-
 #include "AutomatableModel.h"
-#include "Instrument.h"
-#include "Knob.h"
-#include "Vst3EditorWindow.h"
+#include "HostedPluginPanel.h"
 #include "Vst3Host.h"
 #include "Vst3Instrument.h"
 
@@ -45,157 +36,99 @@ namespace lmms::gui
 {
 
 Vst3InstrumentView::Vst3InstrumentView(Instrument* instrument, QWidget* parent) :
-	InstrumentView(instrument, parent)
+	InstrumentView(instrument, parent),
+	m_instrument(dynamic_cast<Vst3Instrument*>(instrument))
 {
-	setMinimumSize(QSize(320, 320));
-	setMaximumSize(QSize(10000, 10000));
-
 	auto* layout = new QVBoxLayout(this);
+	layout->setContentsMargins(0, 0, 0, 0);
 
-	auto* const vst3Instrument = dynamic_cast<Vst3Instrument*>(instrument);
-	if (vst3Instrument == nullptr || vst3Instrument->host() == nullptr)
-	{
-		layout->addWidget(new QLabel(tr("No VST3 instrument loaded."), this));
-		return;
-	}
-
-	auto* const host = vst3Instrument->host();
-	layout->addWidget(new QLabel(tr("Plugin: %1").arg(host->name()), this));
-	if (!host->vendor().isEmpty())
-	{
-		layout->addWidget(new QLabel(tr("Vendor: %1").arg(host->vendor()), this));
-	}
-
-	if (host->hasEditor())
-	{
-		m_guiButton = new QPushButton(tr("Show GUI"), this);
-		m_guiButton->setCheckable(true);
-		const bool editorSupported = Vst3EditorWindow::isSupported(host);
-		m_guiButton->setEnabled(editorSupported);
-		if (!editorSupported)
+	HostedPluginActions actions;
+	actions.name = [this] {
+		auto* host = m_instrument != nullptr ? m_instrument->host() : nullptr;
+		return host != nullptr ? host->name() : QString();
+	};
+	actions.vendor = [this] {
+		auto* host = m_instrument != nullptr ? m_instrument->host() : nullptr;
+		return host != nullptr ? host->vendor() : QString();
+	};
+	actions.location = [this] {
+		return m_instrument != nullptr ? m_instrument->file() : QString();
+	};
+	actions.hasEditor = [this] {
+		return m_instrument != nullptr && m_instrument->hasEditor();
+	};
+	actions.showEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->showEditor(this); }
+	};
+	actions.hideEditor = [this] {
+		if (m_instrument != nullptr) { m_instrument->hideEditor(); }
+	};
+	actions.isEditorVisible = [this] {
+		return m_instrument != nullptr && m_instrument->isEditorVisible();
+	};
+	actions.canReload = [this] {
+		return m_instrument != nullptr && !m_instrument->file().isEmpty();
+	};
+	actions.reload = [this] {
+		if (m_instrument != nullptr)
 		{
-			m_guiButton->setToolTip(
-				tr("The VST3 editor requires X11 or an XWayland display."));
+			if (m_panel != nullptr) { m_panel->clearParameters(); }
+			m_instrument->reloadPlugin();
 		}
-		connect(m_guiButton, &QPushButton::toggled, this,
-			[this, host, vst3Instrument](bool show) {
-			if (!show)
-			{
-				if (m_editorWindow != nullptr)
-				{
-					m_editorWindow->close();
-				}
-				return;
-			}
-			if (m_editorWindow != nullptr)
-			{
-				m_editorWindow->raiseEditor();
-				m_editorWindow->activateEditor();
-				return;
-			}
-			auto* window = Vst3EditorWindow::open(host, this, host->name(),
-				[vst3Instrument](uint32_t id, double value) {
-					vst3Instrument->setParameterValue(id, value);
-				});
-			m_editorWindow = window;
-			connect(window, &QObject::destroyed, this, [this] {
-				if (m_guiButton != nullptr)
-				{
-					QSignalBlocker blocker(m_guiButton);
-					m_guiButton->setChecked(false);
-				}
-			});
-		});
-		layout->addWidget(m_guiButton);
-	}
-	else
-	{
-		layout->addWidget(new QLabel(tr("This VST3 plugin has no editor."), this));
-	}
-
-	const auto& models = vst3Instrument->parameterModels();
-	layout->addWidget(new QLabel(tr("Automatable parameters: %1")
-		.arg(models.count()), this));
-
-	if (models.count() > 0)
-	{
-		auto* scrollArea = new QScrollArea(this);
-		scrollArea->setWidgetResizable(true);
-		auto* parameterWidget = new QWidget(scrollArea);
-		auto* grid = new QGridLayout(parameterWidget);
-		const int shown = std::min(models.count(), 48);
-		for (int index = 0; index < shown; ++index)
+	};
+	actions.presetCount = [this] {
+		auto* host = m_instrument != nullptr ? m_instrument->host() : nullptr;
+		return host != nullptr ? host->programCount() : 0;
+	};
+	actions.presetName = [this](int index) {
+		auto* host = m_instrument != nullptr ? m_instrument->host() : nullptr;
+		if (host == nullptr || index < 0 || index >= host->programCount())
 		{
-			auto* const parameter = models.model(index);
-			if (parameter == nullptr)
+			return QString();
+		}
+		return host->programName(index);
+	};
+	actions.currentPreset = [this] {
+		auto* host = m_instrument != nullptr ? m_instrument->host() : nullptr;
+		return host != nullptr ? host->currentProgram() : -1;
+	};
+	actions.selectPreset = [this](int index) {
+		if (m_instrument != nullptr) { m_instrument->setProgram(index); }
+	};
+	actions.canOpenPlugin = [] { return false; };
+	actions.hasHelp = [] { return false; };
+
+	m_panel = new HostedPluginPanel(actions, [this] {
+		std::vector<HostedParameterEntry> entries;
+		if (m_instrument == nullptr)
+		{
+			return entries;
+		}
+		const auto& models = m_instrument->parameterModels();
+		for (int index = 0; index < models.count(); ++index)
+		{
+			auto* model = models.model(index);
+			if (model == nullptr)
 			{
 				continue;
 			}
 			const auto& info = models.parameter(index);
-			auto* knob = new Knob(KnobType::Bright26, info.name, parameterWidget);
-			knob->setModel(parameter);
-			knob->setHintText(info.name, info.unit);
-			constexpr int columns = 2;
-			grid->addWidget(knob, index / columns, index % columns, Qt::AlignHCenter);
+			entries.push_back({info.name, info.unit, model,
+				model->isAutomatedOrControlled()});
 		}
-		if (models.count() > shown)
-		{
-			grid->addWidget(new QLabel(tr("Showing the first %1 parameters.")
-				.arg(shown), parameterWidget), (shown + 1) / 2, 0, 1, 2);
-		}
-		scrollArea->setWidget(parameterWidget);
-		scrollArea->setMinimumSize(300, 260);
-		layout->addWidget(scrollArea);
-	}
-
-	if (host->programCount() > 1)
-	{
-		layout->addWidget(new QLabel(tr("Program"), this));
-		auto* programBox = new QComboBox(this);
-		for (int index = 0; index < host->programCount(); ++index)
-		{
-			programBox->addItem(host->programName(index));
-		}
-		programBox->setCurrentIndex(std::max(0, host->currentProgram()));
-		connect(programBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-			this, [vst3Instrument](int index) { vst3Instrument->setProgram(index); });
-		layout->addWidget(programBox);
-	}
-
-	if (host->units().size() > 1)
-	{
-		layout->addWidget(new QLabel(tr("Unit"), this));
-		auto* unitBox = new QComboBox(this);
-		for (const auto& unit : host->units())
-		{
-			unitBox->addItem(unit.name, unit.id);
-		}
-		unitBox->setCurrentIndex(std::max(0,
-			unitBox->findData(host->currentUnit())));
-		connect(unitBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-			this, [vst3Instrument, unitBox](int index) {
-				vst3Instrument->setUnit(unitBox->itemData(index).toInt());
-			});
-		layout->addWidget(unitBox);
-	}
-
-	layout->addWidget(new QLabel(
-		tr("MIDI input is active."), this));
-	layout->setSizeConstraint(QLayout::SetFixedSize);
+		return entries;
+	}, this);
+	layout->addWidget(m_panel);
+	layout->addStretch();
+	m_panel->refresh();
 }
 
-QSize Vst3InstrumentView::sizeHint() const
-{
-	return QSize(360, 600);
-}
 
-QSize Vst3InstrumentView::minimumSizeHint() const
-{
-	return minimumSize();
-}
+
 
 void Vst3InstrumentView::modelChanged()
 {
+	if (m_panel != nullptr) { m_panel->refresh(); }
 }
 
 } // namespace lmms::gui

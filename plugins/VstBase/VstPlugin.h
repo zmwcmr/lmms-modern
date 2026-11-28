@@ -49,7 +49,8 @@ class VSTBASE_EXPORT VstPlugin : public RemotePlugin, public JournallingObject
 {
 	Q_OBJECT
 public:
-	VstPlugin( const QString & _plugin, bool skipInit = false );
+	VstPlugin( const QString & _plugin, bool skipInit = false,
+		const QString& embedMethodOverride = QString() );
 	~VstPlugin() override;
 
 	void tryLoad( const QString &remoteVstPluginExecutable, bool skipInit = false );
@@ -59,6 +60,14 @@ public:
 	inline bool hasEditor() const
 	{
 		return m_pluginWindowID != 0;
+	}
+
+	//! True when the plugin has an editor, including a child-owned window.
+	//! hasEditor() additionally means the window can be embedded.
+	inline bool hasEditorSupport() const
+	{
+		return m_pluginWindowID != 0
+			|| (m_pluginGeometry.width() > 0 && m_pluginGeometry.height() > 0);
 	}
 
 	/// Same as pluginWidget(), but can be overwritten in sub-classes to modify

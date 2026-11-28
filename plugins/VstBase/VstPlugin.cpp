@@ -55,6 +55,7 @@
 #include "ConfigManager.h"
 #include "FileDialog.h"
 #include "FontHelper.h"
+#include "EditorPlatform.h"
 #include "GuiApplication.h"
 #include "LocaleHelper.h"
 #include "MainWindow.h"
@@ -145,14 +146,19 @@ enum class ExecutableType
 	Unknown, Win32, Win64, Linux64,
 };
 
-VstPlugin::VstPlugin( const QString & _plugin, bool skipInit ) :
+VstPlugin::VstPlugin( const QString & _plugin, bool skipInit,
+	const QString& embedMethodOverride ) :
 	m_plugin( PathUtil::toAbsolute(_plugin) ),
 	m_pluginWindowID( 0 ),
-	m_embedMethod( skipInit
-			? QStringLiteral("headless")
-			: ( (gui::getGUI() != nullptr)
-				? ConfigManager::inst()->vstEmbedMethod()
-				: QStringLiteral("headless") ) ),
+	m_embedMethod( !embedMethodOverride.isEmpty()
+			? embedMethodOverride
+			: ( skipInit
+				? QStringLiteral("headless")
+				: ( (gui::getGUI() != nullptr)
+					? (EditorPlatform::isWayland()
+						? QStringLiteral("none")
+						: ConfigManager::inst()->vstEmbedMethod())
+					: QStringLiteral("headless") ) ) ),
 	m_version( 0 ),
 	m_isSynth( false ),
 	m_currentProgram()
@@ -435,7 +441,7 @@ bool VstPlugin::processMessage( const message & _m )
 	{
 	case IdVstPluginWindowID:
 		m_pluginWindowID = _m.getInt();
-		if (m_embedMethod == "none" && !gui::GuiApplication::isWayland()
+		if (m_embedMethod == "none" && !EditorPlatform::isWayland()
 			&& ConfigManager::inst()->value("ui", "vstalwaysontop").toInt())
 		{
 #ifdef LMMS_BUILD_WIN32
@@ -859,6 +865,13 @@ void VstPlugin::createUI( QWidget * parent )
 	if ( m_pluginWidget ) {
 		qWarning() << "VstPlugin::createUI called twice";
 		m_pluginWidget->setParent( parent );
+		return;
+	}
+
+	// "none" means the plugin child owns a top-level window. There is no host
+	// widget to create; showUI()/hideUI() talk to the child directly.
+	if ( m_embedMethod == "none" )
+	{
 		return;
 	}
 

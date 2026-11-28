@@ -88,6 +88,7 @@ public:
 		misc
 	*/
 	gui::PluginView* instantiateView(QWidget *parent) override;
+	void requestShowEditor() override;
 
 private slots:
 	void updatePitchRange();
@@ -121,6 +122,7 @@ protected:
 
 private:
 	void modelChanged() override;
+	bool isResizable() const override { return true; }
 };
 
 

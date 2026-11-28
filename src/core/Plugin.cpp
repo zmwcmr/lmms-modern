@@ -299,4 +299,12 @@ QDomElement Plugin::Descriptor::SubPluginFeatures::Key::saveXML(
 
 
 
+void Plugin::setKeyAttribute(const QString& name, const QString& value)
+{
+	m_key.attributes[name] = value;
+}
+
+
+
+
 } // namespace lmms

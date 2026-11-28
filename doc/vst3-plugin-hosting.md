@@ -61,9 +61,12 @@ The wrappers expose:
 - program and unit selection from `IUnitInfo`,
 - component/controller state in the project file.
 
-Auxiliary buses are activated when the plugin needs them, but only the first
-main output bus is routed back into LMMS. Plugins with no main output are
-marked unsupported by the scanner.
+Auxiliary input buses (including sidechain) are activated and receive the
+second mixer input bus. Up to two stereo output pairs are routed back into
+LMMS. The shared DSP segment carries up to four buses with two channels each,
+so the out-of-process path has the same layout; the child calls
+`processBuses()` and the client maps every bus. Plugins with no main output
+are marked unsupported by the scanner.
 
 VST3 instrument views are resizable and use a two-column parameter grid, so
 labels and the **Show GUI** button stay readable even in a narrow instrument
@@ -149,7 +152,8 @@ real `.mmp` and verifies the state after reloading the project.
 
 - Native Wayland embedding is not implemented; editors are floating XWayland
   windows.
-- Multi-output routing beyond the first stereo bus is not implemented.
+- Multi-output routing is limited to two stereo pairs. Buses beyond the
+  first four / two channels are ignored.
 - Note expression and advanced MIDI 2.0 are not implemented.
 - 32-bit VST3 on Linux is not supported.
 - Plugins that reject the host state stream may not restore all of their

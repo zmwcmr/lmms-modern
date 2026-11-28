@@ -64,6 +64,10 @@ protected:
 	void removeControl(const QString& key);
 
 	void removeFocusFromSearchBar();
+	//! Add a widget that spans the full width of the control layout.
+	void addFullWidthWidget(QWidget* widget);
+	//! Hide/show the regular controls (used by the shared parameter drawer).
+	void setControlsVisible(bool visible);
 
 private:
 	ModelGroup* m_model;

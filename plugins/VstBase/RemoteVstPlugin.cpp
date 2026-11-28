@@ -942,8 +942,20 @@ void RemoteVstPlugin::initEditor()
 			static_cast<unsigned int>(m_windowWidth), static_cast<unsigned int>(m_windowHeight));
 	}
 
-	XMapWindow(m_display, m_window);
-	XFlush(m_display);
+	// Detached editors start hidden. The host maps them on the first Show UI
+	// request, so importing a track can open the window without a flash and
+	// project loading keeps it hidden. Embedded (legacy) editors still need
+	// their window mapped for XEmbed/Win32 reparenting.
+	if (EMBED)
+	{
+		XMapWindow(m_display, m_window);
+		m_x11WindowVisible = true;
+	}
+	else
+	{
+		XFlush(m_display);
+		m_x11WindowVisible = false;
+	}
 
 	// Plugins such as Zyn Fusion resolve UI assets relative to the current
 	// working directory. The remote process only hosts this one editor.
@@ -980,7 +992,6 @@ void RemoteVstPlugin::initEditor()
 			| ButtonMotionMask | ExposureMask | KeyPressMask);
 	
 	pluginDispatch(effEditTop);
-	m_x11WindowVisible = true;
 #endif // NATIVE_LINUX_VST
 }
 
@@ -996,9 +1007,12 @@ void RemoteVstPlugin::showEditor() {
 		if (!m_x11WindowVisible)
 		{
 			XMapWindow(m_display, m_window);
-			XFlush(m_display);
 			m_x11WindowVisible = true;
 		}
+		// A second Show GUI request must bring an already mapped window to
+		// the front instead of doing nothing.
+		XRaiseWindow(m_display, m_window);
+		XFlush(m_display);
 #endif
 	}
 }

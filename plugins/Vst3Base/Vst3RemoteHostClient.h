@@ -111,6 +111,8 @@ public:
 		float* leftOut,
 		float* rightOut,
 		int frames) override;
+	void processBuses(const std::vector<ProcessInputBus>& inputs,
+		const std::vector<ProcessOutputBus>& outputs, int frames) override;
 
 	int latencySamples() const override { return m_latency; }
 
@@ -137,6 +139,10 @@ public:
 	std::function<void()> hostRestarted;
 
 private:
+	bool transferBlock(int frames);
+	std::vector<BusInfo> m_inputBuses;
+	std::vector<BusInfo> m_outputBuses;
+
 	void sendMessage(const QJsonObject& message);
 	bool requestState();
 	void onWatchdog();

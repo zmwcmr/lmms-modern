@@ -40,6 +40,7 @@
 #include "Vst3Host.h"
 #include "Vst3RemoteHostClient.h"
 #include "Vst3SubPluginFeatures.h"
+#include "Vst3EditorWindow.h"
 #include "Vst3InstrumentView.h"
 
 #include "embed.h"
@@ -159,10 +160,94 @@ bool Vst3Instrument::openPlugin(const QString& file, const QString& classId)
 
 void Vst3Instrument::closePlugin()
 {
+	hideEditor();
 	m_parameterModels.setQueueCallback({});
 	static_cast<Vst3PluginHost*>(HostedInstrument::host())->adopt(nullptr);
 	m_host.reset();
 }
+
+void Vst3Instrument::requestShowEditor()
+{
+	showEditor(nullptr);
+}
+
+
+
+
+void Vst3Instrument::showEditor(QWidget* parent)
+{
+	if (!hasEditor())
+	{
+		return;
+	}
+	m_editorRequested = true;
+	if (!m_editorWindow.isNull())
+	{
+		m_editorWindow->raiseEditor();
+		m_editorWindow->activateEditor();
+		return;
+	}
+	m_editorWindow = Vst3EditorWindow::open(m_host.get(), parent,
+		displayName(), [this](uint32_t id, double value) {
+			setParameterValue(id, value);
+		});
+}
+
+
+
+
+void Vst3Instrument::hideEditor()
+{
+	m_editorRequested = false;
+	if (!m_editorWindow.isNull()) { m_editorWindow->close(); }
+}
+
+
+
+
+bool Vst3Instrument::isEditorVisible() const
+{
+	return m_editorRequested && !m_editorWindow.isNull();
+}
+
+
+
+
+bool Vst3Instrument::hasEditor() const
+{
+	return m_host != nullptr && m_host->hasEditor();
+}
+
+
+
+
+bool Vst3Instrument::reloadPlugin()
+{
+	if (m_host == nullptr || m_file.isEmpty() || m_classId.isEmpty())
+	{
+		return false;
+	}
+	const auto component = m_host->componentState();
+	const auto controller = m_host->controllerState();
+	const bool wasVisible = isEditorVisible();
+	const QString file = m_file;
+	const QString classId = m_classId;
+	closePlugin();
+	if (!openPlugin(file, classId))
+	{
+		return false;
+	}
+	if (!component.isEmpty() || !controller.isEmpty())
+	{
+		m_host->setState(component, controller);
+	}
+	m_parameterModels.refreshFromHost();
+	if (wasVisible) { showEditor(nullptr); }
+	return true;
+}
+
+
+
 
 void Vst3Instrument::play(SampleFrame* workingBuffer)
 {

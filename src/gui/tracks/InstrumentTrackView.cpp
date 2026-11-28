@@ -82,6 +82,13 @@ InstrumentTrackView::InstrumentTrackView( InstrumentTrack * _it, TrackContainerV
 			this, SLOT(handleConfigChange(QString,QString,QString)));
 
 	connect(_it, &InstrumentTrack::instrumentChanged, this, &InstrumentTrackView::onInstrumentChanged);
+	connect(_it, &InstrumentTrack::requestInstrumentWindow, this, [this] {
+		// Open the LMMS instrument page for a newly created/imported track.
+		// The connection is queued because loadInstrument() may run on the
+		// instrument loader thread.
+		m_tlb->setChecked(true);
+		getInstrumentTrackWindow()->toggleVisibility(true);
+	}, Qt::QueuedConnection);
 
 	m_mixerChannelNumber = new MixerChannelLcdSpinBox(2, getTrackSettingsWidget(), tr("Mixer channel"), this);
 	m_mixerChannelNumber->setVisible(trackContainerView()->trackHeadWidth() >= COMPACT_TRACK_WIDTH);

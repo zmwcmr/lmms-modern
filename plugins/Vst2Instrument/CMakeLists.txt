@@ -1,0 +1,23 @@
+IF(NOT LMMS_HAVE_VST)
+	RETURN()
+ENDIF()
+
+INCLUDE(BuildPlugin)
+
+LINK_DIRECTORIES("${CMAKE_CURRENT_BINARY_DIR}/..")
+IF(LMMS_BUILD_LINUX)
+	LINK_LIBRARIES(-Wl,--enable-new-dtags)
+	SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+	SET(CMAKE_INSTALL_RPATH "$ORIGIN")
+ELSE()
+	SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${PLUGIN_DIR}")
+ENDIF()
+
+BUILD_PLUGIN(vst2instrument
+	Vst2HostedInstrument.cpp
+	Vst2InstrumentView.cpp
+	Vst2HostedInstrument.h
+	Vst2InstrumentView.h
+	MOCFILES Vst2HostedInstrument.h Vst2InstrumentView.h
+)
+TARGET_LINK_LIBRARIES(vst2instrument vstbase)

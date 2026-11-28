@@ -16,7 +16,9 @@ SET(LMMS_SRCS
 	gui/FileBrowser.cpp
 	gui/FileRevealer.cpp
 	gui/FileSearchJob.cpp
+	gui/EditorPlatform.cpp
 	gui/GuiApplication.cpp
+	gui/HostedPluginPanel.cpp
 	gui/LadspaControlView.cpp
 	gui/LfoControllerDialog.cpp
 	gui/ModelGroupView.cpp
@@ -43,6 +45,7 @@ SET(LMMS_SRCS
 	gui/StringPairDrag.cpp
 	gui/SubWindow.cpp
 	gui/ToolPluginView.cpp
+	gui/X11EditorWindow.cpp
 
 	gui/clips/AutomationClipView.cpp
 	gui/clips/ClipView.cpp

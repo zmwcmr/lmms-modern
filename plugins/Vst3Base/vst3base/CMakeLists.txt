@@ -6,6 +6,7 @@ ENDIF()
 
 BUILD_PLUGIN(vst3base
 	../vst3_base.cpp
+	${CMAKE_SOURCE_DIR}/src/gui/X11EditorWindow.cpp
 	../Vst3Module.cpp ../Vst3Module.h
 	../Vst3Scanner.cpp ../Vst3Scanner.h
 	../Vst3List.cpp ../Vst3List.h
@@ -27,7 +28,7 @@ BUILD_PLUGIN(vst3base
 
 TARGET_INCLUDE_DIRECTORIES(vst3base
 	PUBLIC ../
-	PRIVATE ../travesty
+	PRIVATE ../travesty "${CMAKE_SOURCE_DIR}/include"
 )
 
 FIND_PACKAGE(Qt${QT_VERSION_MAJOR} COMPONENTS Core REQUIRED)

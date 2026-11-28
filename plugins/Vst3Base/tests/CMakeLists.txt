@@ -38,6 +38,7 @@ ADD_EXECUTABLE(vst3-editor-test
 	../Vst3EditorWidget.cpp
 	../Vst3EditorWindow.cpp
 	../Vst3X11Editor.cpp
+	${CMAKE_SOURCE_DIR}/src/gui/X11EditorWindow.cpp
 	../Vst3RemoteEditorClient.cpp
 	../Vst3RemoteEditorWidget.cpp
 	${VST3_REMOTE_HOST_SRC}
@@ -48,6 +49,7 @@ TARGET_INCLUDE_DIRECTORIES(vst3-editor-test
 		../
 		../travesty
 		"${CMAKE_CURRENT_BINARY_DIR}/../vst3base"
+		"${CMAKE_SOURCE_DIR}/include"
 )
 
 TARGET_COMPILE_DEFINITIONS(vst3-editor-test PRIVATE VST3BASE_STATIC_DEFINE)

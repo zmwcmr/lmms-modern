@@ -32,7 +32,7 @@ format a plugin uses.
 
 | Concern | VST2 today | VST3 today | LV2 today |
 | --- | --- | --- | --- |
-| Model wrapper | `VestigeInstrument`, `VstEffect` | `Vst3Instrument`, `Vst3Effect` | `Lv2Instrument`, `Lv2Effect` |
+| Model wrapper | `Vst2HostedInstrument` (new default), `VestigeInstrument` (legacy), `VstEffect` | `Vst3Instrument`, `Vst3Effect` | `Lv2Instrument`, `Lv2Effect` |
 | Host object | `VstPlugin` (`RemotePlugin`) | `Vst3HostBase` (`Vst3Host` / `Vst3RemoteHostClient`) | `Lv2Proc` + `Lv2HostClient` |
 | Child process | `NativeLinuxRemoteVstPlugin64`, `RemoteVstPlugin64`, `32/RemoteVstPlugin32` | `lmms-vst3-host` (DSP), `lmms-vst3-editor-host` (editor) | `lmms-lv2-host` (DSP + UI) |
 | Transport | shared audio + socket / shmFifo messages, block handshake | `Vst3SharedAudio` + POSIX semaphores, then JSON socket for the editor | shared audio + `RemotePluginBase` socket / shmFifo |
@@ -284,9 +284,15 @@ path.
       non-owning view. The legacy `paramN`, `chunk`, `numparams`,
       `guivisible` and `program` XML is produced by the native
       `VstPlugin::saveSettings`, so old projects stay byte-compatible.
-- [ ] VST2 state still uses the native chunk XML rather than
+- [x] VST2 state still uses the native chunk XML rather than
       `PluginStateBlob`. This is deliberate for compatibility; the adapter
       exposes `saveState()` for new consumers.
+- [x] New `vst2instrument` plugin is the default VST2 entry. It derives from
+      `HostedInstrument`, owns `Vst2PluginHost` directly and saves
+      `<vst2instrument file="...">` plus the generic host state. It forces the
+      child-owned window (`embedMethod=none`), so it never reaches Vestige's
+      MDI/XEmbed code. VeSTige stays registered as the legacy implementation
+      for `<vestige>` projects and is labelled legacy in the browser.
 - [x] LV2: `Lv2Effect` uses `HostedEffect` and `Lv2Instrument` uses
       `HostedInstrument`; both adopt the same `Lv2Proc` for models, views,
       ports and `<lv2state>`. `Lv2PluginHost` gained an owning and an
@@ -302,27 +308,110 @@ path.
 
 ### Stage 4 — scanner unification
 
-- Move VST2 probing and LV2 metadata behind the scanner protocol.
-- Keep the existing cache files readable during the transition.
-- Acceptance: same plugin lists, rescan behavior and startup time.
+- [x] Define the shared `PluginScanResult` schema (format, path, class,
+      unique ID, name, vendor, version, mtime/size/hash, classes,
+      parameters, error).
+- [x] Add `PluginScanCache`: one versioned JSON file per format, atomic
+      `QSaveFile` writes, upsert/find/remove and mtime/size freshness checks.
+      `PluginScanCacheTest` covers round-trip, wrong format/version,
+      replacement and removal.
+- [x] Move VST2 `VstList` onto the shared cache. On first start it imports
+      the legacy `vst-list.json` once, then writes
+      `plugin-scan-vst2.json`; the legacy file is left untouched for older
+      builds.
+- [x] Move VST3 `Vst3List` onto the shared cache. `plugin-scan-vst3.json`
+      stores one entry per bundle, with the full class metadata in the
+      per-class `extra` object; the legacy `vst3-list.json` is imported once.
+- [x] Move LV2 metadata onto the shared cache. The cache stores the plugin
+      URI, bundle URI, name, type, validity and bundle stamp; on the next
+      start `Lv2Manager` reuses the metadata to avoid repeating
+      `Lv2Proc::check` while still loading the lilv world needed for
+      instantiation.
+- [x] Scanner boundary: VST2 probing already runs through
+      `NativeLinuxRemoteVstPlugin64`, VST3 through `lmms-vst3-scanner`, and
+      LV2 metadata is cached around the in-process lilv scan (lilv is also
+      required later to instantiate the plugin, so a separate LV2 metadata
+      process would not replace that work).
+- Acceptance: same plugin lists, rescan behavior and startup time; the shared
+      caches are covered by `PluginScanCacheTest`, and the existing
+      VST2/VST3/LV2 list and project tests are unchanged.
+- Stage 4 is complete for the unified schema and cache. A future LV2 scanner
+  process can reuse `PluginScanResult` without changing the cache format.
 
 ### Stage 5 — editor host unification
 
-- One editor backend with the three modes above.
-- Migrate Vestige's MDI subwindow, LV2's floating window and VST3's editor host.
-- Acceptance: the UI audit matrix (sizes, crash isolation, Wayland fallback).
+Wayland policy: a host cannot reparent another client's Wayland surface, and
+`xdg-foreign` support is not available from the plugin toolkits used here.
+Every external plugin UI therefore opens as a floating X11/XWayland window on
+Wayland; only a genuine in-process Qt widget may be embedded.
 
-### Stage 6 — remove Vestige code
+- [x] Add `EditorPlatform` with `isWayland()`, `hasXWayland()`,
+      `preferredPresentation()` and `scaleFactor()`. Wayland without
+      `DISPLAY` returns `Unavailable` with an explicit reason.
+- [x] VST2: force `embedMethod=none` on Wayland even if the saved config asks
+      for `qt`/`xembed`; the editor is a floating X11 window.
+- [x] LV2: use the same platform policy instead of its own platform-name
+      checks.
+- [x] Add `X11EditorWindow` as the shared floating-window controller: display
+      and window creation, WM_DELETE_WINDOW, the X event pump, resize
+      clamping, fixed-size hints, raise/activate and close/destroy callbacks.
+      VST3's `Vst3X11Editor` and LV2's suil window both use it now, so
+      lifecycle and event handling exist once. `X11EditorWindowTest` covers
+      open/resize/hide/show/close and repeated WM_DELETE delivery.
+- [x] VST2/Vestige on Wayland: `embedMethod` is forced to `none`, the plugin
+      child owns a floating X11/XWayland window, and `createUI()` no longer
+      logs an unknown-embed-method error for that path. The X11 MDI subwindow
+      remains the X11 UX until Stage 6 removes Vestige; it is not used on
+      Wayland.
+- Acceptance: LV2/VST2/VST3 editors open as floating XWayland windows on
+      Wayland, keep correct sizes/scale/focus/close/reopen, and X11 behavior
+      is unchanged. Native Wayland embedding is explicitly out of scope.
+- Remaining verification: run the manual Wayland matrix with real VST2, VST3
+      and LV2 editors (size, fractional scale, focus, close/reopen, editor
+      crash isolation). The shared window behavior itself is covered by
+      `X11EditorWindowTest`.
+- [x] Shared instrument page: `HostedPluginPanel` provides the same plugin
+      name/vendor line, toolbar (Plugin GUI checkbox, Parameters, Reload,
+      Preset, Open plugin, Help) and searchable parameter drawer for VST2,
+      VST3 and LV2. The green Plugin GUI checkbox reflects whether the editor
+      is open and opens/closes it on toggle.
+      The parameter drawer is collapsed by default; the plugin's own GUI is
+      the primary editor. The old giant knob grids are no longer the default.
+- [x] All hosted instrument views are resizable: VST3 no longer forces
+      `QLayout::SetFixedSize`, LV2 returns `isResizable() == true`, and the
+      common panel has a usable minimum width.
+- [x] A user-created/imported instrument opens both its LMMS instrument page
+      and its native editor once. The page request is a queued
+      `InstrumentTrack` signal handled by `InstrumentTrackView`; the editor is
+      requested from the GUI thread. Project loading instantiates instruments
+      directly and never auto-opens. VST2 creates its editor hidden and maps it
+      on the first Show request, so import no longer flashes and closes the
+      window.
+- [x] LV2 host threading: `lmms-lv2-host` runs DSP on a dedicated audio
+      thread, the suil UI and X11 event loop on a separate UI thread, and the
+      main thread only pumps the host socket. A slow editor such as Pianoteq
+      can no longer delay `lilv_instance_run()` or the next block. Control
+      values and MIDI are copied at block boundaries; state save/restore is
+      serialised against the audio thread.
+      Measured with the ZynAddSubFX and Pianoteq LV2 UIs: block time stayed at
+      about 1.0–1.2 ms with the editor open.
 
-- After one release with the compatibility alias in place.
-- Keep the project loader mapping old nodes to `HostedInstrument`.
-- Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged.
+### Stage 6 — Vestige compatibility
+
+- Decision: do not delete VeSTige. It is a compatibility implementation for
+  old `<vestige>` / `<vstplugin>` projects and for the 32-bit/Wine paths.
+- New projects use `<vst2instrument>`; VeSTige is hidden from the plugin
+  browser and is not the default VST2 path. It remains loadable by name for
+  old `<vestige>` projects.
+- Keep the project loader accepting old nodes unchanged.
+- Acceptance: an old project with VST2, VST3 and LV2 tracks loads unchanged,
+  and a new VST2 instrument round-trips without touching Vestige code.
 
 ## Compatibility constraints
 
 - Project XML node names and attributes must not change:
-  `<vestige>`, `<vstplugin>`, `<vst3instrument>`, `<lv2instrument>`,
-  `<lv2effect>`, `<effect name="vst3effect">`.
+  `<vestige>`, `<vstplugin>`, `<vst2instrument>`, `<vst3instrument>`,
+  `<lv2instrument>`, `<lv2effect>`, `<effect name="vst3effect">`.
 - Existing environment switches stay valid: `LMMS_LV2_REMOTE`,
   `LMMS_LV2_INPROCESS`, `LMMS_LV2_UI_SCALE`, `LMMS_VST3_REMOTE_DSP`,
   `LMMS_VST3_EDITOR_LOCAL`, `LMMS_VST3_HOST`, `LMMS_VST3_EDITOR_HOST`,

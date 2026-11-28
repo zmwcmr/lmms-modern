@@ -1,5 +1,7 @@
 include(CTest)
 
+set(LMMS_TEST_CACHE_DIR "${CMAKE_CURRENT_BINARY_DIR}/test-cache")
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
 
@@ -18,6 +20,7 @@ set(LMMS_TESTS
 	src/core/HostedPluginModelsTest.cpp
 	src/core/ParameterCurveTest.cpp
 	src/core/PluginProcessSupervisorTest.cpp
+	src/core/PluginScanCacheTest.cpp
 	src/core/ProjectVersionTest.cpp
 	src/core/RelativePathsTest.cpp
 	src/core/SampleDecoderTest.cpp
@@ -25,6 +28,7 @@ set(LMMS_TESTS
 	src/core/TimelineTest.cpp
 	src/core/TimePosTest.cpp
 	src/core/ValidationTest.cpp
+	src/core/X11EditorWindowTest.cpp
 	src/core/InlineValueEditorTest.cpp
 	src/gui/SideBarWorkspaceTest.cpp
 	src/gui/ToolButtonTest.cpp
@@ -105,6 +109,19 @@ if(LMMS_HAVE_LV2)
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/manifest.ttl" COPYONLY)
 	configure_file(plugins/fake-lv2-sidechain/sidechain.ttl
 		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-sidechain.lv2/sidechain.ttl" COPYONLY)
+
+	add_library(FakeLv2MultiOut MODULE plugins/fake-lv2-multiout/multiout.c)
+	target_include_directories(FakeLv2MultiOut PRIVATE ${LV2_INCLUDE_DIRS})
+	set_target_properties(FakeLv2MultiOut PROPERTIES
+		PREFIX ""
+		SUFFIX ".so"
+		OUTPUT_NAME "multiout"
+		LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2"
+	)
+	configure_file(plugins/fake-lv2-multiout/manifest.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2/manifest.ttl" COPYONLY)
+	configure_file(plugins/fake-lv2-multiout/multiout.ttl
+		"${CMAKE_CURRENT_BINARY_DIR}/lv2/fake-lv2-multiout.lv2/multiout.ttl" COPYONLY)
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST)
@@ -115,6 +132,14 @@ if(LMMS_BUILD_LINUX AND WANT_VST)
 		PREFIX ""
 		OUTPUT_NAME "fake-midi-vst"
 	)
+
+	add_library(FakeCrashVst SHARED plugins/fake-crash-vst.cpp)
+	target_include_directories(FakeCrashVst PRIVATE ${CMAKE_SOURCE_DIR}/include)
+	target_compile_features(FakeCrashVst PRIVATE cxx_std_17)
+	set_target_properties(FakeCrashVst PROPERTIES
+		PREFIX ""
+		OUTPUT_NAME "fake-crash-vst"
+	)
 endif()
 
 foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
@@ -123,6 +148,8 @@ foreach(LMMS_TEST_SRC IN LISTS LMMS_TESTS)
 
 	add_executable(${LMMS_TEST_NAME} ${LMMS_TEST_SRC})
 	add_test(NAME ${LMMS_TEST_NAME} COMMAND ${LMMS_TEST_NAME})
+	set_tests_properties(${LMMS_TEST_NAME} PROPERTIES
+		ENVIRONMENT "XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 
 	# TODO CMake 3.12: Propagate usage requirements by linking to lmmsobjs
 	target_include_directories(${LMMS_TEST_NAME} PRIVATE $<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>)
@@ -158,7 +185,30 @@ if(TARGET vstbase)
 	set_target_properties(Vst2PluginHostTest PROPERTIES ENABLE_EXPORTS TRUE)
 	add_test(NAME Vst2PluginHostTest COMMAND Vst2PluginHostTest)
 	set_tests_properties(Vst2PluginHostTest PROPERTIES
-		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
+endif()
+
+if(TARGET vstbase AND TARGET FakeCrashVst)
+	add_executable(Vst2CrashTest src/core/Vst2CrashTest.cpp)
+	target_include_directories(Vst2CrashTest PRIVATE
+		$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+		"${CMAKE_SOURCE_DIR}/plugins/VstBase")
+	target_static_libraries(Vst2CrashTest PRIVATE lmmsobjs)
+	target_link_libraries(Vst2CrashTest PRIVATE
+		${QT_LIBRARIES}
+		${QT_QTTEST_LIBRARY}
+		vstbase
+	)
+	target_compile_features(Vst2CrashTest PRIVATE cxx_std_20)
+	target_compile_definitions(Vst2CrashTest PRIVATE
+		LMMS_TESTING
+		LMMS_FAKE_CRASH_VST="$<TARGET_FILE:FakeCrashVst>"
+	)
+	set_target_properties(Vst2CrashTest PROPERTIES ENABLE_EXPORTS TRUE)
+	add_dependencies(Vst2CrashTest FakeCrashVst NativeLinuxRemoteVstPlugin64)
+	add_test(NAME Vst2CrashTest COMMAND Vst2CrashTest)
+	set_tests_properties(Vst2CrashTest PROPERTIES
+		ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 endif()
 
 # Load/save/load helper used by the local stress harness. Not registered as
@@ -243,6 +293,34 @@ if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3)
 	)
 	add_dependencies(Vst3PluginHostTest fake-vst3)
 	add_test(NAME Vst3PluginHostTest COMMAND Vst3PluginHostTest)
+
+	if(TARGET lmms-vst3-host)
+		add_executable(Vst3RemoteBusTest
+			src/core/Vst3RemoteBusTest.cpp
+		)
+		target_include_directories(Vst3RemoteBusTest PRIVATE
+			$<TARGET_PROPERTY:lmmsobjs,INCLUDE_DIRECTORIES>
+			"${CMAKE_SOURCE_DIR}/plugins/Vst3Base"
+		)
+		target_static_libraries(Vst3RemoteBusTest PRIVATE lmmsobjs)
+		target_link_libraries(Vst3RemoteBusTest PRIVATE
+			${QT_LIBRARIES}
+			${QT_QTTEST_LIBRARY}
+			vst3base
+		)
+		target_compile_features(Vst3RemoteBusTest PRIVATE cxx_std_20)
+		target_compile_definitions(Vst3RemoteBusTest PRIVATE
+			LMMS_TESTING
+			VST3_FAKE_BUNDLE="${FAKE_VST3_BUNDLE}"
+			VST3_FAKE_EFFECT_CLASS="${FAKE_VST3_EFFECT_ID}"
+			LMMS_VST3_HOST_EXECUTABLE="$<TARGET_FILE:lmms-vst3-host>"
+		)
+		set_target_properties(Vst3RemoteBusTest PROPERTIES ENABLE_EXPORTS TRUE)
+		add_dependencies(Vst3RemoteBusTest fake-vst3 lmms-vst3-host)
+		add_test(NAME Vst3RemoteBusTest COMMAND Vst3RemoteBusTest)
+		set_tests_properties(Vst3RemoteBusTest PROPERTIES
+			ENVIRONMENT "LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
+	endif()
 endif()
 
 if(LMMS_BUILD_LINUX AND WANT_VST3 AND TARGET fake-vst3 AND TARGET vst3instrument)
@@ -282,13 +360,17 @@ if(TARGET Lv2HostClientTest AND TARGET lmms-lv2-host AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2Sidechain)
 		add_dependencies(Lv2HostClientTest FakeLv2Sidechain)
 	endif()
+	if(TARGET FakeLv2MultiOut)
+		add_dependencies(Lv2HostClientTest FakeLv2MultiOut)
+	endif()
 	target_compile_definitions(Lv2HostClientTest PRIVATE
 		LMMS_LV2_HOST_EXECUTABLE="$<TARGET_FILE:lmms-lv2-host>"
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>"
 		LMMS_FAKE_LV2_MIDI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Midi>"
 		LMMS_FAKE_LV2_CRASH_DSP_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashDsp>"
 		LMMS_FAKE_LV2_CRASH_UI_BUNDLE="$<TARGET_FILE_DIR:FakeLv2CrashUi>"
-		LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
+		LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>"
+		LMMS_FAKE_LV2_MULTIOUT_BUNDLE="$<TARGET_FILE_DIR:FakeLv2MultiOut>")
 	target_include_directories(Lv2HostClientTest PRIVATE
 		${Lilv_INCLUDE_DIRS}
 		${LV2_INCLUDE_DIRS})
@@ -300,13 +382,14 @@ if(TARGET Lv2PluginHostTest AND TARGET FakeLv2Gain)
 	if(TARGET FakeLv2Sidechain)
 		add_dependencies(Lv2PluginHostTest FakeLv2Sidechain)
 		target_compile_definitions(Lv2PluginHostTest PRIVATE
-			LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>")
+			LMMS_FAKE_LV2_SIDECHAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Sidechain>"
+		LMMS_FAKE_LV2_MULTIOUT_BUNDLE="$<TARGET_FILE_DIR:FakeLv2MultiOut>")
 	endif()
 	if(TARGET lmms-lv2-host)
 		add_dependencies(Lv2PluginHostTest lmms-lv2-host)
 		add_test(NAME Lv2PluginHostTestRemote COMMAND Lv2PluginHostTest)
 		set_tests_properties(Lv2PluginHostTestRemote PROPERTIES
-			ENVIRONMENT "LMMS_LV2_TEST_REMOTE=1;LMMS_LV2_REMOTE=1;LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins")
+			ENVIRONMENT "LMMS_LV2_TEST_REMOTE=1;LMMS_LV2_REMOTE=1;LMMS_PLUGIN_DIR=${CMAKE_BINARY_DIR}/plugins;XDG_CACHE_HOME=${LMMS_TEST_CACHE_DIR}")
 	endif()
 	target_compile_definitions(Lv2PluginHostTest PRIVATE
 		LMMS_FAKE_LV2_GAIN_BUNDLE="$<TARGET_FILE_DIR:FakeLv2Gain>")

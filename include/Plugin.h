@@ -242,6 +242,10 @@ public:
 
 		SubPluginFeatures * subPluginFeatures;
 
+		//! Hide this plugin from the plugin browser. It remains loadable by
+		//! name for old projects and compatibility paths.
+		bool hidden = false;
+
 	} ;
 	// typedef a list so we can easily work with list of plugin descriptors
 	using DescriptorList = QList<Descriptor*>;
@@ -318,6 +322,8 @@ protected:
 	//! Create a view for the model
 	virtual gui::PluginView* instantiateView( QWidget * ) = 0;
 	void collectErrorForUI( QString errMsg );
+	//! Update a sub-plugin key attribute after the user changes the selection.
+	void setKeyAttribute( const QString& name, const QString& value );
 
 
 private:

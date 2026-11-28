@@ -25,20 +25,17 @@
 #ifndef LMMS_GUI_VST3_INSTRUMENT_VIEW_H
 #define LMMS_GUI_VST3_INSTRUMENT_VIEW_H
 
-#include <QPointer>
-
 #include "InstrumentView.h"
-
-class QPushButton;
 
 namespace lmms
 {
 
-class Instrument;
-class Vst3EditorWindow;
+class Vst3Instrument;
 
 namespace gui
 {
+
+class HostedPluginPanel;
 
 class Vst3InstrumentView : public InstrumentView
 {
@@ -47,15 +44,15 @@ public:
 	Vst3InstrumentView(Instrument* instrument, QWidget* parent);
 	~Vst3InstrumentView() override = default;
 
-	QSize sizeHint() const override;
-	QSize minimumSizeHint() const override;
+	QSize sizeHint() const override { return QSize(380, 360); }
+	QSize minimumSizeHint() const override { return QSize(320, 240); }
 
 private:
 	void modelChanged() override;
 	bool isResizable() const override { return true; }
 
-	QPointer<Vst3EditorWindow> m_editorWindow;
-	QPushButton* m_guiButton = nullptr;
+	Vst3Instrument* m_instrument = nullptr;
+	HostedPluginPanel* m_panel = nullptr;
 };
 
 } // namespace gui

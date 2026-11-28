@@ -28,6 +28,9 @@
 #include <memory>
 #include <vector>
 
+#include <QByteArray>
+#include <QPointer>
+
 #include <QMutex>
 
 #include "HostedInstrument.h"
@@ -39,6 +42,7 @@ namespace lmms
 
 class Vst3HostBase;
 class Vst3RemoteHostClient;
+class Vst3EditorWindow;
 class InstrumentTrack;
 
 class Vst3Instrument : public HostedInstrument
@@ -59,10 +63,18 @@ public:
 
 	gui::PluginView* instantiateView(QWidget* parent) override;
 
+	void requestShowEditor() override;
+	void showEditor(QWidget* parent = nullptr);
+	void hideEditor();
+	bool isEditorVisible() const;
+	bool hasEditor() const;
+	bool reloadPlugin();
+
 	Vst3HostBase* host() const { return m_host.get(); }
 	QMutex& hostMutex() { return m_mutex; }
 	const Vst3ParameterModels& parameterModels() const { return m_parameterModels; }
 	bool setProgram(int index);
+	const QString& file() const { return m_file; }
 	bool setUnit(int unitId);
 	void setParameterValue(uint32_t id, double value);
 
@@ -75,6 +87,8 @@ private:
 	QString m_file;
 	QString m_classId;
 	Vst3ParameterModels m_parameterModels;
+	QPointer<Vst3EditorWindow> m_editorWindow;
+	bool m_editorRequested = false;
 };
 
 } // namespace lmms
