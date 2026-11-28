@@ -38,6 +38,7 @@
 #include <exception>
 #include <string>
 
+#include <atomic>
 #include <condition_variable>
 #include <chrono>
 #include <cmath>
@@ -73,6 +74,8 @@
 #endif
 
 #ifdef LMMS_BUILD_LINUX
+#include <pthread.h>
+#include <sched.h>
 #include <sys/prctl.h>
 #include <unistd.h>
 #endif
@@ -141,6 +144,22 @@ private:
 namespace
 {
 LilvInstance* g_extDataInstance = nullptr;
+
+// Plugin UIs sometimes touch stale X resources or atoms. The default Xlib
+// handler terminates the whole host process, which would take the audio down
+// with the editor. Log the error and keep the DSP alive instead.
+int lv2HostXErrorHandler(Display*, XErrorEvent* event)
+{
+	static std::atomic<int> logged{0};
+	if (logged.fetch_add(1) < 20)
+	{
+		std::fprintf(stderr,
+			"lv2 host: ignoring X error %d (request %d, resource %lu)\n",
+			event->error_code, event->request_code,
+			static_cast<unsigned long>(event->resourceid));
+	}
+	return 0;
+}
 }
 #endif
 
@@ -258,6 +277,7 @@ public:
 		{
 			return 0;
 		}
+		std::lock_guard<std::mutex> lock(m_mutex);
 		const auto it = m_byUri.find(uri);
 		if (it != m_byUri.end())
 		{
@@ -271,10 +291,13 @@ public:
 
 	const char* unmap(LV2_URID urid) const
 	{
+		std::lock_guard<std::mutex> lock(m_mutex);
 		if (urid == 0 || urid > m_uris.size())
 		{
 			return nullptr;
 		}
+		// deque keeps the string addresses stable when another thread maps a
+		// new URI after the lock is released.
 		return m_uris[urid - 1].c_str();
 	}
 
@@ -282,8 +305,9 @@ public:
 	LV2_URID_Unmap* unmapFeature() { return &m_unmap; }
 
 private:
+	mutable std::mutex m_mutex;
 	std::unordered_map<std::string, LV2_URID> m_byUri;
-	std::vector<std::string> m_uris;
+	std::deque<std::string> m_uris;
 	LV2_URID_Map m_map{};
 	LV2_URID_Unmap m_unmap{};
 };
@@ -414,6 +438,13 @@ private:
 	bool restoreState(const std::string& directory);
 	bool loadPreset(const std::string& presetUri);
 	void sendControlValues();
+	void syncControlValuesFromAudio();
+
+	void startAudioThread();
+	void stopAudioThread();
+	void audioThreadMain();
+	void queueAudioBlock();
+	void sendToHost(const message& m);
 	std::string ensureStateDir();
 	static char* makePathCb(LV2_State_Make_Path_Handle handle, const char* path);
 	static char* mapPathCb(LV2_State_Map_Path_Handle handle, const char* path);
@@ -422,8 +453,14 @@ private:
 	bool showUi(float scale);
 	void hideUi();
 	void destroyUi();
+	bool showUiNow(float scale);
+	void hideUiNow();
+	void destroyUiNow();
 	void idleUi();
 	void processUiEvents();
+	void startUiThread();
+	void stopUiThread();
+	void uiThreadMain();
 	bool waitForMessage(int timeoutMs);
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	static void writeToUiPort(void* handle, uint32_t port, uint32_t size,
@@ -436,6 +473,33 @@ private:
 	f_cnt_t m_frames = 0;
 	sample_rate_t m_sampleRate = 0;
 	std::string m_pluginUri;
+
+	// Audio runs on its own thread; the main thread only pumps messages and
+	// the plugin UI. This mirrors the VST2 child and keeps a heavy editor
+	// idle from delaying the next audio block.
+	std::thread m_audioThread;
+	std::mutex m_stateMutex;
+	std::mutex m_instanceMutex;
+	std::mutex m_sendMutex;
+	std::condition_variable m_audioCv;
+	bool m_audioRequested = false;
+	bool m_audioStop = false;
+	std::vector<lv2host::MidiEventData> m_audioMidi;
+	std::vector<float> m_audioControlValues;
+
+	// The LV2 UI and its X11 event loop run on their own thread. The main
+	// thread must stay free to read audio-start messages and wake the audio
+	// thread; otherwise a slow editor still delays the next block.
+	enum class UiRequest { Idle, Show, Hide, Destroy, Quit };
+	struct UiRequestItem
+	{
+		UiRequest type;
+		float scale = 1.0f;
+	};
+	std::thread m_uiThread;
+	std::mutex m_uiMutex;
+	std::condition_variable m_uiCv;
+	std::deque<UiRequestItem> m_uiRequests;
 
 #ifdef LMMS_HAVE_LV2
 	LilvWorld* m_world = nullptr;
@@ -512,7 +576,9 @@ private:
 
 Lv2HostProcess::~Lv2HostProcess()
 {
-	destroyUi();
+	stopUiThread();
+	stopAudioThread();
+	destroyUiNow();
 #ifdef LMMS_HAVE_LV2
 	if (m_instance != nullptr)
 	{
@@ -534,11 +600,11 @@ Lv2HostProcess::~Lv2HostProcess()
 
 int Lv2HostProcess::run()
 {
+	startUiThread();
 	for (;;)
 	{
 		if (!waitForMessage(30))
 		{
-			idleUi();
 			continue;
 		}
 
@@ -548,8 +614,10 @@ int Lv2HostProcess::run()
 			break;
 		}
 		processMessage(m);
-		idleUi();
 	}
+
+	stopUiThread();
+	stopAudioThread();
 	return 0;
 }
 
@@ -602,7 +670,8 @@ bool Lv2HostProcess::processMessage(const message& m)
 			{
 				return false;
 			}
-			sendMessage(message(lv2host::IdReady));
+			startAudioThread();
+			sendToHost(message(lv2host::IdReady));
 			return true;
 
 		case lv2host::IdControlValue:
@@ -612,6 +681,7 @@ bool Lv2HostProcess::processMessage(const message& m)
 #ifdef LMMS_HAVE_LV2
 			if (index >= 0 && static_cast<std::size_t>(index) < m_controlValues.size())
 			{
+				std::lock_guard<std::mutex> lock(m_stateMutex);
 				m_controlValues[index] = value;
 			}
 #else
@@ -630,7 +700,7 @@ bool Lv2HostProcess::processMessage(const message& m)
 			const bool ok = saveState(m.getString(0));
 			// Values first, so the host has them when the ack arrives.
 			sendControlValues();
-			sendMessage(message(lv2host::IdStateSaved).addInt(ok ? 1 : 0));
+			sendToHost(message(lv2host::IdStateSaved).addInt(ok ? 1 : 0));
 			return true;
 		}
 
@@ -638,7 +708,7 @@ bool Lv2HostProcess::processMessage(const message& m)
 		{
 			const bool ok = restoreState(m.getString(0));
 			sendControlValues();
-			sendMessage(message(lv2host::IdStateRestored).addInt(ok ? 1 : 0));
+			sendToHost(message(lv2host::IdStateRestored).addInt(ok ? 1 : 0));
 			return true;
 		}
 
@@ -646,7 +716,7 @@ bool Lv2HostProcess::processMessage(const message& m)
 		{
 			const bool ok = loadPreset(m.getString(0));
 			sendControlValues();
-			sendMessage(message(lv2host::IdPresetLoaded).addInt(ok ? 1 : 0));
+			sendToHost(message(lv2host::IdPresetLoaded).addInt(ok ? 1 : 0));
 			return true;
 		}
 
@@ -663,13 +733,107 @@ bool Lv2HostProcess::processMessage(const message& m)
 			return true;
 
 		case IdStartProcessing:
-			processBlock();
-			sendMessage(message(IdProcessingDone));
+			queueAudioBlock();
 			return true;
 
 		default:
 			return false;
 	}
+}
+
+
+
+
+void Lv2HostProcess::sendToHost(const message& m)
+{
+	std::lock_guard<std::mutex> lock(m_sendMutex);
+	sendMessage(m);
+}
+
+
+
+
+void Lv2HostProcess::startAudioThread()
+{
+	if (m_audioThread.joinable())
+	{
+		return;
+	}
+	m_audioStop = false;
+	m_audioThread = std::thread(&Lv2HostProcess::audioThreadMain, this);
+}
+
+
+
+
+void Lv2HostProcess::stopAudioThread()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		m_audioStop = true;
+	}
+	m_audioCv.notify_all();
+	if (m_audioThread.joinable())
+	{
+		m_audioThread.join();
+	}
+}
+
+
+
+
+void Lv2HostProcess::queueAudioBlock()
+{
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		m_audioMidi.swap(m_pendingMidi);
+		m_audioControlValues = m_controlValues;
+		m_audioRequested = true;
+	}
+	m_audioCv.notify_one();
+}
+
+
+
+
+void Lv2HostProcess::audioThreadMain()
+{
+#ifdef LMMS_BUILD_LINUX
+	struct sched_param param = {};
+	param.sched_priority = (sched_get_priority_max(SCHED_FIFO)
+		+ sched_get_priority_min(SCHED_FIFO)) / 2;
+	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+#endif
+
+	for (;;)
+	{
+		{
+			std::unique_lock<std::mutex> lock(m_stateMutex);
+			m_audioCv.wait(lock, [this] {
+				return m_audioStop || m_audioRequested;
+			});
+			if (m_audioStop)
+			{
+				return;
+			}
+			m_audioRequested = false;
+		}
+
+		{
+			std::lock_guard<std::mutex> lock(m_instanceMutex);
+			processBlock();
+		}
+		sendToHost(message(IdProcessingDone));
+	}
+}
+
+
+
+
+void Lv2HostProcess::syncControlValuesFromAudio()
+{
+	std::lock_guard<std::mutex> lock(m_stateMutex);
+	m_controlValues = m_audioControlValues;
 }
 
 
@@ -716,7 +880,7 @@ void Lv2HostProcess::processBlock()
 		if (latency != m_reportedLatency)
 		{
 			m_reportedLatency = latency;
-			sendMessage(message(lv2host::IdLatency).addInt(latency));
+			sendToHost(message(lv2host::IdLatency).addInt(latency));
 		}
 	}
 #endif // LMMS_HAVE_LV2
@@ -741,7 +905,7 @@ void Lv2HostProcess::buildMidiInput()
 {
 	if (m_midiInPort < 0)
 	{
-		m_pendingMidi.clear();
+		m_audioMidi.clear();
 		return;
 	}
 
@@ -756,7 +920,7 @@ void Lv2HostProcess::buildMidiInput()
 	const uint8_t* const end = buffer.data() + buffer.size();
 	const LV2_URID midiType = m_urids.map(LV2_MIDI__MidiEvent);
 
-	for (const auto& event : m_pendingMidi)
+	for (const auto& event : m_audioMidi)
 	{
 		const std::size_t total = sizeof(LV2_Atom_Event) + event.data.size();
 		if (out + total > end)
@@ -772,7 +936,7 @@ void Lv2HostProcess::buildMidiInput()
 		out += total;
 		sequence->atom.size += static_cast<uint32_t>(total);
 	}
-	m_pendingMidi.clear();
+	m_audioMidi.clear();
 }
 
 
@@ -813,7 +977,7 @@ void Lv2HostProcess::sendMidiOutput()
 	}
 	if (!events.empty())
 	{
-		sendMessage(message(lv2host::IdMidiOut)
+		sendToHost(message(lv2host::IdMidiOut)
 			.addString(lv2host::encodeMidiEvents(events)));
 	}
 
@@ -911,8 +1075,13 @@ void Lv2HostProcess::freePathCb(LV2_State_Free_Path_Handle, char* path)
 
 void Lv2HostProcess::sendControlValues()
 {
-	sendMessage(message(lv2host::IdControlValues).addString(
-		lv2host::encodeControlValues(m_controlValues)));
+	std::vector<float> values;
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		values = m_controlValues;
+	}
+	sendToHost(message(lv2host::IdControlValues).addString(
+		lv2host::encodeControlValues(values)));
 }
 
 
@@ -920,12 +1089,21 @@ void Lv2HostProcess::sendControlValues()
 
 bool Lv2HostProcess::saveState(const std::string& directory)
 {
+	std::lock_guard<std::mutex> instanceLock(m_instanceMutex);
 #ifdef LMMS_HAVE_LV2
 	if (m_instance == nullptr || m_plugin == nullptr || directory.empty())
 	{
 		return false;
 	}
 	const std::string scratch = ensureStateDir();
+	// State saving reads the control ports connected to the instance. The
+	// audio thread copies the host values at block start, but a parameter
+	// change may not have reached a block yet; publish the current host
+	// values before snapshotting.
+	{
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		m_audioControlValues = m_controlValues;
+	}
 	LilvState* state = lilv_state_new_from_instance(m_plugin, m_instance,
 		m_urids.mapFeature(), scratch.c_str(), directory.c_str(),
 		directory.c_str(), directory.c_str(), nullptr, nullptr, 0, nullptr);
@@ -948,6 +1126,7 @@ bool Lv2HostProcess::saveState(const std::string& directory)
 
 bool Lv2HostProcess::restoreState(const std::string& directory)
 {
+	std::lock_guard<std::mutex> instanceLock(m_instanceMutex);
 #ifdef LMMS_HAVE_LV2
 	if (m_instance == nullptr || directory.empty())
 	{
@@ -971,6 +1150,7 @@ bool Lv2HostProcess::restoreState(const std::string& directory)
 	};
 	lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
 	lilv_state_free(state);
+	syncControlValuesFromAudio();
 	return true;
 #else
 	(void)directory;
@@ -983,6 +1163,7 @@ bool Lv2HostProcess::restoreState(const std::string& directory)
 
 bool Lv2HostProcess::loadPreset(const std::string& presetUri)
 {
+	std::lock_guard<std::mutex> instanceLock(m_instanceMutex);
 #ifdef LMMS_HAVE_LV2
 	if (m_instance == nullptr || presetUri.empty())
 	{
@@ -1009,6 +1190,7 @@ bool Lv2HostProcess::loadPreset(const std::string& presetUri)
 	};
 	lilv_state_restore(state, m_instance, nullptr, nullptr, 0, features);
 	lilv_state_free(state);
+	syncControlValuesFromAudio();
 	return true;
 #else
 	(void)presetUri;
@@ -1022,13 +1204,31 @@ bool Lv2HostProcess::loadPreset(const std::string& presetUri)
 void Lv2HostProcess::sendFailed(const std::string& reason)
 {
 	std::fprintf(stderr, "lv2 host: %s\n", reason.c_str());
-	sendMessage(message(lv2host::IdFailed).addString(reason));
+	sendToHost(message(lv2host::IdFailed).addString(reason));
 }
 
 
 
 
 void Lv2HostProcess::hideUi()
+{
+	if (m_uiThread.joinable()
+		&& std::this_thread::get_id() != m_uiThread.get_id())
+	{
+		{
+			std::lock_guard<std::mutex> lock(m_uiMutex);
+			m_uiRequests.push_back({ UiRequest::Hide });
+		}
+		m_uiCv.notify_one();
+		return;
+	}
+	hideUiNow();
+}
+
+
+
+
+void Lv2HostProcess::hideUiNow()
 {
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	if (m_uiWindow != 0 && m_uiDisplay != nullptr)
@@ -1044,6 +1244,24 @@ void Lv2HostProcess::hideUi()
 
 
 void Lv2HostProcess::destroyUi()
+{
+	if (m_uiThread.joinable()
+		&& std::this_thread::get_id() != m_uiThread.get_id())
+	{
+		{
+			std::lock_guard<std::mutex> lock(m_uiMutex);
+			m_uiRequests.push_back({ UiRequest::Destroy });
+		}
+		m_uiCv.notify_one();
+		return;
+	}
+	destroyUiNow();
+}
+
+
+
+
+void Lv2HostProcess::destroyUiNow()
 {
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 	if (m_uiInstance != nullptr)
@@ -1097,7 +1315,7 @@ void Lv2HostProcess::processUiEvents()
 			&& static_cast<Atom>(event.xclient.data.l[0]) == m_uiWmDelete)
 		{
 			destroyUi();
-			sendMessage(message(lv2host::IdUiClosed).addString("closed by user"));
+			sendToHost(message(lv2host::IdUiClosed).addString("closed by user"));
 			return;
 		}
 		if (event.type == DestroyNotify
@@ -1123,9 +1341,14 @@ void Lv2HostProcess::idleUi()
 	const CurrentDirGuard cwdGuard(m_uiDataRoot);
 
 	// Keep the UI in sync with the values the DSP currently uses.
-	for (std::size_t i = 0; i < m_controlValues.size(); ++i)
+	std::vector<float> controlValues;
 	{
-		const float value = m_controlValues[i];
+		std::lock_guard<std::mutex> lock(m_stateMutex);
+		controlValues = m_controlValues;
+	}
+	for (std::size_t i = 0; i < controlValues.size(); ++i)
+	{
+		const float value = controlValues[i];
 		if (i >= m_lastUiControl.size() || m_lastUiControl[i] != value)
 		{
 			suil_instance_port_event(m_uiInstance, static_cast<uint32_t>(i),
@@ -1164,6 +1387,7 @@ void Lv2HostProcess::writeToUiPort(void* handle, uint32_t port, uint32_t size,
 #ifdef LMMS_HAVE_LV2
 	if (port < self->m_controlValues.size())
 	{
+		std::lock_guard<std::mutex> lock(self->m_stateMutex);
 		self->m_controlValues[port] = *static_cast<const float*>(buffer);
 	}
 #endif
@@ -1210,13 +1434,93 @@ void Lv2HostProcess::touchUiPort(void* handle, uint32_t port, bool grabbed)
 
 
 
+void Lv2HostProcess::startUiThread()
+{
+	if (m_uiThread.joinable())
+	{
+		return;
+	}
+	m_uiThread = std::thread(&Lv2HostProcess::uiThreadMain, this);
+}
+
+
+
+
+void Lv2HostProcess::stopUiThread()
+{
+	if (!m_uiThread.joinable())
+	{
+		return;
+	}
+	{
+		std::lock_guard<std::mutex> lock(m_uiMutex);
+		m_uiRequests.clear();
+		m_uiRequests.push_back({ UiRequest::Quit });
+	}
+	m_uiCv.notify_all();
+	m_uiThread.join();
+}
+
+
+
+
+void Lv2HostProcess::uiThreadMain()
+{
+	for (;;)
+	{
+		UiRequestItem request{ UiRequest::Idle };
+		{
+			std::unique_lock<std::mutex> lock(m_uiMutex);
+			m_uiCv.wait_for(lock, std::chrono::milliseconds(30),
+				[this] { return !m_uiRequests.empty(); });
+			if (!m_uiRequests.empty())
+			{
+				request = m_uiRequests.front();
+				m_uiRequests.pop_front();
+			}
+		}
+
+		if (request.type == UiRequest::Quit)
+		{
+			destroyUiNow();
+			return;
+		}
+		if (request.type == UiRequest::Show) { showUiNow(request.scale); }
+		else if (request.type == UiRequest::Hide) { hideUiNow(); }
+		else if (request.type == UiRequest::Destroy) { destroyUiNow(); }
+
+		idleUi();
+	}
+}
+
+
+
+
 bool Lv2HostProcess::showUi(float scale)
+{
+	if (m_uiThread.joinable()
+		&& std::this_thread::get_id() != m_uiThread.get_id())
+	{
+		{
+			std::lock_guard<std::mutex> lock(m_uiMutex);
+			m_uiRequests.push_back({ UiRequest::Show, scale });
+		}
+		m_uiCv.notify_one();
+		return true;
+	}
+	return showUiNow(scale);
+}
+
+
+
+
+bool Lv2HostProcess::showUiNow(float scale)
 {
 #if defined(LMMS_BUILD_LINUX) && defined(LMMS_HAVE_SUIL)
 #ifdef LMMS_HAVE_LV2
 	if (m_instance == nullptr || m_plugin == nullptr)
 	{
-		sendMessage(message(lv2host::IdUiClosed).addString("no plugin instance"));
+		sendToHost(message(lv2host::IdUiClosed).addString("no plugin instance"));
 		return false;
 	}
 	if (m_uiInstance != nullptr)
@@ -1235,7 +1539,7 @@ bool Lv2HostProcess::showUi(float scale)
 		m_uiDisplay = XOpenDisplay(nullptr);
 		if (m_uiDisplay == nullptr)
 		{
-			sendMessage(message(lv2host::IdUiClosed).addString("no X11 display"));
+			sendToHost(message(lv2host::IdUiClosed).addString("no X11 display"));
 			return false;
 		}
 	}
@@ -1256,7 +1560,7 @@ bool Lv2HostProcess::showUi(float scale)
 		BlackPixel(m_uiDisplay, screen), WhitePixel(m_uiDisplay, screen));
 	if (m_uiWindow == 0)
 	{
-		sendMessage(message(lv2host::IdUiClosed).addString("could not create a window"));
+		sendToHost(message(lv2host::IdUiClosed).addString("could not create a window"));
 		return false;
 	}
 	XStoreName(m_uiDisplay, m_uiWindow, title.c_str());
@@ -1270,7 +1574,7 @@ bool Lv2HostProcess::showUi(float scale)
 	if (m_uiHost == nullptr)
 	{
 		destroyUi();
-		sendMessage(message(lv2host::IdUiClosed).addString("could not create the UI host"));
+		sendToHost(message(lv2host::IdUiClosed).addString("could not create the UI host"));
 		return false;
 	}
 	suil_host_set_touch_func(m_uiHost, touchUiPort);
@@ -1294,7 +1598,7 @@ bool Lv2HostProcess::showUi(float scale)
 	if (selected == nullptr)
 	{
 		destroyUi();
-		sendMessage(message(lv2host::IdUiClosed).addString("no X11 UI available"));
+		sendToHost(message(lv2host::IdUiClosed).addString("no X11 UI available"));
 		return false;
 	}
 
@@ -1378,7 +1682,7 @@ bool Lv2HostProcess::showUi(float scale)
 	if (m_uiInstance == nullptr)
 	{
 		destroyUi();
-		sendMessage(message(lv2host::IdUiClosed).addString("could not instantiate the UI"));
+		sendToHost(message(lv2host::IdUiClosed).addString("could not instantiate the UI"));
 		return false;
 	}
 
@@ -1424,12 +1728,12 @@ bool Lv2HostProcess::showUi(float scale)
 	return true;
 #else
 	(void)scale;
-	sendMessage(message(lv2host::IdUiClosed).addString("LV2 UI support missing"));
+	sendToHost(message(lv2host::IdUiClosed).addString("LV2 UI support missing"));
 	return false;
 #endif // LMMS_HAVE_LV2
 #else
 	(void)scale;
-	sendMessage(message(lv2host::IdUiClosed).addString("LV2 UI is only supported on X11"));
+	sendToHost(message(lv2host::IdUiClosed).addString("LV2 UI is only supported on X11"));
 	return false;
 #endif
 }
@@ -1575,6 +1879,7 @@ void Lv2HostProcess::connectPorts()
 
 	const auto frames = static_cast<std::size_t>(m_frames);
 	m_controlValues.assign(portCount, 0.0f);
+	m_audioControlValues.assign(portCount, 0.0f);
 	m_portScratch.assign(portCount, 0.0f);
 	m_atomBuffers.resize(portCount);
 
@@ -1624,10 +1929,11 @@ void Lv2HostProcess::connectPorts()
 			LilvNode* max = nullptr;
 			lilv_port_get_range(m_plugin, port, &def, &min, &max);
 			m_controlValues[i] = def != nullptr ? lilv_node_as_float(def) : 0.0f;
+			m_audioControlValues[i] = m_controlValues[i];
 			if (def != nullptr) { lilv_node_free(def); }
 			if (min != nullptr) { lilv_node_free(min); }
 			if (max != nullptr) { lilv_node_free(max); }
-			lilv_instance_connect_port(m_instance, i, &m_controlValues[i]);
+			lilv_instance_connect_port(m_instance, i, &m_audioControlValues[i]);
 		}
 		else if (lilv_port_is_a(m_plugin, port, audioClass))
 		{
@@ -1739,7 +2045,7 @@ void Lv2HostProcess::sendPortInfo()
 			if (maxNode != nullptr) { lilv_node_free(maxNode); }
 		}
 
-		sendMessage(message(lv2host::IdPortInfo)
+		sendToHost(message(lv2host::IdPortInfo)
 			.addInt(static_cast<int>(i))
 			.addString(symbol != nullptr ? lilv_node_as_string(symbol) : "")
 			.addString(name != nullptr ? lilv_node_as_string(name.get()) : "")
@@ -1793,6 +2099,7 @@ int main(int argc, char** argv)
 	// Many LV2 UIs render from a second thread; Xlib must be thread safe
 	// before the first display connection is opened.
 	XInitThreads();
+	XSetErrorHandler(lv2HostXErrorHandler);
 #endif
 
 #ifdef LMMS_BUILD_LINUX

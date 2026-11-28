@@ -370,6 +370,14 @@ Wayland; only a genuine in-process Qt widget may be embedded.
       and LV2 editors (size, fractional scale, focus, close/reopen, editor
       crash isolation). The shared window behavior itself is covered by
       `X11EditorWindowTest`.
+- [x] LV2 host threading: `lmms-lv2-host` runs DSP on a dedicated audio
+      thread, the suil UI and X11 event loop on a separate UI thread, and the
+      main thread only pumps the host socket. A slow editor such as Pianoteq
+      can no longer delay `lilv_instance_run()` or the next block. Control
+      values and MIDI are copied at block boundaries; state save/restore is
+      serialised against the audio thread.
+      Measured with the ZynAddSubFX and Pianoteq LV2 UIs: block time stayed at
+      about 1.0–1.2 ms with the editor open.
 
 ### Stage 6 — Vestige compatibility
 
